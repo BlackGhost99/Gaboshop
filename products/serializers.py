@@ -1,0 +1,82 @@
+from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
+from .models import ProductCategory, Product
+
+class ProductCategorySerializer(serializers.ModelSerializer):
+    product_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = ProductCategory
+        fields = ['id', 'name', 'description', 'order', 'product_count']
+
+class ProductSerializer(serializers.ModelSerializer):
+    """Serializer de base pour les produits"""
+    store_name = serializers.CharField(source='store.name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    has_discount = serializers.BooleanField(read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'description', 'store', 'store_name', 
+            'category', 'category_name', 'price', 'compare_price',
+            'has_discount', 'discount_percentage', 'stock', 
+            'sku', 'barcode', 'is_available', 'is_featured',
+            'image', 'image_2', 'image_3', 'created_at'
+        ]
+        read_only_fields = ['store', 'created_at']
+
+class ProductDetailSerializer(serializers.ModelSerializer):
+    """Serializer détaillé pour un produit"""
+    store_name = serializers.CharField(source='store.name', read_only=True)
+    store_zone = serializers.CharField(source='store.zone', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    has_discount = serializers.BooleanField(read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'description', 'store', 'store_name', 'store_zone',
+            'category', 'category_name', 'price', 'compare_price',
+            'has_discount', 'discount_percentage', 'stock', 
+            'sku', 'barcode', 'is_available', 'is_featured',
+            'image', 'image_2', 'image_3', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['store', 'created_at', 'updated_at']
+
+class ProductCreateSerializer(serializers.ModelSerializer):
+    """Serializer pour la création de produit"""
+    class Meta:
+        model = Product
+        fields = [
+            'name', 'description', 'category', 'price', 'compare_price',
+            'stock', 'sku', 'barcode', 'is_featured', 'image',
+            'image_2', 'image_3'
+        ]
+    
+    def validate(self, attrs):
+        request = self.context.get('request')
+        
+        if request and hasattr(request, 'user'):
+            # Dans le contexte d'une vue, le store sera défini par la vue
+            pass
+        
+        # Validation du prix
+        if attrs.get('compare_price') and attrs['price'] >= attrs['compare_price']:
+            raise serializers.ValidationError({
+                'compare_price': _('Le prix de comparaison doit être supérieur au prix actuel.')
+            })
+        
+        return attrs
+
+class ProductUpdateSerializer(serializers.ModelSerializer):
+    """Serializer pour la mise à jour de produit"""
+    class Meta:
+        model = Product
+        fields = [
+            'name', 'description', 'category', 'price', 'compare_price',
+            'stock', 'sku', 'barcode', 'is_available', 'is_featured',
+            'image', 'image_2', 'image_3'
+        ]

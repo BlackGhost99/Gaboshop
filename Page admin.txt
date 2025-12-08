@@ -1,0 +1,39 @@
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+MENU            GABOSHOP(qui doit renvoyer au Dashboard)                                                     RECHERCHE                                                           DECONNEXION 
+(dans le menu 	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+déroulant ...
+		
+* Catégorie "magasins"										Vos courses en toute simplicité
+* Gestion des Clients
+* gestion des Livreurs
+* Gestion des Commandes		
+* Gestion des utilisateurs
+* Gestion des Magasins
+)
+  	        						*****************************************************************************************************************************
+								* ----------------------		
+								* *Nombre de clients	*	Transactions effectuées		Livreurs Disponible 		Magasins Associés	
+	MAGASINS						* * inscrits            *			
+								* *---------------------*
+	PRODUITS (par magasin)					*
+								*
+	TRANSACTION						*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*
+								*									*		MAGASIN EN VEDETTE
+								*									*			*
+								*									*			*
+								*									*	(liste les 3 magasins les plus sollicités)
+								*									*	
