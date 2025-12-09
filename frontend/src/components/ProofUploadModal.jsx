@@ -96,6 +96,9 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
       console.log('PIN vérifié! Mise à jour de pinVerified à true');
       setPinVerified(true);
       setErrors(prev => ({ ...prev, pin: null }));
+      
+      // Afficher un message de succès avec feedback visuel
+      console.log('✓ Code PIN accepté - Vous pouvez maintenant soumettre la preuve');
     } else {
       console.log('PIN incorrect:', response.error);
       setErrors(prev => ({ ...prev, pin: response.error || 'PIN incorrect' }));
@@ -365,58 +368,72 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   🔢 Code PIN du client (4-6 chiffres) <span className="text-red-600">*</span>
                 </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    maxLength="6"
-                    pattern="[0-9]*"
-                    inputMode="numeric"
-                    value={pinCode}
-                    onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
-                    disabled={pinVerified}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                    placeholder="0000"
-                  />
-                  {!pinVerified ? (
-                    <button
-                      onClick={handleVerifyPIN}
-                      disabled={loading || pinCode.length < 4}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? 'Vérification...' : 'Vérifier'}
-                    </button>
-                  ) : (
-                    <div className="px-4 py-2 bg-green-100 text-green-700 rounded-md font-semibold">
-                      ✓ Vérifié
+                <div className={`p-4 rounded-lg border-2 transition ${
+                  pinVerified 
+                    ? 'bg-green-50 border-green-300' 
+                    : 'bg-white border-gray-300'
+                }`}>
+                  <div className="flex space-x-2 mb-3">
+                    <input
+                      type="text"
+                      maxLength="6"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      value={pinCode}
+                      onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
+                      disabled={pinVerified}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                      placeholder="0000"
+                    />
+                    {!pinVerified ? (
+                      <button
+                        onClick={handleVerifyPIN}
+                        disabled={loading || pinCode.length < 4}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition"
+                      >
+                        {loading ? 'Vérification...' : 'Vérifier'}
+                      </button>
+                    ) : (
+                      <div className="px-4 py-2 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center min-w-max">
+                        ✓ Vérifié
+                      </div>
+                    )}
+                  </div>
+                  
+                  {errors.pin && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-700 font-medium">{errors.pin}</p>
+                      <p className="text-xs text-red-600 mt-1">Veuillez vérifier le code et réessayer</p>
+                    </div>
+                  )}
+                  
+                  {pinVerified && (
+                    <div className="p-3 bg-green-100 border border-green-300 rounded-md">
+                      <p className="text-sm text-green-700 font-semibold">✓ Code PIN vérifié avec succès</p>
+                      <p className="text-xs text-green-600 mt-1">Vous pouvez maintenant confirmer la livraison</p>
                     </div>
                   )}
                 </div>
-                {errors.pin && (
-                  <p className="mt-1 text-sm text-red-600">{errors.pin}</p>
-                )}
-                {pinVerified && (
-                  <p className="mt-1 text-sm text-green-600">✓ Code PIN vérifié avec succès</p>
-                )}
               </div>
             )}
 
             <div className="flex justify-between space-x-3">
               <button
                 onClick={() => setStep(1)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium transition"
               >
                 ← Retour
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading || (verificationMethod === 'signature' && !signature) || (verificationMethod === 'pin' && !pinVerified)}
-                className={`px-6 py-2 rounded-md font-semibold transition ${
+                className={`px-8 py-3 rounded-md font-bold text-base transition transform ${
                   loading || (verificationMethod === 'signature' && !signature) || (verificationMethod === 'pin' && !pinVerified)
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
-                    : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                    : 'bg-green-600 text-white hover:bg-green-700 active:scale-95 shadow-lg hover:shadow-xl'
                 }`}
               >
-                {loading ? 'Upload en cours...' : '✓ Confirmer la livraison'}
+                {loading ? '⏳ Upload en cours...' : '✓ Confirmer la livraison'}
               </button>
             </div>
           </div>
