@@ -37,6 +37,17 @@ class Order(models.Model):
 	status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='created')
 	delivery_type = models.CharField(max_length=20, choices=DELIVERY_TYPE_CHOICES, default='standard')
 	notes = models.TextField(blank=True, help_text="Instructions spéciales du client")
+
+	# B2B Fields
+	is_b2b = models.BooleanField(default=False, help_text="Commande entre professionnels (Store à Store)")
+	source_store = models.ForeignKey(
+		Store, 
+		on_delete=models.SET_NULL, 
+		null=True, 
+		blank=True, 
+		related_name='placed_orders',
+		help_text="Magasin qui a passé la commande (si B2B)"
+	)
     
 	# Montants
 	items_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Sous-total produits")

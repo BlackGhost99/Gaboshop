@@ -79,6 +79,19 @@ class Store(models.Model):
 	# Statut et métadonnées
 	is_active = models.BooleanField(default=True)
 	is_verified = models.BooleanField(default=False)
+	
+	STORE_TYPE_CHOICES = (
+		('retail', 'Détail (B2C)'),
+		('wholesaler', 'Grossiste (B2B)'),
+		('industry', 'Industrie (B2B)'),
+	)
+	store_type = models.CharField(
+		max_length=20,
+		choices=STORE_TYPE_CHOICES,
+		default='retail',
+		help_text="Type de magasin: Détail (pour clients), Grossiste/Industrie (pour gérants)"
+	)
+
 	subscription_plan = models.CharField(
 		max_length=20,
 		choices=[('starter', 'Starter'), ('pro', 'Pro'), ('business', 'Business')],
@@ -130,3 +143,64 @@ class Store(models.Model):
 			created_at__date=today,
 			status__in=['confirmed', 'preparing', 'ready', 'assigned', 'in_transit', 'delivered']
 		).aggregate(total=Sum('total_amount'))['total'] or 0
+	
+	def get_active_subscription(self):
+		"""
+		Récupère l'abonnement ACTIF du magasin
+		Utilisé par le système de forfaits temps réel
+		"""
+		from django.utils import timezone
+		from payments.models import StoreSubscription
+		
+		try:
+			return StoreSubscription.objects.filter(
+				store=self,
+				status='active',
+				end_date__gte=timezone.now().date()
+			).latest('end_date')
+		except StoreSubscription.DoesNotExist:
+			return None
+	
+	def get_current_plan(self):
+		"""
+		Récupère le plan ACTUEL du magasin
+		Retourne le plan d'abonnement ou None
+		"""
+		from payments.models import SubscriptionPlan
+		
+		subscription = self.get_active_subscription()
+		
+		if subscription and subscription.plan:
+			return subscription.plan
+		
+		# Plan par défaut: Starter
+		try:
+			return SubscriptionPlan.objects.get(plan_type='starter')
+		except SubscriptionPlan.DoesNotExist:
+			return None
+	
+	def is_subscription_active(self):
+		"""Vérifie si le magasin a un forfait ACTIF"""
+		return self.get_active_subscription() is not None
+	
+	def can_add_product(self):
+		"""Vérifie si le magasin peut ajouter un produit selon son forfait"""
+		plan = self.get_current_plan()
+		if not plan or plan.max_products is None:
+			return True
+		return self.products.count() < plan.max_products
+	
+	def can_access_statistics(self):
+		"""Vérifie si le magasin peut accéder aux statistiques"""
+		plan = self.get_current_plan()
+		return plan and plan.has_statistics
+	
+	def can_customize_store(self):
+		"""Vérifie si le magasin peut personnaliser sa boutique"""
+		plan = self.get_current_plan()
+		return plan and plan.has_custom_page
+	
+	def can_sponsor_products(self):
+		"""Vérifie si le magasin peut sponsoriser des produits"""
+		plan = self.get_current_plan()
+		return plan and plan.can_sponsor_products

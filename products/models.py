@@ -99,3 +99,47 @@ class Product(models.Model):
 		if self.has_discount:
 			return int(((self.compare_price - self.price) / self.compare_price) * 100)
 		return 0
+
+
+class ProductVariant(models.Model):
+	"""
+	Variant d'un produit (taille, couleur, etc.)
+	"""
+	product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+	name = models.CharField(max_length=200, help_text="Nom de la variante, ex: Rouge / XL")
+	sku = models.CharField(max_length=120, blank=True, help_text="SKU optionnel pour la variante")
+	price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Prix spécifique (si null = produit.price)")
+	stock = models.IntegerField(default=0)
+	attributes = models.JSONField(default=dict, blank=True, help_text="Attributs libres ex: {'color': 'red', 'size': 'L'}")
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = "Variante Produit"
+		verbose_name_plural = "Variantes Produits"
+		ordering = ['-created_at']
+
+	def __str__(self):
+		return f"{self.product.name} - {self.name}"
+
+	def get_price(self):
+		return self.price if self.price is not None else self.product.price
+
+
+class ProductImage(models.Model):
+	"""
+	Images additionnelles liées à un produit. Utiliser pour galerie et upload multi-images.
+	"""
+	product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+	image = models.ImageField(upload_to='products/gallery/')
+	alt_text = models.CharField(max_length=200, blank=True)
+	order = models.PositiveIntegerField(default=0)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = "Image Produit"
+		verbose_name_plural = "Images Produits"
+		ordering = ['order', '-created_at']
+
+	def __str__(self):
+		return f"Image {self.id} - {self.product.name}"

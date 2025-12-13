@@ -116,6 +116,14 @@ class RegisterSerializer(serializers.ModelSerializer):
                 })
             if not attrs.get('vehicle_type'):
                 attrs['vehicle_type'] = 'moto'
+
+        # Optional email uniqueness check: avoid multiple accounts with same email
+        email = attrs.get('email', '').strip() if attrs.get('email') else ''
+        if email:
+            if User.objects.filter(email__iexact=email).exists():
+                raise serializers.ValidationError({
+                    'email': _('Un compte utilisant cet email existe déjà.')
+                })
         
         return attrs
     

@@ -1,6 +1,25 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from .models import ProductCategory, Product
+from .models import ProductVariant, ProductImage
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+
+    class Meta:
+        model = ProductVariant
+        fields = ['id', 'name', 'sku', 'price', 'stock', 'attributes', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.CharField(source='image.url', read_only=True)
+
+    class Meta:
+        model = ProductImage
+        fields = ['id', 'image', 'image_url', 'alt_text', 'order']
+        read_only_fields = ['id', 'image_url']
 
 class ProductCategorySerializer(serializers.ModelSerializer):
     product_count = serializers.IntegerField(read_only=True)
@@ -42,9 +61,13 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
-            'image', 'image_2', 'image_3', 'created_at', 'updated_at'
+            'image', 'image_2', 'image_3', 'created_at', 'updated_at',
+            'variants', 'images'
         ]
         read_only_fields = ['store', 'created_at', 'updated_at']
+
+    variants = ProductVariantSerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
 
 class ProductCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de produit"""

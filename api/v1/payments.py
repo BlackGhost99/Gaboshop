@@ -277,8 +277,128 @@ class PaymentDetailView(APIView):
                     'message': 'Paiement non trouvé.'
                 }
             }, status=status.HTTP_404_NOT_FOUND)
-"""API v1: payments endpoints (stubs)."""
 
-from rest_framework import viewsets
 
-# Add payments viewsets/serializers here when ready.
+# ============================================================================
+# FORFAIT / SUBSCRIPTION MANAGEMENT VIEWS
+# ============================================================================
+
+from payments.models import Forfait, ClientForfait, Payout
+from payments.serializers import ForfaitSerializer, ClientForfaitSerializer, PayoutSerializer
+
+
+class ForfaitListView(APIView):
+	"""List all available forfaits/plans"""
+	permission_classes = [permissions.AllowAny]
+	
+	def get(self, request):
+		forfaits = Forfait.objects.filter(is_active=True)
+		serializer = ForfaitSerializer(forfaits, many=True)
+		return Response({
+			'success': True,
+			'data': serializer.data
+		})
+
+
+class ClientForfaitListView(APIView):
+	"""Get user's current active forfait"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def get(self, request):
+		try:
+			client_forfait = ClientForfait.objects.get(user=request.user, status='active')
+			serializer = ClientForfaitSerializer(client_forfait)
+			return Response({
+				'success': True,
+				'data': serializer.data,
+				'is_active': client_forfait.is_active()
+			})
+		except ClientForfait.DoesNotExist:
+			return Response({
+				'success': True,
+				'data': None,
+				'is_active': False,
+				'message': 'Aucun forfait actif'
+			})
+
+
+class ClientForfaitUpdateView(APIView):
+	"""Update/change user's forfait"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def patch(self, request):
+		try:
+			forfait_id = request.data.get('forfait_id')
+			if not forfait_id:
+				return Response({
+					'success': False,
+					'error': 'forfait_id is required'
+				}, status=status.HTTP_400_BAD_REQUEST)
+			
+			forfait = Forfait.objects.get(id=forfait_id, is_active=True)
+			
+			# Deactivate current forfait if exists
+			ClientForfait.objects.filter(
+				user=request.user,
+				status='active'
+			).update(status='cancelled')
+			
+			# Create new forfait subscription
+			from datetime import timedelta
+			client_forfait = ClientForfait.objects.create(
+				user=request.user,
+				forfait=forfait,
+				start_date=timezone.now().date(),
+				expiry_date=timezone.now().date() + timedelta(days=30),
+				status='active'
+			)
+			
+			serializer = ClientForfaitSerializer(client_forfait)
+			return Response({
+				'success': True,
+				'data': serializer.data,
+				'message': f'Forfait {forfait.name} activé avec succès'
+			}, status=status.HTTP_201_CREATED)
+		
+		except Forfait.DoesNotExist:
+			return Response({
+				'success': False,
+				'error': 'Forfait not found'
+			}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			return Response({
+				'success': False,
+				'error': str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PayoutListView(APIView):
+	"""Get payouts for delivery agents and merchants"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def get(self, request):
+		try:
+			# Only users can see their own payouts
+			payouts = Payout.objects.filter(user=request.user).order_by('-created_at')
+			
+			# Optional filters
+			payout_type = request.query_params.get('type')
+			status_filter = request.query_params.get('status')
+			
+			if payout_type:
+				payouts = payouts.filter(payout_type=payout_type)
+			if status_filter:
+				payouts = payouts.filter(status=status_filter)
+			
+			serializer = PayoutSerializer(payouts, many=True)
+			return Response({
+				'success': True,
+				'count': payouts.count(),
+				'data': serializer.data
+			})
+		
+		except Exception as e:
+			return Response({
+				'success': False,
+				'error': str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

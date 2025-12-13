@@ -1,16 +1,14 @@
 """
-WSGI config for gaboshop project.
-
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
+Proxy WSGI module that re-exports application from top-level wsgi.py
 """
+import importlib.util
+from pathlib import Path
 
-import os
+_ROOT = Path(__file__).resolve().parent.parent
+_source = _ROOT / 'wsgi.py'
 
-from django.core.wsgi import get_wsgi_application
+spec = importlib.util.spec_from_file_location('top_wsgi', str(_source))
+_top = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(_top)
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gaboshop.settings')
-
-application = get_wsgi_application()
+application = getattr(_top, 'application')

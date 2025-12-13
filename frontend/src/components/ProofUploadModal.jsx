@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { uploadProof, verifyPIN } from '../services/deliveryService';
+import { uploadProof, verifyPIN, completeDelivery } from '../services/deliveryService';
 
 /**
  * Modal pour uploader la preuve de livraison
@@ -159,13 +159,33 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
     formData.append('client_received_status', true);
 
     setLoading(true);
-    const response = await uploadProof(delivery.id, formData);
-    setLoading(false);
 
-    if (response.success) {
-      onSuccess();
-    } else {
-      setErrors(response.validation_errors || { general: response.error });
+    try {
+      // 1) Uploader la preuve (PIN déjà vérifié côté frontend)
+      const proofResponse = await uploadProof(delivery.id, formData);
+      if (!proofResponse.success) {
+        setLoading(false);
+        const errorMsg = proofResponse.error?.message || proofResponse.error || 'Erreur lors de l\'upload de la preuve';
+        setErrors(proofResponse.validation_errors || { general: `❌ Upload échoué: ${errorMsg}` });
+        return;
+      }
+
+      // 2) Marquer la livraison comme terminée côté backend
+      const completeResponse = await completeDelivery(delivery.id);
+      setLoading(false);
+
+      if (completeResponse.success) {
+        onSuccess();
+      } else {
+        const errorMsg = completeResponse.error?.message || completeResponse.error || 'Erreur lors de la confirmation';
+        const detailMsg = completeResponse.error?.details ? 
+          ` (${Object.values(completeResponse.error.details).join(', ')})` : '';
+        setErrors({ general: `❌ Confirmation échouée: ${errorMsg}${detailMsg}` });
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Erreur lors du traitement de la preuve:', error);
+      setErrors({ general: `❌ Erreur système: ${error.message || 'Une erreur inattendue s\'est produite'}` });
     }
   };
 

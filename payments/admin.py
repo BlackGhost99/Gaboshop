@@ -3,7 +3,8 @@ from django.utils.html import format_html
 from .models import (
 	Payment, Commission, Reversement,
 	PaymentIntent, PaymentTransaction,
-	SubscriptionPlan, StoreSubscription
+	SubscriptionPlan, StoreSubscription,
+	Forfait, ClientForfait, Payout, PaymentCallbackLog
 )
 
 @admin.register(Payment)
@@ -368,7 +369,7 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 	)
 	list_filter = ('status', 'auto_renew', 'start_date')
 	search_fields = ('store__name', 'plan__name', 'plan_name')
-	readonly_fields = ('created_at', 'updated_at')
+	readonly_fields = ('created_at', 'updated_at', 'start_date')
 	raw_id_fields = ('store', 'plan')
 	
 	fieldsets = (
@@ -427,4 +428,288 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 			return format_html('<span style="color: green;">✓ Oui</span>')
 		return format_html('<span style="color: gray;">✗ Non</span>')
 	auto_renew_display.short_description = 'Auto-renouvellement'
+
+
+# ============================================================================
+# ADMIN FOR FORFAIT/SUBSCRIPTION MANAGEMENT SYSTEM
+# ============================================================================
+
+@admin.register(Forfait)
+class ForfaitAdmin(admin.ModelAdmin):
+	"""Admin for forfait/subscription plans"""
+	list_display = (
+		'name',
+		'price_display',
+		'max_priority_orders_display',
+		'discount_rate_display',
+		'is_active'
+	)
+	list_filter = ('is_active', 'created_at')
+	search_fields = ('name', 'description')
+	readonly_fields = ('created_at', 'updated_at')
+	
+	fieldsets = (
+		('Informations de base', {
+			'fields': ('name', 'description', 'is_active')
+		}),
+		('Tarification et Limites', {
+			'fields': ('monthly_price', 'max_priority_orders', 'discount_rate')
+		}),
+		('Métadonnées', {
+			'fields': ('created_at', 'updated_at'),
+			'classes': ('collapse',)
+		}),
+	)
+	
+	def price_display(self, obj):
+		return format_html('<strong>{:,.0f} FCFA/mois</strong>', obj.monthly_price)
+	price_display.short_description = 'Prix mensuel'
+	
+	def max_priority_orders_display(self, obj):
+		if obj.max_priority_orders is None:
+			return format_html('<span style="color: blue;">∞ Illimité</span>')
+		return f"{obj.max_priority_orders} commandes"
+	max_priority_orders_display.short_description = 'Commandes prioritaires'
+	
+	def discount_rate_display(self, obj):
+		return f"{obj.discount_rate}%"
+	discount_rate_display.short_description = 'Réduction'
+
+
+@admin.register(ClientForfait)
+class ClientForfaitAdmin(admin.ModelAdmin):
+	"""Admin for client forfait subscriptions"""
+	list_display = (
+		'user_display',
+		'forfait_display',
+		'status_display',
+		'start_date',
+		'expiration_date_display',
+		'is_active_display'
+	)
+	list_filter = ('status', 'forfait', 'start_date', 'auto_renew')
+	search_fields = ('user__username', 'user__email', 'forfait__name')
+	readonly_fields = ('created_at', 'updated_at', 'start_date')
+	raw_id_fields = ('user', 'forfait')
+	date_hierarchy = 'start_date'
+	
+	fieldsets = (
+		('Client et Forfait', {
+			'fields': ('user', 'forfait')
+		}),
+		('Dates', {
+			'fields': ('start_date', 'expiration_date', 'status', 'auto_renew')
+		}),
+		('Métadonnées', {
+			'fields': ('created_at', 'updated_at'),
+			'classes': ('collapse',)
+		}),
+	)
+	
+	def user_display(self, obj):
+		return format_html(
+			'<a href="/admin/users/user/{}/change/">{} ({})</a>',
+			obj.user.id,
+			obj.user.get_full_name() or obj.user.username,
+			obj.user.email
+		)
+	user_display.short_description = 'Client'
+	
+	def forfait_display(self, obj):
+		if not obj.forfait:
+			return '-'
+		return format_html(
+			'<strong>{}</strong><br/><small>{:,.0f} FCFA/mois</small>',
+			obj.forfait.name,
+			obj.forfait.monthly_price
+		)
+	forfait_display.short_description = 'Forfait'
+	
+	def status_display(self, obj):
+		colors = {
+			'active': 'green',
+			'expired': 'red',
+			'cancelled': 'gray',
+			'suspended': 'orange'
+		}
+		color = colors.get(obj.status, 'black')
+		return format_html(
+			'<span style="color: {}; font-weight: bold;">{}</span>',
+			color,
+			obj.get_status_display()
+		)
+	status_display.short_description = 'Statut'
+	
+	def expiration_date_display(self, obj):
+		from django.utils import timezone
+		if obj.expiration_date < timezone.now():
+			return format_html('<span style="color: red; font-weight: bold;">🔴 {}</span>', obj.expiration_date.date())
+		elif (obj.expiration_date - timezone.now()).days <= 7:
+			return format_html('<span style="color: orange; font-weight: bold;">🟠 {} (7j)</span>', obj.expiration_date.date())
+		return format_html('<span style="color: green;">🟢 {}</span>', obj.expiration_date.date())
+	expiration_date_display.short_description = 'Expiration'
+	
+	def is_active_display(self, obj):
+		if obj.is_active():
+			return format_html('<span style="color: green; font-weight: bold;">✓ Actif</span>')
+		return format_html('<span style="color: red; font-weight: bold;">✗ Inactif</span>')
+	is_active_display.short_description = 'Actif?'
+
+
+@admin.register(PaymentCallbackLog)
+class PaymentCallbackLogAdmin(admin.ModelAdmin):
+	"""Admin for payment callback audit trail"""
+	list_display = (
+		'id_display',
+		'order_display',
+		'status_badge',
+		'signature_badge',
+		'received_at_display'
+	)
+	list_filter = ('signature_valid', 'processed', 'received_at')
+	search_fields = ('id', 'order__order_number')
+	readonly_fields = ('raw_data', 'received_at')
+	date_hierarchy = 'received_at'
+	
+	fieldsets = (
+		('Informations Webhook', {
+			'fields': ('order', 'status_code', 'received_at')
+		}),
+		('Signature et Traitement', {
+			'fields': ('signature_valid', 'processed')
+		}),
+		('Données Brutes', {
+			'fields': ('raw_data',),
+			'classes': ('collapse',)
+		}),
+	)
+	
+	def id_display(self, obj):
+		return format_html('<code>#{}</code>', obj.id)
+	id_display.short_description = 'ID'
+	
+	def order_display(self, obj):
+		if obj.order:
+			return format_html(
+				'<a href="/admin/orders/order/{}/change/">Commande #{}</a>',
+				obj.order.id,
+				obj.order.order_number
+			)
+		return '-'
+	order_display.short_description = 'Commande'
+	
+	def status_badge(self, obj):
+		colors = {
+			200: 'green',
+			400: 'orange',
+			500: 'red'
+		}
+		color = colors.get(obj.status_code, 'gray')
+		return format_html(
+			'<span style="background-color: {}; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;">{}</span>',
+			color,
+			obj.status_code
+		)
+	status_badge.short_description = 'HTTP Code'
+	
+	def signature_badge(self, obj):
+		if obj.signature_valid:
+			return format_html('<span style="color: green; font-weight: bold;">✓ Valide</span>')
+		return format_html('<span style="color: red; font-weight: bold;">✗ Invalide</span>')
+	signature_badge.short_description = 'Signature'
+	
+	def received_at_display(self, obj):
+		return obj.received_at.strftime('%Y-%m-%d %H:%M:%S')
+	received_at_display.short_description = 'Reçu le'
+
+
+@admin.register(Payout)
+class PayoutAdmin(admin.ModelAdmin):
+	"""Admin for payouts to delivery agents and merchants"""
+	list_display = (
+		'id_display',
+		'user_display',
+		'payout_type_display',
+		'amount_display',
+		'status_display',
+		'created_at',
+	)
+	list_filter = ('payout_type', 'status', 'created_at')
+	search_fields = ('user__username', 'user__email', 'flutterwave_payout_id')
+	readonly_fields = ('flutterwave_payout_id', 'created_at', 'updated_at', 'paid_at')
+	raw_id_fields = ('user', 'order')
+	date_hierarchy = 'created_at'
+	
+	fieldsets = (
+		('Bénéficiaire et Commande', {
+			'fields': ('user', 'order', 'payout_type')
+		}),
+		('Montant et Statut', {
+			'fields': ('amount', 'status')
+		}),
+		('Raison et Détails', {
+			'fields': ('reason',)
+		}),
+		('Flutterwave', {
+			'fields': ('flutterwave_payout_id',),
+			'classes': ('collapse',)
+		}),
+		('Métadonnées', {
+			'fields': ('created_at', 'updated_at', 'paid_at'),
+			'classes': ('collapse',)
+		}),
+	)
+	
+	def id_display(self, obj):
+		return format_html('<code>#{}</code>', obj.id)
+	id_display.short_description = 'ID'
+	
+	def user_display(self, obj):
+		user_type = 'Livreur' if obj.payout_type == 'delivery' else 'Commerçant'
+		return format_html(
+			'<a href="/admin/users/user/{}/change/"><strong>{}</strong></a><br/><small>{} ({})</small>',
+			obj.user.id,
+			obj.user.get_full_name() or obj.user.username,
+			user_type,
+			obj.user.email
+		)
+	user_display.short_description = 'Bénéficiaire'
+	
+	def payout_type_display(self, obj):
+		icons = {
+			'delivery': '🚚 Livreur',
+			'merchant': '🏪 Commerçant',
+			'refund': '↩️ Remboursement'
+		}
+		return icons.get(obj.payout_type, obj.get_payout_type_display())
+	payout_type_display.short_description = 'Type'
+	
+	def amount_display(self, obj):
+		return format_html('<strong style="color: green;">{:,.0f} FCFA</strong>', obj.amount)
+	amount_display.short_description = 'Montant'
+	
+	def status_display(self, obj):
+		colors = {
+			'pending': 'orange',
+			'processing': 'blue',
+			'paid': 'green',
+			'failed': 'red',
+			'cancelled': 'gray'
+		}
+		color = colors.get(obj.status, 'black')
+		icons = {
+			'pending': '⏳',
+			'processing': '⚙️',
+			'paid': '✅',
+			'failed': '❌',
+			'cancelled': '⊘'
+		}
+		icon = icons.get(obj.status, '')
+		return format_html(
+			'<span style="color: {}; font-weight: bold;">{} {}</span>',
+			color,
+			icon,
+			obj.get_status_display()
+		)
+	status_display.short_description = 'Statut'
 

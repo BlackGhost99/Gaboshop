@@ -3,6 +3,26 @@ Validateurs pour les transitions de statut et les règles métier
 """
 from decimal import Decimal
 from math import radians, cos, sin, asin, sqrt
+from django.utils import timezone
+from datetime import datetime
+from .exceptions import BusinessValidationError
+
+
+def validate_not_null(value, name: str = 'value'):
+    """Lève BusinessValidationError si value est None"""
+    if value is None:
+        raise BusinessValidationError(f"{name} ne peut pas être null")
+
+
+def ensure_timezone_aware(dt):
+    """Retourne un datetime timezone-aware; si dt est naive, on le rend aware avec le timezone courant."""
+    if dt is None:
+        return None
+    if not isinstance(dt, datetime):
+        return dt
+    if timezone.is_naive(dt):
+        return timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
 
 # Transitions valides pour les commandes
 ORDER_STATUS_TRANSITIONS = {
@@ -25,7 +45,7 @@ DELIVERY_STATUS_TRANSITIONS = {
     'waiting': ['pending', 'cancelled'],
     'pending': ['assigned', 'accepted', 'rejected'],  # 'accepted' pour compatibilité avec les données existantes
     'assigned': ['accepted', 'rejected'],
-    'accepted': ['picked_up', 'rejected'],
+    'accepted': ['picked_up', 'delivered', 'rejected'],  # Peut aller directement à delivered si preuve disponible
     'picked_up': ['in_transit'],
     'in_transit': ['delivered', 'failed'],
     'delivered': [],  # État final
@@ -298,8 +318,8 @@ def can_mark_as_delivered(delivery):
 	Returns:
 		tuple: (can_deliver, reason)
 	"""
-	# 1. Statut doit être 'in_transit' ou 'picked_up'
-	if delivery.status not in ['in_transit', 'picked_up']:
+	# 1. Statut doit être 'in_transit' ou 'picked_up' ou 'accepted' (si preuve disponible)
+	if delivery.status not in ['in_transit', 'picked_up', 'accepted']:
 		return False, f"La livraison doit être en transit. Statut actuel: {delivery.get_status_display()}"
 	
 	# 2. Doit avoir un livreur assigné

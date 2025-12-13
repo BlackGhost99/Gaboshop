@@ -7,6 +7,10 @@ from .models import (
     PaymentIntent,
     PaymentTransaction,
     SubscriptionPlan,
+    Forfait,
+    ClientForfait,
+    Payout,
+    PaymentCallbackLog,
 )
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -174,3 +178,89 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
 
     def get_features(self, obj):
         return obj.get_features_list()
+
+
+# ===============================================================================
+# SERIALIZERS FORFAITS CLIENTS
+# ===============================================================================
+
+class ForfaitSerializer(serializers.ModelSerializer):
+    """Serializer pour les forfaits clients"""
+    
+    class Meta:
+        model = Forfait
+        fields = [
+            'id', 'name', 'description', 'monthly_price', 'max_priority_orders',
+            'discount_rate', 'can_schedule_delivery', 'can_track_realtime',
+            'can_contact_driver', 'priority_support', 'is_active'
+        ]
+        read_only_fields = ['id']
+
+
+class ClientForfaitSerializer(serializers.ModelSerializer):
+    """Serializer pour les forfaits des clients"""
+    forfait_details = ForfaitSerializer(source='forfait', read_only=True)
+    is_active_bool = serializers.SerializerMethodField()
+    days_until_expiry = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ClientForfait
+        fields = [
+            'id', 'user', 'forfait', 'forfait_details', 'start_date',
+            'expiration_date', 'status', 'auto_renew', 'is_active_bool',
+            'days_until_expiry', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+    
+    def get_is_active_bool(self, obj):
+        return obj.is_active()
+    
+    def get_days_until_expiry(self, obj):
+        from django.utils import timezone
+        delta = (obj.expiration_date.date() - timezone.now().date()).days
+        return max(0, delta)
+
+
+# ===============================================================================
+# SERIALIZERS PAYOUTS
+# ===============================================================================
+
+class PayoutSerializer(serializers.ModelSerializer):
+    """Serializer pour les payouts (paiements automatiques)"""
+    user_phone = serializers.CharField(source='user.phone', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    payout_type_display = serializers.CharField(source='get_payout_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    amount_display = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Payout
+        fields = [
+            'id', 'user', 'user_phone', 'user_name', 'order', 'payout_type',
+            'payout_type_display', 'amount', 'amount_display', 'status',
+            'status_display', 'flutterwave_payout_id', 'reason', 'created_at',
+            'paid_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'user_phone', 'user_name', 'payout_type_display',
+            'status_display', 'created_at', 'paid_at', 'updated_at'
+        ]
+    
+    def get_amount_display(self, obj):
+        return f"{obj.amount} FCFA"
+
+
+# ===============================================================================
+# SERIALIZERS CALLBACK LOGS
+# ===============================================================================
+
+class PaymentCallbackLogSerializer(serializers.ModelSerializer):
+    """Serializer pour les logs de callbacks Flutterwave"""
+    
+    class Meta:
+        model = PaymentCallbackLog
+        fields = [
+            'id', 'received_at', 'order', 'status_code', 'raw_data',
+            'signature_valid', 'processed'
+        ]
+        read_only_fields = ['id', 'received_at']

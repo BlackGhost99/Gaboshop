@@ -3,6 +3,19 @@ Modèle pour l'audit trail des changements de statut
 """
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+
+class TimestampedModel(models.Model):
+	"""
+	Abstract base model fournissant des timestamps cohérents pour les autres modèles.
+	Utiliser comme classe mère pour garantir `created_at` et `updated_at` timezone-aware.
+	"""
+	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		abstract = True
 
 User = get_user_model()
 
@@ -108,13 +121,13 @@ class AuditLog(models.Model):
 		return AuditLog.objects.create(
 			action_type=action_type,
 			user=user,
-			user_role=user.user_type if user else 'anonymous',
+			user_role=(user.user_type if user else 'anonymous'),
 			object_type=object_type,
 			object_id=object_id,
 			old_value=old_value,
 			new_value=new_value,
 			ip_address=ip_address,
-			user_agent=user_agent,
-			reason=reason,
+			user_agent=(user_agent or ''),
+			reason=(reason or ''),
 			is_suspicious=is_suspicious,
 		)

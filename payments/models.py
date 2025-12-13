@@ -410,3 +410,165 @@ class ClientCredit(models.Model):
 	def __str__(self):
 		return f"{self.amount} FCFA - {self.client.phone}"
 
+
+# ===============================================================================
+# FORFAITS CLIENTS & ABONNEMENTS
+# ===============================================================================
+
+class Forfait(models.Model):
+	"""
+	Forfaits pour les clients (Basic, Premium, Express,...)
+	Chaque forfait peut influencer :
+	- les frais
+	- les limites
+	- les délais de livraison
+	- le type de services disponibles
+	"""
+	name = models.CharField(max_length=50, unique=True)
+	description = models.TextField(blank=True)
+	monthly_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+	
+	# Exemple : basic = 1 transaction prioritaire, premium = illimité
+	max_priority_orders = models.IntegerField(default=0, help_text="Nombre de commandes prioritaires par mois")
+
+	# Exemple : réduction sur les frais > premium
+	discount_rate = models.FloatField(default=0, help_text="Réduction en % sur les frais de livraison")
+	
+	# Fonctionnalités du forfait
+	can_schedule_delivery = models.BooleanField(default=False, help_text="Peut planifier une livraison")
+	can_track_realtime = models.BooleanField(default=False, help_text="Peut suivre en temps réel")
+	can_contact_driver = models.BooleanField(default=False, help_text="Peut contacter le livreur")
+	priority_support = models.BooleanField(default=False, help_text="Support prioritaire")
+	
+	# Métadonnées
+	is_active = models.BooleanField(default=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = "Forfait Client"
+		verbose_name_plural = "Forfaits Clients"
+		ordering = ['monthly_price']
+
+	def __str__(self):
+		return f"{self.name} ({self.monthly_price} FCFA/mois)"
+
+
+class ClientForfait(models.Model):
+	"""
+	Tableau de correspondance User (Client) → Forfait
+	Permet de savoir en temps réel quel forfait est appliqué au client.
+	"""
+	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_forfait')
+	forfait = models.ForeignKey(Forfait, on_delete=models.SET_NULL, null=True, blank=True, related_name='clients')
+	start_date = models.DateTimeField(auto_now_add=True)
+	expiration_date = models.DateTimeField(help_text="Date d'expiration du forfait")
+	status = models.CharField(
+		max_length=20,
+		choices=[
+			('active', 'Actif'),
+			('expired', 'Expiré'),
+			('suspended', 'Suspendu'),
+			('cancelled', 'Annulé'),
+		],
+		default='active'
+	)
+	auto_renew = models.BooleanField(default=True, help_text="Renouvellement automatique")
+	
+	# Métadonnées
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = "Forfait Client"
+		verbose_name_plural = "Forfaits Clients"
+		ordering = ['-expiration_date']
+
+	def __str__(self):
+		return f"{self.user.phone} - {self.forfait.name if self.forfait else 'Aucun forfait'}"
+	
+	def is_active(self):
+		"""Vérifie si le forfait est actif"""
+		from django.utils import timezone
+		return self.status == 'active' and self.expiration_date >= timezone.now()
+
+
+# ===============================================================================
+# CALLBACKS & LOGS FLUTTERWAVE
+# ===============================================================================
+
+class PaymentCallbackLog(models.Model):
+	"""
+	Sauvegarde chaque webhook reçu de Flutterwave (sécurité, audit).
+	"""
+	id = models.BigAutoField(primary_key=True)
+	received_at = models.DateTimeField(auto_now_add=True)
+	order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_logs')
+	status_code = models.IntegerField(default=200, help_text="Code de réponse HTTP")
+	raw_data = models.JSONField(help_text="Données brutes du webhook")
+	signature_valid = models.BooleanField(default=False, help_text="Signature Flutterwave validée")
+	processed = models.BooleanField(default=False, help_text="Webhook traité avec succès")
+
+	class Meta:
+		verbose_name = "Log Callback Flutterwave"
+		verbose_name_plural = "Logs Callbacks Flutterwave"
+		ordering = ['-received_at']
+
+	def __str__(self):
+		return f"Callback {self.id} - {self.received_at.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+# ===============================================================================
+# PAIEMENTS AUTOMATIQUES (Livreurs + Commerçants)
+# ===============================================================================
+
+class Payout(models.Model):
+	"""
+	Paiements automatiques aux livreurs et commerçants
+	Générés automatiquement après une livraison réussie
+	"""
+	TYPES = [
+		('delivery', 'Paiement Livreur'),
+		('merchant', 'Paiement Commerçant'),
+		('refund', 'Remboursement'),
+	]
+	
+	STATUSES = [
+		('pending', 'En attente'),
+		('processing', 'En traitement'),
+		('paid', 'Payé'),
+		('failed', 'Échec'),
+		('cancelled', 'Annulé'),
+	]
+
+	id = models.BigAutoField(primary_key=True)
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='general_payouts')
+	order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='general_payouts')
+	payout_type = models.CharField(max_length=20, choices=TYPES)
+	amount = models.DecimalField(max_digits=12, decimal_places=2, help_text="Montant en FCFA")
+	status = models.CharField(max_length=20, choices=STATUSES, default='pending')
+	
+	# Référence Flutterwave
+	flutterwave_payout_id = models.CharField(max_length=200, blank=True, null=True, unique=True)
+	
+	# Description et raison
+	reason = models.TextField(blank=True, help_text="Raison du paiement")
+	
+	# Métadonnées
+	created_at = models.DateTimeField(auto_now_add=True)
+	paid_at = models.DateTimeField(null=True, blank=True, help_text="Quand le paiement a été effectué")
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = "Paiement (Payout)"
+		verbose_name_plural = "Paiements (Payouts)"
+		ordering = ['-created_at']
+		indexes = [
+			models.Index(fields=['user', 'status']),
+			models.Index(fields=['payout_type', 'status']),
+		]
+
+	def __str__(self):
+		payout_type_display = dict(self.TYPES).get(self.payout_type, self.payout_type)
+		return f"{payout_type_display} - {self.user.phone} - {self.amount} FCFA ({self.status})"
+

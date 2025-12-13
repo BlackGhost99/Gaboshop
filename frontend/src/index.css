@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-lg border border-white/50 shadow-xl;
+  }
+}
+
+body {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  min-height: 100vh;
+}

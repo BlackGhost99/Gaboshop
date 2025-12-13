@@ -18,12 +18,15 @@ from .products import (
     ProductUpdateView, ProductDeleteView, StoreProductCategoryListView, 
     StoreProductCategoryCreateView, StoreManagerProductsView
 )
+from products.views import ProductViewSet
 from .orders import (
     OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
     ClientConfirmDeliveryView
 )
 from .payments import (
-    PaymentInitView, PaymentDetailView, PaymentWebhookView
+    PaymentInitView, PaymentDetailView, PaymentWebhookView,
+    ClientForfaitListView, ClientForfaitUpdateView, ForfaitListView,
+    PayoutListView
 )
 from .webhooks import WhatsAppWebhookView
 from .dashboards import (
@@ -37,6 +40,9 @@ from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
     DeliveryProofUploadView, DeliveryVerifyPINView
+)
+from .subscription import (
+    get_subscription_status, get_available_plans, check_permission, purchase_plan
 )
 from .admin import (
     AdminSummaryView, AdminUsersView, AdminOrdersView, AdminFinancialsView,
@@ -66,6 +72,7 @@ from .products_admin import (
 )
 
 router = DefaultRouter()
+router.register(r'products-api', ProductViewSet, basename='product')
 
 urlpatterns = [
     # Users / Auth
@@ -92,6 +99,12 @@ urlpatterns = [
     path('dashboard/delivery/<int:delivery_id>/upload-proof/', DeliveryProofUploadView.as_view(), name='delivery-proof-upload'),
     path('dashboard/delivery/<int:delivery_id>/verify-pin/', DeliveryVerifyPINView.as_view(), name='delivery-verify-pin'),
     path('dashboard/delivery/<int:delivery_id>/complete/', DeliveryCompleteView.as_view(), name='delivery-complete'),
+    
+    # Subscription / Forfaits (Dashboard)
+    path('dashboard/subscription/status/', get_subscription_status, name='subscription-status'),
+    path('dashboard/subscription/plans/', get_available_plans, name='subscription-plans'),
+    path('dashboard/subscription/check-permission/', check_permission, name='subscription-check-permission'),
+    path('dashboard/subscription/purchase/', purchase_plan, name='subscription-purchase'),
 
     # Admin (plateforme)
     path('admin/summary/', AdminSummaryView.as_view(), name='admin-summary'),
@@ -178,6 +191,14 @@ urlpatterns = [
     path('orders/<int:order_id>/payments/init/', PaymentInitView.as_view(), name='payment-init'),
     path('orders/<int:order_id>/payments/', PaymentDetailView.as_view(), name='payment-detail'),
     path('payments/webhook/', PaymentWebhookView.as_view(), name='payment-webhook'),
+    
+    # Forfaits Clients (Plans/Subscriptions)
+    path('forfaits/', ForfaitListView.as_view(), name='forfaits-list'),
+    path('my-forfait/', ClientForfaitListView.as_view(), name='my-forfait'),
+    path('my-forfait/update/', ClientForfaitUpdateView.as_view(), name='update-forfait'),
+    
+    # Payouts (Paiements automatiques aux livreurs et commerçants)
+    path('payouts/', PayoutListView.as_view(), name='payouts-list'),
 
     path('', include(router.urls)),
     # Webhooks

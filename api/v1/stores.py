@@ -37,6 +37,15 @@ class StoreListView(ListAPIView):
     
 	def get_queryset(self):
 		queryset = Store.objects.filter(is_active=True)
+		
+		# B2B Visibility Logic
+		user = self.request.user
+		if user.is_authenticated and hasattr(user, 'user_type') and user.user_type == 'store_manager':
+			# Gérants: Voient Grossistes et Industries (pour s'approvisionner)
+			queryset = queryset.filter(store_type__in=['wholesaler', 'industry'])
+		else:
+			# Clients (et autres): Voient uniquement le Détail
+			queryset = queryset.filter(store_type='retail')
         
 		# Filtrer par ville si spécifiée
 		city = self.request.query_params.get('city')

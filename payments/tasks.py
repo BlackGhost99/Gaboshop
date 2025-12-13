@@ -194,3 +194,166 @@ def generer_rapport_financier_quotidien():
     except Exception as e:
         logger.error(f"❌ Erreur génération rapport: {e}")
         return {"erreur": str(e)}
+
+
+# ===============================================================================
+# TÂCHES DE GESTION DES ABONNEMENTS (FORFAITS TEMPS RÉEL)
+# ===============================================================================
+
+@shared_task(bind=True, max_retries=3)
+def check_expired_subscriptions(self):
+    """
+    ⏰ Vérifier et marquer les forfaits expirés
+    Exécutée quotidiennement à minuit
+    
+    - Marque les abonnements expirés
+    - Envoie des notifications
+    - Bloque les fonctionnalités premium
+    """
+    try:
+        from payments.models import StoreSubscription
+        
+        now = timezone.now().date()
+        
+        # Chercher tous les abonnements ACTIFS mais EXPIRÉS
+        expired_subscriptions = StoreSubscription.objects.filter(
+            status='active',
+            end_date__lt=now
+        )
+        
+        count = 0
+        for subscription in expired_subscriptions:
+            subscription.status = 'expired'
+            subscription.save()
+            count += 1
+            
+            logger.info(f"✅ Abonnement #{subscription.id} marqué comme expiré")
+            
+            # Envoyer une notification au magasin
+            send_subscription_expiry_notification.delay(subscription.id)
+        
+        logger.info(f"✅ {count} abonnements marqués comme expirés")
+        
+        return {
+            'status': 'success',
+            'message': f'{count} abonnements marqués comme expirés',
+            'count': count
+        }
+    
+    except Exception as exc:
+        logger.error(f"❌ Erreur lors de la vérification des expirations: {exc}")
+        raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task(bind=True, max_retries=3)
+def send_subscription_expiry_notification(self, subscription_id):
+    """
+    📧 Envoyer une notification d'expiration au commerçant
+    """
+    try:
+        from payments.models import StoreSubscription
+        from django.core.mail import send_mail
+        
+        subscription = StoreSubscription.objects.get(id=subscription_id)
+        store = subscription.store
+        manager = store.manager
+        
+        if not manager or not manager.email:
+            return {'status': 'skipped', 'reason': 'No email found'}
+        
+        plan_name = subscription.plan.name if subscription.plan else subscription.plan_name
+        
+        subject = f"⏰ Votre abonnement {plan_name} a expiré - Gaboshop"
+        message = f"""
+Bonjour {manager.first_name or 'Commerçant'},
+
+Votre abonnement au forfait {plan_name} a expiré le {subscription.end_date}.
+
+Certaines de vos fonctionnalités peuvent être limitées.
+
+Veuillez vous connecter à votre tableau de bord pour renouveler votre forfait:
+https://gaboshop.app/dashboard/billing
+
+Cordialement,
+Équipe Gaboshop
+        """
+        
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email='noreply@gaboshop.app',
+            recipient_list=[manager.email],
+            fail_silently=True
+        )
+        
+        logger.info(f"📧 Notification d'expiration envoyée à {manager.email}")
+        return {'status': 'sent', 'email': manager.email}
+    
+    except Exception as exc:
+        logger.error(f"❌ Erreur lors de l'envoi de notification: {exc}")
+        raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task(bind=True, max_retries=3)
+def send_subscription_expiry_reminder(self):
+    """
+    🔔 Rappel d'expiration : Envoyer une notification 7 jours avant l'expiration
+    Exécutée quotidiennement
+    """
+    try:
+        from payments.models import StoreSubscription
+        from django.core.mail import send_mail
+        
+        now = timezone.now().date()
+        expiry_date_in_7_days = now + timedelta(days=7)
+        
+        # Chercher les abonnements qui expirent dans 7 jours
+        expiring_soon = StoreSubscription.objects.filter(
+            status='active',
+            end_date=expiry_date_in_7_days
+        )
+        
+        count = 0
+        for subscription in expiring_soon:
+            store = subscription.store
+            manager = store.manager
+            
+            if not manager or not manager.email:
+                continue
+            
+            plan_name = subscription.plan.name if subscription.plan else subscription.plan_name
+            
+            subject = f"⏰ Rappel : Votre abonnement {plan_name} expire dans 7 jours"
+            message = f"""
+Bonjour {manager.first_name or 'Commerçant'},
+
+Votre abonnement au forfait {plan_name} expirera le {subscription.end_date} (dans 7 jours).
+
+Pour continuer à bénéficier de toutes les fonctionnalités, veuillez renouveler votre forfait:
+https://gaboshop.app/dashboard/billing
+
+Cordialement,
+Équipe Gaboshop
+            """
+            
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email='noreply@gaboshop.app',
+                recipient_list=[manager.email],
+                fail_silently=True
+            )
+            
+            count += 1
+            logger.info(f"🔔 Rappel d'expiration envoyé à {manager.email}")
+        
+        logger.info(f"✅ {count} rappels d'expiration envoyés")
+        
+        return {
+            'status': 'success',
+            'count': count
+        }
+    
+    except Exception as exc:
+        logger.error(f"❌ Erreur lors de l'envoi des rappels: {exc}")
+        raise self.retry(exc=exc, countdown=60)

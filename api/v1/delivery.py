@@ -569,10 +569,11 @@ class DeliveryProofUploadView(APIView):
 				}, status=status.HTTP_403_FORBIDDEN)
 			
 			# Vérifier le statut (doit être in_transit ou picked_up)
-			if delivery.status not in ['in_transit', 'picked_up']:
+			# Tolérance: accepter aussi 'accepted' pour éviter blocage avant démarrage.
+			if delivery.status not in ['in_transit', 'picked_up', 'accepted']:
 				return Response({
 					'success': False,
-					'error': f'Impossible d\'uploader la preuve. Statut actuel: {delivery.get_status_display()}'
+					'error': f"Impossible d'uploader la preuve. Statut actuel: {delivery.get_status_display()}"
 				}, status=status.HTTP_400_BAD_REQUEST)
 			
 			# Extraire les données
@@ -697,7 +698,7 @@ class DeliveryProofUploadView(APIView):
 					'delivery_id': delivery.id,
 					'proof_id': proof.id,
 					'proof_status': proof.status,
-					'has_photo': bool(proof.photo),
+					'has_photo': bool(proof.id_card_photo),
 					'has_gps': bool(proof.latitude and proof.longitude),
 					'has_signature': bool(proof.signature),
 					'pin_verified': proof.pin_verified,

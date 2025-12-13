@@ -1,25 +1,14 @@
 """
-ASGI config for gaboshop project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
+Proxy ASGI module that re-exports application from top-level asgi.py
 """
+import importlib.util
+from pathlib import Path
 
-import os
+_ROOT = Path(__file__).resolve().parent.parent
+_source = _ROOT / 'asgi.py'
 
-from django.core.asgi import get_asgi_application
-import os
+spec = importlib.util.spec_from_file_location('top_asgi', str(_source))
+_top = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(_top)
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gaboshop.settings')
-
-# If channels is installed and routing exists, import channels application root
-try:
-	from .routing import application as channels_application  # type: ignore
-	# Wrap Django ASGI application so both HTTP and WebSocket are handled
-	django_asgi_app = get_asgi_application()
-	application = channels_application
-except Exception:
-	# Fallback to default WSGI ASGI app
-	application = get_asgi_application()
+application = getattr(_top, 'application')

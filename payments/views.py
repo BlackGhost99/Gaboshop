@@ -531,3 +531,228 @@ class SubscriptionPlansAPIView(APIView):
             'plans': plans_data,
             'current_plan': current_plan
         })
+
+
+# ===============================================================================
+# FORFAITS CLIENTS - ENDPOINTS
+# ===============================================================================
+
+class ClientForfaitListView(APIView):
+    """
+    GET /api/v1/forfaits/
+    Récupère la liste de tous les forfaits clients disponibles
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        from .models import Forfait
+        from .serializers import ForfaitSerializer
+        
+        forfaits = Forfait.objects.filter(is_active=True).order_by('monthly_price')
+        serializer = ForfaitSerializer(forfaits, many=True)
+        
+        return Response({
+            'success': True,
+            'count': forfaits.count(),
+            'forfaits': serializer.data
+        })
+
+
+class MyForfaitView(APIView):
+    """
+    GET /api/v1/my-forfait/
+    Récupère le forfait actuel de l'utilisateur connecté
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        from .models import ClientForfait
+        from .serializers import ClientForfaitSerializer
+        
+        try:
+            client_forfait = ClientForfait.objects.get(user=request.user)
+            serializer = ClientForfaitSerializer(client_forfait)
+            
+            return Response({
+                'success': True,
+                'forfait': serializer.data
+            })
+        except ClientForfait.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Utilisateur n\'a pas de forfait',
+                'message': 'Veuillez choisir un forfait'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class UpgradeForfaitView(APIView):
+    """
+    POST /api/v1/upgrade-forfait/
+    
+    Upgrade le forfait de l'utilisateur
+    Body:
+    {
+        "forfait_id": 2,
+        "auto_renew": true
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        from .models import Forfait, ClientForfait
+        from .serializers import ClientForfaitSerializer
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        forfait_id = request.data.get('forfait_id')
+        auto_renew = request.data.get('auto_renew', True)
+        
+        if not forfait_id:
+            return Response({
+                'success': False,
+                'error': 'forfait_id est requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            forfait = Forfait.objects.get(id=forfait_id, is_active=True)
+        except Forfait.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Forfait non trouvé'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # TODO: Intégrer Flutterwave pour le paiement du forfait
+        # Pour l'instant, on crée juste le ClientForfait
+        
+        client_forfait, created = ClientForfait.objects.update_or_create(
+            user=request.user,
+            defaults={
+                'forfait': forfait,
+                'start_date': timezone.now(),
+                'expiration_date': timezone.now() + timedelta(days=30),
+                'status': 'active',
+                'auto_renew': auto_renew
+            }
+        )
+        
+        serializer = ClientForfaitSerializer(client_forfait)
+        
+        return Response({
+            'success': True,
+            'message': f'Forfait "{forfait.name}" activé avec succès',
+            'forfait': serializer.data
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+# ===============================================================================
+# PAYOUTS - ENDPOINTS (Paiements automatiques)
+# ===============================================================================
+
+class PayoutListView(APIView):
+    """
+    GET /api/v1/payouts/
+    Récupère la liste des payouts de l'utilisateur connecté
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        from .models import Payout
+        from .serializers import PayoutSerializer
+        
+        payouts = Payout.objects.filter(user=request.user).order_by('-created_at')
+        
+        # Filtrer par statut si demandé
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            payouts = payouts.filter(status=status_filter)
+        
+        serializer = PayoutSerializer(payouts, many=True)
+        
+        return Response({
+            'success': True,
+            'count': payouts.count(),
+            'payouts': serializer.data
+        })
+
+
+class PayoutDetailView(APIView):
+    """
+    GET /api/v1/payouts/<int:payout_id>/
+    Récupère les détails d'un payout spécifique
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, payout_id):
+        from .models import Payout
+        from .serializers import PayoutSerializer
+        
+        try:
+            payout = Payout.objects.get(id=payout_id, user=request.user)
+            serializer = PayoutSerializer(payout)
+            
+            return Response({
+                'success': True,
+                'payout': serializer.data
+            })
+        except Payout.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Payout non trouvé'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class PayoutStatisticsView(APIView):
+    """
+    GET /api/v1/payouts/statistics/
+    Récupère les statistiques de payouts de l'utilisateur
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        from .models import Payout
+        from django.db.models import Sum, Count, Q
+        
+        user = request.user
+        
+        # Statistiques générales
+        total_paid = Payout.objects.filter(
+            user=user,
+            status='paid'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        total_pending = Payout.objects.filter(
+            user=user,
+            status='pending'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        count_paid = Payout.objects.filter(user=user, status='paid').count()
+        count_pending = Payout.objects.filter(user=user, status='pending').count()
+        count_failed = Payout.objects.filter(user=user, status='failed').count()
+        
+        # Statistiques par type
+        by_type = {}
+        for payout_type, display in Payout.TYPES:
+            by_type[payout_type] = {
+                'total': Payout.objects.filter(
+                    user=user,
+                    payout_type=payout_type,
+                    status='paid'
+                ).aggregate(total=Sum('amount'))['total'] or 0,
+                'count': Payout.objects.filter(
+                    user=user,
+                    payout_type=payout_type,
+                    status='paid'
+                ).count()
+            }
+        
+        return Response({
+            'success': True,
+            'statistics': {
+                'total_paid': float(total_paid),
+                'total_pending': float(total_pending),
+                'count_paid': count_paid,
+                'count_pending': count_pending,
+                'count_failed': count_failed,
+                'by_type': by_type
+            }
+        })
