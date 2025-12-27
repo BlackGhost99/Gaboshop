@@ -166,18 +166,44 @@ class OrderService:
         Calculer la commission GABOSHOP sur une commande
         """
         try:
-            commission_rate = order.store.commission_rate / Decimal('100.0')
-            commission_amount = order.items_total * commission_rate
-            
-            # Part des frais de livraison pour le livreur (80%)
-            delivery_fee_share = order.delivery_fee * Decimal('0.8')
-            
+            from payments.models import CategoryCommission
+
+            total_commission = Decimal('0.00')
+            # Determine plan multiplier
+            plan = order.store.get_current_plan()
+            multiplier = Decimal(getattr(plan, 'commission_multiplier', 1)) if plan else Decimal('1')
+
+            # Sum commission per item using category base rates
+            for item in order.items.all():
+                product = item.product
+                item_subtotal = item.subtotal
+                base_rate = None
+                if product and product.category and product.category.store_category:
+                    try:
+                        cc = CategoryCommission.objects.get(store_category=product.category.store_category)
+                        base_rate = Decimal(cc.base_rate)
+                    except CategoryCommission.DoesNotExist:
+                        base_rate = None
+
+                if base_rate is None:
+                    base_rate = Decimal(order.store.commission_rate or Decimal('0.00'))
+
+                effective_rate = (base_rate * Decimal(multiplier))
+                item_comm = (item_subtotal * effective_rate) / Decimal('100')
+                total_commission += item_comm
+
+            # Platform share of delivery fee (40%)
+            delivery_fee_share = (order.delivery_fee * Decimal('0.4'))
+
+            # Effective commission rate as percentage for display/storage
+            commission_rate_pct = (total_commission / order.items_total * Decimal('100')) if order.items_total > 0 else Decimal('0.00')
+
             return {
-                'commission_rate': order.store.commission_rate,
-                'commission_amount': commission_amount,
-                'delivery_fee_share': delivery_fee_share,
-                'store_earnings': order.items_total - commission_amount,
-                'agent_earnings': delivery_fee_share
+                'commission_rate': commission_rate_pct.quantize(Decimal('0.01')),
+                'commission_amount': total_commission.quantize(Decimal('0.01')),
+                'delivery_fee_share': delivery_fee_share.quantize(Decimal('0.01')),
+                'store_earnings': (order.items_total - total_commission).quantize(Decimal('0.01')),
+                'agent_earnings': delivery_fee_share.quantize(Decimal('0.01'))
             }
             
         except Exception as e:

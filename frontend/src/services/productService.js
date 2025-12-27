@@ -56,6 +56,11 @@ export const getStoreCategories = async (storeId) => {
   return response.data;
 };
 
+export const getAllCategories = async () => {
+  const response = await api.get(`/products/categories/`);
+  return response.data;
+};
+
 export const createStoreCategory = async (storeId, categoryData) => {
   const response = await api.post(`/stores/${storeId}/categories/create/`, categoryData);
   return response.data;

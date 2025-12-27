@@ -22,6 +22,9 @@ from core.validators import (
 	can_mark_as_delivered
 )
 from core.models import AuditLog
+from django.db import transaction
+from notifications.service import NotificationService
+from delivery.services import auto_assign_delivery
 
 class DeliveryProfileUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -250,6 +253,84 @@ class DeliveryListView(ListAPIView):
 			'success': True,
 			'data': serializer.data
 		})
+
+
+class AvailableDeliveriesView(ListAPIView):
+	"""Liste des livraisons non assignées que les livreurs peuvent voir/claim"""
+	permission_classes = [permissions.IsAuthenticated]
+	serializer_class = DeliverySerializer
+
+	def get_queryset(self):
+		user = self.request.user
+		# Log who requested available deliveries to help debug client visibility issues
+		try:
+			logger.info(f"AvailableDeliveries requested by user_id={getattr(user,'id',None)} phone={getattr(user,'phone',None)} city={getattr(user,'city',None)}")
+		except Exception:
+			pass
+		# Only delivery agents can see available deliveries
+		if not user.is_delivery_agent():
+			return Delivery.objects.none()
+
+		# Filter waiting deliveries in the same city and that are ready
+		qs = Delivery.objects.filter(status='waiting')
+		# Optionally restrict by city
+		if hasattr(user, 'city') and user.city:
+			qs = qs.filter(city=user.city)
+
+		# Only include deliveries whose order status indicates ready for delivery
+		qs = qs.filter(order__status__in=['ready', 'paid', 'confirmed'])
+		return qs.order_by('created_at')
+
+
+class DeliveryClaimView(APIView):
+	"""Permet à un livreur de réclamer (claim) une livraison libre.
+	Utilise une transaction pour éviter les courses concurrentes.
+	"""
+	permission_classes = [permissions.IsAuthenticated]
+
+	def post(self, request, delivery_id):
+		user = request.user
+		if not user.is_delivery_agent():
+			return Response({'success': False, 'error': 'Accès réservé aux livreurs'}, status=status.HTTP_403_FORBIDDEN)
+
+		try:
+			with transaction.atomic():
+				# Lock the delivery row to avoid race conditions
+				delivery = Delivery.objects.select_for_update().get(id=delivery_id)
+
+				# Must be unassigned and in waiting state
+				if delivery.delivery_agent is not None or delivery.status != 'waiting':
+					return Response({'success': False, 'error': 'Livraison déjà prise ou non disponible'}, status=status.HTTP_400_BAD_REQUEST)
+
+				# Assign to current user (manual claim)
+				delivery.delivery_agent = user
+				delivery.status = 'assigned'
+				delivery.assigned_at = timezone.now()
+				delivery.is_auto_assigned = False
+				# Compute agent commission if not set
+				try:
+					if delivery.order and delivery.order.delivery_fee:
+						delivery.agent_commission = delivery.order.delivery_fee * Decimal('0.8')
+				except Exception:
+					pass
+				delivery.save()
+
+				# Update order status
+				delivery.order.status = 'assigned'
+				delivery.order.save()
+
+				# Notify agent (local notification) and client
+				try:
+					NotificationService.notify_delivery_assigned(delivery)
+				except Exception:
+					pass
+
+			return Response({'success': True, 'message': 'Livraison réclamée avec succès', 'data': DeliverySerializer(delivery).data})
+
+		except Delivery.DoesNotExist:
+			return Response({'success': False, 'error': 'Livraison non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def get_client_ip(request):
@@ -483,6 +564,12 @@ class DeliveryRejectAssignmentView(APIView):
 			# Remettre la commande en attente
 			delivery.order.status = 'ready'
 			delivery.order.save()
+
+			# Tenter une réassignation automatique immédiatement
+			try:
+				auto_assign_delivery(delivery.order)
+			except Exception:
+				logger.exception('Erreur lors de l\'auto-assignation après refus de livraison')
 			
 			# Enregistrer l'action dans l'audit
 			AuditLog.log_action(

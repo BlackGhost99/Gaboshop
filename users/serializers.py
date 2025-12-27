@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from stores.models import Store, StoreCategory
 from .models import User, UserProfile, GerantProfile, LivreurProfile
+from .models import DeliveryAgentApiKey
 
 # Choices réutilisables pour les véhicules livreur
 VEHICLE_CHOICES = [
@@ -56,6 +57,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     # Champs pour livreur
     vehicle_type = serializers.ChoiceField(choices=VEHICLE_CHOICES, write_only=True, required=False)
     vehicle_plate = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # GPS requis pour les livreurs
+    position_lat = serializers.DecimalField(write_only=True, required=False, max_digits=9, decimal_places=6)
+    position_lng = serializers.DecimalField(write_only=True, required=False, max_digits=9, decimal_places=6)
     
     class Meta:
         model = User
@@ -116,6 +120,11 @@ class RegisterSerializer(serializers.ModelSerializer):
                 })
             if not attrs.get('vehicle_type'):
                 attrs['vehicle_type'] = 'moto'
+            # GPS activation required at signup for delivery agents
+            if 'position_lat' not in attrs or 'position_lng' not in attrs:
+                raise serializers.ValidationError({
+                    'gps': _('Les coordonnées GPS (position_lat, position_lng) sont requises pour l\'inscription des livreurs.')
+                })
 
         # Optional email uniqueness check: avoid multiple accounts with same email
         email = attrs.get('email', '').strip() if attrs.get('email') else ''
@@ -193,13 +202,23 @@ class RegisterSerializer(serializers.ModelSerializer):
 
             # Cas livreur: créer profil livreur
             if user.user_type == 'delivery_agent':
+                # Create LivreurProfile with provided GPS
+                from django.utils import timezone
                 LivreurProfile.objects.create(
                     user=user,
                     type_vehicule=vehicle_type,
                     immatriculation=vehicle_plate,
                     disponible=True,
                     documents_verifies=False,
+                    position_lat=validated_data.get('position_lat'),
+                    position_lng=validated_data.get('position_lng'),
+                    last_position_update=timezone.now()
                 )
+                # Create an API key for the delivery agent so mobile client can authenticate
+                try:
+                    DeliveryAgentApiKey.create_for_user(user)
+                except Exception:
+                    pass
 
             # Cas client: rien de plus
 

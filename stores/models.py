@@ -57,6 +57,9 @@ class Store(models.Model):
 		default=2000.00,
 		help_text="Frais de livraison standard en FCFA"
 	)
+	# Indique si le magasin gère les livraisons lui-même (optionnel)
+	# Par défaut, le magasin ne gère pas la livraison (False)
+	offers_delivery = models.BooleanField(default=False, help_text="Le magasin gère-t-il la livraison ? (par défaut: non)")
 	delivery_fee_express = models.DecimalField(
 		max_digits=8, 
 		decimal_places=2, 

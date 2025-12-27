@@ -168,6 +168,13 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         for item_data in items_data:
             item_data['product'].reduce_stock(item_data['quantity'])
         
+        # Recalculate totals (commission depends on created OrderItems)
+        try:
+            order.calculate_totals()
+        except Exception:
+            # Don't let a totals calculation error break creation flow; surface later
+            pass
+
         return order
 
 class OrderStatusUpdateSerializer(serializers.ModelSerializer):

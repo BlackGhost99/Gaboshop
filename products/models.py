@@ -1,24 +1,27 @@
 from django.db import models
-from stores.models import Store
+from stores.models import Store, StoreCategory
 
 
 class ProductCategory(models.Model):
 	"""
-	Catégories de produits au sein d'un magasin
+	Catégories de produits (maintenues par catégorie de magasin).
 	"""
-	store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='product_categories')
+	# Temporary state: keep `store` while migrating existing data, will be removed by migration.
+	store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='product_categories', null=True, blank=True)
+	store_category = models.ForeignKey(StoreCategory, on_delete=models.PROTECT, related_name='product_categories', null=True, blank=True)
 	name = models.CharField(max_length=100)
 	description = models.TextField(blank=True)
 	order = models.PositiveIntegerField(default=0, help_text="Ordre d'affichage")
-    
+
 	class Meta:
 		verbose_name = "Catégorie de Produit"
 		verbose_name_plural = "Catégories de Produits"
 		ordering = ['order', 'name']
-		unique_together = ['store', 'name']
-    
+		unique_together = ['store_category', 'name']
+
 	def __str__(self):
-		return f"{self.name} - {self.store.name}"
+		return f"{self.name} - {self.store_category.name}"
+
 
 
 class Product(models.Model):

@@ -17,6 +17,7 @@ const StoreProfile = () => {
         closing_time: '',
         delivery_fee: '',
         min_order_amount: '',
+        offers_delivery: false,
         manager_first_name: '',
         manager_last_name: '',
         manager_email: '',
@@ -47,9 +48,10 @@ const StoreProfile = () => {
                         address: data.address || '',
                         zone: data.zone || '',
                         opening_time: data.opening_time || '',
-                        closing_time: data.closing_time || '',
-                        delivery_fee: data.delivery_fee || '',
-                        min_order_amount: data.min_order_amount || '',
+                            closing_time: data.closing_time || '',
+                            delivery_fee: data.delivery_fee || '',
+                            min_order_amount: data.min_order_amount || '',
+                            offers_delivery: !!data.offers_delivery,
                         manager_first_name: data.manager_details?.first_name || '',
                         manager_last_name: data.manager_details?.last_name || '',
                         manager_email: data.manager_details?.email || '',
@@ -66,8 +68,9 @@ const StoreProfile = () => {
     };
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        const next = type === 'checkbox' ? checked : value;
+        setFormData(prev => ({ ...prev, [name]: next }));
     };
 
     const handleFileChange = (e, type) => {
@@ -87,10 +90,12 @@ const StoreProfile = () => {
         e.preventDefault();
         const data = new FormData();
         Object.keys(formData).forEach(key => {
-            // Only append if value is not null/undefined/empty string
-            // For time/decimal fields, empty string is invalid
-            if (formData[key] !== null && formData[key] !== '') {
-                data.append(key, formData[key]);
+            const value = formData[key];
+            // Always send boolean flags (including false). For others, skip empty strings.
+            if (typeof value === 'boolean') {
+                data.append(key, value ? 'true' : 'false');
+            } else if (value !== null && value !== '') {
+                data.append(key, value);
             }
         });
         if (logoFile) data.append('logo', logoFile);
@@ -238,6 +243,17 @@ const StoreProfile = () => {
                                 type="time" name="closing_time" value={formData.closing_time} onChange={handleChange}
                                 className="mt-1 block w-full border rounded-md shadow-sm p-2" 
                             />
+                        </div>
+                        <div className="md:col-span-2 flex items-center space-x-3">
+                            <input
+                                id="offers_delivery"
+                                name="offers_delivery"
+                                type="checkbox"
+                                checked={!!formData.offers_delivery}
+                                onChange={handleChange}
+                                className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                            />
+                            <label htmlFor="offers_delivery" className="text-sm text-gray-700">Le magasin gère la livraison</label>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Frais de livraison (FCFA)</label>

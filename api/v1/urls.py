@@ -18,6 +18,7 @@ from .products import (
     ProductUpdateView, ProductDeleteView, StoreProductCategoryListView, 
     StoreProductCategoryCreateView, StoreManagerProductsView
 )
+from .products import AllProductCategoryListView
 from products.views import ProductViewSet
 from .orders import (
     OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
@@ -39,7 +40,8 @@ from .notifications import (
 from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
-    DeliveryProofUploadView, DeliveryVerifyPINView
+    DeliveryProofUploadView, DeliveryVerifyPINView,
+    AvailableDeliveriesView, DeliveryClaimView
 )
 from .subscription import (
     get_subscription_status, get_available_plans, check_permission, purchase_plan
@@ -52,6 +54,7 @@ from .admin import (
 from .finances import (
     FinanceDashboardView, TransactionsListView, CommissionsByStoreView,
     DeliveryPayoutView, SubscriptionsView, SponsoredProductsView, RevenueBreakdownView
+    , CategoryCommissionListCreateView, CategoryCommissionDetailView
 )
 from .orders_admin import (
     OrderStatsView, OrdersListView, OrderDetailView as AdminOrderDetailView,
@@ -92,7 +95,9 @@ urlpatterns = [
     path('dashboard/store/', StoreDashboardView.as_view(), name='dashboard-store'),
     path('dashboard/delivery/', DeliveryDashboardView.as_view(), name='dashboard-delivery'),
     path('dashboard/delivery/assigned-orders/', DeliveryAssignedOrdersView.as_view(), name='dashboard-delivery-assigned'),
+    path('dashboard/delivery/available/', AvailableDeliveriesView.as_view(), name='dashboard-delivery-available'),
     path('dashboard/delivery/profile/update/', DeliveryProfileUpdateView.as_view(), name='delivery-profile-update'),
+    path('dashboard/delivery/<int:delivery_id>/claim/', DeliveryClaimView.as_view(), name='delivery-claim'),
     path('dashboard/delivery/<int:delivery_id>/accept/', DeliveryAcceptAssignmentView.as_view(), name='delivery-accept'),
     path('dashboard/delivery/<int:delivery_id>/reject/', DeliveryRejectAssignmentView.as_view(), name='delivery-reject'),
     path('dashboard/delivery/<int:delivery_id>/start/', DeliveryStartView.as_view(), name='delivery-start'),
@@ -126,6 +131,8 @@ urlpatterns = [
     path('finance/subscriptions/', SubscriptionsView.as_view(), name='finance-subscriptions'),
     path('finance/sponsored-products/', SponsoredProductsView.as_view(), name='finance-sponsored'),
     path('finance/revenue-breakdown/', RevenueBreakdownView.as_view(), name='finance-breakdown'),
+    path('finance/category-commissions/', CategoryCommissionListCreateView.as_view(), name='finance-category-commissions'),
+    path('finance/category-commissions/<int:pk>/', CategoryCommissionDetailView.as_view(), name='finance-category-commission-detail'),
     
     # Orders Admin Management
     path('admin/orders/stats/', OrderStatsView.as_view(), name='orders-stats'),
@@ -176,6 +183,7 @@ urlpatterns = [
     path('stores/<int:store_id>/products/create/', ProductCreateView.as_view(), name='product-create'),
     path('stores/<int:store_id>/categories/', StoreProductCategoryListView.as_view(), name='store-product-categories'),
     path('stores/<int:store_id>/categories/create/', StoreProductCategoryCreateView.as_view(), name='store-product-category-create'),
+    path('products/categories/', AllProductCategoryListView.as_view(), name='product-categories'),
     path('products/<int:pk>/', ProductDetailView.as_view(), name='product-detail'),
     path('products/<int:pk>/update/', ProductUpdateView.as_view(), name='product-update'),
     path('products/<int:pk>/delete/', ProductDeleteView.as_view(), name='product-delete'),

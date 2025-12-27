@@ -10,6 +10,9 @@ from rest_framework.views import APIView
 from payments.models import Payment, Commission, DeliveryPayout, StoreSubscription, SponsoredProduct
 from orders.models import Order
 from stores.models import Store
+from payments.models import CategoryCommission
+from payments.serializers_category_commission import CategoryCommissionSerializer
+from rest_framework import generics, permissions as rf_permissions
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -21,61 +24,61 @@ class IsPlatformAdmin(permissions.BasePermission):
 class FinanceDashboardView(APIView):
 	"""Dashboard financier avec KPIs"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		today = timezone.now().date()
 		month_start = today.replace(day=1)
-		
+
 		# Statistiques d'aujourd'hui
 		today_payments = Payment.objects.filter(
 			status='success',
 			completed_at__date=today
 		).aggregate(total=Sum('amount'))['total'] or 0
-		
+
 		today_commissions = Commission.objects.filter(
 			created_at__date=today
 		).aggregate(total=Sum('commission_amount'))['total'] or 0
-		
+
 		# Statistiques du mois
 		month_payments = Payment.objects.filter(
 			status='success',
 			completed_at__date__gte=month_start
 		).aggregate(total=Sum('amount'))['total'] or 0
-		
+
 		month_orders = Order.objects.filter(
 			created_at__date__gte=month_start
 		).count()
-		
+
 		month_commissions = Commission.objects.filter(
 			created_at__date__gte=month_start
 		).aggregate(total=Sum('commission_amount'))['total'] or 0
-		
+
 		# Paiements livreurs
 		month_delivery_payouts = DeliveryPayout.objects.filter(
 			created_at__date__gte=month_start,
 			status='completed'
 		).aggregate(total=Sum('calculated_payout'))['total'] or 0
-		
+
 		# Abonnements actifs
 		active_subscriptions = StoreSubscription.objects.filter(
 			status='active',
 			end_date__gte=today
 		).aggregate(total=Sum('monthly_fee'))['total'] or 0
-		
+
 		# Revenus sponsoring
 		sponsoring_revenue = SponsoredProduct.objects.filter(
 			status='active',
 			end_date__gte=timezone.now()
 		).aggregate(total=Sum('price_paid'))['total'] or 0
-		
+
 		# Calcul du bénéfice réel
 		month_platform_profit = (
-			month_commissions + 
-			active_subscriptions + 
-			sponsoring_revenue - 
+			month_commissions +
+			active_subscriptions +
+			sponsoring_revenue -
 			month_delivery_payouts
 		)
-		
+
 		data = {
 			"today": {
 				"revenue": float(today_payments),
@@ -97,17 +100,17 @@ class FinanceDashboardView(APIView):
 				"failed_payments": Payment.objects.filter(status='failed').count(),
 			}
 		}
-		
+
 		return Response({"success": True, "data": data})
 
 
 class TransactionsListView(APIView):
 	"""Liste des transactions clients"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		payments = Payment.objects.select_related('order').all()[:100]
-		
+
 		data = [
 			{
 				"id": p.id,
@@ -123,24 +126,24 @@ class TransactionsListView(APIView):
 			}
 			for p in payments
 		]
-		
+
 		return Response({"success": True, "data": data})
 
 
 class CommissionsByStoreView(APIView):
 	"""Commissions par magasin"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		stores = Store.objects.all()
-		
+
 		data = []
 		for store in stores:
 			commissions = Commission.objects.filter(store=store).aggregate(
 				total_sales=Sum('order_amount'),
 				total_commission=Sum('commission_amount')
 			)
-			
+
 			data.append({
 				"store_id": store.id,
 				"store_name": store.name,
@@ -149,17 +152,17 @@ class CommissionsByStoreView(APIView):
 				"commission_amount": float(commissions['total_commission'] or 0),
 				"status": "pending",
 			})
-		
+
 		return Response({"success": True, "data": data})
 
 
 class DeliveryPayoutView(APIView):
 	"""Coûts de livraison et paiements livreurs"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		payouts = DeliveryPayout.objects.select_related('delivery_agent', 'order').all()[:100]
-		
+
 		data = [
 			{
 				"id": p.id,
@@ -173,17 +176,17 @@ class DeliveryPayoutView(APIView):
 			}
 			for p in payouts
 		]
-		
+
 		return Response({"success": True, "data": data})
 
 
 class SubscriptionsView(APIView):
 	"""Abonnements Mode Pro des magasins"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		subscriptions = StoreSubscription.objects.select_related('store').all()
-		
+
 		data = [
 			{
 				"id": s.id,
@@ -197,17 +200,91 @@ class SubscriptionsView(APIView):
 			}
 			for s in subscriptions
 		]
-		
+
 		return Response({"success": True, "data": data})
+
+
+class IsStaffOrStoreManager(rf_permissions.BasePermission):
+	"""Allow access to staff/admin or store managers (read-only for others)."""
+
+	def has_permission(self, request, view):
+		user = request.user
+		return bool(
+			user
+			and user.is_authenticated
+			and (user.is_staff or user.user_type == 'admin' or user.user_type == 'store_manager')
+		)
+
+
+class CategoryCommissionListCreateView(generics.ListCreateAPIView):
+	"""List all category commissions or create/update (staff only)."""
+	queryset = CategoryCommission.objects.select_related('store_category').all()
+	serializer_class = CategoryCommissionSerializer
+	permission_classes = [IsStaffOrStoreManager]
+
+	def get_queryset(self):
+		user = self.request.user
+		if user and (user.is_staff or user.user_type == 'admin'):
+			return super().get_queryset()
+		# store managers: only show commissions for their store category
+		try:
+			store = getattr(user, 'store', None)
+			if store and store.category:
+				return CategoryCommission.objects.filter(store_category=store.category)
+		except Exception:
+			pass
+		return CategoryCommission.objects.none()
+
+	def perform_create(self, serializer):
+		instance = serializer.save()
+		# Create audit entry
+		try:
+			from payments.models import CategoryCommissionChangeLog
+			user = getattr(self.request, 'user', None)
+			CategoryCommissionChangeLog.objects.create(
+				category_commission=instance,
+				old_rate=None,
+				new_rate=instance.base_rate,
+				changed_by=user if getattr(user, 'is_authenticated', False) else None,
+				note='Created via API',
+			)
+		except Exception:
+			pass
+
+
+class CategoryCommissionDetailView(generics.RetrieveUpdateAPIView):
+	queryset = CategoryCommission.objects.select_related('store_category').all()
+	serializer_class = CategoryCommissionSerializer
+	permission_classes = [IsStaffOrStoreManager]
+
+	def perform_update(self, serializer):
+		# capture old value
+		instance = self.get_object()
+		old_rate = instance.base_rate
+		updated = serializer.save()
+		new_rate = updated.base_rate
+		if old_rate != new_rate:
+			try:
+				from payments.models import CategoryCommissionChangeLog
+				user = getattr(self.request, 'user', None)
+				CategoryCommissionChangeLog.objects.create(
+					category_commission=updated,
+					old_rate=old_rate,
+					new_rate=new_rate,
+					changed_by=user if getattr(user, 'is_authenticated', False) else None,
+					note='Updated via API',
+				)
+			except Exception:
+				pass
 
 
 class SponsoredProductsView(APIView):
 	"""Produits sponsorisés / mises en avant payantes"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		sponsored = SponsoredProduct.objects.select_related('product', 'store').all()
-		
+
 		data = [
 			{
 				"id": s.id,
@@ -222,52 +299,52 @@ class SponsoredProductsView(APIView):
 			}
 			for s in sponsored
 		]
-		
+
 		return Response({"success": True, "data": data})
 
 
 class RevenueBreakdownView(APIView):
 	"""Répartition des revenus par catégorie"""
 	permission_classes = [IsPlatformAdmin]
-	
+
 	def get(self, request):
 		today = timezone.now().date()
 		month_start = today.replace(day=1)
-		
+
 		# Commissions
 		commissions_revenue = Commission.objects.filter(
 			created_at__date__gte=month_start
 		).aggregate(total=Sum('commission_amount'))['total'] or 0
-		
+
 		# Livraison
 		delivery_revenue = DeliveryPayout.objects.filter(
 			created_at__date__gte=month_start
 		).aggregate(total=Sum('platform_profit'))['total'] or 0
-		
+
 		# Abonnements
 		subscriptions_revenue = StoreSubscription.objects.filter(
 			start_date__gte=month_start
 		).aggregate(total=Sum('monthly_fee'))['total'] or 0
-		
+
 		# Sponsoring
 		sponsoring_revenue = SponsoredProduct.objects.filter(
 			start_date__gte=timezone.now() - timedelta(days=30)
 		).aggregate(total=Sum('price_paid'))['total'] or 0
-		
+
 		# Frais de service
 		service_fees = Payment.objects.filter(
 			status='success',
 			created_at__date__gte=month_start
 		).aggregate(total=Sum('fees_amount'))['total'] or 0
-		
+
 		total_revenue = (
-			float(commissions_revenue) + 
-			float(delivery_revenue) + 
-			float(subscriptions_revenue) + 
-			float(sponsoring_revenue) + 
+			float(commissions_revenue) +
+			float(delivery_revenue) +
+			float(subscriptions_revenue) +
+			float(sponsoring_revenue) +
 			float(service_fees)
 		)
-		
+
 		data = {
 			"commissions": {
 				"amount": float(commissions_revenue),
@@ -291,5 +368,5 @@ class RevenueBreakdownView(APIView):
 			},
 			"total_revenue": total_revenue,
 		}
-		
+
 		return Response({"success": True, "data": data})

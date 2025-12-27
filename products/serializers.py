@@ -23,10 +23,11 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 class ProductCategorySerializer(serializers.ModelSerializer):
     product_count = serializers.IntegerField(read_only=True)
-    
+    store_category = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = ProductCategory
-        fields = ['id', 'name', 'description', 'order', 'product_count']
+        fields = ['id', 'name', 'description', 'order', 'product_count', 'store_category']
 
 class ProductSerializer(serializers.ModelSerializer):
     """Serializer de base pour les produits"""
@@ -103,3 +104,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             'stock', 'sku', 'barcode', 'is_available', 'is_featured',
             'image', 'image_2', 'image_3'
         ]
+
+
+# ProductCategoryTemplate serializer removed after merging templates into ProductCategory
+

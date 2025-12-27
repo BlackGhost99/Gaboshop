@@ -91,14 +91,17 @@ class Order(models.Model):
 			import random
 			import string
 			self.order_number = f"CMD{''.join(random.choices(string.digits, k=8))}"
-        
-		# Calculs automatiques si pas encore faits
-		if not self.pk:  # Nouvelle commande
+
+		# Calculs automatiques avant première sauvegarde qui ne nécessitent pas de relation inverse
+		is_new = not self.pk
+		if is_new:
 			self.calculate_delivery_fee()
 			self.calculate_service_fee()
-			self.calculate_commission()
-        
+
 		super().save(*args, **kwargs)
+
+		# Do NOT attempt to access reverse relations (self.items) before PK is set.
+		# Commission calculation depends on OrderItems and must run after items exist.
     
 	def calculate_delivery_fee(self):
 		"""Calcule les frais de livraison selon le type"""
@@ -119,9 +122,41 @@ class Order(models.Model):
 	
 	def calculate_commission(self):
 		"""Calcule la commission GABOSHOP"""
+		from payments.models import CategoryCommission
+
 		if self.items_total > 0:
-			self.commission_rate = self.store.commission_rate
-			self.commission_amount = (self.items_total * self.commission_rate) / Decimal('100')
+			# Determine current plan multiplier (default 1.00)
+			plan = self.store.get_current_plan()
+			multiplier = Decimal(getattr(plan, 'commission_multiplier', 1)) if plan else Decimal('1')
+
+			total_commission = Decimal('0.00')
+			# Sum commission per OrderItem using category base rates
+			for item in self.items.all():
+				product = item.product
+				item_subtotal = item.subtotal
+				base_rate = None
+				# Try category-level commission (linked to StoreCategory)
+				if product and product.category and product.category.store_category:
+					try:
+						cc = CategoryCommission.objects.get(store_category=product.category.store_category)
+						base_rate = Decimal(cc.base_rate)
+					except CategoryCommission.DoesNotExist:
+						base_rate = None
+				# Fallback to store-level commission rate
+				if base_rate is None:
+					base_rate = Decimal(self.store.commission_rate or Decimal('0.00'))
+
+				# Effective rate after plan multiplier
+				effective_rate = (base_rate * Decimal(multiplier))
+				item_commission = (item_subtotal * effective_rate) / Decimal('100')
+				total_commission += item_commission
+
+			self.commission_amount = total_commission.quantize(Decimal('0.01'))
+			# Store an approximate effective commission rate for the order (used for display)
+			try:
+				self.commission_rate = (self.commission_amount / self.items_total) * Decimal('100')
+			except Exception:
+				self.commission_rate = Decimal('0.00')
 		return self.commission_amount
 	
 	def calculate_store_amount(self):

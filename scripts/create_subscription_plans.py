@@ -4,6 +4,11 @@ Script pour créer les plans d'abonnement Starter, Pro et Business
 import os
 import django
 
+import sys
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gaboshop.settings')
 django.setup()
 
@@ -47,17 +52,18 @@ def create_subscription_plans():
         defaults={
             'name': 'Pro',
             'slug': 'pro',
-            'price': 10000,
+            'price': 15000,
             'max_products': None,  # Illimité
             'can_sponsor_products': False,
             'has_statistics': True,
             'has_custom_page': False,
             'has_priority_support': False,
             'priority_listing': 1,
-            'commission_rate': 7.00,  # Commission réduite de 7% au lieu de 8%
+            'commission_rate': None,
+            'commission_multiplier': 0.60,  # Réduction de 40% par rapport au taux de base
             'description': 'Plan professionnel avec statistiques avancées',
             'features_json': [
-                'Commission réduite à 7%',
+                'Réduction de 40% sur le taux de commission de base (hors Alimentaire)',
                 'Rapports de ventes détaillés',
                 'Analytics en temps réel'
             ],
@@ -75,17 +81,18 @@ def create_subscription_plans():
         defaults={
             'name': 'Business',
             'slug': 'business',
-            'price': 30000,
+            'price': 40000,
             'max_products': None,  # Illimité
             'can_sponsor_products': True,
             'has_statistics': True,
             'has_custom_page': True,
             'has_priority_support': True,
             'priority_listing': 10,
-            'commission_rate': 5.00,  # Commission réduite à 5%
+            'commission_rate': None,
+            'commission_multiplier': 0.25,  # Réduction de 75% par rapport au taux de base
             'description': 'Plan premium pour maximiser votre visibilité',
             'features_json': [
-                'Commission réduite à 5%',
+                'Réduction de 75% sur le taux de commission de base (hors Alimentaire)',
                 'Produits sponsorisés illimités',
                 'Page personnalisée premium',
                 'Support VIP prioritaire',
@@ -102,8 +109,8 @@ def create_subscription_plans():
     print("\n✅ Plans d'abonnement configurés avec succès!")
     print(f"\nRécapitulatif:")
     print(f"- Starter: Gratuit (max 20 produits)")
-    print(f"- Pro: 10 000 FCFA/mois (produits illimités, stats)")
-    print(f"- Business: 30 000 FCFA/mois (page personnalisée, support VIP)")
+    print(f"- Pro: 15 000 FCFA/mois (produits illimités, stats)")
+    print(f"- Business: 40 000 FCFA/mois (page personnalisée, support VIP)")
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ class StoreListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'category', 'category_name', 'city', 'zone', 
             'phone', 'logo', 'is_active', 'is_open', 'total_products',
-            'delivery_fee', 'min_order_amount', 'commission_rate'
+            'offers_delivery', 'delivery_fee', 'min_order_amount', 'commission_rate'
         ]
 
 class StoreDetailSerializer(serializers.ModelSerializer):
@@ -37,7 +37,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'category', 'category_name',
             'manager', 'manager_name', 'manager_details', 'phone', 'email', 'address', 'city', 'zone',
             'latitude', 'longitude', 'logo', 'banner_image',
-            'commission_rate', 'delivery_fee', 'min_order_amount',
+            'commission_rate', 'offers_delivery', 'delivery_fee', 'min_order_amount',
             'is_active', 'is_verified', 'is_open', 'total_products',
             'opening_time', 'closing_time', 'created_at'
         ]
@@ -87,5 +87,6 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'phone', 'email', 'address', 
             'zone', 'latitude', 'longitude', 'logo', 'banner_image',
-            'opening_time', 'closing_time', 'delivery_fee', 'min_order_amount'
+            'opening_time', 'closing_time', 'offers_delivery', 'delivery_fee', 'min_order_amount'
         ]
+        

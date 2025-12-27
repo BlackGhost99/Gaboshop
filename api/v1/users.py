@@ -12,6 +12,11 @@ from users.serializers import (
 )
 from users.models import User
 from core.models import AuditLog
+from users.models import DeliveryAgentApiKey
+from rest_framework import permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 class RegisterView(APIView):
 	permission_classes = [permissions.AllowAny]
@@ -158,6 +163,44 @@ class RefreshTokenView(APIView):
     
 	def post(self, request):
 		refresh_token = request.data.get('refresh')
+
+
+class MyApiKeyView(APIView):
+	"""GET returns the delivery agent's API key (if any).
+	POST regenerates the key.
+
+	Routes:
+	- GET /api/v1/me/api-key/
+	- POST /api/v1/me/api-key/  # regenerate
+	"""
+	permission_classes = [permissions.IsAuthenticated]
+
+	def get(self, request):
+		user = request.user
+		if not user.is_delivery_agent():
+			return Response({'success': False, 'error': 'Accès réservé aux livreurs'}, status=status.HTTP_403_FORBIDDEN)
+
+		api = getattr(user, 'api_key', None)
+		if not api:
+			return Response({'success': True, 'data': {'api_key': None}}, status=status.HTTP_200_OK)
+
+		return Response({'success': True, 'data': {'api_key': api.key}}, status=status.HTTP_200_OK)
+
+	def post(self, request):
+		user = request.user
+		if not user.is_delivery_agent():
+			return Response({'success': False, 'error': 'Accès réservé aux livreurs'}, status=status.HTTP_403_FORBIDDEN)
+
+		# Regenerate: delete existing and create a new one
+		try:
+			old = getattr(user, 'api_key', None)
+			if old:
+				old.delete()
+			new = DeliveryAgentApiKey.create_for_user(user)
+			AuditLog.log_action(action_type='api_key_regenerated', user=user, object_type='api_key', object_id=new.id, old_value=None, new_value='regenerated', ip_address=request.META.get('REMOTE_ADDR'), user_agent=request.META.get('HTTP_USER_AGENT',''))
+			return Response({'success': True, 'data': {'api_key': new.key}}, status=status.HTTP_201_CREATED)
+		except Exception as e:
+			return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 		if not refresh_token:
 			return Response({

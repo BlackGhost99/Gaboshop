@@ -7,6 +7,7 @@ from django.utils import timezone
 from decimal import Decimal
 from .models import Order
 from payments.models import Payment, Commission
+from orders.services import OrderService
 from delivery.models import Delivery
 from notifications.service import NotificationService
 
@@ -56,15 +57,18 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 	
 	# 3. Créer Commission quand commande est payée
 	if order.status == 'paid' and not hasattr(order, 'commission'):
-		Commission.objects.create(
-			order=order,
-			store=order.store,
-			order_amount=order.items_total,
-			commission_rate=order.commission_rate,
-			commission_amount=order.commission_amount,
-			delivery_fee_share=order.delivery_fee * Decimal('0.4'),  # 40% des frais de livraison pour GABOSHOP
-		)
-		print(f"✅ Commission créée pour commande {order.order_number}: {order.commission_amount} FCFA")
+		# Use OrderService to calculate commission with per-category rules
+		commission_calc = OrderService.calculate_order_commission(order)
+		if commission_calc:
+			Commission.objects.create(
+				order=order,
+				store=order.store,
+				order_amount=order.items_total,
+				commission_rate=commission_calc.get('commission_rate', order.store.commission_rate),
+				commission_amount=commission_calc['commission_amount'],
+				delivery_fee_share=commission_calc['delivery_fee_share'],
+			)
+			print(f"✅ Commission créée pour commande {order.order_number}: {commission_calc['commission_amount']} FCFA")
 	
 	# 4. Confirmer la commande après paiement
 	if order.status == 'paid' and not order.confirmed_at:

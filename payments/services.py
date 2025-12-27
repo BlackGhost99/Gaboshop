@@ -359,10 +359,10 @@ class PaymentService:
                 commission = Commission.objects.create(
                     order=order,
                     store=order.store,
-                    order_amount=order.items_total,
-                    commission_rate=order.store.commission_rate,
-                    commission_amount=commission_calc['commission_amount'],
-                    delivery_fee_share=commission_calc['delivery_fee_share']
+                        order_amount=order.items_total,
+                        commission_rate=commission_calc.get('commission_rate', order.store.commission_rate),
+                        commission_amount=commission_calc['commission_amount'],
+                        delivery_fee_share=commission_calc['delivery_fee_share']
                 )
                 
                 logger.info(

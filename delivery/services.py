@@ -217,3 +217,54 @@ class DeliveryService:
         except Exception as e:
             logger.error(f"❌ Erreur calcul métriques: {e}")
             return None
+
+
+def auto_assign_delivery(order):
+    """Assigner automatiquement un livreur disponible à la commande prête.
+
+    Cette fonction est compatible avec l'usage direct depuis les vues/admins.
+    """
+    try:
+        with transaction.atomic():
+            # Verrouiller la livraison si existante
+            try:
+                delivery = Delivery.objects.select_for_update().get(order=order)
+            except Delivery.DoesNotExist:
+                delivery, _ = Delivery.objects.get_or_create(order=order)
+
+            if delivery.delivery_agent is not None:
+                return delivery
+
+            # Chercher un profil de livreur disponible
+            profile = (
+                DeliveryProfile.objects
+                .select_for_update()
+                .filter(status='available')
+                .select_related('user')
+                .first()
+            )
+
+            if not profile:
+                logger.info(f"auto_assign: pas de livreur disponible pour order {order.id}")
+                return None
+
+            # Assigner via le service existant
+            delivery = DeliveryService.assign_delivery_agent(order, profile.user)
+
+            # Marquer le profil occupé
+            try:
+                profile.status = 'busy'
+                profile.save()
+            except Exception:
+                logger.exception('Impossible de mettre à jour le statut du profil livreur')
+
+            delivery.is_auto_assigned = True
+            delivery.assigned_at = delivery.assigned_at or timezone.now()
+            delivery.save()
+
+            logger.info(f"Auto-assign: livraison {delivery.id} → livreur {profile.user.id}")
+            return delivery
+
+    except Exception:
+        logger.exception('Erreur auto_assign_delivery')
+        return None

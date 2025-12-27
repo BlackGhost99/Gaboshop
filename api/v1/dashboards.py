@@ -1,11 +1,15 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
-from django.db.models import Sum
+from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+from products.models import ProductCategory
+from payments.models import CategoryCommission
 from django.utils import timezone
 from payments.models import StoreSubscription
 from orders.models import Order
 from delivery.models import Delivery
+from orders.models import OrderItem
+from decimal import Decimal
 
 class ClientDashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -77,11 +81,18 @@ class StoreDashboardView(APIView):
         today = timezone.now().date()
         month_start = today.replace(day=1)
         
-        # Commandes du jour
-        daily_orders = Order.objects.filter(store=store, created_at__date=today)
-        daily_revenue = daily_orders.exclude(status__in=['cancelled', 'refunded']).aggregate(Sum('items_total'))['items_total__sum'] or 0
-        daily_commission = daily_orders.exclude(status__in=['cancelled', 'refunded']).aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0
-        daily_net_revenue = daily_revenue - daily_commission
+        # Commandes du jour — définir un filtre 'payées' robuste (par status ou paiement)
+        from django.db.models import Q
+        paid_filter = Q(payment__status__in=['success', 'completed']) | Q(status__in=['paid', 'confirmed', 'delivered', 'in_transit', 'assigned', 'ready', 'preparing'])
+        daily_orders = Order.objects.filter(store=store, created_at__date=today).filter(paid_filter)
+
+        # Somme exacte des ventes = sum(unit_price * quantity) des OrderItems liés
+        subtotal_expr = ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=12, decimal_places=2))
+        daily_items_qs = OrderItem.objects.filter(order__in=daily_orders).annotate(subtotal=subtotal_expr)
+        daily_ca = daily_items_qs.aggregate(s=Sum('subtotal'))['s'] or 0
+
+        daily_commission = daily_orders.aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0
+        daily_net_after_commission = (daily_ca - daily_commission)
         
         # Commandes en attente de traitement
         pending_orders = Order.objects.filter(store=store, status__in=['paid', 'confirmed']).count()
@@ -103,11 +114,35 @@ class StoreDashboardView(APIView):
                 'items_count': o.items.count(),
             })
 
-        monthly_orders_qs = Order.objects.filter(store=store, created_at__date__gte=month_start).exclude(status__in=['cancelled', 'refunded'])
+        # Utiliser commandes payées pour métriques mensuelles (filtre robuste)
+        monthly_orders_qs = Order.objects.filter(store=store, created_at__date__gte=month_start).filter(paid_filter)
         monthly_orders = monthly_orders_qs.count()
-        monthly_revenue = monthly_orders_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        # Calculer CA mensuel à partir des OrderItems
+        monthly_items_qs = OrderItem.objects.filter(order__in=monthly_orders_qs).annotate(subtotal=subtotal_expr)
+        monthly_ca = monthly_items_qs.aggregate(s=Sum('subtotal'))['s'] or 0
         monthly_commission = monthly_orders_qs.aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0
-        monthly_net_revenue = monthly_revenue - monthly_commission
+        monthly_net_after_commission = monthly_ca - monthly_commission
+
+        # Weekly revenue: compute last 7 days (Mon-Sun of current week)
+        # Build list of days starting from Monday
+        from datetime import timedelta
+        today = timezone.now().date()
+        # Determine Monday of current week
+        monday = today - timedelta(days=today.weekday())
+        weekly_revenue_list = []
+        for i in range(7):
+            day = monday + timedelta(days=i)
+            day_orders = Order.objects.filter(store=store, created_at__date=day).filter(paid_filter)
+            # Use OrderItem subtotals per day for store CA
+            day_items_qs = OrderItem.objects.filter(order__in=day_orders).annotate(subtotal=subtotal_expr)
+            day_total = day_items_qs.aggregate(Sum('subtotal'))['subtotal__sum'] or 0
+            # short name in French
+            day_name = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]
+            weekly_revenue_list.append({
+                'date': day.isoformat(),
+                'name': day_name,
+                'revenue': day_total
+            })
 
         # Forfait / abonnement actif
         active_subscription = StoreSubscription.objects.filter(store=store, status='active').order_by('-end_date').first()
@@ -120,6 +155,53 @@ class StoreDashboardView(APIView):
                 'auto_renew': active_subscription.auto_renew,
                 'monthly_fee': active_subscription.monthly_fee,
             }
+
+        # --- Breakdown par catégorie (CA et commission) ---
+        # Expression pour le subtotal des OrderItems
+        subtotal_expr = ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=12, decimal_places=2))
+
+        def compute_category_breakdown(order_qs):
+            items_qs = OrderItem.objects.filter(order__in=order_qs).annotate(subtotal=subtotal_expr)
+            grouped = items_qs.values('product__category__id', 'product__category__name').annotate(items_ca=Sum('subtotal')).order_by('-items_ca')
+            breakdown = []
+            # plan multiplier for store
+            plan = store.get_current_plan()
+            multiplier = Decimal(getattr(plan, 'commission_multiplier', 1)) if plan else Decimal('1')
+            for g in grouped:
+                cat_id = g.get('product__category__id')
+                cat_name = g.get('product__category__name') or 'Autres'
+                items_ca = g.get('items_ca') or Decimal('0.00')
+                base_rate = None
+                try:
+                    if cat_id:
+                        pc = ProductCategory.objects.get(id=cat_id)
+                        sc = getattr(pc, 'store_category', None)
+                        if sc:
+                            try:
+                                cc = CategoryCommission.objects.get(store_category=sc)
+                                base_rate = Decimal(cc.base_rate)
+                            except CategoryCommission.DoesNotExist:
+                                base_rate = None
+                except ProductCategory.DoesNotExist:
+                    base_rate = None
+
+                if base_rate is None:
+                    base_rate = Decimal(store.commission_rate or Decimal('0.00'))
+
+                effective_rate = (base_rate * Decimal(multiplier))
+                commission_amount = (Decimal(items_ca) * effective_rate) / Decimal('100')
+                breakdown.append({
+                    'category_id': cat_id,
+                    'category_name': cat_name,
+                    'items_ca': items_ca,
+                    'base_rate': str(base_rate),
+                    'effective_rate': str(effective_rate),
+                    'commission': commission_amount.quantize(Decimal('0.01'))
+                })
+            return breakdown
+
+        category_breakdown_daily = compute_category_breakdown(daily_orders)
+        category_breakdown_monthly = compute_category_breakdown(monthly_orders_qs)
 
         return Response({
             'success': True,
@@ -138,18 +220,28 @@ class StoreDashboardView(APIView):
                     'phone': getattr(store.manager, 'phone_number', '') or getattr(store.manager, 'phone', ''),
                 },
                 'stats': {
-                    'daily_revenue': daily_revenue,
+                    # New explicit keys
+                    'daily_ca': daily_ca,
                     'daily_commission': daily_commission,
-                    'daily_net_revenue': daily_net_revenue,
+                    'daily_net_after_commission': daily_net_after_commission,
+                    # Backward-compatible aliases expected by frontend
+                    'daily_revenue': daily_ca,
+                    'daily_net_revenue': daily_net_after_commission,
                     'daily_orders_count': daily_orders.count(),
                     'pending_orders': pending_orders,
                     'ongoing_orders': ongoing_orders
                 },
                 'pending_order_list': pending_payload,
                 'monthly_orders': monthly_orders,
-                'monthly_revenue': monthly_revenue,
+                'monthly_ca': monthly_ca,
                 'monthly_commission': monthly_commission,
-                'monthly_net_revenue': monthly_net_revenue,
+                'monthly_net_after_commission': monthly_net_after_commission,
+                # Backward-compatible aliases
+                'monthly_revenue': monthly_ca,
+                'monthly_net_revenue': monthly_net_after_commission,
+                'weekly_revenue': weekly_revenue_list,
+                'category_breakdown_daily': category_breakdown_daily,
+                'category_breakdown_monthly': category_breakdown_monthly,
                 'subscription': subscription_payload,
             }
         })

@@ -42,7 +42,7 @@ class StoreAdmin(admin.ModelAdmin):
             'fields': ('phone', 'email', 'address', 'city', 'zone', 'latitude', 'longitude')
         }),
         ('Configuration Business', {
-            'fields': ('commission_rate', 'delivery_fee', 'min_order_amount')
+            'fields': ('commission_rate', 'offers_delivery', 'delivery_fee', 'min_order_amount')
         }),
         ('Horaires et Statut', {
             'fields': ('opening_time', 'closing_time', 'is_active', 'is_verified')

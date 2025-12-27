@@ -58,7 +58,13 @@ const Register = () => {
       if (res.success && res.data?.tokens) {
         sessionStorage.setItem('token', res.data.tokens.access);
         sessionStorage.setItem('refresh_token', res.data.tokens.refresh);
-        navigate('/dashboard');
+        // If the created user is an admin, redirect to admin dashboard
+        const createdUserType = res.data.user?.user_type || res.data.user_type;
+        if (createdUserType === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setError(res.error?.message || 'Inscription impossible.');
       }

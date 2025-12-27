@@ -12,7 +12,7 @@ from orders.serializers import (
 	OrderStatusUpdateSerializer
 )
 from notifications.models import Notification
-from delivery.services import DeliveryService
+from delivery.services import DeliveryService, auto_assign_delivery
 from users.models import User
 
 logger = logging.getLogger(__name__)
@@ -149,14 +149,10 @@ class OrderStatusUpdateView(APIView):
 				serializer.save()
 				order.refresh_from_db()
 
-				# Auto-assigner dès que le statut passe à "ready": on prend simplement le premier livreur disponible
-				if order.status == 'ready' and not getattr(order, 'delivery', None):
+				# Auto-assigner dès que le statut passe à "ready"
+				if order.status == 'ready':
 					try:
-						agent = User.objects.filter(user_type='delivery_agent', is_available=True).first()
-						if agent:
-							DeliveryService.assign_delivery_agent(order, agent)
-						else:
-							logger.warning(f"⚠️ Aucun livreur disponible pour {order.order_number}")
+						auto_assign_delivery(order)
 					except Exception as assign_err:
 						logger.error(f"❌ Auto-assignation livreur échouée pour {order.order_number}: {assign_err}")
 				

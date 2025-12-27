@@ -16,6 +16,7 @@ import StoreProfile from './pages/store/StoreProfile';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
+import SubscriptionPlans from './pages/SubscriptionPlans';
 
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
@@ -83,6 +84,7 @@ function App() {
             <AdminDashboard />
           </ErrorBoundary>
         } />
+        <Route path="/plans" element={<SubscriptionPlans />} />
       </Routes>
       <GaboshopAI />
     </Router>

@@ -244,6 +244,10 @@ class SubscriptionPlan(models.Model):
 	# Configuration
 	commission_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, 
 										  help_text="Taux de commission spécifique au plan (si null, utilise le taux par défaut)")
+	# Multiplicateur appliqué au taux de commission de base par catégorie.
+	# Ex: 1.00 = pas de réduction (Starter), 0.60 = réduction de 40% (Pro), 0.25 = réduction de 75% (Business)
+	commission_multiplier = models.DecimalField(max_digits=4, decimal_places=2, default=1.00,
+												help_text="Multiplicateur appliqué au taux de commission de base (ex: 0.60 pour -40%)")
 	
 	# Métadonnées
 	description = models.TextField(blank=True)
@@ -278,6 +282,47 @@ class SubscriptionPlan(models.Model):
 		if self.priority_listing > 0:
 			features.append("Meilleure visibilité sur la plateforme")
 		return features + self.features_json
+
+
+class CategoryCommission(models.Model):
+	"""
+	Taux de commission de base par catégorie de magasin (StoreCategory).
+	Permet de définir des taux différents pour 'Alimentation', 'Électronique', etc.
+	"""
+	from stores.models import StoreCategory
+
+	store_category = models.OneToOneField('stores.StoreCategory', on_delete=models.CASCADE, related_name='category_commission')
+	base_rate = models.DecimalField(max_digits=5, decimal_places=2, default=8.00, help_text="Taux de commission de base en %")
+	notes = models.TextField(blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = "Commission Par Catégorie"
+		verbose_name_plural = "Commissions Par Catégorie"
+		ordering = ['store_category']
+
+	def __str__(self):
+		return f"{self.store_category.name} - {self.base_rate}%"
+
+
+class CategoryCommissionChangeLog(models.Model):
+	"""Audit log for changes to CategoryCommission.base_rate"""
+	category_commission = models.ForeignKey('CategoryCommission', on_delete=models.CASCADE, related_name='change_logs')
+	old_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+	new_rate = models.DecimalField(max_digits=5, decimal_places=2)
+	changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
+	note = models.TextField(blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = "Historique Commission Catégorie"
+		verbose_name_plural = "Historique Commissions Catégorie"
+		ordering = ['-created_at']
+
+	def __str__(self):
+		who = self.changed_by.get_full_name() if self.changed_by else 'Système'
+		return f"{self.category_commission.store_category.name}: {self.old_rate} → {self.new_rate} par {who} @ {self.created_at}"
 
 
 class StoreSubscription(models.Model):

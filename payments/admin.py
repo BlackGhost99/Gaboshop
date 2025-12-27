@@ -4,8 +4,11 @@ from .models import (
 	Payment, Commission, Reversement,
 	PaymentIntent, PaymentTransaction,
 	SubscriptionPlan, StoreSubscription,
-	Forfait, ClientForfait, Payout, PaymentCallbackLog
+	Forfait, ClientForfait, Payout, PaymentCallbackLog,
+	CategoryCommission
 )
+
+from .models import CategoryCommissionChangeLog
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
@@ -317,7 +320,8 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 				'has_custom_page',
 				'has_priority_support',
 				'priority_listing',
-				'commission_rate'
+					'commission_rate',
+					'commission_multiplier'
 			)
 		}),
 		('Fonctionnalités additionnelles', {
@@ -428,6 +432,29 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 			return format_html('<span style="color: green;">✓ Oui</span>')
 		return format_html('<span style="color: gray;">✗ Non</span>')
 	auto_renew_display.short_description = 'Auto-renouvellement'
+
+
+@admin.register(CategoryCommission)
+class CategoryCommissionAdmin(admin.ModelAdmin):
+	list_display = ('store_category', 'base_rate', 'created_at')
+	search_fields = ('store_category__name',)
+	readonly_fields = ('created_at', 'updated_at')
+	fieldsets = (
+		(None, {
+			'fields': ('store_category', 'base_rate', 'notes')
+		}),
+		('Métadonnées', {
+			'fields': ('created_at', 'updated_at'),
+			'classes': ('collapse',)
+		}),
+	)
+
+
+@admin.register(CategoryCommissionChangeLog)
+class CategoryCommissionChangeLogAdmin(admin.ModelAdmin):
+	list_display = ('category_commission', 'old_rate', 'new_rate', 'changed_by', 'created_at')
+	search_fields = ('category_commission__store_category__name', 'changed_by__username')
+	readonly_fields = ('category_commission', 'old_rate', 'new_rate', 'changed_by', 'note', 'created_at')
 
 
 # ============================================================================

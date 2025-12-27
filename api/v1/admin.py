@@ -471,8 +471,8 @@ class AdminProductCategoriesView(APIView):
                 "id": c.id,
                 "name": c.name,
                 "description": c.description,
-                "store_id": c.store.id,
-                "store_name": c.store.name,
+                "store_id": c.store.id if c.store else None,
+                "store_name": c.store.name if c.store else (c.store_category.name if getattr(c, 'store_category', None) else ''),
                 "order": c.order,
             }
             for c in qs[:300] # Limit to avoid huge payload

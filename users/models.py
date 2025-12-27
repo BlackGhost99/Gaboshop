@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.db import models
+import secrets
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -12,7 +14,21 @@ class UserManager(BaseUserManager):
 	def create_user(self, phone, password=None, **extra_fields):
 		if not phone:
 			raise ValueError('The phone must be set')
-		phone = self.normalize_email(phone) if '@' in phone else phone
+
+		# Normaliser le numéro de téléphone selon les mêmes règles que LoginSerializer
+		phone = phone.strip().replace(' ', '')
+		if phone.startswith('+241'):
+			phone = phone
+		elif phone.startswith('241'):
+			phone = '+' + phone
+		elif phone.startswith('0'):
+			phone = '+241' + phone[1:]
+		elif phone.isdigit() and len(phone) == 8:
+			phone = '+241' + phone
+		# else: keep as provided
+
+		# keep compatibility with previous code paths that used normalize_email for emails
+		phone = phone
 		# Ensure username is set (AbstractUser still has a username field with unique constraint)
 		username = extra_fields.pop('username', None) or phone
 		extra_fields.setdefault('email', extra_fields.get('email', ''))
@@ -122,6 +138,33 @@ class User(AbstractUser):
 			return self.first_name
 		else:
 			return f"User {self.phone}"
+
+
+class DeliveryAgentApiKey(models.Model):
+	"""
+	API key for delivery agents to allow persistent auth from mobile devices.
+	"""
+	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='api_key')
+	key = models.CharField(max_length=64, unique=True, db_index=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	last_used_at = models.DateTimeField(null=True, blank=True)
+
+	class Meta:
+		verbose_name = "API Key Livreur"
+		verbose_name_plural = "API Keys Livreurs"
+
+	def __str__(self):
+		return f"API Key for {self.user.phone}"
+
+	@classmethod
+	def generate_key(cls):
+		return secrets.token_urlsafe(32)
+
+	@classmethod
+	def create_for_user(cls, user):
+		key = cls.generate_key()
+		return cls.objects.create(user=user, key=key, created_at=timezone.now())
+
 
 
 class ClientProfile(models.Model):

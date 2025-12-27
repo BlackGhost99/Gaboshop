@@ -5,9 +5,9 @@ import {
     getStoreProducts, 
     getManagerStoreProducts,
     getStoreCategories, 
+    getAllCategories,
     createProduct, 
     updateProduct,
-    createStoreCategory,
     deleteProduct
 } from '../../services/productService';
 
@@ -17,10 +17,8 @@ const StoreProducts = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showProductModal, setShowProductModal] = useState(false);
-    const [showCategoryModal, setShowCategoryModal] = useState(false);
     
     // Form states
-    const [newCategory, setNewCategory] = useState({ name: '', description: '' });
     const [newProduct, setNewProduct] = useState({
         name: '', description: '', price: '', stock: '', category: '', image: null
     });
@@ -40,13 +38,19 @@ const StoreProducts = () => {
                 setStore(storeInfo);
                 const storeId = storeInfo.id;
                 
-                const [productsRes, categoriesRes] = await Promise.all([
+                const [productsRes, storeCategoriesRes, allCategoriesRes] = await Promise.all([
                     getManagerStoreProducts(storeId),
-                    getStoreCategories(storeId)
+                    getStoreCategories(storeId),
+                    getAllCategories()
                 ]);
 
                 if (productsRes.success) setProducts(productsRes.data.products || []);
-                if (categoriesRes.success) setCategories(categoriesRes.data || []);
+                // Prefer global list when available, otherwise use store-specific
+                if (allCategoriesRes && allCategoriesRes.success) {
+                    setCategories(allCategoriesRes.data || []);
+                } else if (storeCategoriesRes && storeCategoriesRes.success) {
+                    setCategories(storeCategoriesRes.data || []);
+                }
             }
         } catch (error) {
             console.error("Error fetching data", error);
@@ -55,23 +59,7 @@ const StoreProducts = () => {
         }
     };
 
-    const handleCreateCategory = async (e) => {
-        e.preventDefault();
-        try {
-            const res = await createStoreCategory(store.id, newCategory);
-            if (res.success) {
-                setCategories([...categories, res.data]);
-                setShowCategoryModal(false);
-                setNewCategory({ name: '', description: '' });
-            }
-        } catch (error) {
-            console.error("Error creating category", error);
-            const message = error.error?.details 
-                ? Object.values(error.error.details).flat().join('\n')
-                : (error.error?.message || "Erreur lors de la création de la catégorie");
-            alert(message);
-        }
-    };
+    // Note: merchants cannot create categories from the frontend.
 
     const handleViewProduct = (product) => {
         setViewingProduct(product);
@@ -156,17 +144,13 @@ const StoreProducts = () => {
 
     if (loading) return <StoreLayout title="Chargement..."><div>Chargement...</div></StoreLayout>;
 
+    const hasCategories = Array.isArray(categories) && categories.length > 0;
+
     return (
         <StoreLayout title="Gestion des Produits">
             <div className="mb-6 flex justify-between">
                 <h2 className="text-2xl font-bold">Mes Produits</h2>
                 <div className="space-x-2">
-                    <button 
-                        onClick={() => setShowCategoryModal(true)}
-                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                    >
-                        + Nouvelle Catégorie
-                    </button>
                     <button 
                         onClick={() => setShowProductModal(true)}
                         className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
@@ -280,48 +264,7 @@ const StoreProducts = () => {
             )}
 
             {/* Category Modal */}
-            {showCategoryModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                        <h3 className="text-lg font-bold mb-4">Nouvelle Catégorie</h3>
-                        <form onSubmit={handleCreateCategory}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium mb-1">Nom</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full border rounded p-2"
-                                    value={newCategory.name}
-                                    onChange={e => setNewCategory({...newCategory, name: e.target.value})}
-                                    required
-                                />
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium mb-1">Description</label>
-                                <textarea 
-                                    className="w-full border rounded p-2"
-                                    value={newCategory.description}
-                                    onChange={e => setNewCategory({...newCategory, description: e.target.value})}
-                                />
-                            </div>
-                            <div className="flex justify-end space-x-2">
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowCategoryModal(false)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-                                >
-                                    Annuler
-                                </button>
-                                <button 
-                                    type="submit"
-                                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                                >
-                                    Créer
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {/* Category creation removed: merchants cannot add categories from frontend */}
 
             {/* Product Modal */}
             {showProductModal && (
@@ -358,12 +301,16 @@ const StoreProducts = () => {
                                     value={newProduct.category}
                                     onChange={e => setNewProduct({...newProduct, category: e.target.value})}
                                     required
+                                    disabled={!hasCategories}
                                 >
-                                    <option value="">Sélectionner une catégorie</option>
+                                    <option value="">{hasCategories ? 'Sélectionner une catégorie' : 'Aucune catégorie disponible'}</option>
                                     {categories.map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>
+                                {!hasCategories && (
+                                    <p className="text-sm text-gray-500 mt-2">Aucune catégorie disponible pour votre magasin. Contactez l'administrateur.</p>
+                                )}
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-1">Description</label>
@@ -409,6 +356,7 @@ const StoreProducts = () => {
                                 <button 
                                     type="submit"
                                     className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                    disabled={!hasCategories}
                                 >
                                     {editingProduct ? 'Enregistrer' : 'Créer'}
                                 </button>

@@ -5,9 +5,10 @@ from .models import ProductCategory, Product
 
 @admin.register(ProductCategory)
 class ProductCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'store', 'product_count', 'order')
-    list_filter = ('store',)
-    search_fields = ('name', 'store__name')
+    list_display = ('name', 'store_category', 'product_count', 'order')
+    list_filter = ('store_category',)
+    search_fields = ('name', 'store_category__name')
+    exclude = ('store',)
     list_editable = ('order',)
     
     def product_count(self, obj):
@@ -103,3 +104,6 @@ class ProductAdmin(admin.ModelAdmin):
 from django.contrib import admin
 
 # Register your models here.
+
+
+# ProductCategoryTemplate admin removed after templates merged into ProductCategory

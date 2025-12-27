@@ -113,16 +113,18 @@ const StoreDashboard = () => {
     );
   }
 
-  // Demo data for chart
-  const chartData = [
-    { name: 'Lun', vente: 15000 },
-    { name: 'Mar', vente: 23000 },
-    { name: 'Mer', vente: 18000 },
-    { name: 'Jeu', vente: 32000 },
-    { name: 'Ven', vente: 21000 },
-    { name: 'Sam', vente: 45000 },
-    { name: 'Dim', vente: dashboardData?.stats?.daily_revenue || 12000 },
-  ];
+  // Chart data: prefer weekly_revenue from API, otherwise fallback to demo
+  const chartData = (dashboardData?.weekly_revenue && Array.isArray(dashboardData.weekly_revenue))
+    ? dashboardData.weekly_revenue.map(d => ({ name: d.name, vente: d.revenue }))
+    : [
+        { name: 'Lun', vente: 15000 },
+        { name: 'Mar', vente: 23000 },
+        { name: 'Mer', vente: 18000 },
+        { name: 'Jeu', vente: 32000 },
+        { name: 'Ven', vente: 21000 },
+        { name: 'Sam', vente: 45000 },
+        { name: 'Dim', vente: dashboardData?.stats?.daily_revenue || 12000 },
+      ];
 
   return (
     <>
@@ -209,23 +211,7 @@ const StoreDashboard = () => {
                 </div>
               </div>
 
-              {/* Mini Stat or Goal */}
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl shadow-lg p-6 text-white flex flex-col justify-between">
-                <div>
-                  <h4 className="text-indigo-100 font-medium mb-1">Objectif Hebdomadaire</h4>
-                  <p className="text-3xl font-bold">85%</p>
-                  <div className="w-full bg-black/20 rounded-full h-2 mt-3">
-                    <div className="bg-white rounded-full h-2" style={{ width: '85%' }}></div>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <p className="text-sm text-indigo-100">Conseil du jour :</p>
-                  <p className="font-medium mt-1">Boostez vos ventes en activant une promotion Flash ce week-end !</p>
-                  <button className="mt-4 w-full py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition-colors">
-                    Créer une promo
-                  </button>
-                </div>
-              </div>
+              {/* Goal card removed per request */}
             </div>
 
             {/* Statistiques principales */}

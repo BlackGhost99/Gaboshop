@@ -146,8 +146,9 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
     if (packagePhoto) {
       formData.append('package_photo', packagePhoto); // OPTIONNELLE
     }
-    formData.append('latitude', gpsLocation.latitude);
-    formData.append('longitude', gpsLocation.longitude);
+    // Round GPS coordinates to 6 decimal places to match backend DecimalField(max_digits=9, decimal_places=6)
+    formData.append('latitude', gpsLocation.latitude.toFixed(6));
+    formData.append('longitude', gpsLocation.longitude.toFixed(6));
     
     if (verificationMethod === 'signature') {
       formData.append('signature', signature);

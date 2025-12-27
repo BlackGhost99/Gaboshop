@@ -1,4 +1,7 @@
 from django.contrib import admin
+import logging
+
+logger = logging.getLogger(__name__)
 from django.utils.html import format_html
 from .models import Order, OrderItem
 
@@ -105,7 +108,19 @@ class OrderAdmin(admin.ModelAdmin):
 	mark_as_preparing.short_description = "Marquer comme en préparation"
     
 	def mark_as_ready(self, request, queryset):
-		updated = queryset.update(status='ready')
-		self.message_user(request, f'{updated} commandes prêtes pour livraison.')
+		# Boucler pour déclencher l'assignation automatique pour chaque commande
+		from delivery.services import auto_assign_delivery
+
+		count = 0
+		for order in queryset:
+			order.status = 'ready'
+			order.save()
+			try:
+				auto_assign_delivery(order)
+			except Exception:
+				logger.exception('Erreur auto-assign depuis admin')
+			count += 1
+
+		self.message_user(request, f'{count} commandes prêtes pour livraison.')
 	mark_as_ready.short_description = "Marquer comme prêtes"
 

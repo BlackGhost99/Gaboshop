@@ -1,8 +1,13 @@
 import axios from 'axios';
 
 // Configuration de base pour Axios
+// Use VITE_API_URL when provided (development/production override),
+// otherwise fall back to the relative path so Vite proxy continues to work.
+const envBase = import.meta.env.VITE_API_URL;
+const baseURL = envBase ? `${envBase.replace(/\/$/, '')}/api/v1` : '/api/v1';
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
 });
 
 // Intercepteur pour ajouter le token JWT et gérer Content-Type

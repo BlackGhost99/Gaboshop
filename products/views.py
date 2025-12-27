@@ -9,6 +9,7 @@ from .serializers import (
     ProductSerializer, ProductDetailSerializer, ProductCreateSerializer,
     ProductUpdateSerializer, ProductImageSerializer
 )
+from rest_framework.permissions import IsAdminUser
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -73,6 +74,9 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         img = ProductImage.objects.create(product=product, image=file_obj, alt_text=alt, order=order)
         return Response({'success': True, 'image': ProductImageSerializer(img, context={'request': request}).data}, status=status.HTTP_201_CREATED)
+
+
+# ProductCategoryTemplateViewSet removed; templates merged into ProductCategory
 from django.shortcuts import render
 
 # Create your views here.

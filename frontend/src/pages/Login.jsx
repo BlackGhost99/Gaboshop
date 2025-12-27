@@ -21,9 +21,14 @@ const Login = () => {
         // Stocker le token
         sessionStorage.setItem('token', response.data.tokens.access);
         sessionStorage.setItem('refresh_token', response.data.tokens.refresh);
-        
-        // Rediriger vers le dashboard (le composant DashboardRedirect gérera le rôle)
-        navigate('/dashboard');
+
+        // Direct redirect for admin users, otherwise go to /dashboard
+        const userType = response.data.user?.user_type || response.data.user_type;
+        if (userType === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setError('Réponse du serveur invalide.');
       }
