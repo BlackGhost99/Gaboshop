@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'notifications',
     'revenue',
     'core',
+    'b2b',
 ]
 
 MIDDLEWARE = [

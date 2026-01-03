@@ -56,6 +56,15 @@ from .finances import (
     DeliveryPayoutView, SubscriptionsView, SponsoredProductsView, RevenueBreakdownView
     , CategoryCommissionListCreateView, CategoryCommissionDetailView
 )
+from b2b.api.views import (
+    WholesalerListView, WholesalerDetailView, WholesalerProductsView,
+    WholesalerCategoriesView, WholesalerCatalogView, B2BOrderCreateView,
+    MyB2BOrdersView, B2BProfileDetailView, B2BProfileCreateView,
+    B2BProfileUpdateView, B2BProfileActivateView, B2BProfileDeactivateView,
+    B2BProductPricingListView, B2BProductPricingCreateView,
+    B2BProductPricingUpdateView, B2BProductPricingDeleteView,
+    B2BProductPricingBulkCreateView
+)
 from .orders_admin import (
     OrderStatsView, OrdersListView, OrderDetailView as AdminOrderDetailView,
     DeliveryAssignmentView, OrderStatusUpdateView as AdminOrderStatusUpdateView,
@@ -207,6 +216,25 @@ urlpatterns = [
     
     # Payouts (Paiements automatiques aux livreurs et commerçants)
     path('payouts/', PayoutListView.as_view(), name='payouts-list'),
+
+    # B2B Endpoints
+    path('b2b/wholesalers/', WholesalerListView.as_view(), name='b2b-wholesalers'),
+    path('b2b/wholesalers/<int:pk>/', WholesalerDetailView.as_view(), name='b2b-wholesaler-detail'),
+    path('b2b/wholesalers/<int:id>/products/', WholesalerProductsView.as_view(), name='b2b-wholesaler-products'),
+    path('b2b/wholesalers/<int:id>/categories/', WholesalerCategoriesView.as_view(), name='b2b-wholesaler-categories'),
+    path('b2b/wholesalers/<int:id>/catalog/', WholesalerCatalogView.as_view(), name='b2b-wholesaler-catalog'),
+    path('b2b/orders/', B2BOrderCreateView.as_view(), name='b2b-order-create'),
+    path('b2b/my-orders/', MyB2BOrdersView.as_view(), name='b2b-my-orders'),
+    path('b2b/profile/', B2BProfileDetailView.as_view(), name='b2b-profile-detail'),
+    path('b2b/profile/create/', B2BProfileCreateView.as_view(), name='b2b-profile-create'),
+    path('b2b/profile/update/', B2BProfileUpdateView.as_view(), name='b2b-profile-update'),
+    path('b2b/profile/activate/', B2BProfileActivateView.as_view(), name='b2b-profile-activate'),
+    path('b2b/profile/deactivate/', B2BProfileDeactivateView.as_view(), name='b2b-profile-deactivate'),
+    path('b2b/pricings/', B2BProductPricingListView.as_view(), name='b2b-pricings'),
+    path('b2b/pricings/create/', B2BProductPricingCreateView.as_view(), name='b2b-pricing-create'),
+    path('b2b/pricings/bulk-create/', B2BProductPricingBulkCreateView.as_view(), name='b2b-pricing-bulk-create'),
+    path('b2b/pricings/<int:pricing_id>/', B2BProductPricingUpdateView.as_view(), name='b2b-pricing-update'),
+    path('b2b/pricings/<int:pricing_id>/delete/', B2BProductPricingDeleteView.as_view(), name='b2b-pricing-delete'),
 
     path('', include(router.urls)),
     # Webhooks

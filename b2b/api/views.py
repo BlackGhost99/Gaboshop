@@ -13,7 +13,7 @@ from django.db import transaction
 from django.db.models import Q
 from stores.models import Store
 from orders.models import Order, OrderItem
-from b2b.models import B2BProfile, B2BCategory
+from b2b.models import B2BProfile, B2BCategory, B2BProductPricing
 from b2b.services.permissions import (
 	can_access_b2b, 
 	can_purchase_from_wholesaler,
@@ -735,7 +735,6 @@ class B2BProfileDeactivateView(APIView):
 
 # ==================== B2B PRODUCT PRICING MANAGEMENT ====================
 
-from b2b.models import B2BProductPricing
 from b2b.api.serializers import B2BProductPricingSerializer
 from products.models import Product
 

@@ -5,8 +5,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import StoreLayout from '../../components/StoreLayout';
 import StatCard from '../../components/StatCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import B2BProcurementEmbedded from '../../components/b2b/B2BProcurementEmbedded';
 import { getStoreDashboard } from '../../services/dashboardService';
-import { getStores } from '../../services/storeService';
 import { updateOrderStatus } from '../../services/orderService';
 import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils/helpers';
 
@@ -17,8 +17,6 @@ const StoreDashboard = () => {
   const [toast, setToast] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
   const [activeTab, setActiveTab] = useState('overview'); // overview, supply
-  const [wholesalers, setWholesalers] = useState([]);
-  const [loadingWholesalers, setLoadingWholesalers] = useState(false);
 
   const fetchDashboard = async () => {
     try {
@@ -40,16 +38,16 @@ const StoreDashboard = () => {
   const fetchWholesalers = async () => {
     try {
       setLoadingWholesalers(true);
-      const res = await getStores();
-      // Le backend filtre déjà pour ne renvoyer que les Grossistes/Industries aux gérants
-      let data = [];
-      if (res.success) data = res.data;
-      else if (Array.isArray(res)) data = res;
-      else if (res.results) data = res.results;
-
-      setWholesalers(data);
+      const response = await getWholesalers();
+      if (response.success) {
+        setWholesalers(response.data || []);
+      } else {
+        setWholesalers([]);
+        console.error("Erreur chargement grossistes", response.error);
+      }
     } catch (err) {
       console.error("Erreur chargement grossistes", err);
+      setWholesalers([]);
     } finally {
       setLoadingWholesalers(false);
     }
@@ -58,12 +56,6 @@ const StoreDashboard = () => {
   useEffect(() => {
     fetchDashboard();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'supply') {
-      fetchWholesalers();
-    }
-  }, [activeTab]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -388,63 +380,7 @@ const StoreDashboard = () => {
         )}
 
         {activeTab === 'supply' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-indigo-600">
-              <h2 className="text-2xl font-bold text-gray-900">Espace Approvisionnement B2B</h2>
-              <p className="text-gray-600 mt-2">
-                Accédez aux catalogues exclusifs des grossistes et industries partenaires pour réapprovisionner votre stock.
-              </p>
-            </div>
-
-            {loadingWholesalers ? (
-              <LoadingSpinner />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {wholesalers.length > 0 ? wholesalers.map(wholesaler => (
-                  <div key={wholesaler.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-100">
-                    <div className="h-32 bg-gray-200 relative">
-                      {wholesaler.banner_image ? (
-                        <img src={wholesaler.banner_image} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                          <span className="text-white font-bold text-xl">{wholesaler.name}</span>
-                        </div>
-                      )}
-                      <div className="absolute -bottom-6 left-4">
-                        <div className="h-16 w-16 rounded-full border-4 border-white bg-white shadow overflow-hidden">
-                          {wholesaler.logo ? (
-                            <img src={wholesaler.logo} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-800 font-bold">
-                              {wholesaler.name.substr(0, 1)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <span className="absolute top-2 right-2 bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded">
-                        Grossiste
-                      </span>
-                    </div>
-                    <div className="pt-8 px-4 pb-4">
-                      <h3 className="text-lg font-bold text-gray-900">{wholesaler.name}</h3>
-                      <p className="text-sm text-gray-500 mb-4">{wholesaler.category_name} • {wholesaler.city}</p>
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{wholesaler.description || 'Fournisseur partenaire'}</p>
-                      <Link
-                        to={`/stores/${wholesaler.id}`}
-                        className="block w-full text-center bg-indigo-50 text-indigo-700 py-2 rounded-md font-medium hover:bg-indigo-100 transition-colors"
-                      >
-                        Voir le catalogue
-                      </Link>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="col-span-full text-center py-12 bg-white rounded-lg">
-                    <p className="text-gray-500">Aucun grossiste disponible pour le moment.</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <B2BProcurementEmbedded />
         )}
       </StoreLayout>
       {toast && (
