@@ -11,6 +11,10 @@ const AdminStoresSection = ({
   handleDeactivateStore,
   handleActivateStore,
   handleDeleteStore,
+  handleActivateB2B,
+  handleDeactivateB2B,
+  handleCreateB2BProfile,
+  b2bLoading = {},
   storeCategories,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,6 +162,7 @@ const AdminStoresSection = ({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ville</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gérant</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">B2B</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Créé le</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -186,6 +191,26 @@ const AdminStoresSection = ({
                   <span className={`px-2 py-1 text-xs rounded-full ${store.is_active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                     {store.is_active ? 'Actif' : 'Inactif'}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {store.is_b2b ? (
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-1 text-xs rounded-full bg-purple-50 text-purple-700">
+                        B2B
+                      </span>
+                      {store.b2b_profile?.is_active ? (
+                        <span className="px-2 py-1 text-xs rounded-full bg-green-50 text-green-700">
+                          Actif
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
+                          Inactif
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {store.created_at ? new Date(store.created_at).toLocaleDateString('fr-FR') : '-'}
@@ -236,7 +261,7 @@ const AdminStoresSection = ({
             ))}
             {storesListAdmin.length === 0 && (
               <tr>
-                <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
                   Aucun magasin trouvé
                 </td>
               </tr>

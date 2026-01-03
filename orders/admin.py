@@ -21,6 +21,8 @@ class OrderAdmin(admin.ModelAdmin):
 		'order_number',
 		'client_display',
 		'store',
+		'is_b2b',
+		'source_store',
 		'city',
 		'status_display',
 		'total_amount_display',
@@ -28,16 +30,16 @@ class OrderAdmin(admin.ModelAdmin):
 		'created_at',
 		'delivery_status'
 	)
-	list_filter = ('status', 'store', 'created_at', 'city', 'delivery_zone')
-	search_fields = ('order_number', 'client__phone', 'store__name', 'delivery_address', 'city')
+	list_filter = ('is_b2b', 'status', 'store', 'created_at', 'city', 'delivery_zone')
+	search_fields = ('order_number', 'client__phone', 'store__name', 'source_store__name', 'delivery_address', 'city')
 	readonly_fields = (
-		'order_number', 'created_at', 'updated_at', 'confirmed_at', 
+		'order_number', 'is_b2b', 'source_store', 'created_at', 'updated_at', 'confirmed_at', 
 		'delivered_at', 'items_total_display', 'total_amount_display'
 	)
 	inlines = [OrderItemInline]
 	fieldsets = (
 		('Informations Commande', {
-			'fields': ('order_number', 'client', 'store', 'status', 'notes')
+			'fields': ('order_number', 'client', 'store', 'is_b2b', 'source_store', 'status', 'notes')
 		}),
 		('Montants', {
 			'fields': ('items_total_display', 'delivery_fee', 'service_fee', 'tax_amount', 'payment_fees', 'total_amount_display')

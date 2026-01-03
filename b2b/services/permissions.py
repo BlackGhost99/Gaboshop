@@ -10,6 +10,7 @@ def can_access_b2b(user):
 	Règles:
 	- Uniquement StoreUser (user_type='store_manager')
 	- Le magasin doit avoir is_b2c = True
+	- Le magasin doit avoir un plan Business (seuls les Business peuvent acheter en B2B)
 	
 	Args:
 		user: Instance de User
@@ -27,7 +28,19 @@ def can_access_b2b(user):
 	# Vérifier que le user a un store actif
 	from stores.models import Store
 	store = Store.objects.filter(manager=user, is_active=True).first()
-	return bool(store)
+	
+	if not store:
+		return False
+	
+	# Vérifier le plan de souscription
+	# Seul le plan Business donne accès au B2B (approvisionnement)
+	from payments.subscription_check import SubscriptionChecker
+	plan = SubscriptionChecker.get_current_plan(store)
+	
+	if not plan or not plan.can_access_b2b:
+		return False
+	
+	return True
 
 
 def can_purchase_from_wholesaler(buyer_store, wholesaler_store):

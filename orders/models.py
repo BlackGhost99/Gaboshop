@@ -125,8 +125,9 @@ class Order(models.Model):
 		from payments.models import CategoryCommission
 
 		if self.items_total > 0:
-			# Determine current plan multiplier (default 1.00)
+			# Determine current plan
 			plan = self.store.get_current_plan()
+			plan_type = plan.plan_type if plan else 'free'
 			multiplier = Decimal(getattr(plan, 'commission_multiplier', 1)) if plan else Decimal('1')
 
 			total_commission = Decimal('0.00')
@@ -135,19 +136,40 @@ class Order(models.Model):
 				product = item.product
 				item_subtotal = item.subtotal
 				base_rate = None
-				# Try category-level commission (linked to StoreCategory)
-				if product and product.category and product.category.store_category:
-					try:
-						cc = CategoryCommission.objects.get(store_category=product.category.store_category)
-						base_rate = Decimal(cc.base_rate)
-					except CategoryCommission.DoesNotExist:
-						base_rate = None
-				# Fallback to store-level commission rate
-				if base_rate is None:
-					base_rate = Decimal(self.store.commission_rate or Decimal('0.00'))
+				
+				# REGLES SPECIALES PLAN BUSINESS
+				if plan_type == 'business':
+					# Business B2B: 2% sur tout
+					if self.is_b2b:
+						effective_rate = Decimal('2.00')
+					# Business B2C: 0% alimentaire, 2% reste
+					else:
+						# Vérifier si c'est alimentaire
+						is_food = False
+						if product and product.category and product.category.store_category:
+							category_name = product.category.store_category.name.upper()
+							is_food = 'ALIMENTATION' in category_name or 'BOISSONS' in category_name
+						
+						if is_food:
+							effective_rate = Decimal('0.00')  # 0% pour alimentaire B2C Business
+						else:
+							effective_rate = Decimal('2.00')  # 2% pour reste B2C Business
+				else:
+					# Plans Free et Pro: utiliser base_rate * multiplier
+					# Try category-level commission (linked to StoreCategory)
+					if product and product.category and product.category.store_category:
+						try:
+							cc = CategoryCommission.objects.get(store_category=product.category.store_category)
+							base_rate = Decimal(cc.base_rate)
+						except CategoryCommission.DoesNotExist:
+							base_rate = None
+					# Fallback to store-level commission rate
+					if base_rate is None:
+						base_rate = Decimal(self.store.commission_rate or Decimal('0.00'))
 
-				# Effective rate after plan multiplier
-				effective_rate = (base_rate * Decimal(multiplier))
+					# Effective rate after plan multiplier
+					effective_rate = (base_rate * Decimal(multiplier))
+				
 				item_commission = (item_subtotal * effective_rate) / Decimal('100')
 				total_commission += item_commission
 

@@ -223,7 +223,7 @@ class SubscriptionPlan(models.Model):
 	Plans d'abonnement pour les magasins (Starter, Pro, Business)
 	"""
 	PLAN_TYPE_CHOICES = (
-		('starter', 'Starter'),
+		('free', 'Free'),
 		('pro', 'Pro'),
 		('business', 'Business'),
 	)
@@ -235,6 +235,9 @@ class SubscriptionPlan(models.Model):
 	
 	# Limites et fonctionnalités
 	max_products = models.IntegerField(null=True, blank=True, help_text="Limite de produits (null = illimité)")
+	max_orders_per_month = models.IntegerField(null=True, blank=True, help_text="Limite commandes/mois (null = illimité)")
+	can_access_b2b = models.BooleanField(default=False, help_text="Accès approvisionnement B2B (pour stores B2C)")
+	has_b2b_visibility = models.BooleanField(default=False, help_text="Visibilité maximale dans catalogue B2B (pour grossistes)")
 	can_sponsor_products = models.BooleanField(default=False, help_text="Peut sponsoriser des produits")
 	has_statistics = models.BooleanField(default=False, help_text="Accès aux statistiques avancées")
 	has_custom_page = models.BooleanField(default=False, help_text="Page personnalisée")
@@ -271,12 +274,21 @@ class SubscriptionPlan(models.Model):
 			features.append(f"Jusqu'à {self.max_products} produits")
 		else:
 			features.append("Produits illimités")
+		if self.max_orders_per_month:
+			features.append(f"Jusqu'à {self.max_orders_per_month} commandes/mois")
+		else:
+			if self.plan_type != 'free':
+				features.append("Commandes illimitées")
+		if self.can_access_b2b:
+			features.append("Accès approvisionnement B2B")
+		if self.has_b2b_visibility:
+			features.append("Visibilité maximale catalogue B2B")
 		if self.has_statistics:
 			features.append("Statistiques et rapports de ventes")
 		if self.has_custom_page:
 			features.append("Page personnalisée")
 		if self.has_priority_support:
-			features.append("Support VIP")
+			features.append("Support prioritaire")
 		if self.can_sponsor_products:
 			features.append("Produits sponsorisés")
 		if self.priority_listing > 0:

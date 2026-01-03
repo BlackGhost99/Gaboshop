@@ -6,6 +6,7 @@ from .views import (
     CheckPaymentAPIView,
     RefundAPIView,
     SubscriptionPlansAPIView,
+    SubscribeToPlanView,
 )
 
 urlpatterns = [
@@ -40,6 +41,9 @@ urlpatterns = [
     # Rembourser
     path("refund/", RefundAPIView.as_view(), name="payment-refund"),
     
-    # Plans d'abonnement (Starter / Pro / Business)
+    # Plans d'abonnement (Free / Pro / Business)
     path("subscription-plans/", SubscriptionPlansAPIView.as_view(), name="subscription-plans"),
+    
+    # Souscrire à un plan
+    path("subscriptions/subscribe/", SubscribeToPlanView.as_view(), name="subscribe-to-plan"),
 ]

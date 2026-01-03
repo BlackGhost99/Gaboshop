@@ -1,5 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../../components/Modal';
+import { 
+	activateStoreB2B, 
+	deactivateStoreB2B, 
+	getStoreB2BProfile,
+	createStoreB2BProfile 
+} from '../../services/b2bService';
 import {
   getAdminSummary,
   getAdminFinancials,
@@ -85,6 +92,11 @@ const AdminDashboard = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [confirmDeleteUser, setConfirmDeleteUser] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [selectedStoreDetail, setSelectedStoreDetail] = useState(null);
+  const [showStoreDetailModal, setShowStoreDetailModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState({ isOpen: false, message: '', onConfirm: null });
+  const [b2bLoading, setB2bLoading] = useState({});
   const [storeCategories, setStoreCategories] = useState([]);
   const [allProductCategories, setAllProductCategories] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -478,36 +490,122 @@ const AdminDashboard = () => {
 
   const viewStoreDetail = async (storeId) => {
     try {
+      setB2bLoading(prev => ({ ...prev, [storeId]: true }));
       const res = await getStoreDetailAdmin(storeId);
       if (res?.success) {
-        // Pour maintenant, affiche une alerte
-        alert(`Magasin: ${res.data.name}\n\nFonctionnalité dashboard détaillé à implémenter`);
+        // Charger aussi le profil B2B si disponible
+        let b2bProfile = null;
+        try {
+          const b2bRes = await getStoreB2BProfile(storeId);
+          if (b2bRes?.success) {
+            b2bProfile = b2bRes.data;
+          }
+        } catch (b2bErr) {
+          // Pas de profil B2B, c'est normal
+          console.log('Pas de profil B2B pour ce magasin');
+        }
+        
+        setSelectedStoreDetail({ ...res.data, b2b_profile: b2bProfile });
+        setShowStoreDetailModal(true);
       }
     } catch (err) {
       setActionError(err?.message || 'Erreur chargement magasin');
+    } finally {
+      setB2bLoading(prev => ({ ...prev, [storeId]: false }));
     }
   };
 
   const handleDeactivateStore = async (storeId) => {
-    if (!window.confirm('Désactiver ce magasin ? Les produits deviendront invisibles.')) return;
-    try {
-      const res = await deactivateStoreAdmin(storeId);
-      if (res?.success) {
-        loadStoresData();
+    setShowConfirmModal({
+      isOpen: true,
+      message: 'Désactiver ce magasin ? Les produits deviendront invisibles.',
+      onConfirm: async () => {
+        try {
+          const res = await deactivateStoreAdmin(storeId);
+          if (res?.success) {
+            setActionSuccess('Magasin désactivé avec succès');
+            loadStoresData();
+          }
+        } catch (err) {
+          setActionError(err?.message || 'Erreur désactivation magasin');
+        } finally {
+          setShowConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        }
       }
-    } catch (err) {
-      setActionError(err?.message || 'Erreur désactivation magasin');
-    }
+    });
   };
 
   const handleActivateStore = async (storeId) => {
     try {
       const res = await activateStoreAdmin(storeId);
       if (res?.success) {
+        setActionSuccess('Magasin activé avec succès');
         loadStoresData();
       }
     } catch (err) {
       setActionError(err?.message || 'Erreur activation magasin');
+    }
+  };
+
+  const handleActivateB2B = async (storeId) => {
+    try {
+      setB2bLoading(prev => ({ ...prev, [`b2b_${storeId}`]: true }));
+      const res = await activateStoreB2B(storeId);
+      if (res?.success) {
+        setActionSuccess('Profil B2B activé avec succès');
+        loadStoresData();
+        if (selectedStoreDetail?.id === storeId) {
+          // Rafraîchir les détails si le modal est ouvert
+          viewStoreDetail(storeId);
+        }
+      }
+    } catch (err) {
+      setActionError(err?.response?.data?.error?.message || err?.message || 'Erreur activation B2B');
+    } finally {
+      setB2bLoading(prev => ({ ...prev, [`b2b_${storeId}`]: false }));
+    }
+  };
+
+  const handleDeactivateB2B = async (storeId) => {
+    setShowConfirmModal({
+      isOpen: true,
+      message: 'Désactiver le profil B2B de ce magasin ? Il ne sera plus visible dans l\'approvisionnement.',
+      onConfirm: async () => {
+        try {
+          setB2bLoading(prev => ({ ...prev, [`b2b_${storeId}`]: true }));
+          const res = await deactivateStoreB2B(storeId);
+          if (res?.success) {
+            setActionSuccess('Profil B2B désactivé avec succès');
+            loadStoresData();
+            if (selectedStoreDetail?.id === storeId) {
+              viewStoreDetail(storeId);
+            }
+          }
+        } catch (err) {
+          setActionError(err?.response?.data?.error?.message || err?.message || 'Erreur désactivation B2B');
+        } finally {
+          setB2bLoading(prev => ({ ...prev, [`b2b_${storeId}`]: false }));
+          setShowConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        }
+      }
+    });
+  };
+
+  const handleCreateB2BProfile = async (storeId, data = {}) => {
+    try {
+      setB2bLoading(prev => ({ ...prev, [`b2b_create_${storeId}`]: true }));
+      const res = await createStoreB2BProfile(storeId, data);
+      if (res?.success) {
+        setActionSuccess('Profil B2B créé avec succès');
+        loadStoresData();
+        if (selectedStoreDetail?.id === storeId) {
+          viewStoreDetail(storeId);
+        }
+      }
+    } catch (err) {
+      setActionError(err?.response?.data?.error?.message || err?.message || 'Erreur création profil B2B');
+    } finally {
+      setB2bLoading(prev => ({ ...prev, [`b2b_create_${storeId}`]: false }));
     }
   };
 
@@ -1663,6 +1761,10 @@ const AdminDashboard = () => {
       handleDeactivateStore={handleDeactivateStore}
       handleActivateStore={handleActivateStore}
       handleDeleteStore={handleDeleteStore}
+      handleActivateB2B={handleActivateB2B}
+      handleDeactivateB2B={handleDeactivateB2B}
+      handleCreateB2BProfile={handleCreateB2BProfile}
+      b2bLoading={b2bLoading}
       storeCategories={storeCategories}
     />
   );
@@ -2209,6 +2311,20 @@ const AdminDashboard = () => {
       <AdminNavbar onRefresh={() => loadData(false)} onLogout={handleLogout} refreshing={refreshing} />
       <main className="pt-20 pl-64 pr-6 pb-10">
         {/* Navigation désormais uniquement via la sidebar */}
+        
+        {/* Messages de succès/erreur */}
+        {actionSuccess && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 flex justify-between items-center">
+            <span>{actionSuccess}</span>
+            <button onClick={() => setActionSuccess('')} className="text-green-600 hover:text-green-800">✕</button>
+          </div>
+        )}
+        {actionError && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex justify-between items-center">
+            <span>{actionError}</span>
+            <button onClick={() => setActionError('')} className="text-red-600 hover:text-red-800">✕</button>
+          </div>
+        )}
 
         {activeTab === 'overview' && overviewSection}
         {activeTab === 'users' && usersSection}
@@ -3291,6 +3407,118 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmation */}
+      <Modal
+        isOpen={showConfirmModal.isOpen}
+        onClose={() => setShowConfirmModal({ isOpen: false, message: '', onConfirm: null })}
+        title="Confirmation"
+        onConfirm={showConfirmModal.onConfirm}
+        confirmText="Confirmer"
+        cancelText="Annuler"
+        showCancel={true}
+        confirmButtonClass="bg-red-600 hover:bg-red-700"
+      >
+        <p className="text-gray-700">{showConfirmModal.message}</p>
+      </Modal>
+
+      {/* Modal détails du store */}
+      <Modal
+        isOpen={showStoreDetailModal}
+        onClose={() => {
+          setShowStoreDetailModal(false);
+          setSelectedStoreDetail(null);
+        }}
+        title={selectedStoreDetail ? `Détails - ${selectedStoreDetail.name}` : 'Détails du magasin'}
+        size="xl"
+        showCancel={false}
+      >
+        {selectedStoreDetail && (
+          <div className="space-y-6">
+            {/* Informations générales */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-gray-600">Nom</label>
+                <p className="text-gray-900">{selectedStoreDetail.name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-600">Catégorie</label>
+                <p className="text-gray-900">{selectedStoreDetail.category_name || '—'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-600">Ville</label>
+                <p className="text-gray-900">{selectedStoreDetail.city || '—'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-600">Zone</label>
+                <p className="text-gray-900">{selectedStoreDetail.zone || '—'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-600">Gérant</label>
+                <p className="text-gray-900">{selectedStoreDetail.manager_name || '—'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-600">Statut</label>
+                <p className={`inline-block px-2 py-1 rounded text-xs ${selectedStoreDetail.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {selectedStoreDetail.is_active ? 'Actif' : 'Inactif'}
+                </p>
+              </div>
+            </div>
+
+            {/* Section B2B */}
+            <div className="border-t pt-4">
+              <h4 className="text-lg font-semibold mb-4">Configuration B2B</h4>
+              {selectedStoreDetail.b2b_profile ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div>
+                      <p className="font-semibold">Profil B2B</p>
+                      <p className="text-sm text-gray-600">
+                        Statut: <span className={selectedStoreDetail.b2b_profile.is_active ? 'text-green-600' : 'text-red-600'}>
+                          {selectedStoreDetail.b2b_profile.is_active ? 'Actif' : 'Inactif'}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Montant minimum: {selectedStoreDetail.b2b_profile.minimum_order_amount?.toLocaleString('fr-FR') || 0} FCFA
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {selectedStoreDetail.b2b_profile.is_active ? (
+                        <button
+                          onClick={() => handleDeactivateB2B(selectedStoreDetail.id)}
+                          disabled={b2bLoading[`b2b_${selectedStoreDetail.id}`]}
+                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {b2bLoading[`b2b_${selectedStoreDetail.id}`] ? '...' : 'Désactiver B2B'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivateB2B(selectedStoreDetail.id)}
+                          disabled={b2bLoading[`b2b_${selectedStoreDetail.id}`]}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {b2bLoading[`b2b_${selectedStoreDetail.id}`] ? '...' : 'Activer B2B'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+                  <p className="text-sm text-yellow-800 mb-3">Aucun profil B2B configuré pour ce magasin.</p>
+                  <button
+                    onClick={() => handleCreateB2BProfile(selectedStoreDetail.id)}
+                    disabled={b2bLoading[`b2b_create_${selectedStoreDetail.id}`]}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {b2bLoading[`b2b_create_${selectedStoreDetail.id}`] ? 'Création...' : 'Créer un profil B2B'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

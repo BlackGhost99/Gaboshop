@@ -76,6 +76,48 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 		order.confirmed_at = timezone.now()
 		order.save(update_fields=['status', 'confirmed_at'])
 		print(f"✅ Commande {order.order_number} confirmée")
+	
+	# 5. Mettre à jour l'inventaire du store B2C quand commande B2B est livrée
+	if order.is_b2b and order.source_store and hasattr(order, '_old_status'):
+		if order._old_status != 'delivered' and order.status == 'delivered':
+			# Import ici pour éviter circular import
+			from products.models import Product
+			
+			print(f"[B2B] Mise a jour inventaire pour commande {order.order_number}")
+			
+			for order_item in order.items.all():
+				wholesaler_product = order_item.product
+				buyer_store = order.source_store
+				
+				# Trouver ou créer le produit équivalent dans le store acheteur
+				# On cherche d'abord par nom exact dans la même catégorie
+				buyer_product = Product.objects.filter(
+					store=buyer_store,
+					name=wholesaler_product.name,
+					category=wholesaler_product.category
+				).first()
+				
+				if buyer_product:
+					# Produit existe déjà : augmenter le stock
+					old_stock = buyer_product.stock
+					buyer_product.stock += order_item.quantity
+					buyer_product.save(update_fields=['stock'])
+					print(f"  [OK] {wholesaler_product.name}: Stock {old_stock} -> {buyer_product.stock}")
+				else:
+					# Créer le produit dans l'inventaire du store acheteur
+					buyer_product = Product.objects.create(
+						store=buyer_store,
+						category=wholesaler_product.category,
+						name=wholesaler_product.name,
+						description=f"{wholesaler_product.description} (Recu via B2B)",
+						price=wholesaler_product.price,  # Prix de revente suggéré
+						stock=order_item.quantity,
+						is_available=True,
+						image=wholesaler_product.image
+					)
+					print(f"  [OK] {wholesaler_product.name}: Nouveau produit cree avec stock {buyer_product.stock}")
+			
+			print(f"[OK] Inventaire mis a jour pour {buyer_store.name}")
 
 
 @receiver(post_save, sender=Payment)

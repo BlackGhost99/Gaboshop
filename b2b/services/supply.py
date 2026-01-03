@@ -61,12 +61,13 @@ def get_b2b_products(wholesaler_id, category_id=None, search=None):
 	if not hasattr(wholesaler, 'b2b_profile') or not wholesaler.b2b_profile.is_active:
 		return Product.objects.none()
 	
-	# Récupérer les produits du grossiste qui ont des prix B2B
-	# Filtrer uniquement les produits avec market_type='b2b' ou 'both'
+	# Récupérer les produits du grossiste qui ont des prix B2B actifs
+	# Un produit est visible en B2B s'il a au moins un prix B2B actif pour ce grossiste
+	# On ne filtre plus par market_type car un produit peut être B2B s'il a des prix B2B
 	products = Product.objects.filter(
 		store=wholesaler,
 		is_available=True,
-		market_type__in=['b2b', 'both'],  # Filtrer par type de marché
+		b2b_pricings__b2b_store=wholesaler,
 		b2b_pricings__is_active=True
 	).select_related('category', 'b2b_category').prefetch_related(
 		Prefetch(
@@ -111,6 +112,7 @@ def get_b2b_categories(wholesaler_id=None):
 			product_category_ids = Product.objects.filter(
 				store=wholesaler,
 				b2b_category__isnull=False,
+				b2b_pricings__b2b_store=wholesaler,
 				b2b_pricings__is_active=True
 			).values_list('b2b_category_id', flat=True).distinct()
 			
@@ -203,7 +205,11 @@ def calculate_b2b_order_totals(order_items, wholesaler, buyer_store):
 	
 	# Calculer les frais
 	delivery_fee = wholesaler.delivery_fee or Decimal('0.00')
-	service_fee = wholesaler.service_fee or Decimal('0.00')
+	
+	# Frais de service B2B selon le plan du buyer_store
+	# Business: 0 F, Autres: 200 F
+	from payments.subscription_check import SubscriptionChecker
+	service_fee = SubscriptionChecker.get_service_fee_b2b(buyer_store)
 	
 	# Total
 	total_amount = items_total + delivery_fee + service_fee

@@ -498,11 +498,28 @@ class SubscriptionPlansAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from payments.subscription_check import SubscriptionChecker
+        
         plans_qs = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
         plans_data = SubscriptionPlanSerializer(plans_qs, many=True).data
+        
+        # Ajouter le prix dynamique pour Business selon le type de store
+        store = Store.objects.filter(manager=request.user).first()
+        if store:
+            for plan in plans_data:
+                if plan['plan_type'] == 'business':
+                    # Prix dynamique: 50k B2C, 80k B2B
+                    if store.is_b2b or store.store_type in ['wholesaler', 'industry']:
+                        plan['actual_price'] = 80000.00
+                        plan['price_label'] = '80 000 F/mois (B2B)'
+                    else:
+                        plan['actual_price'] = 50000.00
+                        plan['price_label'] = '50 000 F/mois (B2C)'
+                else:
+                    plan['actual_price'] = float(plan['price'])
+                    plan['price_label'] = f"{int(plan['price'])} F/mois" if plan['price'] > 0 else "Gratuit"
 
         current_plan = None
-        store = Store.objects.filter(manager=request.user).first()
         if store:
             active_sub = (
                 StoreSubscription.objects
@@ -516,21 +533,126 @@ class SubscriptionPlansAPIView(APIView):
                     'id': plan_obj.id if plan_obj else None,
                     'name': plan_obj.name if plan_obj else active_sub.plan_name,
                     'plan_type': plan_obj.plan_type if plan_obj else active_sub.plan_name.lower(),
-                    'price': float(plan_obj.price) if plan_obj else float(active_sub.monthly_fee),
+                    'price': float(active_sub.monthly_fee),
                     'commission_rate': float(plan_obj.commission_rate) if plan_obj and plan_obj.commission_rate is not None else None,
                     'end_date': active_sub.end_date,
                     'status': active_sub.status,
                     'auto_renew': active_sub.auto_renew,
                     'features': active_sub.get_plan_features(),
                     'max_products': plan_obj.max_products if plan_obj else None,
+                    'max_orders_per_month': plan_obj.max_orders_per_month if plan_obj else None,
+                    'can_access_b2b': plan_obj.can_access_b2b if plan_obj else False,
                     'priority_listing': plan_obj.priority_listing if plan_obj else 0,
                     'can_sponsor_products': plan_obj.can_sponsor_products if plan_obj else False,
+                    'days_until_expiry': SubscriptionChecker.get_days_until_expiry(store),
                 }
 
         return Response({
+            'success': True,
             'plans': plans_data,
-            'current_plan': current_plan
+            'current_plan': current_plan,
+            'store_type': store.store_type if store else None
         })
+
+
+class SubscribeToPlanView(APIView):
+    """
+    POST /api/v1/subscriptions/subscribe/
+    Souscrire à un plan (Pro ou Business)
+    
+    Body: {
+        "plan_id": 2,
+        "payment_method": "admin_validation" | "mobile_money" | "wallet" | "bank_transfer"
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        from datetime import timedelta
+        from payments.subscription_check import SubscriptionChecker
+        
+        # Vérifier que l'utilisateur est store manager
+        if not request.user.is_store_manager():
+            return Response({
+                'success': False,
+                'error': 'Seuls les gérants de magasin peuvent souscrire'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Récupérer le store
+        store = Store.objects.filter(manager=request.user).first()
+        if not store:
+            return Response({
+                'success': False,
+                'error': 'Aucun magasin trouvé'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Récupérer les paramètres
+        plan_id = request.data.get('plan_id')
+        payment_method = request.data.get('payment_method', 'admin_validation')
+        
+        if not plan_id:
+            return Response({
+                'success': False,
+                'error': 'plan_id requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Récupérer le plan
+        try:
+            plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
+        except SubscriptionPlan.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Plan introuvable'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Vérifier que ce n'est pas le plan Free
+        if plan.plan_type == 'free':
+            return Response({
+                'success': False,
+                'error': 'Impossible de souscrire au plan Free'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculer le prix selon le type de store (Business uniquement)
+        subscription_price = SubscriptionChecker.get_subscription_price(store) if plan.plan_type == 'business' else plan.price
+        
+        # Expirer les abonnements actifs existants
+        StoreSubscription.objects.filter(
+            store=store,
+            status='active'
+        ).update(status='expired')
+        
+        # Pour l'instant, on valide manuellement (admin)
+        # TODO: Implémenter Mobile Money, Wallet, Bank Transfer
+        if payment_method == 'admin_validation':
+            # Créer directement la souscription (à valider par admin)
+            subscription = StoreSubscription.objects.create(
+                store=store,
+                plan=plan,
+                plan_name=plan.name,
+                monthly_fee=subscription_price,
+                status='pending_payment',
+                start_date=timezone.now().date(),
+                end_date=timezone.now().date() + timedelta(days=30),
+                auto_renew=False
+            )
+            
+            return Response({
+                'success': True,
+                'message': f'Demande de souscription au plan {plan.name} créée. En attente de validation admin.',
+                'data': {
+                    'subscription_id': subscription.id,
+                    'plan': plan.name,
+                    'price': float(subscription_price),
+                    'status': subscription.status,
+                    'payment_method': 'admin_validation'
+                }
+            }, status=status.HTTP_201_CREATED)
+        
+        else:
+            return Response({
+                'success': False,
+                'error': f'Méthode de paiement {payment_method} non implémentée pour le moment'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ===============================================================================

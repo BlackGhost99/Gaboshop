@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.utils import timezone
 
 from django.db.models import Q
 from stores.models import Store
@@ -336,6 +337,7 @@ class WholesalerCatalogView(APIView):
 			product_count=Count('products', filter=Q(
 				products__store=wholesaler,
 				products__is_available=True,
+				products__b2b_pricings__b2b_store=wholesaler,
 				products__b2b_pricings__is_active=True
 			))
 		).filter(product_count__gt=0)
@@ -484,7 +486,7 @@ class B2BOrderCreateView(APIView):
 		
 		# Créer la commande
 		with transaction.atomic():
-			# Créer l'ordre
+			# Créer l'ordre - B2B orders are auto-confirmed (no payment required)
 			order = Order.objects.create(
 				client=user,
 				store=wholesaler,
@@ -500,7 +502,8 @@ class B2BOrderCreateView(APIView):
 				delivery_fee=totals['delivery_fee'],
 				service_fee=totals['service_fee'],
 				total_amount=totals['total_amount'],
-				status='created'
+				status='confirmed',  # B2B orders start as confirmed (credit/invoice payment)
+				confirmed_at=timezone.now()
 			)
 			
 			# Créer les items de commande

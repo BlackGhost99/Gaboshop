@@ -303,7 +303,7 @@ export const deactivateStoreB2B = async (storeId) => {
  */
 export const getB2BPricingList = async (storeId) => {
 	try {
-		const response = await api.get(`/b2b/pricing/${storeId}/list/`);
+		const response = await api.get(`/b2b/pricing/${storeId}/`);
 		return response.data;
 	} catch (error) {
 		console.error('Erreur lors de la récupération des prix B2B:', error);

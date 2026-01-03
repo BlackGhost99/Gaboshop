@@ -100,13 +100,38 @@ class StoreDashboardView(APIView):
         # Commandes en cours
         ongoing_orders = Order.objects.filter(store=store, status__in=['preparing', 'ready', 'assigned', 'in_transit']).count()
 
-        pending_order_list = Order.objects.filter(store=store, status__in=['paid', 'confirmed']).order_by('-created_at')[:20]
-        pending_payload = []
-        for o in pending_order_list:
-            pending_payload.append({
+        # Séparer les commandes entrantes (B2C vs B2B)
+        all_pending_incoming = Order.objects.filter(store=store, status__in=['paid', 'confirmed']).order_by('-created_at')[:20]
+        
+        b2c_pending = []
+        b2b_incoming_pending = []
+        
+        for o in all_pending_incoming:
+            order_data = {
                 'id': o.id,
                 'order_number': o.order_number,
                 'client_name': o.client.get_full_name() or o.client.phone,
+                'created_at': o.created_at,
+                'total': o.total_amount,
+                'status': o.status,
+                'status_display': o.get_status_display(),
+                'items_count': o.items.count(),
+                'is_b2b': o.is_b2b,
+                'source_store_name': o.source_store.name if o.is_b2b and o.source_store else None,
+            }
+            if o.is_b2b:
+                b2b_incoming_pending.append(order_data)
+            else:
+                b2c_pending.append(order_data)
+
+        # Commandes B2B sortantes (passées par ce magasin aux grossistes)
+        outgoing_b2b_orders = Order.objects.filter(source_store=store, is_b2b=True).order_by('-created_at')[:20]
+        outgoing_b2b_payload = []
+        for o in outgoing_b2b_orders:
+            outgoing_b2b_payload.append({
+                'id': o.id,
+                'order_number': o.order_number,
+                'wholesaler_name': o.store.name,
                 'created_at': o.created_at,
                 'total': o.total_amount,
                 'status': o.status,
@@ -145,15 +170,31 @@ class StoreDashboardView(APIView):
             })
 
         # Forfait / abonnement actif
+        from payments.subscription_check import SubscriptionChecker
         active_subscription = StoreSubscription.objects.filter(store=store, status='active').order_by('-end_date').first()
         subscription_payload = None
         if active_subscription:
+            days_until_expiry = SubscriptionChecker.get_days_until_expiry(store)
+            plan_type = active_subscription.plan.plan_type if active_subscription.plan else 'free'
             subscription_payload = {
                 'plan_name': active_subscription.plan_name,
+                'plan_type': plan_type,
                 'status': active_subscription.status,
                 'end_date': active_subscription.end_date,
                 'auto_renew': active_subscription.auto_renew,
                 'monthly_fee': active_subscription.monthly_fee,
+                'days_until_expiry': days_until_expiry,
+            }
+        else:
+            # Pas de souscription active, probablement Free par défaut
+            subscription_payload = {
+                'plan_name': 'Free',
+                'plan_type': 'free',
+                'status': 'active',
+                'end_date': None,
+                'auto_renew': False,
+                'monthly_fee': 0,
+                'days_until_expiry': None,
             }
 
         # --- Breakdown par catégorie (CA et commission) ---
@@ -231,7 +272,10 @@ class StoreDashboardView(APIView):
                     'pending_orders': pending_orders,
                     'ongoing_orders': ongoing_orders
                 },
-                'pending_order_list': pending_payload,
+                'pending_order_list': b2c_pending, # Backward compatibility for B2C
+                'b2c_pending_orders': b2c_pending,
+                'b2b_incoming_orders': b2b_incoming_pending,
+                'b2b_outgoing_orders': outgoing_b2b_payload,
                 'monthly_orders': monthly_orders,
                 'monthly_ca': monthly_ca,
                 'monthly_commission': monthly_commission,

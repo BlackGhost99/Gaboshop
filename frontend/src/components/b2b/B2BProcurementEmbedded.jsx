@@ -3,8 +3,10 @@ import WholesalerList from './WholesalerList';
 import WholesalerDetail from './WholesalerDetail';
 import B2BProductList from './B2BProductList';
 import B2BCart from './B2BCart';
+import B2BCartSummary from './B2BCartSummary';
 import B2BOrderForm from './B2BOrderForm';
 import LoadingSpinner from '../LoadingSpinner';
+import Modal from '../Modal';
 import {
 	getWholesalers,
 	getWholesalerCatalog,
@@ -25,6 +27,7 @@ const B2BProcurementEmbedded = () => {
 	const [cart, setCart] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
+	const [successModal, setSuccessModal] = useState({ isOpen: false, message: '' });
 	const [pagination, setPagination] = useState({
 		page: 1,
 		total_products: 0,
@@ -128,8 +131,21 @@ const B2BProcurementEmbedded = () => {
 			return;
 		}
 
+		const item = cart.find((item) => item.id === productId);
+		if (!item) return;
+
+		// Valider la quantité minimale
+		const minQuantity = item.min_order_quantity || 1;
+		const finalQuantity = Math.max(newQuantity, minQuantity);
+
+		// Vérifier le stock
+		if (item.stock < finalQuantity) {
+			setError(`Stock insuffisant. Disponible: ${item.stock} unité(s)`);
+			return;
+		}
+
 		setCart(
-			cart.map((item) => (item.id === productId ? { ...item, quantity: newQuantity } : item))
+			cart.map((item) => (item.id === productId ? { ...item, quantity: finalQuantity } : item))
 		);
 	};
 
@@ -148,7 +164,10 @@ const B2BProcurementEmbedded = () => {
 			setError(null);
 			const response = await createB2BOrder(orderData);
 			if (response.success) {
-				alert('Commande B2B créée avec succès !');
+				setSuccessModal({
+					isOpen: true,
+					message: `Commande B2B créée avec succès !\n\nNuméro de commande: ${response.data?.order_number || 'N/A'}`
+				});
 				setCart([]);
 				setView('list');
 				setSelectedWholesaler(null);
@@ -178,7 +197,7 @@ const B2BProcurementEmbedded = () => {
 			{/* Header */}
 			<div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-indigo-600">
 				<h2 className="text-2xl font-bold text-gray-900">Espace Approvisionnement B2B</h2>
-				<p className="text-gray-600 mt-2">
+				<p className="text-black mt-2 font-medium">
 					Accédez aux catalogues exclusifs des grossistes et industries partenaires pour réapprovisionner votre stock.
 				</p>
 			</div>
@@ -235,22 +254,30 @@ const B2BProcurementEmbedded = () => {
 							)}
 						</div>
 						<div className="flex-1 text-center md:text-left">
-							<h3 className="text-xl font-bold">{selectedWholesaler.name}</h3>
-							<p className="text-sm text-gray-500">{selectedWholesaler.zone} • {selectedWholesaler.city || 'Libreville'}</p>
+							<h3 className="text-xl font-bold text-black">{selectedWholesaler.name}</h3>
+							<p className="text-sm text-black font-bold">{selectedWholesaler.zone} • {selectedWholesaler.city || 'Libreville'}</p>
 						</div>
 						<div className="flex flex-col items-end gap-1">
 							{(() => {
 								const minAmount = selectedWholesaler.minimum_order_amount || selectedWholesaler.b2b_profile?.minimum_order_amount;
 								return minAmount ? (
-									<div className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-800 rounded">
+									<div className="text-xs font-bold px-2 py-1 bg-blue-200 text-black rounded border-2 border-blue-400">
 										Minimum commande: {minAmount.toLocaleString()} FCFA
 									</div>
 								) : null;
 							})()}
-							<div className="text-xs text-gray-500">
+							<div className="text-xs text-black font-bold">
 								{pagination.total_products || 0} produits disponibles
 							</div>
 						</div>
+					</div>
+
+					{/* Cart Summary */}
+					<div className="mb-6">
+						<B2BCartSummary
+							cartItems={cart}
+							onViewCart={() => setView('cart')}
+						/>
 					</div>
 
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -322,6 +349,7 @@ const B2BProcurementEmbedded = () => {
 									onUpdateQuantity={handleUpdateQuantity}
 									onCheckout={handleCheckout}
 									loading={loading}
+									wholesaler={selectedWholesaler}
 								/>
 							</div>
 						</div>
@@ -341,6 +369,7 @@ const B2BProcurementEmbedded = () => {
 								onUpdateQuantity={handleUpdateQuantity}
 								onCheckout={handleCheckout}
 								loading={loading}
+								wholesaler={selectedWholesaler}
 							/>
 						</div>
 					</div>
@@ -359,6 +388,26 @@ const B2BProcurementEmbedded = () => {
 					/>
 				</div>
 			)}
+
+			{/* Modal de succès */}
+			<Modal
+				isOpen={successModal.isOpen}
+				onClose={() => setSuccessModal({ isOpen: false, message: '' })}
+				title="Commande créée avec succès"
+				onConfirm={() => setSuccessModal({ isOpen: false, message: '' })}
+				confirmText="OK"
+				showCancel={false}
+				confirmButtonClass="bg-green-600 hover:bg-green-700"
+			>
+				<div className="text-center py-4">
+					<div className="mb-4">
+						<svg className="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<p className="text-gray-700 whitespace-pre-line">{successModal.message}</p>
+				</div>
+			</Modal>
 		</div>
 	);
 };

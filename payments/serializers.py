@@ -170,6 +170,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
         model = SubscriptionPlan
         fields = [
             'id', 'name', 'slug', 'plan_type', 'price', 'max_products',
+            'max_orders_per_month', 'can_access_b2b', 'has_b2b_visibility',
             'can_sponsor_products', 'has_statistics', 'has_custom_page',
             'has_priority_support', 'priority_listing', 'commission_rate',
             'commission_multiplier',

@@ -167,6 +167,72 @@ class SubscriptionChecker:
                 f"Le support prioritaire n'est pas disponible avec votre forfait actuel. "
                 f"Passez à un forfait supérieur pour accéder au support VIP."
             )
+    
+    @staticmethod
+    def check_can_create_order(store):
+        """
+        🛒 Vérifie si le store peut créer une commande ce mois
+        """
+        plan = SubscriptionChecker.get_current_plan(store)
+        if plan and plan.max_orders_per_month:
+            # Compter commandes ce mois
+            from django.utils import timezone
+            from orders.models import Order
+            month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            order_count = Order.objects.filter(
+                store=store,
+                created_at__gte=month_start
+            ).count()
+            if order_count >= plan.max_orders_per_month:
+                raise PermissionDenied(
+                    f"Vous avez atteint la limite de {plan.max_orders_per_month} commandes/mois "
+                    f"de votre plan {plan.name}. Passez au plan Business pour des commandes illimitées."
+                )
+    
+    @staticmethod
+    def check_can_access_b2b(store):
+        """
+        🏭 Vérifie si le store B2C peut accéder au B2B (approvisionnement)
+        """
+        plan = SubscriptionChecker.get_current_plan(store)
+        if not plan or not plan.can_access_b2b:
+            raise PermissionDenied(
+                f"L'accès au catalogue B2B (approvisionnement) est réservé au plan Business. "
+                f"Passez au plan Business pour commander chez les grossistes."
+            )
+    
+    @staticmethod
+    def get_service_fee_b2b(store):
+        """
+        💰 Retourne les frais de service B2B selon le plan
+        Business: 0 F
+        Autres: 200 F
+        """
+        plan = SubscriptionChecker.get_current_plan(store)
+        if plan and plan.plan_type == 'business':
+            return Decimal('0.00')
+        return Decimal('200.00')
+    
+    @staticmethod
+    def get_subscription_price(store):
+        """
+        💵 Retourne le prix de la souscription selon le type de store
+        Business: 50 000 F (B2C) ou 80 000 F (B2B)
+        Pro: 30 000 F
+        Free: 0 F
+        """
+        plan = SubscriptionChecker.get_current_plan(store)
+        if not plan:
+            return Decimal('0.00')
+        
+        # Plan Business a un prix différent selon le type de store
+        if plan.plan_type == 'business':
+            if store.is_b2b or store.store_type in ['wholesaler', 'industry']:
+                return Decimal('80000.00')  # B2B
+            else:
+                return Decimal('50000.00')  # B2C
+        
+        return plan.price
 
 
 def check_subscription_permission(permission_type):
