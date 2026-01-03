@@ -31,6 +31,14 @@ class Product(models.Model):
 	# Relations
 	store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='products')
 	category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+	b2b_category = models.ForeignKey(
+		"b2b.B2BCategory",
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name='products',
+		help_text="Catégorie B2B (logique métier)"
+	)
     
 	# Informations produit
 	name = models.CharField(max_length=200)
@@ -53,6 +61,19 @@ class Product(models.Model):
 	is_available = models.BooleanField(default=True)
 	is_featured = models.BooleanField(default=False)
 	
+	# Type de marché
+	MARKET_TYPE_CHOICES = [
+		('b2c', 'B2C - Vente au détail'),
+		('b2b', 'B2B - Vente en gros'),
+		('both', 'B2C et B2B'),
+	]
+	market_type = models.CharField(
+		max_length=10,
+		choices=MARKET_TYPE_CHOICES,
+		default='b2c',
+		help_text="Type de marché pour ce produit"
+	)
+	
 	# Sponsoring (pour produits mis en avant)
 	is_sponsored = models.BooleanField(default=False, help_text="Produit sponsorisé (affiché en priorité)")
 	sponsor_expiry = models.DateTimeField(null=True, blank=True, help_text="Date d'expiration du sponsoring")
@@ -74,6 +95,7 @@ class Product(models.Model):
 		indexes = [
 			models.Index(fields=['store', 'is_available']),
 			models.Index(fields=['category', 'is_available']),
+			models.Index(fields=['market_type', 'is_available'], name='product_market_avail_idx'),
 		]
     
 	def __str__(self):

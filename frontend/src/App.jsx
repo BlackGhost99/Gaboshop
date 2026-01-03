@@ -13,10 +13,13 @@ import StoreProducts from './pages/store/StoreProducts';
 import StoreOrders from './pages/store/StoreOrders';
 import StoreSettings from './pages/store/StoreSettings';
 import StoreProfile from './pages/store/StoreProfile';
+import B2BProcurement from './pages/store/B2BProcurement';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import SubscriptionPlans from './pages/SubscriptionPlans';
+import PrivateRoute from './components/guards/PrivateRoute';
+import PublicRoute from './components/guards/PublicRoute';
 
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
@@ -60,30 +63,76 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
+        {/* Routes publiques (BLOQUEES pour store_managers) */}
+        <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
+        <Route path="/stores/:id" element={<PublicRoute><StoreDetail /></PublicRoute>} />
+        
+        {/* Auth (accessible à tous) */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<DashboardRedirect />} />
 
-        <Route path="/stores/:id" element={<StoreDetail />} />
-
-        <Route path="/client/dashboard" element={<ClientDashboard />} />
-        <Route path="/client/orders" element={<ClientOrders />} />
-
-        {/* Store Routes */}
-        <Route path="/store/dashboard" element={<StoreDashboard />} />
-        <Route path="/store/products" element={<StoreProducts />} />
-        <Route path="/store/orders" element={<StoreOrders />} />
-        <Route path="/store/settings" element={<StoreSettings />} />
-        <Route path="/store/settings/profile" element={<StoreProfile />} />
-
-        <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
-
-        <Route path="/admin/dashboard" element={
-          <ErrorBoundary>
-            <AdminDashboard />
-          </ErrorBoundary>
+        {/* Client routes (PROTEGEES) */}
+        <Route path="/client/dashboard" element={
+          <PrivateRoute allowedRoles={['client']}>
+            <ClientDashboard />
+          </PrivateRoute>
         } />
+        <Route path="/client/orders" element={
+          <PrivateRoute allowedRoles={['client']}>
+            <ClientOrders />
+          </PrivateRoute>
+        } />
+
+        {/* Store routes (PROTEGEES) */}
+        <Route path="/store/dashboard" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreDashboard />
+          </PrivateRoute>
+        } />
+        <Route path="/store/products" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreProducts />
+          </PrivateRoute>
+        } />
+        <Route path="/store/orders" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreOrders />
+          </PrivateRoute>
+        } />
+        <Route path="/store/b2b" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <B2BProcurement />
+          </PrivateRoute>
+        } />
+        <Route path="/store/settings" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreSettings />
+          </PrivateRoute>
+        } />
+        <Route path="/store/settings/profile" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreProfile />
+          </PrivateRoute>
+        } />
+
+        {/* Delivery routes (PROTEGEES) */}
+        <Route path="/delivery/dashboard" element={
+          <PrivateRoute allowedRoles={['delivery_agent']}>
+            <DeliveryDashboard />
+          </PrivateRoute>
+        } />
+
+        {/* Admin routes (PROTEGEES) */}
+        <Route path="/admin/dashboard" element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <ErrorBoundary>
+              <AdminDashboard />
+            </ErrorBoundary>
+          </PrivateRoute>
+        } />
+        
+        {/* Plans (accessible à tous) */}
         <Route path="/plans" element={<SubscriptionPlans />} />
       </Routes>
       <GaboshopAI />

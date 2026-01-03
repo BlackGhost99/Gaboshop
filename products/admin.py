@@ -22,13 +22,14 @@ class ProductAdmin(admin.ModelAdmin):
         'name',
         'store',
         'category',
+        'market_type',
         'price',
         'stock',
         'is_available',
         'has_discount_display',
         'created_at'
     )
-    list_filter = ('is_available', 'is_featured', 'store', 'category', 'created_at')
+    list_filter = ('is_available', 'is_featured', 'market_type', 'store', 'category', 'created_at')
     search_fields = ('name', 'description', 'store__name', 'sku')
     list_editable = ('price', 'stock', 'is_available')
     readonly_fields = ('created_at', 'updated_at', 'discount_percentage_display')
@@ -44,7 +45,7 @@ class ProductAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Statut', {
-            'fields': ('is_available', 'is_featured')
+            'fields': ('is_available', 'is_featured', 'market_type')
         }),
         ('Métadonnées', {
             'fields': ('created_at', 'updated_at'),

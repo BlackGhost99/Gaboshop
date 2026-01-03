@@ -60,7 +60,8 @@ class ProductListView(ListAPIView):
     def get_queryset(self):
         return Product.objects.filter(
             is_available=True,
-            store__is_active=True
+            store__is_active=True,
+            market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
         ).select_related('store', 'category').order_by('-is_sponsored', '-created_at')
 
     def list(self, request, *args, **kwargs):
@@ -91,7 +92,8 @@ class StoreProductsView(ListAPIView):
         return Product.objects.filter(
             store_id=store_id, 
             is_available=True,
-            store__is_active=True
+            store__is_active=True,
+            market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
         ).select_related('store', 'category')
 
     def list(self, request, *args, **kwargs):
@@ -133,7 +135,11 @@ class StoreProductsView(ListAPIView):
 class ProductDetailView(RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = ProductDetailSerializer
-    queryset = Product.objects.filter(is_available=True, store__is_active=True)
+    queryset = Product.objects.filter(
+        is_available=True, 
+        store__is_active=True,
+        market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
+    )
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
