@@ -337,7 +337,9 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 	def price_display(self, obj):
 		if obj.price == 0:
 			return format_html('<span style="color: green; font-weight: bold;">GRATUIT</span>')
-		return format_html('<strong>{:,.0f} FCFA/mois</strong>', obj.price)
+		# Formater le prix d'abord, puis passer le résultat à format_html
+		formatted_price = f"{obj.price:,.0f}"
+		return format_html('<strong>{} FCFA/mois</strong>', formatted_price)
 	price_display.short_description = 'Prix'
 	
 	def max_products_display(self, obj):
@@ -402,7 +404,9 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 		price = obj.plan.price if obj.plan else obj.monthly_fee
 		if price == 0:
 			return format_html('<span style="color: green; font-weight: bold;">{}</span>', plan_name)
-		return format_html('<strong>{}</strong> ({:,.0f} FCFA)', plan_name, price)
+		# Formater le prix d'abord, puis passer le résultat à format_html
+		formatted_price = f"{price:,.0f}"
+		return format_html('<strong>{}</strong> ({} FCFA)', plan_name, formatted_price)
 	plan_display.short_description = 'Plan'
 	
 	def status_display(self, obj):
@@ -489,7 +493,9 @@ class ForfaitAdmin(admin.ModelAdmin):
 	)
 	
 	def price_display(self, obj):
-		return format_html('<strong>{:,.0f} FCFA/mois</strong>', obj.monthly_price)
+		# Formater le prix d'abord, puis passer le résultat à format_html
+		formatted_price = f"{obj.monthly_price:,.0f}"
+		return format_html('<strong>{} FCFA/mois</strong>', formatted_price)
 	price_display.short_description = 'Prix mensuel'
 	
 	def max_priority_orders_display(self, obj):
@@ -712,7 +718,9 @@ class PayoutAdmin(admin.ModelAdmin):
 	payout_type_display.short_description = 'Type'
 	
 	def amount_display(self, obj):
-		return format_html('<strong style="color: green;">{:,.0f} FCFA</strong>', obj.amount)
+		# Formater le montant d'abord, puis passer le résultat à format_html
+		formatted_amount = f"{obj.amount:,.0f}"
+		return format_html('<strong style="color: green;">{} FCFA</strong>', formatted_amount)
 	amount_display.short_description = 'Montant'
 	
 	def status_display(self, obj):

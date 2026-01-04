@@ -552,7 +552,6 @@ const AdminDashboard = () => {
   }, [storesFilter]);
 
   const viewStoreDetail = async (storeId) => {
-<<<<<<< Updated upstream
     try {
       setB2bLoading(prev => ({ ...prev, [storeId]: true }));
       const res = await getStoreDetailAdmin(storeId);
@@ -568,7 +567,7 @@ const AdminDashboard = () => {
           // Pas de profil B2B, c'est normal
           console.log('Pas de profil B2B pour ce magasin');
         }
-        
+
         setSelectedStoreDetail({ ...res.data, b2b_profile: b2bProfile });
         setShowStoreDetailModal(true);
       }
@@ -580,41 +579,24 @@ const AdminDashboard = () => {
   };
 
   const handleDeactivateStore = async (storeId) => {
-    setShowConfirmModal({
-      isOpen: true,
-      message: 'Désactiver ce magasin ? Les produits deviendront invisibles.',
-=======
-    setSelectedStoreForDetail(storeId);
-  };
-
-  const handleDeactivateStore = async (storeId) => {
     setConfirmModal({
       isOpen: true,
       title: 'Désactiver le magasin',
       message: 'Désactiver ce magasin ? Les produits deviendront invisibles.',
       variant: 'warning',
->>>>>>> Stashed changes
       onConfirm: async () => {
         try {
           const res = await deactivateStoreAdmin(storeId);
           if (res?.success) {
-<<<<<<< Updated upstream
             setActionSuccess('Magasin désactivé avec succès');
-=======
->>>>>>> Stashed changes
             loadStoresData();
           }
         } catch (err) {
           setActionError(err?.message || 'Erreur désactivation magasin');
-<<<<<<< Updated upstream
         } finally {
-          setShowConfirmModal({ isOpen: false, message: '', onConfirm: null });
-        }
-      }
-=======
+          setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
         }
       },
->>>>>>> Stashed changes
     });
   };
 
@@ -3517,119 +3499,6 @@ const AdminDashboard = () => {
         </div>
       )}
 
-<<<<<<< Updated upstream
-      {/* Modal de confirmation */}
-      <Modal
-        isOpen={showConfirmModal.isOpen}
-        onClose={() => setShowConfirmModal({ isOpen: false, message: '', onConfirm: null })}
-        title="Confirmation"
-        onConfirm={showConfirmModal.onConfirm}
-        confirmText="Confirmer"
-        cancelText="Annuler"
-        showCancel={true}
-        confirmButtonClass="bg-red-600 hover:bg-red-700"
-      >
-        <p className="text-gray-700">{showConfirmModal.message}</p>
-      </Modal>
-
-      {/* Modal détails du store */}
-      <Modal
-        isOpen={showStoreDetailModal}
-        onClose={() => {
-          setShowStoreDetailModal(false);
-          setSelectedStoreDetail(null);
-        }}
-        title={selectedStoreDetail ? `Détails - ${selectedStoreDetail.name}` : 'Détails du magasin'}
-        size="xl"
-        showCancel={false}
-      >
-        {selectedStoreDetail && (
-          <div className="space-y-6">
-            {/* Informations générales */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Nom</label>
-                <p className="text-gray-900">{selectedStoreDetail.name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Catégorie</label>
-                <p className="text-gray-900">{selectedStoreDetail.category_name || '—'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Ville</label>
-                <p className="text-gray-900">{selectedStoreDetail.city || '—'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Zone</label>
-                <p className="text-gray-900">{selectedStoreDetail.zone || '—'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Gérant</label>
-                <p className="text-gray-900">{selectedStoreDetail.manager_name || '—'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Statut</label>
-                <p className={`inline-block px-2 py-1 rounded text-xs ${selectedStoreDetail.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {selectedStoreDetail.is_active ? 'Actif' : 'Inactif'}
-                </p>
-              </div>
-            </div>
-
-            {/* Section B2B */}
-            <div className="border-t pt-4">
-              <h4 className="text-lg font-semibold mb-4">Configuration B2B</h4>
-              {selectedStoreDetail.b2b_profile ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <div>
-                      <p className="font-semibold">Profil B2B</p>
-                      <p className="text-sm text-gray-600">
-                        Statut: <span className={selectedStoreDetail.b2b_profile.is_active ? 'text-green-600' : 'text-red-600'}>
-                          {selectedStoreDetail.b2b_profile.is_active ? 'Actif' : 'Inactif'}
-                        </span>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Montant minimum: {selectedStoreDetail.b2b_profile.minimum_order_amount?.toLocaleString('fr-FR') || 0} FCFA
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {selectedStoreDetail.b2b_profile.is_active ? (
-                        <button
-                          onClick={() => handleDeactivateB2B(selectedStoreDetail.id)}
-                          disabled={b2bLoading[`b2b_${selectedStoreDetail.id}`]}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {b2bLoading[`b2b_${selectedStoreDetail.id}`] ? '...' : 'Désactiver B2B'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleActivateB2B(selectedStoreDetail.id)}
-                          disabled={b2bLoading[`b2b_${selectedStoreDetail.id}`]}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {b2bLoading[`b2b_${selectedStoreDetail.id}`] ? '...' : 'Activer B2B'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
-                  <p className="text-sm text-yellow-800 mb-3">Aucun profil B2B configuré pour ce magasin.</p>
-                  <button
-                    onClick={() => handleCreateB2BProfile(selectedStoreDetail.id)}
-                    disabled={b2bLoading[`b2b_create_${selectedStoreDetail.id}`]}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {b2bLoading[`b2b_create_${selectedStoreDetail.id}`] ? 'Création...' : 'Créer un profil B2B'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
-=======
       {/* Modals */}
       <AlertModal
         isOpen={alertModal.isOpen}
@@ -3654,7 +3523,6 @@ const AdminDashboard = () => {
         onClose={() => setSelectedStoreForDetail(null)}
         storeId={selectedStoreForDetail}
       />
->>>>>>> Stashed changes
     </div>
   );
 };
