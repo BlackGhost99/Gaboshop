@@ -218,6 +218,13 @@ class DeliveryPayout(models.Model):
 		return f"Paiement {self.calculated_payout} FCFA - {self.delivery_agent.username}"
 
 
+SUPPORT_LEVEL_CHOICES = (
+	('standard', 'Standard'),
+	('prioritaire', 'Prioritaire'),
+	('dedie', 'Dédié VIP'),
+)
+
+
 class SubscriptionPlan(models.Model):
 	"""
 	Plans d'abonnement pour les magasins (Starter, Pro, Business)
@@ -243,6 +250,133 @@ class SubscriptionPlan(models.Model):
 	has_custom_page = models.BooleanField(default=False, help_text="Page personnalisée")
 	has_priority_support = models.BooleanField(default=False, help_text="Support VIP")
 	priority_listing = models.IntegerField(default=0, help_text="Ordre de priorité dans les listings (plus élevé = plus visible)")
+	
+	# FRAIS DE SERVICE
+	service_fee_client_amount = models.IntegerField(
+		default=500,
+		help_text="Montant des frais de service payés par le client final par commande B2C (FCFA)"
+	)
+	service_fee_to_wholesaler_amount = models.IntegerField(
+		default=1000,
+		help_text="Frais facturés au commerce B2C pour chaque commande B2B vers un grossiste (FCFA)"
+	)
+	
+	# COMMISSIONS
+	commission_reduction_percent = models.IntegerField(
+		default=0,
+		help_text="Réduction de commission en % par rapport au taux de base (0-100). Ex: 40 = -40%, 75 = -75%"
+	)
+	
+	# PRODUITS NON-ALIMENTAIRES
+	can_sell_non_food_products = models.BooleanField(
+		default=True,
+		help_text="Autorise la vente de produits non alimentaires"
+	)
+	max_products_non_food = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text="Limite de produits non alimentaires (null = illimité si can_sell_non_food_products=True)"
+	)
+	
+	# LIVRAISON
+	can_offer_express_delivery = models.BooleanField(
+		default=False,
+		help_text="Autorise la livraison express (option payante pour le client)"
+	)
+	has_advanced_delivery_tracking = models.BooleanField(
+		default=False,
+		help_text="Accès au suivi détaillé des livraisons (GPS, notifications en temps réel)"
+	)
+	
+	# RAPPORTS ET EXPORTS
+	can_view_basic_reports = models.BooleanField(
+		default=True,
+		help_text="Peut voir les rapports basiques (ventes du jour/mois, commissions)"
+	)
+	can_view_detailed_reports = models.BooleanField(
+		default=False,
+		help_text="Peut voir les détails par commande et par catégorie"
+	)
+	can_export_excel = models.BooleanField(
+		default=False,
+		help_text="Peut exporter les rapports en Excel/CSV"
+	)
+	can_export_pdf = models.BooleanField(
+		default=False,
+		help_text="Peut exporter les rapports en PDF officiel"
+	)
+	history_limit_days = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text="Limite d'historique en jours (null = illimité)"
+	)
+	
+	# FINANCE B2B (aligné avec B2C)
+	can_view_finance_basic = models.BooleanField(
+		default=True,
+		help_text="Peut voir les rapports financiers basiques (ventes B2B du jour/mois)"
+	)
+	can_view_finance_detailed = models.BooleanField(
+		default=False,
+		help_text="Peut voir les détails financiers par commande B2B et par catégorie"
+	)
+	can_export_finance_csv = models.BooleanField(
+		default=False,
+		help_text="Peut exporter les rapports financiers B2B en Excel/CSV"
+	)
+	can_export_finance_pdf = models.BooleanField(
+		default=False,
+		help_text="Peut exporter les rapports financiers B2B en PDF officiel"
+	)
+	finance_history_limit_days = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text="Limite d'historique financier B2B en jours (null = illimité)"
+	)
+	
+	# QUOTAS B2B (pour stores B2C qui achètent)
+	max_b2b_suppliers = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text="Nombre max de grossistes avec lesquels commander (null = illimité)"
+	)
+	max_b2b_monthly_orders = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text="Nombre max de commandes B2B par mois (null = illimité)"
+	)
+	
+	# VISIBILITE B2B (pour buyers)
+	b2b_catalog_priority = models.IntegerField(
+		default=0,
+		help_text="Priorité d'affichage dans le catalogue B2B (plus élevé = plus visible)"
+	)
+	b2b_featured_access = models.BooleanField(
+		default=False,
+		help_text="Accès prioritaire aux grossistes mis en avant"
+	)
+	
+	# TYPE DE MAGASIN
+	APPLIES_TO_CHOICES = [
+		('b2c', 'B2C Store uniquement'),
+		('b2b_buyer', 'B2B Buyer (boutique cliente)'),
+		('b2b_wholesaler', 'B2B Grossiste'),
+		('both', 'B2C et B2B'),
+	]
+	applies_to = models.CharField(
+		max_length=20,
+		choices=APPLIES_TO_CHOICES,
+		default='b2c',
+		help_text="Type de magasin auquel ce plan s'applique"
+	)
+	
+	# SUPPORT
+	support_level = models.CharField(
+		max_length=20,
+		choices=SUPPORT_LEVEL_CHOICES,
+		default='standard',
+		help_text="Niveau de support client"
+	)
 	
 	# Configuration
 	commission_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, 
@@ -283,7 +417,7 @@ class SubscriptionPlan(models.Model):
 			features.append("Accès approvisionnement B2B")
 		if self.has_b2b_visibility:
 			features.append("Visibilité maximale catalogue B2B")
-		if self.has_statistics:
+		if self.can_view_detailed_reports or self.has_statistics:  # has_statistics pour compatibilité
 			features.append("Statistiques et rapports de ventes")
 		if self.has_custom_page:
 			features.append("Page personnalisée")

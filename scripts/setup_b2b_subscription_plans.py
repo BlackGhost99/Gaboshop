@@ -5,6 +5,9 @@ import os
 import sys
 import django
 
+# Reconfigure stdout for UTF-8
+sys.stdout.reconfigure(encoding='utf-8')
+
 # Setup Django
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
@@ -32,10 +35,19 @@ def create_b2b_subscription_plans():
             'featured_in_catalog': False,
             'can_offer_bulk_discounts': True,
             'has_advanced_analytics': False,
+            'can_view_detailed_reports': False,
             'has_priority_support': False,
             'can_create_promotions': False,
             'has_api_access': False,
             'commission_reduction_percent': 0,  # 8% de commission (pas de réduction)
+            # Finance - FREE: Basique uniquement
+            'can_view_finance_basic': True,
+            'can_view_finance_detailed': False,
+            'can_export_finance_csv': False,
+            'can_export_finance_pdf': False,
+            'finance_history_limit_days': 30,  # 30 jours
+            # Type de magasin
+            'applies_to': 'b2b_wholesaler',
             'custom_features': [
                 {
                     'title': '2 produits B2B maximum',
@@ -80,10 +92,19 @@ def create_b2b_subscription_plans():
             'featured_in_catalog': True,
             'can_offer_bulk_discounts': True,
             'has_advanced_analytics': True,
+            'can_view_detailed_reports': True,
             'has_priority_support': False,
             'can_create_promotions': True,
             'has_api_access': False,
             'commission_reduction_percent': 15,
+            # Finance - PRO: Détails + CSV
+            'can_view_finance_basic': True,
+            'can_view_finance_detailed': True,
+            'can_export_finance_csv': True,
+            'can_export_finance_pdf': False,
+            'finance_history_limit_days': 180,  # 6 mois
+            # Type de magasin
+            'applies_to': 'b2b_wholesaler',
             'custom_features': [
                 {
                     'title': 'Mise en avant catalogue',
@@ -128,10 +149,19 @@ def create_b2b_subscription_plans():
             'featured_in_catalog': True,
             'can_offer_bulk_discounts': True,
             'has_advanced_analytics': True,
+            'can_view_detailed_reports': True,
             'has_priority_support': True,
             'can_create_promotions': True,
             'has_api_access': True,
             'commission_reduction_percent': 30,
+            # Finance - BUSINESS: Complet + PDF
+            'can_view_finance_basic': True,
+            'can_view_finance_detailed': True,
+            'can_export_finance_csv': True,
+            'can_export_finance_pdf': True,  # PDF disponible
+            'finance_history_limit_days': None,  # Illimité
+            # Type de magasin
+            'applies_to': 'b2b_wholesaler',
             'custom_features': [
                 {
                     'title': 'Priorité maximale',

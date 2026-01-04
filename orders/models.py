@@ -112,12 +112,15 @@ class Order(models.Model):
 		return self.delivery_fee
 	
 	def calculate_service_fee(self):
-		"""Calcule les frais de service"""
-		if self.store.service_fee > 0:
-			self.service_fee = self.store.service_fee
+		"""Calcule les frais de service selon le plan d'abonnement"""
+		plan = self.store.get_current_plan()
+		
+		if plan and hasattr(plan, 'service_fee_client_amount'):
+			self.service_fee = Decimal(str(plan.service_fee_client_amount))
 		else:
-			# Frais de service par défaut (100-300 FCFA)
-			self.service_fee = Decimal('200.00')
+			# Fallback si pas de plan ou ancien modèle
+			self.service_fee = self.store.service_fee if self.store.service_fee > 0 else Decimal('500.00')
+		
 		return self.service_fee
 	
 	def calculate_commission(self):
@@ -128,7 +131,10 @@ class Order(models.Model):
 			# Determine current plan
 			plan = self.store.get_current_plan()
 			plan_type = plan.plan_type if plan else 'free'
-			multiplier = Decimal(getattr(plan, 'commission_multiplier', 1)) if plan else Decimal('1')
+			# Convert commission_reduction_percent to multiplier
+			# Ex: 40% reduction → multiplier 0.60 (1 - 0.40)
+			reduction_percent = Decimal(getattr(plan, 'commission_reduction_percent', 0)) if plan else Decimal('0')
+			multiplier = (Decimal('100') - reduction_percent) / Decimal('100')
 
 			total_commission = Decimal('0.00')
 			# Sum commission per OrderItem using category base rates

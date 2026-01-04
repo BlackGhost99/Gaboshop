@@ -66,6 +66,14 @@ import AdminStoresSection from '../../components/AdminStoresSection';
 import AdminProductsSection from '../../components/AdminProductsSection';
 import AdminOverviewSection from '../../components/AdminOverviewSection';
 import AdminDeliverySection from '../../components/AdminDeliverySection';
+import AdminSubscriptionsSection from '../../components/AdminSubscriptionsSection';
+import AdminB2BManagementSection from '../../components/AdminB2BManagementSection';
+import AdminCommissionsSection from '../../components/AdminCommissionsSection';
+import AdminReversementsSection from '../../components/AdminReversementsSection';
+import AdminClientCreditsSection from '../../components/AdminClientCreditsSection';
+import AdminForfaitsSection from '../../components/AdminForfaitsSection';
+import AdminPaymentLogsSection from '../../components/AdminPaymentLogsSection';
+import AdminPayoutsSection from '../../components/AdminPayoutsSection';
 import AlertModal from '../../components/AlertModal';
 import ConfirmModal from '../../components/ConfirmModal';
 import StoreDetailModal from '../../components/StoreDetailModal';
@@ -2421,6 +2429,14 @@ const AdminDashboard = () => {
         {activeTab === 'users' && usersSection}
         {activeTab === 'orders' && ordersSection}
         {activeTab === 'finances' && financesSection}
+        {activeTab === 'subscriptions' && <AdminSubscriptionsSection />}
+        {activeTab === 'b2b_management' && <AdminB2BManagementSection />}
+        {activeTab === 'commissions' && <AdminCommissionsSection />}
+        {activeTab === 'reversements' && <AdminReversementsSection />}
+        {activeTab === 'client_credits' && <AdminClientCreditsSection />}
+        {activeTab === 'forfaits' && <AdminForfaitsSection />}
+        {activeTab === 'payment_logs' && <AdminPaymentLogsSection />}
+        {activeTab === 'payouts' && <AdminPayoutsSection />}
         {activeTab === 'stores' && storesSection}
         {activeTab === 'products' && productsSection}
         {activeTab === 'store_categories' && storeCategoriesSection}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport des Dépenses - {{ store.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #dc2626;
+            padding-bottom: 15px;
+        }
+        
+        .header h1 {
+            color: #dc2626;
+            margin: 0;
+            font-size: 22pt;
+        }
+        
+        .header .store-name {
+            font-size: 14pt;
+            color: #666;
+            margin: 5px 0;
+        }
+        
+        .header .date {
+            font-size: 9pt;
+            color: #999;
+        }
+        
+        .summary {
+            background: #fef2f2;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .summary h3 {
+            margin: 0 0 10px 0;
+            color: #dc2626;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .summary-item {
+            text-align: center;
+        }
+        
+        .summary-label {
+            font-size: 9pt;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        .summary-value {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #dc2626;
+            margin-top: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 9pt;
+        }
+        
+        table thead {
+            background: #dc2626;
+            color: white;
+        }
+        
+        table th {
+            padding: 8px 5px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        table td {
+            padding: 6px 5px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        table tbody tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        table tbody tr:hover {
+            background: #f3f4f6;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .badge {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 8pt;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .badge-auto {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-manual {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 8pt;
+            color: #999;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ report_title }}</h1>
+        <div class="store-name">{{ store.name }}</div>
+        <div class="date">Généré le {{ generated_at|date:"d/m/Y à H:i" }}</div>
+    </div>
+    
+    <div class="summary">
+        <h3>Résumé des Dépenses</h3>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-label">Total Dépenses</div>
+                <div class="summary-value">{{ summary.total_expenses|floatformat:0 }} FCFA</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Nombre de Dépenses</div>
+                <div class="summary-value">{{ summary.expenses_count }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Fournisseur</th>
+                <th>Référence</th>
+                <th class="text-right">Montant</th>
+                <th>Paiement</th>
+                <th class="text-center">Auto</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for expense in expenses %}
+            <tr>
+                <td>{{ expense.date }}</td>
+                <td>{{ expense.type }}</td>
+                <td>{{ expense.supplier }}</td>
+                <td>{{ expense.reference }}</td>
+                <td class="text-right">{{ expense.amount|floatformat:0 }} FCFA</td>
+                <td>{{ expense.payment_method }}</td>
+                <td class="text-center">
+                    <span class="badge {% if expense.auto_tracked == 'Oui' %}badge-auto{% else %}badge-manual{% endif %}">
+                        {{ expense.auto_tracked }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        <p>Ce rapport a été généré automatiquement par Gaboshop.</p>
+        <p>Pour toute question, contactez le support technique.</p>
+    </div>
+</body>
+</html>
+

@@ -309,29 +309,95 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 	readonly_fields = ('created_at', 'updated_at')
 	
 	fieldsets = (
-		('Informations de base', {
-			'fields': ('name', 'slug', 'plan_type', 'price', 'description', 'is_active')
+		('Informations générales', {
+			'fields': ('name', 'slug', 'plan_type', 'price', 'applies_to', 'description', 'is_active')
 		}),
-		('Limites et Fonctionnalités', {
+		('Limites Produits & Commandes', {
 			'fields': (
 				'max_products',
-				'can_sponsor_products',
-				'has_statistics',
-				'has_custom_page',
-				'has_priority_support',
-				'priority_listing',
-					'commission_rate',
-					'commission_multiplier'
+				'max_orders_per_month',
+				'can_sell_non_food_products',
+				'max_products_non_food',
 			)
 		}),
-		('Fonctionnalités additionnelles', {
-			'fields': ('features_json',),
-			'classes': ('collapse',)
+		('Quotas B2B', {
+			'fields': (
+				'max_b2b_suppliers',
+				'max_b2b_monthly_orders',
+			),
+			'description': 'Limites pour les stores B2C qui achètent chez des grossistes'
+		}),
+		('Frais de Service', {
+			'fields': (
+				'service_fee_client_amount',
+				'service_fee_to_wholesaler_amount',
+			),
+			'description': 'Montants en FCFA facturés par commande'
+		}),
+		('Commissions', {
+			'fields': (
+				'commission_reduction_percent',
+				'commission_rate',  # Optionnel, pour affichage
+			),
+			'description': 'Réduction en % appliquée au taux de commission de base'
+		}),
+		('Fonctionnalités B2B', {
+			'fields': (
+				'can_access_b2b',
+				'has_b2b_visibility',
+			)
+		}),
+		('Visibilité B2B', {
+			'fields': (
+				'b2b_catalog_priority',
+				'b2b_featured_access',
+			),
+			'description': 'Contrôle de la visibilité dans le catalogue B2B pour les buyers'
+		}),
+		('Livraison', {
+			'fields': (
+				'can_offer_express_delivery',
+				'has_advanced_delivery_tracking',
+			)
+		}),
+		('Rapports et Exports', {
+			'fields': (
+				'can_view_basic_reports',
+				'can_view_detailed_reports',
+				'can_export_excel',
+				'can_export_pdf',
+				'history_limit_days',
+			),
+			'description': 'Contrôle des accès aux rapports financiers et exports'
+		}),
+		('Finance B2B', {
+			'fields': (
+				'can_view_finance_basic',
+				'can_view_finance_detailed',
+				'can_export_finance_csv',
+				'can_export_finance_pdf',
+				'finance_history_limit_days',
+			),
+			'description': 'Contrôle des accès aux rapports financiers B2B (pour stores qui achètent chez grossistes)'
+		}),
+		('Support', {
+			'fields': (
+				'support_level',
+				'has_statistics',
+				'has_priority_support',
+			)
+		}),
+		('Autres Fonctionnalités', {
+			'fields': (
+				'has_custom_page',
+				'can_sponsor_products',
+				'priority_listing',
+			)
 		}),
 		('Métadonnées', {
-			'fields': ('created_at', 'updated_at'),
+			'fields': ('features_json', 'created_at', 'updated_at'),
 			'classes': ('collapse',)
-		}),
+		})
 	)
 	
 	def price_display(self, obj):

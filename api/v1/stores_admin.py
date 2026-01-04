@@ -124,6 +124,12 @@ class StoreDetailView(APIView):
             'commission_rate': float(store.commission_rate),
             'delivery_fee': float(store.delivery_fee),
             'is_active': store.is_active,
+            'is_verified': store.is_verified,
+            'is_b2c': store.is_b2c,
+            'is_b2b': store.is_b2b,
+            'b2b_min_order_amount': float(store.b2b_min_order_amount) if hasattr(store, 'b2b_min_order_amount') else 0,
+            'b2b_delivery_delay': store.b2b_delivery_delay if hasattr(store, 'b2b_delivery_delay') else 24,
+            'store_type': store.store_type,
             'created_at': store.created_at.isoformat(),
             'updated_at': store.updated_at.isoformat() if store.updated_at else None,
             'stats': {
@@ -243,6 +249,41 @@ class StoreUpdateView(APIView):
                 'data': {
                     'id': store.id,
                     'name': store.name,
+                }
+            })
+        
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StoreB2BSettingsUpdateView(APIView):
+    """Mettre à jour les paramètres B2B d'un magasin"""
+    permission_classes = [IsPlatformAdmin]
+    
+    def patch(self, request, store_id):
+        try:
+            store = get_object_or_404(Store, id=store_id)
+            data = request.data
+            
+            # Update B2B fields
+            if 'is_b2b' in data:
+                store.is_b2b = bool(data['is_b2b'])
+            if 'b2b_min_order_amount' in data:
+                store.b2b_min_order_amount = float(data['b2b_min_order_amount'])
+            if 'b2b_delivery_delay' in data:
+                store.b2b_delivery_delay = int(data['b2b_delivery_delay'])
+            
+            store.save()
+            
+            return Response({
+                'success': True,
+                'message': 'Paramètres B2B mis à jour avec succès',
+                'data': {
+                    'id': store.id,
+                    'name': store.name,
+                    'is_b2b': store.is_b2b,
+                    'b2b_min_order_amount': float(store.b2b_min_order_amount),
+                    'b2b_delivery_delay': store.b2b_delivery_delay,
                 }
             })
         

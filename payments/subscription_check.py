@@ -205,13 +205,14 @@ class SubscriptionChecker:
     def get_service_fee_b2b(store):
         """
         💰 Retourne les frais de service B2B selon le plan
-        Business: 0 F
-        Autres: 200 F
         """
         plan = SubscriptionChecker.get_current_plan(store)
-        if plan and plan.plan_type == 'business':
-            return Decimal('0.00')
-        return Decimal('200.00')
+        
+        if plan and hasattr(plan, 'service_fee_to_wholesaler_amount'):
+            return Decimal(str(plan.service_fee_to_wholesaler_amount))
+        else:
+            # Fallback pour compatibilité
+            return Decimal('1000.00')
     
     @staticmethod
     def get_subscription_price(store):

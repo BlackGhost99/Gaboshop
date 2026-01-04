@@ -14,6 +14,7 @@ import StoreOrders from './pages/store/StoreOrders';
 import StoreSettings from './pages/store/StoreSettings';
 import StoreProfile from './pages/store/StoreProfile';
 import B2BProcurement from './pages/store/B2BProcurement';
+import Finance from './pages/store/Finance';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -103,6 +104,11 @@ function App() {
         <Route path="/store/b2b" element={
           <PrivateRoute allowedRoles={['store_manager']}>
             <B2BProcurement />
+          </PrivateRoute>
+        } />
+        <Route path="/store/finance" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <Finance />
           </PrivateRoute>
         } />
         <Route path="/store/settings" element={

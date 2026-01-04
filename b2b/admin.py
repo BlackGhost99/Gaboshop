@@ -60,7 +60,7 @@ class B2BSubscriptionPlanAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Informations de base', {
-            'fields': ('name', 'slug', 'plan_type', 'price', 'description', 'tagline')
+            'fields': ('name', 'slug', 'plan_type', 'price', 'applies_to', 'description', 'tagline')
         }),
         ('Limites et quotas', {
             'fields': (
@@ -69,18 +69,20 @@ class B2BSubscriptionPlanAdmin(admin.ModelAdmin):
                 'max_monthly_orders'
             )
         }),
-        ('Visibilité et marketing', {
+        ('Distribution & visibilité commerciale', {
             'fields': (
                 'catalog_priority',
                 'featured_in_catalog',
                 'is_popular',
                 'display_order'
-            )
+            ),
+            'description': 'Contrôle de la visibilité et de la distribution dans le catalogue B2B'
         }),
         ('Fonctionnalités', {
             'fields': (
                 'can_offer_bulk_discounts',
-                'has_advanced_analytics',
+                'has_advanced_analytics',  # Déprécié, gardé pour compatibilité
+                'can_view_detailed_reports',
                 'has_priority_support',
                 'can_create_promotions',
                 'has_api_access'
@@ -88,6 +90,16 @@ class B2BSubscriptionPlanAdmin(admin.ModelAdmin):
         }),
         ('Tarification', {
             'fields': ('commission_reduction_percent',)
+        }),
+        ('Finance', {
+            'fields': (
+                'can_view_finance_basic',
+                'can_view_finance_detailed',
+                'can_export_finance_csv',
+                'can_export_finance_pdf',
+                'finance_history_limit_days',
+            ),
+            'description': 'Contrôle des accès aux rapports financiers et exports (aligné avec B2C)'
         }),
         ('Avantages personnalisés', {
             'fields': ('custom_features',),
@@ -118,7 +130,7 @@ class B2BSubscriptionPlanAdmin(admin.ModelAdmin):
     
     def features_summary(self, obj):
         features = []
-        if obj.has_advanced_analytics:
+        if obj.can_view_detailed_reports or obj.has_advanced_analytics:
             features.append('📊 Analytics')
         if obj.has_priority_support:
             features.append('🎧 Support VIP')

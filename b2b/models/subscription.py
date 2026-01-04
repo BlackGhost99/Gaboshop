@@ -48,14 +48,14 @@ class B2BSubscriptionPlan(models.Model):
         help_text="Nombre max de commandes B2B par mois (null = illimité)"
     )
     
-    # Visibilité et marketing
+    # Distribution & visibilité commerciale
     catalog_priority = models.IntegerField(
         default=0,
-        help_text="Priorité d'affichage dans le catalogue B2B (plus élevé = plus visible)"
+        help_text="Priorité d'affichage dans le catalogue B2B (Distribution prioritaire)"
     )
     featured_in_catalog = models.BooleanField(
         default=False,
-        help_text="Mis en avant dans le catalogue B2B"
+        help_text="Référencé en tête du catalogue B2B (Grossiste recommandé)"
     )
     
     # Fonctionnalités booléennes
@@ -65,7 +65,11 @@ class B2BSubscriptionPlan(models.Model):
     )
     has_advanced_analytics = models.BooleanField(
         default=False,
-        help_text="Accès aux statistiques avancées B2B"
+        help_text="Accès aux statistiques avancées B2B (déprécié, utiliser can_view_detailed_reports)"
+    )
+    can_view_detailed_reports = models.BooleanField(
+        default=False,
+        help_text="Peut voir les détails par commande et par catégorie"
     )
     has_priority_support = models.BooleanField(
         default=False,
@@ -86,6 +90,37 @@ class B2BSubscriptionPlan(models.Model):
         decimal_places=2,
         default=0,
         help_text="Réduction sur les commissions en % (ex: 10 pour -10%)"
+    )
+    
+    # FINANCE (aligné avec B2C et Buyers B2B)
+    can_view_finance_basic = models.BooleanField(
+        default=True,
+        help_text="Peut voir les rapports financiers basiques (ventes du jour/mois)"
+    )
+    can_view_finance_detailed = models.BooleanField(
+        default=False,
+        help_text="Peut voir les détails financiers par commande et par catégorie"
+    )
+    can_export_finance_csv = models.BooleanField(
+        default=False,
+        help_text="Peut exporter les rapports financiers en Excel/CSV"
+    )
+    can_export_finance_pdf = models.BooleanField(
+        default=False,
+        help_text="Peut exporter les rapports financiers en PDF officiel"
+    )
+    finance_history_limit_days = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Limite d'historique financier en jours (null = illimité)"
+    )
+    
+    # TYPE DE MAGASIN
+    applies_to = models.CharField(
+        max_length=20,
+        choices=[('b2b_wholesaler', 'B2B Grossiste uniquement')],
+        default='b2b_wholesaler',
+        help_text="Type de magasin auquel ce plan s'applique"
     )
     
     # Avantages personnalisables (JSON pour flexibilité)
@@ -162,7 +197,7 @@ class B2BSubscriptionPlan(models.Model):
                 'enabled': True
             })
         
-        if self.has_advanced_analytics:
+        if self.can_view_detailed_reports or self.has_advanced_analytics:  # has_advanced_analytics pour compatibilité
             features.append({
                 'title': "Statistiques avancées",
                 'category': 'features',

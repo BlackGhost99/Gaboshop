@@ -53,8 +53,32 @@ from .admin import (
 )
 from .finances import (
     FinanceDashboardView, TransactionsListView, CommissionsByStoreView,
-    DeliveryPayoutView, SubscriptionsView, SponsoredProductsView, RevenueBreakdownView
-    , CategoryCommissionListCreateView, CategoryCommissionDetailView
+    DeliveryPayoutView, SubscriptionsView, SponsoredProductsView, RevenueBreakdownView,
+    CategoryCommissionListCreateView, CategoryCommissionDetailView,
+    ReversementListView, ReversementCreateView, ReversementUpdateView,
+    CommissionListView, CommissionSettleView,
+    CategoryCommissionChangeLogListView,
+    DeliveryPayoutUpdateView,
+    SponsoredProductCreateView, SponsoredProductUpdateView,
+    ClientCreditListView, ClientCreditCreateView, ClientCreditUpdateView,
+    ForfaitListView, ForfaitCreateView, ForfaitUpdateView,
+    ClientForfaitListView, ClientForfaitCreateView, ClientForfaitUpdateView
+)
+from .subscriptions_admin import (
+    SubscriptionPlanListView, SubscriptionPlanCreateView, SubscriptionPlanDetailView,
+    SubscriptionPlanUpdateView, SubscriptionPlanDeleteView,
+    B2BSubscriptionPlanListView, B2BSubscriptionPlanCreateView, B2BSubscriptionPlanDetailView,
+    B2BSubscriptionPlanUpdateView, B2BSubscriptionPlanDeleteView,
+    StoreSubscriptionListView, StoreSubscriptionCreateView, StoreSubscriptionUpdateView,
+    B2BStoreSubscriptionListView, B2BStoreSubscriptionCreateView, B2BStoreSubscriptionUpdateView
+)
+from .b2b_admin import (
+    B2BCategoryListView, B2BCategoryCreateView, B2BCategoryUpdateView, B2BCategoryDeleteView,
+    B2BOrderListView, B2BOrderDetailView, B2BOrderStatusUpdateView
+)
+from .payments_admin import (
+    PaymentCallbackLogListView, PaymentCallbackLogDetailView,
+    PayoutListView as AdminPayoutListView, PayoutCreateView, PayoutUpdateView
 )
 from b2b.api.views import (
     WholesalerListView, WholesalerDetailView, WholesalerProductsView,
@@ -72,7 +96,7 @@ from .orders_admin import (
 )
 from .stores_admin import (
     StoresListView, StoreDetailView as AdminStoreDetailView, StoreCreateView as AdminStoreCreateView,
-    StoreUpdateView as AdminStoreUpdateView, StoreDeactivateView, StoreActivateView,
+    StoreUpdateView as AdminStoreUpdateView, StoreB2BSettingsUpdateView, StoreDeactivateView, StoreActivateView,
     StoreDeleteView, StoreProductsView as AdminStoreProductsView,
     StoreOrdersView as AdminStoreOrdersView, StoreDeliveryAgentsView
 )
@@ -143,6 +167,26 @@ urlpatterns = [
     path('finance/category-commissions/', CategoryCommissionListCreateView.as_view(), name='finance-category-commissions'),
     path('finance/category-commissions/<int:pk>/', CategoryCommissionDetailView.as_view(), name='finance-category-commission-detail'),
     
+    # Finance Admin Extended
+    path('admin/finance/reversements/', ReversementListView.as_view(), name='admin-finance-reversements'),
+    path('admin/finance/reversements/create/', ReversementCreateView.as_view(), name='admin-finance-reversements-create'),
+    path('admin/finance/reversements/<int:reversement_id>/', ReversementUpdateView.as_view(), name='admin-finance-reversements-update'),
+    path('admin/finance/commissions/', CommissionListView.as_view(), name='admin-finance-commissions'),
+    path('admin/finance/commissions/<int:commission_id>/settle/', CommissionSettleView.as_view(), name='admin-finance-commissions-settle'),
+    path('admin/finance/category-commission-logs/', CategoryCommissionChangeLogListView.as_view(), name='admin-finance-category-commission-logs'),
+    path('admin/finance/delivery-payouts/<int:payout_id>/', DeliveryPayoutUpdateView.as_view(), name='admin-finance-delivery-payouts-update'),
+    path('admin/finance/sponsored-products/create/', SponsoredProductCreateView.as_view(), name='admin-finance-sponsored-products-create'),
+    path('admin/finance/sponsored-products/<int:sponsored_id>/', SponsoredProductUpdateView.as_view(), name='admin-finance-sponsored-products-update'),
+    path('admin/finance/client-credits/', ClientCreditListView.as_view(), name='admin-finance-client-credits'),
+    path('admin/finance/client-credits/create/', ClientCreditCreateView.as_view(), name='admin-finance-client-credits-create'),
+    path('admin/finance/client-credits/<int:credit_id>/', ClientCreditUpdateView.as_view(), name='admin-finance-client-credits-update'),
+    path('admin/finance/forfaits/', ForfaitListView.as_view(), name='admin-finance-forfaits'),
+    path('admin/finance/forfaits/create/', ForfaitCreateView.as_view(), name='admin-finance-forfaits-create'),
+    path('admin/finance/forfaits/<int:forfait_id>/', ForfaitUpdateView.as_view(), name='admin-finance-forfaits-update'),
+    path('admin/finance/client-forfaits/', ClientForfaitListView.as_view(), name='admin-finance-client-forfaits'),
+    path('admin/finance/client-forfaits/create/', ClientForfaitCreateView.as_view(), name='admin-finance-client-forfaits-create'),
+    path('admin/finance/client-forfaits/<int:client_forfait_id>/', ClientForfaitUpdateView.as_view(), name='admin-finance-client-forfaits-update'),
+    
     # Orders Admin Management
     path('admin/orders/stats/', OrderStatsView.as_view(), name='orders-stats'),
     path('admin/orders/list/', OrdersListView.as_view(), name='orders-list-admin'),
@@ -157,6 +201,7 @@ urlpatterns = [
     path('admin/stores/create/', AdminStoreCreateView.as_view(), name='admin-stores-create'),
     path('admin/stores/<int:store_id>/detail/', AdminStoreDetailView.as_view(), name='admin-stores-detail'),
     path('admin/stores/<int:store_id>/update/', AdminStoreUpdateView.as_view(), name='admin-stores-update'),
+    path('admin/stores/<int:store_id>/b2b-settings/', StoreB2BSettingsUpdateView.as_view(), name='admin-stores-b2b-settings'),
     path('admin/stores/<int:store_id>/deactivate/', StoreDeactivateView.as_view(), name='admin-stores-deactivate'),
     path('admin/stores/<int:store_id>/activate/', StoreActivateView.as_view(), name='admin-stores-activate'),
     path('admin/stores/<int:store_id>/', StoreDeleteView.as_view(), name='admin-stores-delete'),
@@ -177,6 +222,40 @@ urlpatterns = [
     
     # System Settings (public)
     path('settings/', SystemSettingsView.as_view(), name='system-settings'),
+    
+    # Subscription Plans Admin
+    path('admin/subscription-plans/', SubscriptionPlanListView.as_view(), name='admin-subscription-plans'),
+    path('admin/subscription-plans/create/', SubscriptionPlanCreateView.as_view(), name='admin-subscription-plans-create'),
+    path('admin/subscription-plans/<int:plan_id>/', SubscriptionPlanDetailView.as_view(), name='admin-subscription-plans-detail'),
+    path('admin/subscription-plans/<int:plan_id>/update/', SubscriptionPlanUpdateView.as_view(), name='admin-subscription-plans-update'),
+    path('admin/subscription-plans/<int:plan_id>/delete/', SubscriptionPlanDeleteView.as_view(), name='admin-subscription-plans-delete'),
+    path('admin/b2b-subscription-plans/', B2BSubscriptionPlanListView.as_view(), name='admin-b2b-subscription-plans'),
+    path('admin/b2b-subscription-plans/create/', B2BSubscriptionPlanCreateView.as_view(), name='admin-b2b-subscription-plans-create'),
+    path('admin/b2b-subscription-plans/<int:plan_id>/', B2BSubscriptionPlanDetailView.as_view(), name='admin-b2b-subscription-plans-detail'),
+    path('admin/b2b-subscription-plans/<int:plan_id>/update/', B2BSubscriptionPlanUpdateView.as_view(), name='admin-b2b-subscription-plans-update'),
+    path('admin/b2b-subscription-plans/<int:plan_id>/delete/', B2BSubscriptionPlanDeleteView.as_view(), name='admin-b2b-subscription-plans-delete'),
+    path('admin/store-subscriptions/', StoreSubscriptionListView.as_view(), name='admin-store-subscriptions'),
+    path('admin/store-subscriptions/create/', StoreSubscriptionCreateView.as_view(), name='admin-store-subscriptions-create'),
+    path('admin/store-subscriptions/<int:subscription_id>/', StoreSubscriptionUpdateView.as_view(), name='admin-store-subscriptions-update'),
+    path('admin/b2b-store-subscriptions/', B2BStoreSubscriptionListView.as_view(), name='admin-b2b-store-subscriptions'),
+    path('admin/b2b-store-subscriptions/create/', B2BStoreSubscriptionCreateView.as_view(), name='admin-b2b-store-subscriptions-create'),
+    path('admin/b2b-store-subscriptions/<int:subscription_id>/', B2BStoreSubscriptionUpdateView.as_view(), name='admin-b2b-store-subscriptions-update'),
+    
+    # B2B Admin
+    path('admin/b2b/categories/', B2BCategoryListView.as_view(), name='admin-b2b-categories'),
+    path('admin/b2b/categories/create/', B2BCategoryCreateView.as_view(), name='admin-b2b-categories-create'),
+    path('admin/b2b/categories/<int:category_id>/', B2BCategoryUpdateView.as_view(), name='admin-b2b-categories-update'),
+    path('admin/b2b/categories/<int:category_id>/delete/', B2BCategoryDeleteView.as_view(), name='admin-b2b-categories-delete'),
+    path('admin/b2b/orders/', B2BOrderListView.as_view(), name='admin-b2b-orders'),
+    path('admin/b2b/orders/<int:order_id>/', B2BOrderDetailView.as_view(), name='admin-b2b-orders-detail'),
+    path('admin/b2b/orders/<int:order_id>/status/', B2BOrderStatusUpdateView.as_view(), name='admin-b2b-orders-status'),
+    
+    # Payments Admin
+    path('admin/payment-callbacks/', PaymentCallbackLogListView.as_view(), name='admin-payment-callbacks'),
+    path('admin/payment-callbacks/<int:log_id>/', PaymentCallbackLogDetailView.as_view(), name='admin-payment-callbacks-detail'),
+    path('admin/payouts/', AdminPayoutListView.as_view(), name='admin-payouts'),
+    path('admin/payouts/create/', PayoutCreateView.as_view(), name='admin-payouts-create'),
+    path('admin/payouts/<int:payout_id>/', PayoutUpdateView.as_view(), name='admin-payouts-update'),
 
     # Stores
     path('stores/categories/', StoreCategoryListView.as_view(), name='store-categories'),
@@ -242,4 +321,7 @@ urlpatterns = [
     
     # B2B
     path('b2b/', include('b2b.urls')),
+    
+    # Store Finance Module (Store-level financial management)
+    path('store/finance/', include('finance.urls')),
 ]
