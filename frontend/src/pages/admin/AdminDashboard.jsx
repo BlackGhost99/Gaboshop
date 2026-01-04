@@ -66,6 +66,9 @@ import AdminStoresSection from '../../components/AdminStoresSection';
 import AdminProductsSection from '../../components/AdminProductsSection';
 import AdminOverviewSection from '../../components/AdminOverviewSection';
 import AdminDeliverySection from '../../components/AdminDeliverySection';
+import AlertModal from '../../components/AlertModal';
+import ConfirmModal from '../../components/ConfirmModal';
+import StoreDetailModal from '../../components/StoreDetailModal';
 
 const StatCard = ({ title, value, hint }) => (
   <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
@@ -151,6 +154,11 @@ const AdminDashboard = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   // const [sponsored, setSponsored] = useState([]);  // Not used in dashboard
   const [revenueBreakdown, setRevenueBreakdown] = useState(null);
+
+  // Modal states
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'info' });
+  const [selectedStoreForDetail, setSelectedStoreForDetail] = useState(null);
 
 
   const loadData = async (initial = false) => {
@@ -308,13 +316,20 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteStoreCat = async (id) => {
-    if (!window.confirm('Supprimer cette catégorie ?')) return;
-    try {
-      await deleteStoreCategory(id);
-      loadData(false);
-    } catch (err) {
-      setActionError(err?.message || 'Erreur suppression catégorie');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Supprimer la catégorie',
+      message: 'Êtes-vous sûr de vouloir supprimer cette catégorie ?',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteStoreCategory(id);
+          loadData(false);
+        } catch (err) {
+          setActionError(err?.message || 'Erreur suppression catégorie');
+        }
+      },
+    });
   };
 
   const handleCreateStore = async (e) => {
@@ -351,16 +366,23 @@ const AdminDashboard = () => {
     const msg = hardDelete 
       ? 'Supprimer définitivement ce magasin ?' 
       : 'Archiver ce magasin ?';
-    if (!window.confirm(msg)) return;
-    try {
-      const res = await deleteStoreAdmin(id, hardDelete);
-      if (res?.success) {
-        loadStoresData();
-        loadData(false);
-      }
-    } catch (err) {
-      setActionError(err?.message || 'Erreur suppression magasin');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: hardDelete ? 'Suppression définitive' : 'Archivage',
+      message: msg,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await deleteStoreAdmin(id, hardDelete);
+          if (res?.success) {
+            loadStoresData();
+            loadData(false);
+          }
+        } catch (err) {
+          setActionError(err?.message || 'Erreur suppression magasin');
+        }
+      },
+    });
   };
 
   // Orders functions
@@ -396,7 +418,12 @@ const AdminDashboard = () => {
   const handleAssignDelivery = async () => {
     if (!assigningOrder) return;
     if (!autoAssign && !selectedDeliveryAgent) {
-      alert('Sélectionnez un livreur ou activez l\'attribution automatique');
+      setAlertModal({
+        isOpen: true,
+        title: 'Attribution de livraison',
+        message: 'Sélectionnez un livreur ou activez l\'attribution automatique',
+        type: 'warning',
+      });
       return;
     }
     try {
@@ -416,10 +443,20 @@ const AdminDashboard = () => {
           if (detail?.success) setSelectedOrder(detail.data);
         }
       } else {
-        alert(res?.error || 'Erreur lors de l\'attribution');
+        setAlertModal({
+          isOpen: true,
+          title: 'Erreur',
+          message: res?.error || 'Erreur lors de l\'attribution',
+          type: 'error',
+        });
       }
     } catch (err) {
-      alert(err?.message || 'Erreur attribution');
+      setAlertModal({
+        isOpen: true,
+        title: 'Erreur',
+        message: err?.message || 'Erreur attribution',
+        type: 'error',
+      });
     }
   };
 
@@ -433,14 +470,25 @@ const AdminDashboard = () => {
           if (detail?.success) setSelectedOrder(detail.data);
         }
       } else {
-        alert(res?.error || 'Impossible de mettre à jour le statut');
+        setAlertModal({
+          isOpen: true,
+          title: 'Erreur',
+          message: res?.error || 'Impossible de mettre à jour le statut',
+          type: 'error',
+        });
       }
     } catch (err) {
-      alert(err?.message || 'Erreur mise à jour statut');
+      setAlertModal({
+        isOpen: true,
+        title: 'Erreur',
+        message: err?.message || 'Erreur mise à jour statut',
+        type: 'error',
+      });
     }
   };
 
   const handleCancelOrder = async (orderId) => {
+    // Pour l'instant, on utilise un prompt simple. On pourrait créer un InputModal plus tard
     const reason = window.prompt('Motif d\'annulation (optionnel) :', '');
     if (reason === null) return;
     try {
@@ -449,10 +497,20 @@ const AdminDashboard = () => {
         await loadOrdersData();
         if (selectedOrder?.id === orderId) setSelectedOrder(null);
       } else {
-        alert(res?.error || 'Impossible d\'annuler la commande');
+        setAlertModal({
+          isOpen: true,
+          title: 'Erreur',
+          message: res?.error || 'Impossible d\'annuler la commande',
+          type: 'error',
+        });
       }
     } catch (err) {
-      alert(err?.message || 'Erreur annulation');
+      setAlertModal({
+        isOpen: true,
+        title: 'Erreur',
+        message: err?.message || 'Erreur annulation',
+        type: 'error',
+      });
     }
   };
 
@@ -463,7 +521,12 @@ const AdminDashboard = () => {
       if (res?.success) {
         setSystemSettings(res.data);
         setEditingSettings(false);
-        alert('Paramètres mis à jour avec succès!');
+        setAlertModal({
+          isOpen: true,
+          title: 'Succès',
+          message: 'Paramètres mis à jour avec succès!',
+          type: 'success',
+        });
       }
     } catch (err) {
       setActionError(err?.message || 'Erreur mise à jour paramètres');
@@ -489,6 +552,7 @@ const AdminDashboard = () => {
   }, [storesFilter]);
 
   const viewStoreDetail = async (storeId) => {
+<<<<<<< Updated upstream
     try {
       setB2bLoading(prev => ({ ...prev, [storeId]: true }));
       const res = await getStoreDetailAdmin(storeId);
@@ -519,19 +583,38 @@ const AdminDashboard = () => {
     setShowConfirmModal({
       isOpen: true,
       message: 'Désactiver ce magasin ? Les produits deviendront invisibles.',
+=======
+    setSelectedStoreForDetail(storeId);
+  };
+
+  const handleDeactivateStore = async (storeId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Désactiver le magasin',
+      message: 'Désactiver ce magasin ? Les produits deviendront invisibles.',
+      variant: 'warning',
+>>>>>>> Stashed changes
       onConfirm: async () => {
         try {
           const res = await deactivateStoreAdmin(storeId);
           if (res?.success) {
+<<<<<<< Updated upstream
             setActionSuccess('Magasin désactivé avec succès');
+=======
+>>>>>>> Stashed changes
             loadStoresData();
           }
         } catch (err) {
           setActionError(err?.message || 'Erreur désactivation magasin');
+<<<<<<< Updated upstream
         } finally {
           setShowConfirmModal({ isOpen: false, message: '', onConfirm: null });
         }
       }
+=======
+        }
+      },
+>>>>>>> Stashed changes
     });
   };
 
@@ -659,43 +742,69 @@ const AdminDashboard = () => {
   };
 
   const handleDeactivateProduct = async (productId) => {
-    if (!window.confirm('Désactiver ce produit ? Il ne sera plus visible sur le site.')) return;
-    try {
-      const res = await deactivateProductAdmin(productId);
-      if (res?.success) {
-        loadProductsData();
-      }
-    } catch (err) {
-      setActionError(err?.message || 'Erreur désactivation produit');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Désactiver le produit',
+      message: 'Désactiver ce produit ? Il ne sera plus visible sur le site.',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          const res = await deactivateProductAdmin(productId);
+          if (res?.success) {
+            loadProductsData();
+          }
+        } catch (err) {
+          setActionError(err?.message || 'Erreur désactivation produit');
+        }
+      },
+    });
   };
 
   const handleDeleteProduct = async (productId, hardDelete = false) => {
     const msg = hardDelete 
       ? 'Supprimer définitivement ce produit ?' 
       : 'Archiver ce produit (soft delete) ?';
-    if (!window.confirm(msg)) return;
-    try {
-      const res = await deleteProductAdmin(productId, hardDelete);
-      if (res?.success) {
-        loadProductsData();
-      }
-    } catch (err) {
-      setActionError(err?.message || 'Erreur suppression produit');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: hardDelete ? 'Suppression définitive' : 'Archivage',
+      message: msg,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await deleteProductAdmin(productId, hardDelete);
+          if (res?.success) {
+            loadProductsData();
+          }
+        } catch (err) {
+          setActionError(err?.message || 'Erreur suppression produit');
+        }
+      },
+    });
   };
 
   const handleBulkActions = async (action, productIds, stockValue = null) => {
-    if (!window.confirm(`Confirmer l'action "${action}" sur ${productIds.length} produits ?`)) return;
-    try {
-      const res = await bulkActionsProductsAdmin(action, productIds, stockValue);
-      if (res?.success) {
-        loadProductsData();
-        alert(res.message || 'Action exécutée avec succès');
-      }
-    } catch (err) {
-      setActionError(err?.message || 'Erreur action en masse');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirmation',
+      message: `Confirmer l'action "${action}" sur ${productIds.length} produits ?`,
+      variant: 'info',
+      onConfirm: async () => {
+        try {
+          const res = await bulkActionsProductsAdmin(action, productIds, stockValue);
+          if (res?.success) {
+            loadProductsData();
+            setAlertModal({
+              isOpen: true,
+              title: 'Succès',
+              message: res.message || 'Action exécutée avec succès',
+              type: 'success',
+            });
+          }
+        } catch (err) {
+          setActionError(err?.message || 'Erreur action en masse');
+        }
+      },
+    });
   };
 
   const handleCreateProduct = async (e) => {
@@ -3408,6 +3517,7 @@ const AdminDashboard = () => {
         </div>
       )}
 
+<<<<<<< Updated upstream
       {/* Modal de confirmation */}
       <Modal
         isOpen={showConfirmModal.isOpen}
@@ -3519,6 +3629,32 @@ const AdminDashboard = () => {
           </div>
         )}
       </Modal>
+=======
+      {/* Modals */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+      />
+
+      {/* Store Detail Modal */}
+      <StoreDetailModal
+        isOpen={selectedStoreForDetail !== null}
+        onClose={() => setSelectedStoreForDetail(null)}
+        storeId={selectedStoreForDetail}
+      />
+>>>>>>> Stashed changes
     </div>
   );
 };

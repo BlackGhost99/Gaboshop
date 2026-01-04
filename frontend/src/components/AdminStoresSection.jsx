@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import StoreB2BModal from './StoreB2BModal';
 
 const AdminStoresSection = ({
   storesListAdmin,
@@ -19,6 +20,7 @@ const AdminStoresSection = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStores, setSelectedStores] = useState([]);
+  const [selectedStoreForB2B, setSelectedStoreForB2B] = useState(null);
 
   // Calculate stats on the fly
   const stats = useMemo(() => {
@@ -188,9 +190,16 @@ const AdminStoresSection = ({
                 <td className="px-4 py-3 text-sm text-gray-500">{store.city}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{store.manager_name || '—'}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 text-xs rounded-full ${store.is_active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                    {store.is_active ? 'Actif' : 'Inactif'}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className={`px-2 py-1 text-xs rounded-full ${store.is_active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      {store.is_active ? 'Actif' : 'Inactif'}
+                    </span>
+                    {store.is_b2b && (
+                      <span className="px-2 py-1 text-xs rounded-full bg-blue-50 text-blue-700 font-semibold">
+                        B2B
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   {store.is_b2b ? (
@@ -255,6 +264,13 @@ const AdminStoresSection = ({
                     >
                       🗑️
                     </button>
+                    <button
+                      onClick={() => setSelectedStoreForB2B(store)}
+                      className="p-1.5 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded"
+                      title="Gérer B2B"
+                    >
+                      🏪
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -269,6 +285,17 @@ const AdminStoresSection = ({
           </tbody>
         </table>
       </div>
+
+      {/* Modal B2B */}
+      <StoreB2BModal
+        isOpen={selectedStoreForB2B !== null}
+        onClose={() => setSelectedStoreForB2B(null)}
+        store={selectedStoreForB2B}
+        onSuccess={() => {
+          loadStoresData();
+          setSelectedStoreForB2B(null);
+        }}
+      />
     </div>
   );
 };

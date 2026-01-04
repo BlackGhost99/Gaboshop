@@ -2,6 +2,32 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+# Force PYTHONPATH to include the project root
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(BASE_DIR))
+
+# Force registration of gaboshop package before Django is loaded
+# This allows 'import gaboshop' to work even though directory is 'Gaboshop'
+# On Windows, filesystem is case-insensitive but Python imports are case-sensitive
+try:
+    import types
+    
+    # Register gaboshop package (note: directory is 'Gaboshop' but we import as 'gaboshop')
+    gaboshop_dir = BASE_DIR / 'Gaboshop'
+    gaboshop_init = gaboshop_dir / '__init__.py'
+    
+    if gaboshop_init.exists():
+        # Create and register the parent gaboshop module
+        gaboshop_module = types.ModuleType('gaboshop')
+        gaboshop_module.__path__ = [str(gaboshop_dir)]
+        gaboshop_module.__file__ = str(gaboshop_init)
+        gaboshop_module.__package__ = ''
+        sys.modules['gaboshop'] = gaboshop_module
+except Exception:
+    # If registration fails, Django will try to import it normally
+    pass
 
 
 def main():

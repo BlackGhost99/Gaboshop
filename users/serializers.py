@@ -5,6 +5,8 @@ from django.db import transaction
 from stores.models import Store, StoreCategory
 from .models import User, UserProfile, GerantProfile, LivreurProfile
 from .models import DeliveryAgentApiKey
+import json
+import time
 
 # Choices réutilisables pour les véhicules livreur
 VEHICLE_CHOICES = [
@@ -13,6 +15,24 @@ VEHICLE_CHOICES = [
     ('velo', 'Vélo'),
     ('voiture', 'Voiture'),
 ]
+
+def log_debug_info(location, message, data, hypothesis_id='A'):
+    """Log debug information to the log file for debugging sessions"""
+    try:
+        log_entry = {
+            'id': f'log_{int(time.time() * 1000)}_py',
+            'timestamp': int(time.time() * 1000),
+            'location': location,
+            'message': message,
+            'data': data,
+            'sessionId': 'debug-session',
+            'runId': 'initial-test',
+            'hypothesisId': hypothesis_id
+        }
+        with open('c:\\Users\\BlackGhost\\Desktop\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
+    except Exception:
+        pass  # Silently fail if logging doesn't work
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -106,7 +126,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         # Contraintes spécifiques
         if user_type == 'store_manager':
-            # store_phone est optionnel (fallback sur user.phone)
+
             required_fields = ['store_name', 'store_address', 'store_zone']
             missing = [f for f in required_fields if not attrs.get(f)]
             if missing:
@@ -114,6 +134,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                     'store': _(f'Champs requis pour le magasin: {", ".join(missing)}')
                 })
         if user_type == 'delivery_agent':
+
             if not attrs.get('vehicle_plate'):
                 raise serializers.ValidationError({
                     'vehicle_plate': _('Immatriculation du véhicule requise pour le livreur.')
@@ -122,6 +143,17 @@ class RegisterSerializer(serializers.ModelSerializer):
                 attrs['vehicle_type'] = 'moto'
             # GPS activation required at signup for delivery agents
             if 'position_lat' not in attrs or 'position_lng' not in attrs:
+                log_debug_info(
+                    'users/serializers.py:131',
+                    'GPS validation failed - missing coordinates',
+                    {
+                        'has_position_lat': 'position_lat' in attrs,
+                        'has_position_lng': 'position_lng' in attrs,
+                        'position_lat': attrs.get('position_lat'),
+                        'position_lng': attrs.get('position_lng')
+                    },
+                    'A'
+                )
                 raise serializers.ValidationError({
                     'gps': _('Les coordonnées GPS (position_lat, position_lng) sont requises pour l\'inscription des livreurs.')
                 })
@@ -137,6 +169,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
+
         # Extraire les données du profil
         profile_data = {
             'address': validated_data.pop('address', ''),
@@ -174,26 +207,33 @@ class RegisterSerializer(serializers.ModelSerializer):
 
             # Cas gérant: créer un magasin minimal
             if user.user_type == 'store_manager':
-                category = None
-                if store_payload['category_id']:
-                    category = StoreCategory.objects.filter(id=store_payload['category_id']).first()
-                if not category:
-                    category = StoreCategory.objects.order_by('id').first()
-                if not category:
-                    category = StoreCategory.objects.create(name='Général')
 
-                store = Store.objects.create(
-                    name=store_payload['name'],
-                    description='Magasin auto-créé lors de l\'inscription',
-                    category=category,
-                    manager=user,
-                    phone=store_payload['phone'] or user.phone,
-                    email=user.email,
-                    address=store_payload['address'],
-                    city=store_payload['city'],
-                    zone=store_payload['zone'] or 'Libreville',
-                    min_order_amount=store_payload['min_order_amount'] or 0,
-                )
+                category = None
+                try:
+                    if store_payload['category_id']:
+                        category = StoreCategory.objects.filter(id=store_payload['category_id']).first()
+                    if not category:
+                        category = StoreCategory.objects.order_by('id').first()
+                    if not category:
+                        category = StoreCategory.objects.create(name='Général')
+                except Exception as e:
+                    raise
+
+                try:
+                    store = Store.objects.create(
+                        name=store_payload['name'],
+                        description='Magasin auto-créé lors de l\'inscription',
+                        category=category,
+                        manager=user,
+                        phone=store_payload['phone'] or user.phone,
+                        email=user.email,
+                        address=store_payload['address'],
+                        city=store_payload['city'],
+                        zone=store_payload['zone'] or 'Libreville',
+                        min_order_amount=store_payload['min_order_amount'] or 0,
+                    )
+                except Exception as e:
+                    raise
                 GerantProfile.objects.get_or_create(user=user)
                 # Option: marquer store actif mais non vérifié
                 store.is_active = True

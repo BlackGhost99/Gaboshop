@@ -24,9 +24,12 @@ const Register = () => {
     // Delivery
     vehicle_type: 'moto',
     vehicle_plate: '',
+    position_lat: null,
+    position_lng: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
   const navigate = useNavigate();
 
   const isManager = form.user_type === 'store_manager';
@@ -34,6 +37,43 @@ const Register = () => {
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+
+    // If user type changes to delivery_agent, get GPS coordinates
+    if (field === 'user_type' && value === 'delivery_agent') {
+      getGPSCoordinates();
+    }
+  };
+
+  const getGPSCoordinates = () => {
+    if (!navigator.geolocation) {
+      setError('La géolocalisation n\'est pas supportée par ce navigateur.');
+      return;
+    }
+
+    setGpsLoading(true);
+    setError('');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setForm((prev) => ({
+          ...prev,
+          position_lat: latitude,
+          position_lng: longitude,
+        }));
+        setGpsLoading(false);
+      },
+      (error) => {
+        console.error('Erreur de géolocalisation:', error);
+        setError('Impossible d\'obtenir votre position GPS. Veuillez autoriser la géolocalisation.');
+        setGpsLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000, // 5 minutes
+      }
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -54,6 +94,15 @@ const Register = () => {
         delete payload.vehicle_type;
         delete payload.vehicle_plate;
       }
+
+      //#region agent log
+      fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:58',message:'Payload after cleanup, about to send to API',data:{payload:payload,user_type:form.user_type,is_delivery_agent:form.user_type==='delivery_agent',has_gps_fields:'position_lat' in payload && 'position_lng' in payload,position_lat:payload.position_lat,position_lng:payload.position_lng},timestamp:Date.now(),sessionId:'debug-session',runId:'initial-test',hypothesisId:'A'})}).catch(()=>{});
+      //#endregion
+
+      //#region agent log
+      fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:57',message:'About to call register API',data:{payload:payload,user_type:form.user_type,is_delivery_agent:form.user_type==='delivery_agent',has_gps_fields:'position_lat' in payload},timestamp:Date.now(),sessionId:'debug-session',runId:'initial-test',hypothesisId:'A'})}).catch(()=>{});
+      //#endregion
+
       const res = await register(payload);
       if (res.success && res.data?.tokens) {
         sessionStorage.setItem('token', res.data.tokens.access);

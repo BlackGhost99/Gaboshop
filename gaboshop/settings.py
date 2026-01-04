@@ -1,21 +1,17 @@
 """
-Proxy module for project settings so `import gaboshop.settings` works while
-keeping the existing top-level settings.py file.
+Proxy module for gaboshop.settings -> settings (root level)
+This bypasses Gaboshop/settings.py to avoid circular imports.
 """
 import importlib.util
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-_source = _ROOT / 'settings.py'
+_source = _ROOT / 'settings.py'  # Import directly from root, not from Gaboshop/
 
-spec = importlib.util.spec_from_file_location('top_settings', str(_source))
+spec = importlib.util.spec_from_file_location('gaboshop.settings', str(_source))
 _top = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_top)
 
-# Re-export relevant attributes (all UPPERCASE and common names)
+# Re-export all attributes
 for name, val in vars(_top).items():
-    if name.isupper() or name in ('BASE_DIR', 'INSTALLED_APPS', 'MIDDLEWARE'):
-        globals()[name] = val
-
-# also keep module reference for introspection
-_top_settings = _top
+    globals()[name] = val

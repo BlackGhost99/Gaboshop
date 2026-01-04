@@ -116,6 +116,20 @@ class Store(models.Model):
 		default='retail',
 		help_text="Type de magasin: Détail (pour clients), Grossiste/Industrie (pour gérants)"
 	)
+	
+	# Configuration B2B/B2C
+	is_b2c = models.BooleanField(default=True, help_text="Le magasin peut vendre à des clients finaux")
+	is_b2b = models.BooleanField(default=False, help_text="Le magasin peut vendre à d'autres magasins (grossiste)")
+	b2b_min_order_amount = models.DecimalField(
+		max_digits=10, 
+		decimal_places=2, 
+		default=0,
+		help_text="Montant minimum de commande B2B en FCFA"
+	)
+	b2b_delivery_delay = models.PositiveIntegerField(
+		default=24,
+		help_text="Délai de livraison B2B en heures"
+	)
 
 	subscription_plan = models.CharField(
 		max_length=20,

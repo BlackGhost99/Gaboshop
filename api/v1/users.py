@@ -20,11 +20,107 @@ from rest_framework import status
 
 class RegisterView(APIView):
 	permission_classes = [permissions.AllowAny]
-    
+
 	def post(self, request):
+		# Debug log: RegisterView post method entered
+		import json
+		import time
+		try:
+			with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				log_entry = {
+					'id': f'log_{int(time.time() * 1000)}_backend',
+					'timestamp': int(time.time() * 1000),
+					'location': 'api/v1/users.py:24',
+					'message': 'RegisterView post method entered',
+					'data': {'request_data': dict(request.data) if hasattr(request.data, 'dict') else str(request.data)},
+					'sessionId': 'debug-session',
+					'runId': 'initial-test',
+					'hypothesisId': 'A'
+				}
+				f.write(json.dumps(log_entry) + '\n')
+		except Exception as e:
+			pass  # Silently fail if logging fails
+
 		serializer = RegisterSerializer(data=request.data)
+
+		# Debug log: Serializer created, about to validate
+		try:
+			with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				log_entry = {
+					'id': f'log_{int(time.time() * 1000)}_backend',
+					'timestamp': int(time.time() * 1000),
+					'location': 'api/v1/users.py:28',
+					'message': 'Serializer created, about to validate',
+					'data': {'is_valid_before_check': serializer.is_valid()},
+					'sessionId': 'debug-session',
+					'runId': 'initial-test',
+					'hypothesisId': 'A'
+				}
+				f.write(json.dumps(log_entry) + '\n')
+		except Exception as e:
+			pass
+
 		if serializer.is_valid():
-			user = serializer.save()
+			# Debug log: Serializer is valid, about to save
+			try:
+				with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+					log_entry = {
+						'id': f'log_{int(time.time() * 1000)}_backend',
+						'timestamp': int(time.time() * 1000),
+						'location': 'api/v1/users.py:32',
+						'message': 'Serializer is valid, about to save',
+						'data': {'validated_data': dict(serializer.validated_data)},
+						'sessionId': 'debug-session',
+						'runId': 'initial-test',
+						'hypothesisId': 'A'
+					}
+					f.write(json.dumps(log_entry) + '\n')
+			except Exception as e:
+				pass
+
+			try:
+				user = serializer.save()
+				# Debug log: User created successfully
+				try:
+					with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+						log_entry = {
+							'id': f'log_{int(time.time() * 1000)}_backend',
+							'timestamp': int(time.time() * 1000),
+							'location': 'api/v1/users.py:37',
+							'message': 'User created successfully',
+							'data': {'user_id': user.id, 'user_type': user.user_type},
+							'sessionId': 'debug-session',
+							'runId': 'initial-test',
+							'hypothesisId': 'A'
+						}
+						f.write(json.dumps(log_entry) + '\n')
+				except Exception as e:
+					pass
+			except Exception as e:
+				# Debug log: Exception during serializer.save()
+				try:
+					with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+						log_entry = {
+							'id': f'log_{int(time.time() * 1000)}_backend',
+							'timestamp': int(time.time() * 1000),
+							'location': 'api/v1/users.py:40',
+							'message': 'Exception during serializer.save()',
+							'data': {'error_type': type(e).__name__, 'error_message': str(e)},
+							'sessionId': 'debug-session',
+							'runId': 'initial-test',
+							'hypothesisId': 'A'
+						}
+						f.write(json.dumps(log_entry) + '\n')
+				except Exception as e:
+					pass
+				return Response({
+					'success': False,
+					'error': {
+						'code': status.HTTP_500_INTERNAL_SERVER_ERROR,
+						'message': 'Erreur interne lors de la création du compte.',
+						'details': str(e)
+					}
+				}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
 			# Log user registration
 			AuditLog.log_action(
@@ -53,16 +149,34 @@ class RegisterView(APIView):
 					}
 				}
 			}, status=status.HTTP_201_CREATED)
-        
+
+
+		# Debug log: Serializer validation failed
+		try:
+			with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				log_entry = {
+					'id': f'log_{int(time.time() * 1000)}_backend',
+					'timestamp': int(time.time() * 1000),
+					'location': 'api/v1/users.py:86',
+					'message': 'Serializer validation failed',
+					'data': {'errors': serializer.errors, 'request_data': dict(request.data) if hasattr(request.data, 'dict') else str(request.data)},
+					'sessionId': 'debug-session',
+					'runId': 'initial-test',
+					'hypothesisId': 'E'
+				}
+				f.write(json.dumps(log_entry) + '\n')
+		except Exception as e:
+			pass
+
 		print("REGISTRATION ERRORS:", serializer.errors)
 		return Response({
-			'success': False,
-			'error': {
-				'code': status.HTTP_400_BAD_REQUEST,
-				'message': _('Données invalides.'),
-				'details': serializer.errors
-			}
-		}, status=status.HTTP_400_BAD_REQUEST)
+				'success': False,
+				'error': {
+					'code': status.HTTP_400_BAD_REQUEST,
+					'message': _('Données invalides.'),
+					'details': serializer.errors
+				}
+			}, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(APIView):
 	permission_classes = [permissions.AllowAny]

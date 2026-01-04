@@ -239,4 +239,7 @@ urlpatterns = [
     path('', include(router.urls)),
     # Webhooks
     path('webhooks/whatsapp/', WhatsAppWebhookView.as_view(), name='whatsapp-webhook'),
+    
+    # B2B
+    path('b2b/', include('b2b.urls')),
 ]
