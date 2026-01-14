@@ -281,6 +281,11 @@ export const updateStoreB2BSettings = async (storeId, payload) => {
   return res.data;
 };
 
+export const updateStoreB2CSettings = async (storeId, payload) => {
+  const res = await api.patch(`/admin/stores/${storeId}/b2c-settings/`, payload);
+  return res.data;
+};
+
 // Products Admin Management API
 export const getProductStats = async () => {
   const res = await api.get('/admin/products/stats/');
@@ -519,6 +524,81 @@ export const getB2BOrderDetail = async (orderId) => {
 
 export const updateB2BOrderStatus = async (orderId, status) => {
   const res = await api.patch(`/admin/b2b/orders/${orderId}/status/`, { status });
+  return res.data;
+};
+
+// ============================================================================
+// B2C ADMIN API
+// ============================================================================
+
+// B2C Profiles (using Store.is_b2c)
+export const getB2CProfiles = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.status) params.append('status', filters.status);
+  if (filters.search) params.append('search', filters.search);
+  
+  const res = await api.get('/admin/stores/', { params });
+  if (res?.data?.success) {
+    // Filter stores with is_b2c = true
+    const allStores = res.data.data || [];
+    const b2cStores = allStores.filter(store => store.is_b2c !== false);
+    return { success: true, data: b2cStores };
+  }
+  return res.data;
+};
+
+// B2C Categories (using ProductCategory)
+export const getB2CCategories = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.search) params.append('search', filters.search);
+  if (filters.store_id) params.append('store_id', filters.store_id);
+  
+  const res = await api.get('/admin/product-categories/', { params });
+  return res.data;
+};
+
+export const createB2CCategory = async (payload) => {
+  const res = await api.post('/admin/product-categories/', payload);
+  return res.data;
+};
+
+export const updateB2CCategory = async (categoryId, payload) => {
+  const res = await api.patch('/admin/product-categories/', { id: categoryId, ...payload });
+  return res.data;
+};
+
+export const deleteB2CCategory = async (categoryId) => {
+  const res = await api.delete('/admin/product-categories/', { data: { id: categoryId } });
+  return res.data;
+};
+
+// B2C Product Pricings (using Product.price with market_type='b2c' or 'both')
+export const getB2CProductPricings = async (storeId) => {
+  const res = await api.get(`/admin/b2c/pricing/${storeId}/`);
+  return res.data;
+};
+
+export const updateB2CProductPrice = async (productId, payload) => {
+  const res = await api.patch(`/admin/products/${productId}/update/`, payload);
+  return res.data;
+};
+
+// B2C Orders (filter non-B2B orders)
+export const getB2COrders = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.store_id) params.append('store_id', filters.store_id);
+  if (filters.status) params.append('status', filters.status);
+  if (filters.date_from) params.append('date_from', filters.date_from);
+  if (filters.date_to) params.append('date_to', filters.date_to);
+  if (filters.search) params.append('search', filters.search);
+  
+  const res = await api.get('/admin/orders/list/', { params });
+  if (res?.data?.success) {
+    // Filter out B2B orders
+    const allOrders = Array.isArray(res.data.data) ? res.data.data : (res.data.data?.results || []);
+    const b2cOrders = allOrders.filter(order => !order.is_b2b_order && order.order_type !== 'b2b');
+    return { success: true, data: b2cOrders };
+  }
   return res.data;
 };
 

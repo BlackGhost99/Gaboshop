@@ -23,17 +23,15 @@ class StoreAdmin(admin.ModelAdmin):
         'city',
         'zone', 
         'category', 
-        'commission_rate', 
+        'is_b2b_display',
+        'is_b2c_display',
         'is_active_display',
         'total_products_display',
         'is_open_display'
     )
-    list_filter = ('is_active', 'is_verified', 'city', 'zone', 'category', 'created_at')
-    search_fields = ('name', 'manager__phone', 'manager__email', 'address', 'city')
-    # `is_active_display` is a boolean display helper, not the actual field name,
-    # so keep only editable fields that exist on the model in `list_editable`.
-    list_editable = ('commission_rate',)
-    readonly_fields = ('created_at', 'updated_at', 'total_products_display')
+    list_filter = ('is_active', 'is_verified', 'is_b2b', 'is_b2c', 'city', 'zone', 'category', 'created_at')
+    search_fields = ('name', 'manager__phone', 'manager__email', 'address', 'city', 'phone')
+    readonly_fields = ('created_at', 'updated_at', 'total_products_display', 'has_b2b_profile_display')
     fieldsets = (
         ('Informations Générales', {
             'fields': ('name', 'description', 'category', 'manager', 'logo', 'banner_image')
@@ -42,7 +40,19 @@ class StoreAdmin(admin.ModelAdmin):
             'fields': ('phone', 'email', 'address', 'city', 'zone', 'latitude', 'longitude')
         }),
         ('Configuration Business', {
-            'fields': ('commission_rate', 'offers_delivery', 'delivery_fee', 'min_order_amount')
+            'fields': (
+                'service_fee',
+                'min_order_amount'
+            )
+        }),
+        ('Configuration B2B/B2C', {
+            'fields': (
+                'is_b2c',
+                'is_b2b',
+                'b2b_min_order_amount',
+                'b2b_delivery_delay',
+                'has_b2b_profile_display'
+            )
         }),
         ('Horaires et Statut', {
             'fields': ('opening_time', 'closing_time', 'is_active', 'is_verified')
@@ -67,6 +77,21 @@ class StoreAdmin(admin.ModelAdmin):
     is_open_display.boolean = True
     is_open_display.short_description = 'Ouvert'
     
+    def is_b2b_display(self, obj):
+        return obj.is_b2b
+    is_b2b_display.boolean = True
+    is_b2b_display.short_description = 'B2B'
+    
+    def is_b2c_display(self, obj):
+        return obj.is_b2c
+    is_b2c_display.boolean = True
+    is_b2c_display.short_description = 'B2C'
+    
+    def has_b2b_profile_display(self, obj):
+        return hasattr(obj, 'b2b_profile')
+    has_b2b_profile_display.boolean = True
+    has_b2b_profile_display.short_description = 'Profil B2B'
+    
     # Actions personnalisées
     actions = ['activate_stores', 'deactivate_stores']
     
@@ -79,6 +104,3 @@ class StoreAdmin(admin.ModelAdmin):
         updated = queryset.update(is_active=False)
         self.message_user(request, f'{updated} magasins désactivés avec succès.')
     deactivate_stores.short_description = "Désactiver les magasins sélectionnés"
-from django.contrib import admin
-
-# Register your models here.

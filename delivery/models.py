@@ -1,7 +1,150 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from decimal import Decimal
 from users.models import User
 from orders.models import Order
+
+
+class DeliveryZone(models.Model):
+	"""
+	Zones de livraison avec tarification configurable par véhicule
+	Permet de gérer des tarifs différents selon la zone (Libreville Centre, Louis, Mont-Bouët, etc.)
+	"""
+	name = models.CharField(max_length=100, help_text="Nom de la zone (ex: Centre-Ville, Louis, Mont-Bouët)")
+	city = models.CharField(max_length=100, help_text="Ville (Libreville, Owendo, etc.)")
+	is_active = models.BooleanField(default=True, help_text="Zone active pour les commandes")
+	description = models.TextField(blank=True, help_text="Description de la zone (localisation, quartiers)")
+	
+	# Surcharge inter-ville (appliquée si livraison hors de la zone du magasin)
+	inter_city_surcharge = models.DecimalField(
+		max_digits=10, 
+		decimal_places=2, 
+		default=Decimal('1000.00'),
+		help_text="Surcharge fixe pour livraison inter-ville (FCFA)"
+	)
+	
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	
+	class Meta:
+		verbose_name = "Zone de Livraison"
+		verbose_name_plural = "Zones de Livraison"
+		ordering = ['city', 'name']
+		unique_together = [['name', 'city']]
+		indexes = [
+			models.Index(fields=['is_active', 'city']),
+		]
+	
+	def __str__(self):
+		return f"{self.name} ({self.city})"
+
+
+class VehicleType(models.Model):
+	"""
+	Types de véhicules pour la livraison
+	"""
+	VEHICLE_NAME_CHOICES = (
+		('MOTO', 'Moto'),
+		('CAR', 'Petite Voiture'),
+		('VAN', 'Camionnette'),
+		('TRUCK', 'Camion'),
+	)
+	
+	name = models.CharField(max_length=20, choices=VEHICLE_NAME_CHOICES, unique=True, help_text="Type de véhicule")
+	max_weight_kg = models.DecimalField(max_digits=8, decimal_places=2, help_text="Poids maximum en kg")
+	max_items = models.PositiveIntegerField(help_text="Nombre maximum d'articles (0 = illimité)")
+	max_distance_km = models.DecimalField(max_digits=8, decimal_places=2, help_text="Distance maximum en km")
+	allow_intercity = models.BooleanField(default=False, help_text="Autorisé pour livraison inter-ville")
+	
+	# Tarifs intra-ville
+	base_price_intra_city = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Prix de base intra-ville (FCFA)")
+	price_per_km_intra_city = models.DecimalField(max_digits=8, decimal_places=2, default=0.00, help_text="Prix par km intra-ville (FCFA)")
+	
+	# Tarifs inter-ville
+	base_price_inter_city = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Prix de base inter-ville (FCFA)")
+	price_per_km_inter_city = models.DecimalField(max_digits=8, decimal_places=2, default=0.00, help_text="Prix par km inter-ville (FCFA)")
+	
+	is_active = models.BooleanField(default=True, help_text="Type de véhicule actif")
+	
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	
+	class Meta:
+		verbose_name = "Type de Véhicule"
+		verbose_name_plural = "Types de Véhicules"
+		ordering = ['max_weight_kg']
+	
+	def __str__(self):
+		return self.get_name_display()
+	
+	@property
+	def can_handle_unlimited_items(self):
+		"""Vérifie si le véhicule peut transporter un nombre illimité d'articles"""
+		return self.max_items == 0
+
+
+class ZoneVehicleRate(models.Model):
+	"""
+	Tarif d'une combinaison zone + type de véhicule
+	Permet de définir des prix spécifiques par zone et par type de véhicule
+	"""
+	zone = models.ForeignKey(DeliveryZone, on_delete=models.CASCADE, related_name='vehicle_rates', help_text="Zone de livraison")
+	vehicle = models.ForeignKey(VehicleType, on_delete=models.CASCADE, related_name='zone_rates', help_text="Type de véhicule")
+	
+	# Tarifs intra-zone (dans la même zone que le magasin)
+	base_price = models.DecimalField(
+		max_digits=10, 
+		decimal_places=2,
+		help_text="Prix de base pour cette zone + véhicule (FCFA)"
+	)
+	price_per_km = models.DecimalField(
+		max_digits=8, 
+		decimal_places=2, 
+		default=Decimal('0.00'),
+		help_text="Prix par km supplémentaire (FCFA/km)"
+	)
+	
+	is_active = models.BooleanField(default=True, help_text="Tarif actif")
+	notes = models.TextField(blank=True, help_text="Notes (ex: tarif réduit, promo, etc.)")
+	
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	
+	class Meta:
+		verbose_name = "Tarif Zone + Véhicule"
+		verbose_name_plural = "Tarifs Zones + Véhicules"
+		unique_together = [['zone', 'vehicle']]
+		ordering = ['zone', 'vehicle']
+		indexes = [
+			models.Index(fields=['zone', 'is_active']),
+		]
+	
+	def __str__(self):
+		return f"{self.zone.name} - {self.vehicle.get_name_display()}: {self.base_price} FCFA"
+
+
+class CityDistance(models.Model):
+	"""
+	Distances entre villes pour le calcul des frais de livraison
+	"""
+	from_city = models.CharField(max_length=100, help_text="Ville d'origine")
+	to_city = models.CharField(max_length=100, help_text="Ville de destination")
+	distance_km = models.DecimalField(max_digits=8, decimal_places=2, help_text="Distance en km")
+	estimated_time_minutes = models.PositiveIntegerField(help_text="Temps estimé en minutes")
+	
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	
+	class Meta:
+		verbose_name = "Distance entre Villes"
+		verbose_name_plural = "Distances entre Villes"
+		unique_together = [['from_city', 'to_city']]
+		indexes = [
+			models.Index(fields=['from_city', 'to_city']),
+		]
+	
+	def __str__(self):
+		return f"{self.from_city} → {self.to_city}: {self.distance_km} km"
 
 
 class Delivery(models.Model):
@@ -9,12 +152,17 @@ class Delivery(models.Model):
 	Gestion des livraisons
 	"""
 	DELIVERY_STATUS_CHOICES = (
+		('pending_vehicle_validation', 'En attente validation véhicule'),
+		('awaiting_delivery_payment', 'En attente paiement livraison'),
+		('ready_for_assignment', 'Prête pour assignation'),
 		('waiting', 'En attente d\'assignation'),
 		('pending', 'En attente d\'acceptation'),
 		('assigned', 'Assignée'),
-		('accepted', 'Acceptée par livreur'),
+		('accepted_by_driver', 'Acceptée par livreur'),
+		('accepted', 'Acceptée par livreur'),  # Compatibilité
 		('picked_up', 'Colis récupéré'),
-		('in_transit', 'En cours'),
+		('in_delivery', 'En cours de livraison'),
+		('in_transit', 'En cours'),  # Compatibilité
 		('delivered', 'Livrée'),
 		('failed', 'Échec'),
 		('cancelled', 'Annulée'),
@@ -36,15 +184,44 @@ class Delivery(models.Model):
 		limit_choices_to={'user_type': 'delivery_agent'},
 		related_name='deliveries'
 	)
+	
+	# Types de véhicules
+	vehicle_type = models.ForeignKey(
+		VehicleType,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='deliveries',
+		help_text="Type de véhicule utilisé (déduit du livreur)"
+	)
+	selected_vehicle_type = models.ForeignKey(
+		VehicleType,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='selected_deliveries',
+		help_text="Type de véhicule sélectionné par le client"
+	)
+	minimum_required_vehicle_type = models.ForeignKey(
+		VehicleType,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='required_deliveries',
+		help_text="Type de véhicule minimum requis (calculé automatiquement)"
+	)
     
 	# Informations livraison
-	status = models.CharField(max_length=20, choices=DELIVERY_STATUS_CHOICES, default='waiting')
+	status = models.CharField(max_length=30, choices=DELIVERY_STATUS_CHOICES, default='waiting')
 	tracking_number = models.CharField(max_length=50, unique=True, blank=True)
 	
 	# Assignation automatique
 	is_auto_assigned = models.BooleanField(default=False, help_text="Assigné automatiquement")
 	distance_to_store = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Distance en km")
+	distance_km = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Distance totale en km (store → client)")
 	estimated_duration = models.PositiveIntegerField(null=True, blank=True, help_text="Durée estimée en minutes")
+	is_intra_city = models.BooleanField(default=True, help_text="Livraison intra-ville (même ville)")
+	assignment_timeout_minutes = models.PositiveIntegerField(default=2, help_text="Timeout pour acceptation livreur (minutes)")
     
 	# Adresses
 	city = models.CharField(max_length=100, default='Libreville', help_text="Ville de livraison")
@@ -145,8 +322,17 @@ class DeliveryProfile(models.Model):
 
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='delivery_profile')
 	cin_number = models.CharField(max_length=50, blank=True, help_text="Numéro CIN ou ID interne")
-	vehicle_type = models.CharField(max_length=50, blank=True, help_text="Moto, Voiture, Vélo")
+	vehicle_type = models.ForeignKey(
+		VehicleType,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='delivery_profiles',
+		help_text="Type de véhicule du livreur"
+	)
+	vehicle_type_old = models.CharField(max_length=50, blank=True, help_text="Ancien champ (migration) - Moto, Voiture, Vélo")
 	vehicle_plate = models.CharField(max_length=20, blank=True)
+	allow_intercity = models.BooleanField(default=False, help_text="Livreur autorisé pour livraisons inter-ville")
 
 	status = models.CharField(max_length=20, choices=AGENT_STATUS_CHOICES, default='offline')
 

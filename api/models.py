@@ -196,3 +196,54 @@ class CommissionByCategory(models.Model):
     
     def __str__(self):
         return f"{self.category.name} - {self.commission_rate}%"
+
+
+class AIActionLog(models.Model):
+    """
+    Log de toutes les actions effectuées par l'IA
+    """
+    ACTION_TYPES = (
+        ('search', 'Recherche'),
+        ('prepare_order', 'Préparation commande'),
+        ('confirm_order', 'Confirmation commande'),
+        ('explain_error', 'Explication erreur'),
+        ('suggest_action', 'Suggestion action'),
+        ('trigger_alert', 'Déclenchement alerte'),
+    )
+    
+    # Identification
+    actor = models.CharField(max_length=20, default='AI', help_text="Toujours 'AI'")
+    initiator = models.ForeignKey(
+        'users.User', 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='ai_actions',
+        help_text="Utilisateur qui a initié l'action"
+    )
+    action = models.CharField(max_length=50, choices=ACTION_TYPES)
+    
+    # Détails
+    details = models.JSONField(default=dict, help_text="Détails de l'action (produits, montants, etc.)")
+    confirmed = models.BooleanField(default=False, help_text="Action confirmée par l'utilisateur")
+    
+    # Résultat
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True, null=True)
+    
+    # Métadonnées
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    
+    class Meta:
+        verbose_name = "Log Action IA"
+        verbose_name_plural = "Logs Actions IA"
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['timestamp', 'action']),
+            models.Index(fields=['initiator', 'timestamp']),
+            models.Index(fields=['confirmed']),
+        ]
+    
+    def __str__(self):
+        return f"AI {self.action} - {self.initiator} - {self.timestamp}"

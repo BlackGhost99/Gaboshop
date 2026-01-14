@@ -278,6 +278,8 @@ class ProductUpdateView(APIView):
                 product.price = price
             if 'promo_price' in data:
                 product.promo_price = Decimal(str(data['promo_price'])) if data['promo_price'] else None
+            if 'compare_price' in data:
+                product.compare_price = Decimal(str(data['compare_price'])) if data['compare_price'] else None
             if 'stock' in data:
                 stock = int(data['stock'])
                 if stock < 0:

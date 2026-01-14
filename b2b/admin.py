@@ -2,6 +2,7 @@
 Configuration de l'admin Django pour le module B2B
 """
 from django.contrib import admin
+from django.db import models
 from django.utils.html import format_html
 from b2b.models import (
     B2BProfile, 
@@ -14,11 +15,53 @@ from b2b.models import (
 
 @admin.register(B2BProfile)
 class B2BProfileAdmin(admin.ModelAdmin):
-    list_display = ('store', 'minimum_order_amount', 'visible_to_all', 'is_active', 'created_at')
-    list_filter = ('is_active', 'visible_to_all', 'created_at')
-    search_fields = ('store__name',)
+    list_display = (
+        'store_link', 
+        'store_type_display',
+        'store_is_b2b_display',
+        'minimum_order_amount_display', 
+        'visible_to_all', 
+        'is_active', 
+        'created_at'
+    )
+    list_filter = ('is_active', 'visible_to_all', 'store__store_type', 'store__is_b2b', 'created_at')
+    search_fields = ('store__name', 'store__phone', 'store__city')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('store',)
+    
+    fieldsets = (
+        ('Magasin', {
+            'fields': ('store',)
+        }),
+        ('Configuration B2B', {
+            'fields': ('is_active', 'minimum_order_amount', 'visible_to_all')
+        }),
+        ('Métadonnées', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def store_link(self, obj):
+        return format_html(
+            '<a href="/admin/stores/store/{}/change/">{}</a>',
+            obj.store.id,
+            obj.store.name
+        )
+    store_link.short_description = 'Magasin'
+    
+    def store_type_display(self, obj):
+        return obj.store.get_store_type_display() if hasattr(obj.store, 'store_type') else '—'
+    store_type_display.short_description = 'Type'
+    
+    def store_is_b2b_display(self, obj):
+        return obj.store.is_b2b
+    store_is_b2b_display.boolean = True
+    store_is_b2b_display.short_description = 'is_b2b'
+    
+    def minimum_order_amount_display(self, obj):
+        return f"{obj.minimum_order_amount:,.0f} FCFA"
+    minimum_order_amount_display.short_description = 'Montant min. commande'
 
 
 @admin.register(B2BCategory)
@@ -157,12 +200,12 @@ class B2BStoreSubscriptionAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'auto_renew', 'start_date')
     search_fields = ('store__name', 'plan__name', 'plan_name')
-    readonly_fields = ('created_at', 'updated_at', 'start_date')
-    raw_id_fields = ('store', 'plan')
+    readonly_fields = ('created_at', 'updated_at', 'start_date', 'plan_name', 'monthly_fee')
     
     fieldsets = (
         ('Magasin et Plan', {
-            'fields': ('store', 'plan', 'plan_name', 'monthly_fee')
+            'fields': ('store', 'plan'),
+            'description': 'Sélectionnez le magasin et le plan. Le nom du plan et le prix mensuel seront remplis automatiquement à partir du plan sélectionné.'
         }),
         ('Statut et Dates', {
             'fields': ('status', 'start_date', 'end_date', 'auto_renew')
@@ -172,6 +215,54 @@ class B2BStoreSubscriptionAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def get_form(self, request, obj=None, **kwargs):
+        from django import forms
+        from stores.models import Store
+        
+        form = super().get_form(request, obj, **kwargs)
+        
+        # Filtrer les stores pour ne montrer que les magasins B2B (is_b2b=True OU avec un profil B2B)
+        from django.db.models import Exists, OuterRef
+        from b2b.models import B2BProfile
+        
+        form.base_fields['store'].queryset = Store.objects.filter(
+            is_active=True
+        ).filter(
+            models.Q(is_b2b=True) | 
+            models.Q(id__in=B2BProfile.objects.values_list('store_id', flat=True))
+        ).order_by('name')
+        
+        # Filtrer les plans pour ne montrer que les plans B2B actifs
+        form.base_fields['plan'].queryset = B2BSubscriptionPlan.objects.filter(
+            is_active=True
+        ).order_by('display_order', 'price')
+        
+        # Personnaliser l'affichage des options du select pour le plan
+        # pour inclure le prix dans le texte
+        plan_field = form.base_fields['plan']
+        plan_field.widget = forms.Select(attrs={'class': 'plan-select'})
+        
+        # Créer les choix avec nom et prix
+        choices = [('', '---------')]
+        for plan in plan_field.queryset:
+            if plan.price == 0:
+                display_text = f"{plan.name} - GRATUIT"
+            else:
+                formatted_price = f"{plan.price:,.0f}"
+                display_text = f"{plan.name} - {formatted_price} FCFA/mois"
+            choices.append((plan.id, display_text))
+        
+        plan_field.choices = choices
+        
+        return form
+    
+    def save_model(self, request, obj, form, change):
+        # Auto-remplir plan_name et monthly_fee depuis le plan sélectionné
+        if obj.plan:
+            obj.plan_name = obj.plan.name
+            obj.monthly_fee = obj.plan.price
+        super().save_model(request, obj, form, change)
     
     def store_link(self, obj):
         return format_html(

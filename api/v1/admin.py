@@ -465,19 +465,121 @@ class AdminProductCategoriesView(APIView):
 
     def get(self, request):
         # List all product categories with store info
-        qs = ProductCategory.objects.select_related('store').all().order_by('store__name', 'order', 'name')
+        search = request.query_params.get('search', '')
+        store_id = request.query_params.get('store_id', '')
+        
+        qs = ProductCategory.objects.select_related('store', 'store_category').all()
+        
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
+        if store_id:
+            qs = qs.filter(store_id=store_id)
+        
+        qs = qs.order_by('store__name', 'order', 'name')[:300]  # Limit to avoid huge payload
+        
         data = [
             {
                 "id": c.id,
                 "name": c.name,
-                "description": c.description,
+                "description": c.description or '',
                 "store_id": c.store.id if c.store else None,
                 "store_name": c.store.name if c.store else (c.store_category.name if getattr(c, 'store_category', None) else ''),
-                "order": c.order,
+                "order": c.order or 0,
             }
-            for c in qs[:300] # Limit to avoid huge payload
+            for c in qs
         ]
         return Response({"success": True, "data": data})
+    
+    def post(self, request):
+        """Create a new product category"""
+        from products.models import ProductCategory
+        from stores.models import Store
+        
+        name = request.data.get('name')
+        if not name:
+            return Response({"success": False, "error": "Nom requis"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            store_id = request.data.get('store_id')
+            store = Store.objects.get(id=store_id) if store_id else None
+            
+            category = ProductCategory.objects.create(
+                name=name,
+                description=request.data.get('description', ''),
+                store=store,
+                order=request.data.get('order', 0)
+            )
+            
+            return Response({
+                "success": True,
+                "data": {
+                    "id": category.id,
+                    "name": category.name,
+                    "description": category.description or '',
+                    "store_id": category.store.id if category.store else None,
+                    "store_name": category.store.name if category.store else '',
+                    "order": category.order or 0,
+                }
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def patch(self, request):
+        """Update a product category"""
+        from products.models import ProductCategory
+        
+        category_id = request.data.get('id')
+        if not category_id:
+            return Response({"success": False, "error": "ID requis"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            category = ProductCategory.objects.get(id=category_id)
+            
+            if 'name' in request.data:
+                category.name = request.data['name']
+            if 'description' in request.data:
+                category.description = request.data['description']
+            if 'order' in request.data:
+                category.order = request.data['order']
+            if 'store_id' in request.data:
+                from stores.models import Store
+                store_id = request.data['store_id']
+                category.store = Store.objects.get(id=store_id) if store_id else None
+            
+            category.save()
+            
+            return Response({
+                "success": True,
+                "data": {
+                    "id": category.id,
+                    "name": category.name,
+                    "description": category.description or '',
+                    "store_id": category.store.id if category.store else None,
+                    "store_name": category.store.name if category.store else '',
+                    "order": category.order or 0,
+                }
+            })
+        except ProductCategory.DoesNotExist:
+            return Response({"success": False, "error": "Catégorie introuvable"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request):
+        """Delete a product category"""
+        from products.models import ProductCategory
+        
+        category_id = request.query_params.get('id') or request.data.get('id')
+        if not category_id:
+            return Response({"success": False, "error": "ID requis"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            category = ProductCategory.objects.get(id=category_id)
+            category.delete()
+            return Response({"success": True})
+        except ProductCategory.DoesNotExist:
+            return Response({"success": False, "error": "Catégorie introuvable"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AdminStoresView(APIView):

@@ -14,10 +14,28 @@ const ConfirmModal = ({
   cancelText = 'Annuler',
   onConfirm,
   variant = 'info',
+  autoClose = true, // Si false, le modal ne se ferme pas automatiquement après onConfirm
+  loading = false, // État de chargement pour désactiver le bouton
 }) => {
-  const handleConfirm = () => {
-    onConfirm?.();
-    onClose();
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  
+  const handleConfirm = async () => {
+    if (isProcessing || loading) return;
+    
+    setIsProcessing(true);
+    try {
+      if (onConfirm) {
+        const result = await onConfirm();
+        // Ne fermer que si autoClose est true ou si onConfirm retourne explicitement true
+        if (autoClose || result === true) {
+          onClose();
+        }
+      } else {
+        onClose();
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const variantClasses = {
@@ -40,13 +58,15 @@ const ConfirmModal = ({
         <div className="flex justify-end gap-3 pt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            disabled={isProcessing || loading}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelText}
           </button>
           <button
             onClick={handleConfirm}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${variantClasses[variant]}`}
+            disabled={isProcessing || loading}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${variantClasses[variant]} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {confirmText}
           </button>

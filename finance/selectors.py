@@ -106,3 +106,45 @@ def get_top_categories(store, date_from=None, date_to=None, limit=5):
     ).order_by('-total_sales')[:limit]
     
     return list(top_categories)
+
+
+def get_category_detailed_report(store, date_from=None, date_to=None):
+    """
+    Retourne un rapport détaillé par catégorie avec toutes les commandes
+    Disponible uniquement pour les plans avec can_view_finance_detailed=True
+    """
+    orders = Order.objects.filter(store=store, status='delivered')
+    
+    from .services import apply_history_limit
+    orders = apply_history_limit(orders, store, 'created_at')
+    
+    if date_from:
+        orders = orders.filter(created_at__gte=date_from)
+    if date_to:
+        orders = orders.filter(created_at__lte=date_to)
+    
+    # Agrégation complète par catégorie avec détails des commandes
+    order_items = OrderItem.objects.filter(order__in=orders).select_related(
+        'product__category', 'order', 'order__client'
+    )
+    
+    line_total_expr = ExpressionWrapper(
+        F('quantity') * F('unit_price'),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    
+    # Rapport par catégorie avec toutes les commandes
+    category_report = order_items.values(
+        'product__category__id',
+        'product__category__name',
+        'order__id',
+        'order__order_number',
+        'order__created_at',
+        'order__client__first_name',
+        'order__client__last_name',
+    ).annotate(
+        category_sales=Coalesce(Sum(line_total_expr), Decimal('0')),
+        items_sold=Coalesce(Sum('quantity'), 0)
+    ).order_by('product__category__name', '-order__created_at')
+    
+    return list(category_report)

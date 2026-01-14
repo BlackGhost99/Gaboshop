@@ -166,8 +166,6 @@ class OrderService:
         Calculer la commission GABOSHOP sur une commande
         """
         try:
-            from payments.models import CategoryCommission
-
             total_commission = Decimal('0.00')
             # Determine plan multiplier
             plan = order.store.get_current_plan()
@@ -178,12 +176,22 @@ class OrderService:
                 product = item.product
                 item_subtotal = item.subtotal
                 base_rate = None
-                if product and product.category and product.category.store_category:
+                
+                # Récupérer le taux de commission de la catégorie de produit
+                if product and product.category:
+                    # Priorité: CategoryCommission (store_category) si configuré
                     try:
-                        cc = CategoryCommission.objects.get(store_category=product.category.store_category)
-                        base_rate = Decimal(cc.base_rate)
-                    except CategoryCommission.DoesNotExist:
-                        base_rate = None
+                        from payments.models import CategoryCommission
+                        if product.category.store_category:
+                            cat_comm = CategoryCommission.objects.filter(store_category=product.category.store_category).first()
+                            if cat_comm:
+                                base_rate = Decimal(cat_comm.base_rate)
+                    except Exception:
+                        # Fallback to product.category.commission_rate if payments module unavailable
+                        pass
+                    # Utiliser commission_rate de ProductCategory si toujours None
+                    if base_rate is None and product.category.commission_rate is not None:
+                        base_rate = Decimal(product.category.commission_rate)
 
                 if base_rate is None:
                     base_rate = Decimal(order.store.commission_rate or Decimal('0.00'))

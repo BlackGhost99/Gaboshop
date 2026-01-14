@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from .models import Delivery, DeliveryTracking, DeliveryProfile
+from decimal import Decimal
+from .models import Delivery, DeliveryTracking, DeliveryProfile, VehicleType, CityDistance, DeliveryZone, ZoneVehicleRate
 from users.models import User
 
 class DeliveryTrackingSerializer(serializers.ModelSerializer):
@@ -9,6 +10,19 @@ class DeliveryTrackingSerializer(serializers.ModelSerializer):
         model = DeliveryTracking
         fields = ['id', 'status', 'location', 'latitude', 'longitude', 'notes', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+class VehicleTypeSerializer(serializers.ModelSerializer):
+	"""Serializer pour les types de véhicules"""
+	class Meta:
+		model = VehicleType
+		fields = [
+			'id', 'name', 'max_weight_kg', 'max_items', 'max_distance_km',
+			'allow_intercity', 'base_price_intra_city', 'price_per_km_intra_city',
+			'base_price_inter_city', 'price_per_km_inter_city', 'is_active'
+		]
+		read_only_fields = ['id']
+
 
 class DeliverySerializer(serializers.ModelSerializer):
     """Serializer pour les livraisons"""
@@ -19,6 +33,9 @@ class DeliverySerializer(serializers.ModelSerializer):
     delivery_agent_phone = serializers.CharField(source='delivery_agent.phone', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     tracking_history = DeliveryTrackingSerializer(many=True, read_only=True)
+    vehicle_type_detail = VehicleTypeSerializer(source='vehicle_type', read_only=True)
+    selected_vehicle_type_detail = VehicleTypeSerializer(source='selected_vehicle_type', read_only=True)
+    minimum_required_vehicle_type_detail = VehicleTypeSerializer(source='minimum_required_vehicle_type', read_only=True)
     
     class Meta:
         model = Delivery
@@ -27,13 +44,18 @@ class DeliverySerializer(serializers.ModelSerializer):
             'delivery_agent', 'delivery_agent_phone', 'status', 'status_display',
             'city', 'pickup_address', 'delivery_address', 'store_name', 'store_address',
             'client_phone', 'delivery_fee', 'agent_commission',
+            'vehicle_type', 'vehicle_type_detail',
+            'selected_vehicle_type', 'selected_vehicle_type_detail',
+            'minimum_required_vehicle_type', 'minimum_required_vehicle_type_detail',
+            'is_intra_city', 'distance_km',
             'assigned_at', 'picked_up_at', 'delivered_at',
             'delivery_notes', 'customer_feedback', 'rating',
             'tracking_history', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'tracking_number', 'created_at', 'updated_at',
-            'assigned_at', 'picked_up_at', 'delivered_at'
+            'assigned_at', 'picked_up_at', 'delivered_at',
+            'minimum_required_vehicle_type', 'is_intra_city'
         ]
 
 class DeliveryAssignSerializer(serializers.ModelSerializer):
@@ -115,10 +137,89 @@ class DeliveryConfirmSerializer(serializers.Serializer):
         
         return instance
 
+
+class CityDistanceSerializer(serializers.ModelSerializer):
+	"""Serializer pour les distances entre villes"""
+	class Meta:
+		model = CityDistance
+		fields = ['id', 'from_city', 'to_city', 'distance_km', 'estimated_time_minutes']
+		read_only_fields = ['id']
+
+
+class DeliveryCalculatePriceSerializer(serializers.Serializer):
+	"""Serializer pour calculer le prix de livraison"""
+	order_id = serializers.IntegerField()
+	vehicle_type_id = serializers.IntegerField()
+	distance_km = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+	
+	def validate(self, attrs):
+		from orders.models import Order
+		from delivery.models import VehicleType
+		
+		try:
+			order = Order.objects.get(id=attrs['order_id'])
+		except Order.DoesNotExist:
+			raise serializers.ValidationError({'order_id': 'Commande introuvable'})
+		
+		try:
+			vehicle_type = VehicleType.objects.get(id=attrs['vehicle_type_id'])
+		except VehicleType.DoesNotExist:
+			raise serializers.ValidationError({'vehicle_type_id': 'Type de véhicule introuvable'})
+		
+		attrs['order'] = order
+		attrs['vehicle_type'] = vehicle_type
+		return attrs
+
+
+class DeliveryCalculatePriceResponseSerializer(serializers.Serializer):
+	"""Serializer pour la réponse du calcul de prix"""
+	price = serializers.DecimalField(max_digits=10, decimal_places=2)
+	vehicle_type = VehicleTypeSerializer()
+	is_intra_city = serializers.BooleanField()
+	distance_km = serializers.DecimalField(max_digits=8, decimal_places=2)
+
+
+class DeliveryValidateVehicleSerializer(serializers.Serializer):
+	"""Serializer pour valider le choix d'un véhicule"""
+	order_id = serializers.IntegerField()
+	vehicle_type_id = serializers.IntegerField()
+	
+	def validate(self, attrs):
+		from orders.models import Order
+		from delivery.models import VehicleType
+		
+		try:
+			order = Order.objects.get(id=attrs['order_id'])
+		except Order.DoesNotExist:
+			raise serializers.ValidationError({'order_id': 'Commande introuvable'})
+		
+		try:
+			vehicle_type = VehicleType.objects.get(id=attrs['vehicle_type_id'])
+		except VehicleType.DoesNotExist:
+			raise serializers.ValidationError({'vehicle_type_id': 'Type de véhicule introuvable'})
+		
+		attrs['order'] = order
+		attrs['vehicle_type'] = vehicle_type
+		return attrs
+
+
+class DeliveryValidateVehicleResponseSerializer(serializers.Serializer):
+	"""Serializer pour la réponse de validation"""
+	is_valid = serializers.BooleanField()
+	error_message = serializers.CharField(required=False, allow_null=True)
+	minimum_required_vehicle_type = VehicleTypeSerializer(required=False, allow_null=True)
+
+
 class DeliveryProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DeliveryProfile
-        fields = ['cin_number', 'vehicle_type', 'vehicle_plate', 'status', 'average_rating', 'total_deliveries', 'success_rate']
+	vehicle_type_detail = VehicleTypeSerializer(source='vehicle_type', read_only=True)
+	
+	class Meta:
+		model = DeliveryProfile
+		fields = [
+			'cin_number', 'vehicle_type', 'vehicle_type_detail', 'vehicle_plate',
+			'status', 'average_rating', 'total_deliveries', 'success_rate',
+			'allow_intercity'
+		]
 
 class DeliveryAgentSerializer(serializers.ModelSerializer):
     delivery_profile = DeliveryProfileSerializer(write_only=True, required=False)
@@ -174,3 +275,35 @@ class DeliveryAgentSerializer(serializers.ModelSerializer):
             DeliveryProfile.objects.update_or_create(user=instance, defaults=profile_data)
             
         return instance
+
+
+class ZoneVehicleRateSerializer(serializers.ModelSerializer):
+	"""Serializer pour les tarifs de véhicule par zone"""
+	vehicle_name = serializers.CharField(source='vehicle.get_name_display', read_only=True)
+	vehicle_type = serializers.CharField(source='vehicle.name', read_only=True)
+	
+	class Meta:
+		model = ZoneVehicleRate
+		fields = [
+			'id', 'zone', 'vehicle', 'vehicle_type', 'vehicle_name',
+			'base_price', 'price_per_km', 'is_active', 'notes'
+		]
+		read_only_fields = ['id']
+
+
+class DeliveryZoneSerializer(serializers.ModelSerializer):
+	"""Serializer pour les zones de livraison avec leurs tarifs"""
+	rates = ZoneVehicleRateSerializer(
+		source='vehicle_rates',
+		many=True,
+		read_only=True
+	)
+	
+	class Meta:
+		model = DeliveryZone
+		fields = [
+			'id', 'name', 'city', 'description',
+			'inter_city_surcharge', 'is_active', 'rates',
+			'created_at', 'updated_at'
+		]
+		read_only_fields = ['id', 'created_at', 'updated_at']

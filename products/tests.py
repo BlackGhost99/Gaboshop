@@ -51,3 +51,16 @@ class ProductModelTests(TestCase):
 		page2 = qs[10:20]
 		self.assertEqual(len(page1), 10)
 		self.assertEqual(len(page2), 5)
+
+	def test_product_creation_requires_weight(self):
+		# Ensure API-level serializer enforces weight requirement
+		from .serializers import ProductCreateSerializer
+		data = {
+			'name': 'NoWeight',
+			'category': self.category.id,
+			'price': 100,
+			'stock': 10
+		}
+		serializer = ProductCreateSerializer(data=data, context={'request': None})
+		self.assertFalse(serializer.is_valid())
+		self.assertIn('weight_kg', serializer.errors)

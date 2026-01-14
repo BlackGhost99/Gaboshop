@@ -12,8 +12,31 @@ from orders.serializers import (
 	OrderStatusUpdateSerializer
 )
 from notifications.models import Notification
-from delivery.services import DeliveryService, auto_assign_delivery
+# Importer DeliveryService depuis le fichier services.py (pas le package services/)
+# IMPORTANT: Importer le fichier AVANT le package pour éviter les conflits
+import sys
+import importlib.util
+import os
+
+# Chemin absolu vers le fichier services.py
+delivery_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'delivery')
+services_file_path = os.path.abspath(os.path.join(delivery_dir, 'services.py'))
+
+# Charger le fichier services.py comme module séparé
+spec = importlib.util.spec_from_file_location("delivery_services_file_module", services_file_path)
+delivery_services_file_module = importlib.util.module_from_spec(spec)
+sys.modules["delivery_services_file_module"] = delivery_services_file_module
+spec.loader.exec_module(delivery_services_file_module)
+
+# Extraire DeliveryService et auto_assign_delivery du fichier
+DeliveryService = delivery_services_file_module.DeliveryService
+auto_assign_delivery = delivery_services_file_module.auto_assign_delivery
+
+# Maintenant importer les nouveaux services depuis le package
+from delivery.services import DeliveryRulesService, DeliveryPricingService
+from delivery.models import Delivery, VehicleType
 from users.models import User
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -323,4 +346,117 @@ class ClientConfirmDeliveryView(APIView):
 					'message': 'Commande non trouvée ou vous n\'êtes pas autorisé.'
 				}
 			}, status=status.HTTP_404_NOT_FOUND)
+
+
+class OrderSelectVehicleView(APIView):
+	"""Permet au client de sélectionner un type de véhicule pour sa commande"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def patch(self, request, order_id):
+		try:
+			order = Order.objects.get(id=order_id)
+			
+			# Vérifier que c'est le client de la commande
+			if order.client != request.user:
+				return Response({
+					'success': False,
+					'error': 'Non autorisé - Vous n\'êtes pas le client de cette commande'
+				}, status=status.HTTP_403_FORBIDDEN)
+			
+			# Vérifier que la commande est dans un état où on peut sélectionner un véhicule
+			if order.status not in ['created', 'pending_payment']:
+				return Response({
+					'success': False,
+					'error': f'Impossible de sélectionner un véhicule. Statut actuel: {order.get_status_display()}'
+				}, status=status.HTTP_400_BAD_REQUEST)
+			
+			vehicle_type_id = request.data.get('vehicle_type_id')
+			if not vehicle_type_id:
+				return Response({
+					'success': False,
+					'error': 'vehicle_type_id requis'
+				}, status=status.HTTP_400_BAD_REQUEST)
+			
+			try:
+				vehicle_type = VehicleType.objects.get(id=vehicle_type_id, is_active=True)
+			except VehicleType.DoesNotExist:
+				return Response({
+					'success': False,
+					'error': 'Type de véhicule introuvable ou inactif'
+				}, status=status.HTTP_404_NOT_FOUND)
+			
+			# Valider le choix
+			is_valid, error_message, minimum_required = DeliveryRulesService.validate_vehicle_selection(
+				order, vehicle_type
+			)
+			
+			if not is_valid:
+				return Response({
+					'success': False,
+					'error': error_message or 'Véhicule non compatible avec la commande',
+					'minimum_required_vehicle_type': {
+						'id': minimum_required.id,
+						'name': minimum_required.get_name_display()
+					} if minimum_required else None
+				}, status=status.HTTP_400_BAD_REQUEST)
+			
+			# Récupérer ou créer la livraison
+			delivery, created = Delivery.objects.get_or_create(order=order)
+			
+			# Calculer le véhicule minimum requis si pas déjà fait
+			if not delivery.minimum_required_vehicle_type:
+				delivery.minimum_required_vehicle_type = DeliveryRulesService.calculate_minimum_vehicle_type(order)
+			
+			# Mettre à jour le véhicule sélectionné
+			delivery.selected_vehicle_type = vehicle_type
+			
+			# Calculer la distance et déterminer si intra/inter-ville
+			from delivery.services.delivery_pricing import DeliveryPricingService
+			distance_km = DeliveryPricingService.estimate_distance(order.store, order)
+			delivery.distance_km = distance_km
+			delivery.is_intra_city = not DeliveryRulesService.is_intercity_delivery(order)
+			
+			# Calculer le prix de livraison
+			delivery_price = DeliveryPricingService.calculate_delivery_price(
+				order, vehicle_type, distance_km
+			)
+			
+			# Mettre à jour les frais de livraison de la commande
+			order.delivery_fee = delivery_price
+			delivery.delivery_fee = delivery_price
+			
+			# Recalculer le total de la commande
+			order.calculate_totals()
+			
+			# Sauvegarder
+			delivery.save()
+			order.save()
+			
+			return Response({
+				'success': True,
+				'message': 'Véhicule sélectionné avec succès',
+				'data': {
+					'order_id': order.id,
+					'vehicle_type': {
+						'id': vehicle_type.id,
+						'name': vehicle_type.get_name_display()
+					},
+					'delivery_fee': float(delivery_price),
+					'total_amount': float(order.total_amount),
+					'is_intra_city': delivery.is_intra_city,
+					'distance_km': float(distance_km)
+				}
+			})
+			
+		except Order.DoesNotExist:
+			return Response({
+				'success': False,
+				'error': 'Commande introuvable'
+			}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			logger.error(f"Erreur sélection véhicule: {e}")
+			return Response({
+				'success': False,
+				'error': f'Erreur: {str(e)}'
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

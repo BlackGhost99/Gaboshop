@@ -12,6 +12,12 @@ class ProductCategory(models.Model):
 	name = models.CharField(max_length=100)
 	description = models.TextField(blank=True)
 	order = models.PositiveIntegerField(default=0, help_text="Ordre d'affichage")
+	commission_rate = models.DecimalField(
+		max_digits=5, 
+		decimal_places=2, 
+		default=8.00,
+		help_text="Taux de commission en % pour les produits de cette catégorie"
+	)
 
 	class Meta:
 		verbose_name = "Catégorie de Produit"
@@ -56,6 +62,22 @@ class Product(models.Model):
 	stock = models.PositiveIntegerField(default=0)
 	sku = models.CharField(max_length=100, blank=True, help_text="Référence interne")
 	barcode = models.CharField(max_length=100, blank=True, help_text="Code-barres")
+    
+	# Poids pour calcul livraison
+	weight_kg = models.DecimalField(
+		max_digits=8, 
+		decimal_places=2, 
+		null=True, 
+		blank=True,
+		help_text="Poids du produit en kg"
+	)
+	estimated_weight_kg = models.DecimalField(
+		max_digits=8,
+		decimal_places=2,
+		null=True,
+		blank=True,
+		help_text="Poids estimé si non renseigné (calculé automatiquement)"
+	)
     
 	# Statut et visibilité
 	is_available = models.BooleanField(default=True)

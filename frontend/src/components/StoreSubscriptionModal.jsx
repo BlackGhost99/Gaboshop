@@ -87,7 +87,7 @@ const StoreSubscriptionModal = ({ isOpen, onClose, subscription = null, onSucces
       }
 
       if (res?.success) {
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(res.data); // Passer les données mises à jour
         onClose();
       } else {
         setError(res?.error || res?.errors || 'Erreur lors de l\'enregistrement');

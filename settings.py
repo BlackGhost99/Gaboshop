@@ -147,6 +147,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+] if (BASE_DIR / 'static').exists() else []
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -272,6 +275,40 @@ TWILIO_PHONE_NUMBER = env('TWILIO_PHONE_NUMBER', default='')
 # Hub2SMS Gabon Configuration
 HUB2SMS_API_KEY = env('HUB2SMS_API_KEY', default='')
 HUB2SMS_SENDER_ID = env('HUB2SMS_SENDER_ID', default='GABOSHOP')
+
+# AI Provider Configuration
+# Options: 'local', 'anthropic', 'deepseek', 'openai', 'groq', 'gemini'
+# RECOMMANDÉ: 'groq' (gratuit, rapide) ou 'gemini' (gratuit, puissant)
+AI_PROVIDER = env('AI_PROVIDER', default='groq')
+
+# Anthropic Claude API Configuration
+# Pour obtenir une clé: https://console.anthropic.com/
+ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
+ANTHROPIC_MODEL = env('ANTHROPIC_MODEL', default='claude-3-5-sonnet-20241022')
+
+# DeepSeek API Configuration (GRATUIT avec limites généreuses)
+# Pour obtenir une clé: https://platform.deepseek.com/
+# DeepSeek est GRATUIT avec 1M tokens/mois
+DEEPSEEK_API_KEY = env('DEEPSEEK_API_KEY', default='sk-db6bf344ff014abfb68dd97f777b9146')
+DEEPSEEK_MODEL = env('DEEPSEEK_MODEL', default='deepseek-chat')
+DEEPSEEK_BASE_URL = env('DEEPSEEK_BASE_URL', default='https://api.deepseek.com/v1')
+
+# OpenAI API Configuration (payant, mais crédits gratuits au départ)
+# Pour obtenir une clé: https://platform.openai.com/
+OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
+OPENAI_MODEL = env('OPENAI_MODEL', default='gpt-3.5-turbo')
+
+# Groq API Configuration (GRATUIT - 14,400 requêtes/jour)
+# Pour obtenir une clé: https://console.groq.com/
+# Groq est GRATUIT, ultra-rapide, pas de carte bancaire requise
+GROQ_API_KEY = env('GROQ_API_KEY', default='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')
+GROQ_MODEL = env('GROQ_MODEL', default='llama-3.1-8b-instant')  # ou 'mixtral-8x7b-32768'
+
+# Google Gemini API Configuration (GRATUIT - 1,500 requêtes/jour)
+# Pour obtenir une clé: https://makersuite.google.com/app/apikey
+# Gemini est GRATUIT, puissant, pas de carte bancaire requise initialement
+GEMINI_API_KEY = env('GEMINI_API_KEY', default='AIzaSyBwD_d3-tR5rLFeDO3KKKqRUjd0-gIAAKc')
+GEMINI_MODEL = env('GEMINI_MODEL', default='models/gemini-2.0-flash')
 
 # Email Configuration (optionnel)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

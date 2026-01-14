@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import SubscriptionPlanModal from './SubscriptionPlanModal';
 import B2BSubscriptionPlanModal from './B2BSubscriptionPlanModal';
 import StoreSubscriptionModal from './StoreSubscriptionModal';
@@ -58,11 +58,7 @@ const AdminSubscriptionsSection = () => {
     search: ''
   });
 
-  useEffect(() => {
-    loadData();
-  }, [activeSubTab]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -84,7 +80,30 @@ const AdminSubscriptionsSection = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeSubTab, storeSubFilters, b2bStoreSubFilters]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Recharger les données quand les filtres changent (avec debounce pour la recherche)
+  useEffect(() => {
+    if (activeSubTab === 'store_subscriptions') {
+      const timeoutId = setTimeout(() => {
+        loadData();
+      }, storeSubFilters.search ? 500 : 0); // Debounce de 500ms pour la recherche
+      return () => clearTimeout(timeoutId);
+    }
+  }, [storeSubFilters, activeSubTab, loadData]);
+
+  useEffect(() => {
+    if (activeSubTab === 'b2b_store_subscriptions') {
+      const timeoutId = setTimeout(() => {
+        loadData();
+      }, b2bStoreSubFilters.search ? 500 : 0); // Debounce de 500ms pour la recherche
+      return () => clearTimeout(timeoutId);
+    }
+  }, [b2bStoreSubFilters, activeSubTab, loadData]);
 
   const handleDeleteB2CPlan = async () => {
     if (!confirmDeleteB2CPlan) return;
@@ -130,7 +149,7 @@ const AdminSubscriptionsSection = () => {
   const subTabs = [
     { id: 'b2c_plans', label: 'Plans B2C' },
     { id: 'b2b_plans', label: 'Plans B2B' },
-    { id: 'store_subscriptions', label: 'Abonnements Actifs' },
+    { id: 'store_subscriptions', label: 'Abonnements B2C' },
     { id: 'b2b_store_subscriptions', label: 'Abonnements B2B' },
   ];
 
@@ -582,9 +601,19 @@ const AdminSubscriptionsSection = () => {
           setEditingStoreSub(null);
         }}
         subscription={editingStoreSub}
-        onSuccess={() => {
-          loadData();
+        onSuccess={async (updatedData) => {
           setSuccess('Abonnement enregistré avec succès');
+          // Mettre à jour immédiatement l'état avec les données reçues
+          if (updatedData && editingStoreSub?.id) {
+            setStoreSubscriptions(prev =>
+              prev.map(sub => sub.id === editingStoreSub.id
+                ? { ...sub, ...updatedData }
+                : sub
+              )
+            );
+          }
+          // Recharger les données depuis le backend pour s'assurer de la cohérence
+          await loadData();
         }}
       />
 
@@ -595,9 +624,19 @@ const AdminSubscriptionsSection = () => {
           setEditingB2BStoreSub(null);
         }}
         subscription={editingB2BStoreSub}
-        onSuccess={() => {
-          loadData();
+        onSuccess={async (updatedData) => {
           setSuccess('Abonnement enregistré avec succès');
+          // Mettre à jour immédiatement l'état avec les données reçues
+          if (updatedData && editingB2BStoreSub?.id) {
+            setB2bStoreSubscriptions(prev =>
+              prev.map(sub => sub.id === editingB2BStoreSub.id
+                ? { ...sub, ...updatedData }
+                : sub
+              )
+            );
+          }
+          // Recharger les données depuis le backend pour s'assurer de la cohérence
+          await loadData();
         }}
       />
 

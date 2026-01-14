@@ -55,20 +55,23 @@ class OrderSerializer(serializers.ModelSerializer):
     client_received_status = serializers.SerializerMethodField()
     client_confirmation_pending = serializers.SerializerMethodField()
     client_can_confirm = serializers.SerializerMethodField()
+    invoice_breakdown = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'client', 'client_phone', 'store', 'store_name', 'store_zone',
-            'status', 'status_display', 'items_total', 'delivery_fee', 'service_fee', 'tax_amount', 'payment_fees',
+            'status', 'status_display', 'items_total', 'delivery_fee', 'delivery_cost', 'delivery_requested', 'vehicle_type', 'service_fee', 'operator_fee', 'tax_amount', 'payment_fees',
             'total_amount', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
             'notes', 'items', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
-            'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm'
+            'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
+            'invoice_breakdown'
         ]
         read_only_fields = [
-            'id', 'order_number', 'client', 'items_total', 'total_amount', 'service_fee', 'payment_fees',
+            'id', 'order_number', 'client', 'items_total', 'total_amount', 'service_fee', 'operator_fee', 'payment_fees',
             'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
-            'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm'
+            'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
+            'invoice_breakdown', 'delivery_cost', 'vehicle_type'
         ]
 
     def _get_delivery(self, obj):
@@ -100,6 +103,87 @@ class OrderSerializer(serializers.ModelSerializer):
             return False
         return obj.status == 'delivered' and delivery.proof.client_confirmation_pending
 
+    def get_invoice_breakdown(self, obj):
+        """
+        Retourne le détail complet de la facture pour le client
+        Affiche chaque franc FCFA avec la ventilation complète, y compris frais opérateur
+        """
+        from decimal import Decimal
+        
+        # Construire la liste des articles avec subtotaux
+        items_breakdown = []
+        for item in obj.items.all():
+            items_breakdown.append({
+                'product_id': item.product.id,
+                'product_name': item.product.name,
+                'quantity': item.quantity,
+                'unit_price': str(item.unit_price),
+                'subtotal': str(item.subtotal)
+            })
+        
+        # Convertir tous les montants en string pour éviter les problèmes de sérialisation
+        return {
+            'items': items_breakdown,
+            'summary': {
+                'items_total': str(obj.items_total),
+                'delivery_fee': str(obj.delivery_fee),
+                'delivery_cost': str(obj.delivery_cost),
+                'vehicle_type': obj.vehicle_type or None,
+                'service_fee': str(obj.service_fee),
+                'operator_fee': str(obj.operator_fee),
+                'tax_amount': str(obj.tax_amount),
+                'payment_fees': str(obj.payment_fees),
+                'total_amount': str(obj.total_amount)
+            },
+            'payment_breakdown': {
+                'label': 'Voici le détail exact de votre paiement:',
+                'lines': [
+                    {
+                        'description': 'Sous-total (articles)',
+                        'amount': str(obj.items_total),
+                        'currency': 'FCFA'
+                    },
+                    {
+                        'description': 'Frais de livraison (calculé selon véhicule)',
+                        'amount': str(obj.delivery_cost),
+                        'currency': 'FCFA'
+                    },
+                    {
+                        'description': 'Type de véhicule',
+                        'amount': obj.vehicle_type or '',
+                        'currency': ''
+                    },
+                    {
+                        'description': 'Frais de service plateforme',
+                        'amount': str(obj.service_fee),
+                        'currency': 'FCFA'
+                    },
+                    
+                    *([{
+                        'description': 'Frais opérateur Mobile Money (Airtel/Moov)',
+                        'amount': str(obj.operator_fee),
+                        'currency': 'FCFA'
+                    }] if obj.operator_fee > 0 else []),
+                    *([{
+                        'description': 'Taxes',
+                        'amount': str(obj.tax_amount),
+                        'currency': 'FCFA'
+                    }] if obj.tax_amount > 0 else []),
+                    *([{
+                        'description': 'Frais de transaction (Mobile Money)',
+                        'amount': str(obj.payment_fees),
+                        'currency': 'FCFA'
+                    }] if obj.payment_fees > 0 else []),
+                    {
+                        'description': 'TOTAL A PAYER',
+                        'amount': str(obj.total_amount),
+                        'currency': 'FCFA',
+                        'is_total': True
+                    }
+                ]
+            }
+        }
+
 class OrderCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de commande"""
     items = OrderItemCreateSerializer(many=True, write_only=True)
@@ -107,7 +191,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'store', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone', 'notes', 'items'
+            'store', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone', 'delivery_requested', 'notes', 'items'
         ]
     
     def validate(self, attrs):

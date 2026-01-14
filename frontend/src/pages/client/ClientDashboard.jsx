@@ -9,6 +9,8 @@ import { initPayment, simulatePaymentSuccess } from '../../services/paymentServi
 import { getProductDetails } from '../../services/productService';
 
 const CART_KEY = 'gaboshop_cart';
+const envBase = import.meta.env.VITE_API_URL;
+const API_BASE = envBase ? `${envBase.replace(/\/$/, '')}/api/v1` : '/api/v1';
 
 const ClientDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,80 @@ const ClientDashboard = () => {
   const [submitting, setSubmitting] = useState({});
   const [toast, setToast] = useState(null);
   const [storeAlerts, setStoreAlerts] = useState({});
+  const [zones, setZones] = useState([]);
+  const [zonesLoading, setZonesLoading] = useState(true);
+
+  // Helper: Calculate service fee (5% of subtotal by default, configurable by store plan)
+  const calculateServiceFee = (subtotal) => {
+    try {
+      // Default: 5% service fee (can be overridden per store)
+      // In production, this should come from the store's subscription plan
+      const serviceFeeRate = 0.05; // 5%
+      return Math.round(subtotal * serviceFeeRate);
+    } catch (err) {
+      console.warn('Erreur calcul frais service', err);
+      return 500; // Fallback
+    }
+  };
+
+  // Helper: Calculate operator fee (3% of items + delivery)
+  const calculateOperatorFee = (subtotal, deliveryCost) => {
+    try {
+      // Operator fee: 3% on (items + delivery)
+      const operatorFeeRate = 0.03; // 3%
+      const baseAmount = subtotal + deliveryCost;
+      return Math.round(baseAmount * operatorFeeRate);
+    } catch (err) {
+      console.warn('Erreur calcul frais opérateur', err);
+      return Math.round((subtotal + deliveryCost) * 0.03);
+    }
+  };
+
+  // Helper: Calculate total amount
+  const calculateTotal = (subtotal, deliveryCost, serviceFee, operatorFee) => {
+    return subtotal + deliveryCost + serviceFee + operatorFee;
+  };
+
+  // Helper: Calculate delivery cost based on zone and items
+  const calculateDeliveryCost = (city, items) => {
+    try {
+      if (!city || !items || !items.length) return 0;
+      
+      // Find zone by city
+      const zoneForCity = zones.find(z => z.city?.toLowerCase() === city?.toLowerCase());
+      if (!zoneForCity || !zoneForCity.rates || !zoneForCity.rates.length) {
+        // Fallback: use a default estimate
+        return 3000; // Placeholder if zone not configured
+      }
+      
+      // Calculate total weight
+      const totalWeight = items.reduce((sum, item) => sum + (parseFloat(item.weight_kg) || 0) * item.quantity, 0);
+      
+      // Select vehicle based on weight (same logic as backend)
+      let selectedRate = null;
+      if (totalWeight <= 5) {
+        selectedRate = zoneForCity.rates.find(r => r.vehicle_type === 'BIKE');
+      } else if (totalWeight <= 20) {
+        selectedRate = zoneForCity.rates.find(r => r.vehicle_type === 'MOTO');
+      } else {
+        selectedRate = zoneForCity.rates.find(r => r.vehicle_type === 'VAN');
+      }
+      
+      if (!selectedRate) {
+        return 3000; // Fallback
+      }
+      
+      // Estimate distance = 2km for intra-city
+      const estimatedKm = 2;
+      const baseCost = parseFloat(selectedRate.base_price) || 0;
+      const perKmCost = (parseFloat(selectedRate.price_per_km) || 0) * estimatedKm;
+      
+      return Math.round(baseCost + perKmCost);
+    } catch (err) {
+      console.warn('Erreur calcul frais livraison', err);
+      return 3000;
+    }
+  };
 
   const groupByStore = (items) => {
     return items.reduce((acc, item) => {
@@ -61,6 +137,28 @@ const ClientDashboard = () => {
     };
 
     fetchDashboard();
+  }, []);
+
+  // Fetch delivery zones with rates
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        setZonesLoading(true);
+        const response = await fetch(`${API_BASE}/delivery/zones/?active=true`);
+        if (response.ok) {
+          const data = await response.json();
+          setZones(Array.isArray(data) ? data : data.results || []);
+        } else {
+          console.warn('Erreur au chargement des zones');
+        }
+      } catch (err) {
+        console.warn('Impossible de charger les zones de livraison', err);
+      } finally {
+        setZonesLoading(false);
+      }
+    };
+
+    fetchZones();
   }, []);
 
   // Durée de vie des toasts pour qu'elles restent visibles
@@ -167,6 +265,7 @@ const ClientDashboard = () => {
         phone: prev[storeName]?.phone ?? '',
         zone: prev[storeName]?.zone ?? '',
         notes: prev[storeName]?.notes ?? '',
+        delivery_requested: prev[storeName]?.delivery_requested ?? true,
         [field]: value,
       },
     }));
@@ -210,6 +309,7 @@ const ClientDashboard = () => {
       delivery_address,
       delivery_phone,
       delivery_zone,
+      delivery_requested: form.delivery_requested !== false,
       notes: form.notes || '',
       items: items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
     };
@@ -225,12 +325,12 @@ const ClientDashboard = () => {
         if (orderId) {
           try {
             const payRes = await initPayment(orderId, { payment_method: 'cash' });
-              paymentInfo = payRes?.data?.payment || payRes?.payment || null;
+            paymentInfo = payRes?.data?.payment || payRes?.payment || null;
 
-              // Pour le mode cash, considère comme confirmé même si aucune transaction simulée n'est renvoyée
-              if (!paymentInfo && payRes?.success) {
-                paymentInfo = { status: 'success', payment_method: 'cash' };
-              }
+            // Pour le mode cash, considère comme confirmé même si aucune transaction simulée n'est renvoyée
+            if (!paymentInfo && payRes?.success) {
+              paymentInfo = { status: 'success', payment_method: 'cash' };
+            }
 
             if (paymentInfo?.transaction_id) {
               await simulatePaymentSuccess(paymentInfo.transaction_id, paymentInfo.amount);
@@ -516,6 +616,21 @@ const ClientDashboard = () => {
                     ))}
                   </div>
 
+                  {/* Livraison souhaitée toggle */}
+                  <div className="mt-4 mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-md px-4 py-3">
+                    <input
+                      type="checkbox"
+                      id={`delivery-${storeName}`}
+                      checked={storeForms[storeName]?.delivery_requested !== false}
+                      onChange={(e) => handleChangeForm(storeName, 'delivery_requested', e.target.checked)}
+                      className="h-5 w-5 text-blue-600 border-gray-300 rounded cursor-pointer"
+                    />
+                    <label htmlFor={`delivery-${storeName}`} className="flex-1 cursor-pointer">
+                      <p className="font-semibold text-gray-900">🚚 Livraison souhaitée</p>
+                      <p className="text-xs text-gray-600">Activée par défaut. Désactiver pour retrait au magasin.</p>
+                    </label>
+                  </div>
+
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     <input
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
@@ -559,6 +674,57 @@ const ClientDashboard = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Détail des frais */}
+                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2">
+                    <p className="text-xs font-semibold text-gray-700 uppercase">Détail du devis</p>
+                    <div className="space-y-1 text-xs text-gray-700">
+                      <div className="flex justify-between">
+                        <span>Sous-total (articles)</span>
+                        <span className="font-semibold">{formatCurrency(data.total)}</span>
+                      </div>
+                      
+                      {/* Delivery fee */}
+                      {storeForms[storeName]?.delivery_requested !== false && (
+                        <div className="flex justify-between text-amber-700">
+                          <span>🚚 Frais de livraison</span>
+                          <span className="font-semibold">
+                            {!zonesLoading ? formatCurrency(calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items)) : 'Calcul...'}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Service fee */}
+                      <div className="flex justify-between text-blue-700">
+                        <span>💳 Frais de service (plateforme)</span>
+                        <span className="font-semibold">{formatCurrency(calculateServiceFee(data.total))}</span>
+                      </div>
+                      
+                      {/* Operator fee */}
+                      <div className="flex justify-between text-green-700">
+                        <span>📱 Frais opérateur (paiement)</span>
+                        <span className="font-semibold">
+                          {!zonesLoading ? formatCurrency(calculateOperatorFee(data.total, calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items))) : 'Calcul...'}
+                        </span>
+                      </div>
+                      
+                      {/* TOTAL */}
+                      <div className="pt-2 border-t border-gray-300 flex justify-between font-bold text-gray-900 text-sm">
+                        <span>TOTAL A PAYER</span>
+                        <span className="text-base text-indigo-600">
+                          {!zonesLoading ? formatCurrency(
+                            calculateTotal(
+                              data.total,
+                              storeForms[storeName]?.delivery_requested !== false ? calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items) : 0,
+                              calculateServiceFee(data.total),
+                              calculateOperatorFee(data.total, storeForms[storeName]?.delivery_requested !== false ? calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items) : 0)
+                            )
+                          ) : 'Calcul...'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 italic pt-2">Tous les frais sont calculés et affichés ici. Aucune surcharge à la confirmation.</p>
+                  </div>
 
                   <div className="mt-4 flex gap-2">
                     <button

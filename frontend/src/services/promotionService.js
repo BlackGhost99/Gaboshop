@@ -8,24 +8,47 @@ export const getPromotions = async () => {
   try {
     const response = await api.get('/products/', {
       params: {
-        has_discount: true,
-        limit: 6,
-        ordering: '-discount_percentage',
+        limit: 20, // Récupérer plus de produits pour filtrer ceux avec remise
       },
     });
     
     // Normalize response
     let data = [];
     if (response.data?.success) {
-      data = response.data.data || [];
+      // Si response.data.data existe et est un tableau, l'utiliser
+      if (Array.isArray(response.data.data)) {
+        data = response.data.data;
+      } else if (response.data.data?.data && Array.isArray(response.data.data.data)) {
+        // Cas où la structure est { success: true, data: { data: [...] } }
+        data = response.data.data.data;
+      } else if (Array.isArray(response.data.data)) {
+        data = response.data.data;
+      } else {
+        data = [];
+      }
     } else if (response.data?.results) {
-      data = response.data.results;
+      data = Array.isArray(response.data.results) ? response.data.results : [];
     } else if (Array.isArray(response.data)) {
       data = response.data;
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      // Cas où la structure est { data: [...] }
+      data = response.data.data;
     }
     
+    // S'assurer que data est un tableau
+    if (!Array.isArray(data)) {
+      console.warn('Promotions: data is not an array', response.data);
+      return [];
+    }
+    
+    // Filtrer les produits avec remise et trier par pourcentage de remise
+    const productsWithDiscount = data
+      .filter(product => product.has_discount === true)
+      .sort((a, b) => (b.discount_percentage || 0) - (a.discount_percentage || 0))
+      .slice(0, 6); // Limiter à 6 produits
+    
     // Transform to promotion format
-    return data.map((product) => ({
+    return productsWithDiscount.map((product) => ({
       id: product.id,
       title: product.name,
       subtitle: `${product.store_name || 'Magasin'} - Jusqu'à -${product.discount_percentage || 0}%`,
@@ -47,7 +70,7 @@ export const getPromotions = async () => {
 export const getCategories = async () => {
   try {
     // Essayer de récupérer depuis les catégories de magasin
-    const response = await api.get('/store-categories/', {
+    const response = await api.get('/stores/categories/', {
       params: {
         limit: 10,
       },

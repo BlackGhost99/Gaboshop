@@ -264,8 +264,27 @@ const StoreDashboard = () => {
               </Link>
             )}
             <button
-              onClick={() => setActiveTab('supply')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${activeTab === 'supply' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              onClick={() => {
+                // Vérifier si le plan est Free B2B
+                const isB2BFree = dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b;
+                if (isB2BFree) {
+                  return; // Ne rien faire si Free B2B
+                }
+                setActiveTab('supply');
+              }}
+              disabled={dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : activeTab === 'supply'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+              title={
+                dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b
+                  ? 'L\'approvisionnement B2B n\'est pas disponible avec le plan Free. Passez au plan Pro ou Business.'
+                  : ''
+              }
             >
               Approvisionnement (B2B)
             </button>
@@ -288,18 +307,24 @@ const StoreDashboard = () => {
                   Évolution des ventes (Semaine)
                 </h3>
                 <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} tickFormatter={(value) => `${value / 1000}k`} />
-                      <Tooltip
-                        cursor={{ fill: '#f3f4f6' }}
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                      />
-                      <Bar dataKey="vente" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={40} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {chartData && chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={256}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} tickFormatter={(value) => `${value / 1000}k`} />
+                        <Tooltip
+                          cursor={{ fill: '#f3f4f6' }}
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                        />
+                        <Bar dataKey="vente" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      Aucune donnée disponible
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -700,7 +725,10 @@ const StoreDashboard = () => {
               </div>
             )}
 
-            <B2BProcurementEmbedded />
+            <B2BProcurementEmbedded 
+              subscription={dashboardData?.subscription}
+              store={dashboardData?.store}
+            />
           </div>
         )}
       </StoreLayout>

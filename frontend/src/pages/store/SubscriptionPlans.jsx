@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StoreLayout from '../../components/StoreLayout';
-import { api } from '../../services/api';
+import api from '../../services/api';
 
 const SubscriptionPlans = () => {
   const [plans, setPlans] = useState([]);

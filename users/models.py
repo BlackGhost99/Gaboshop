@@ -236,8 +236,10 @@ class LivreurProfile(models.Model):
 	
 	# Disponibilité et localisation
 	disponible = models.BooleanField(default=True, help_text="Livreur disponible pour assignation")
-	position_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-	position_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	# max_digits=18 permet jusqu'à 18 chiffres au total pour la précision GPS
+	# decimal_places=15 permet jusqu'à 15 décimales (ex: 0.4300757811347232)
+	position_lat = models.DecimalField(max_digits=18, decimal_places=15, null=True, blank=True)
+	position_lng = models.DecimalField(max_digits=18, decimal_places=15, null=True, blank=True)
 	last_position_update = models.DateTimeField(null=True, blank=True)
 	
 	# Informations véhicule

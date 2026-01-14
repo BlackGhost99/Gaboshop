@@ -82,7 +82,7 @@ def create_b2b_subscription_plans():
             'name': 'B2B Pro',
             'slug': 'b2b-pro',
             'plan_type': 'pro',
-            'price': 25000,
+            'price': 30000,
             'description': 'Plan professionnel pour grossistes en croissance',
             'tagline': 'Le plus populaire',
             'max_b2b_products': 500,
@@ -96,7 +96,7 @@ def create_b2b_subscription_plans():
             'has_priority_support': False,
             'can_create_promotions': True,
             'has_api_access': False,
-            'commission_reduction_percent': 15,
+            'commission_reduction_percent': 40,
             # Finance - PRO: Détails + CSV
             'can_view_finance_basic': True,
             'can_view_finance_detailed': True,
@@ -139,7 +139,7 @@ def create_b2b_subscription_plans():
             'name': 'B2B Business',
             'slug': 'b2b-business',
             'plan_type': 'business',
-            'price': 50000,
+            'price': 80000,
             'description': 'Plan premium pour grossistes établis avec volume élevé',
             'tagline': 'Pour les leaders du marché',
             'max_b2b_products': None,  # Illimité
@@ -153,7 +153,7 @@ def create_b2b_subscription_plans():
             'has_priority_support': True,
             'can_create_promotions': True,
             'has_api_access': True,
-            'commission_reduction_percent': 30,
+            'commission_reduction_percent': 75,
             # Finance - BUSINESS: Complet + PDF
             'can_view_finance_basic': True,
             'can_view_finance_detailed': True,
@@ -188,7 +188,7 @@ def create_b2b_subscription_plans():
                     'enabled': True
                 },
                 {
-                    'title': 'Réduction 30% commissions',
+                    'title': 'Réduction 75% commissions',
                     'description': 'Économisez sur chaque transaction',
                     'category': 'pricing',
                     'enabled': True

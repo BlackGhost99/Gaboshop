@@ -37,16 +37,20 @@ const StoreB2BModal = ({ isOpen, onClose, store, onSuccess }) => {
 
 			if (res?.success) {
 				setSuccess(true);
+				// Afficher un message de confirmation avec les infos du profil B2B
+				if (res?.data?.b2b_profile && isB2B) {
+					console.log('Profil B2B créé/activé:', res.data.b2b_profile);
+				}
 				if (onSuccess) {
 					onSuccess();
 				}
-				// Fermer après 1.5s
+				// Fermer après 2s pour laisser le temps de voir le message
 				setTimeout(() => {
 					onClose();
 					setSuccess(false);
-				}, 1500);
+				}, 2000);
 			} else {
-				setError(res?.error || 'Erreur lors de la mise à jour');
+				setError(res?.error || res?.message || 'Erreur lors de la mise à jour');
 			}
 		} catch (err) {
 			setError(err?.message || 'Erreur lors de la mise à jour');
@@ -73,7 +77,12 @@ const StoreB2BModal = ({ isOpen, onClose, store, onSuccess }) => {
 
 				{success && (
 					<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded text-sm">
-						✓ Paramètres B2B mis à jour avec succès
+						<div className="font-semibold mb-1">✓ Paramètres B2B mis à jour avec succès</div>
+						{isB2B && (
+							<div className="text-xs mt-1 text-green-600">
+								Le profil B2B a été créé/activé automatiquement. Le magasin est maintenant visible comme grossiste.
+							</div>
+						)}
 					</div>
 				)}
 

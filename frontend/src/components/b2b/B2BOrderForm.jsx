@@ -7,6 +7,7 @@ import { formatCurrency } from '../../utils/helpers';
 const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) => {
 	const [formData, setFormData] = useState({
 		delivery_type: 'standard',
+		delivery_requested: true,
 		notes: '',
 		delivery_address: '',
 		delivery_phone: '',
@@ -150,6 +151,22 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 					<option value="standard">Standard (2-3h)</option>
 					<option value="express">Express (1h)</option>
 				</select>
+			</div>
+
+			{/* Toggle Livraison souhaitée */}
+			<div className="flex items-center gap-3 bg-blue-50 border-2 border-blue-300 rounded px-4 py-3">
+				<input
+					type="checkbox"
+					id="delivery-requested"
+					name="delivery_requested"
+					checked={formData.delivery_requested}
+					onChange={(e) => setFormData((prev) => ({ ...prev, delivery_requested: e.target.checked }))}
+					className="h-5 w-5 text-blue-600 border-gray-300 rounded cursor-pointer"
+				/>
+				<label htmlFor="delivery-requested" className="flex-1 cursor-pointer">
+					<p className="font-bold text-black">🚚 Livraison souhaitée</p>
+					<p className="text-xs text-gray-700">Activée par défaut. Désactiver pour retrait au magasin.</p>
+				</label>
 			</div>
 
 			{/* Adresse */}

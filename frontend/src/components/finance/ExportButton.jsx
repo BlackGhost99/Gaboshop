@@ -24,6 +24,23 @@ const ExportButton = ({
       setError(null);
       
       const blob = await onExport(filters);
+      
+      // Check if the response is HTML (error page) or text/plain (error message) instead of the expected file type
+      if (blob.type === 'text/html' || blob.type === 'text/plain') {
+        // Try to read the error message from the response
+        const text = await blob.text();
+        // If it's text/plain, it's likely our error message with traceback
+        if (blob.type === 'text/plain') {
+          // Extract the first line (main error message) for display
+          const firstLine = text.split('\n')[0];
+          throw new Error(firstLine || 'Erreur serveur lors de l\'export');
+        }
+        // If it's HTML, try to extract error message
+        const errorMatch = text.match(/<title>(.*?)<\/title>/i) || text.match(/<h1>(.*?)<\/h1>/i) || text.match(/Erreur lors de l'export[^:]*:\s*([^<]+)/i);
+        const errorMessage = errorMatch ? errorMatch[1] : 'Erreur serveur lors de l\'export';
+        throw new Error(errorMessage);
+      }
+      
       const extension = type === 'pdf' ? 'pdf' : 'csv';
       const fullFilename = `${filename}.${extension}`;
       
@@ -35,6 +52,9 @@ const ExportButton = ({
       // Show permission error if 403
       if (err.response?.status === 403) {
         alert(err.response?.data?.detail || "Cette fonctionnalité nécessite un plan supérieur.");
+      } else {
+        // Show error message
+        alert(err.message || "Erreur lors de l'export. Veuillez réessayer.");
       }
     } finally {
       setLoading(false);

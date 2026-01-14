@@ -6,6 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('stores', '0009_add_b2b_flags'),
         ('stores', '0009_add_b2c_b2b_fields'),
     ]
 

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import SystemSettings, CommissionByCategory
+from .models import SystemSettings, CommissionByCategory, AIActionLog
 
 
 @admin.register(SystemSettings)
@@ -76,3 +76,32 @@ class CommissionByCategoryAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+
+@admin.register(AIActionLog)
+class AIActionLogAdmin(admin.ModelAdmin):
+    """
+    Interface d'administration pour les logs d'actions IA
+    """
+    list_display = ('id', 'action', 'initiator', 'confirmed', 'success', 'timestamp')
+    list_filter = ('action', 'confirmed', 'success', 'timestamp')
+    search_fields = ('initiator__phone', 'action', 'details')
+    readonly_fields = ('timestamp', 'ip_address', 'user_agent')
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Action', {
+            'fields': ('actor', 'initiator', 'action', 'details')
+        }),
+        ('Résultat', {
+            'fields': ('confirmed', 'success', 'error_message')
+        }),
+        ('Métadonnées', {
+            'fields': ('timestamp', 'ip_address', 'user_agent'),
+            'classes': ('collapse',),
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        """Les logs sont créés automatiquement, pas d'ajout manuel"""
+        return False

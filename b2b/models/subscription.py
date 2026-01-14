@@ -246,6 +246,52 @@ class B2BSubscriptionPlan(models.Model):
                 'enabled': True
             })
         
+        # Finance - Vue détaillée
+        if self.can_view_finance_detailed:
+            features.append({
+                'title': "Finance : vue détaillée par commande et catégorie",
+                'category': 'finance',
+                'enabled': True
+            })
+        
+        # Finance - Export CSV
+        if self.can_export_finance_csv:
+            features.append({
+                'title': "Export CSV/Excel des rapports financiers",
+                'category': 'finance',
+                'enabled': True
+            })
+        
+        # Finance - Export PDF
+        if self.can_export_finance_pdf:
+            features.append({
+                'title': "Export PDF officiel des rapports financiers",
+                'category': 'finance',
+                'enabled': True
+            })
+        
+        # Finance - Historique illimité
+        if self.finance_history_limit_days is None:
+            features.append({
+                'title': "Historique financier illimité",
+                'category': 'finance',
+                'enabled': True
+            })
+        elif self.finance_history_limit_days > 0:
+            features.append({
+                'title': f"Historique financier : {self.finance_history_limit_days} jours",
+                'category': 'finance',
+                'enabled': True
+            })
+        
+        # Accès approvisionnement B2B (seulement Pro et Business)
+        if self.plan_type in ['pro', 'business']:
+            features.append({
+                'title': "Accès approvisionnement B2B (catalogues grossistes)",
+                'category': 'features',
+                'enabled': True
+            })
+        
         # Fonctionnalités personnalisées
         for custom_feature in self.custom_features:
             if custom_feature.get('enabled', True):

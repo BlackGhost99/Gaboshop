@@ -22,7 +22,7 @@ from .products import AllProductCategoryListView
 from products.views import ProductViewSet
 from .orders import (
     OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
-    ClientConfirmDeliveryView
+    ClientConfirmDeliveryView, OrderSelectVehicleView
 )
 from .payments import (
     PaymentInitView, PaymentDetailView, PaymentWebhookView,
@@ -41,7 +41,12 @@ from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
     DeliveryProofUploadView, DeliveryVerifyPINView,
-    AvailableDeliveriesView, DeliveryClaimView
+    AvailableDeliveriesView, DeliveryClaimView,
+    VehicleTypeListView, VehicleTypeDetailView, DeliveryCalculatePriceView,
+    DeliveryValidateVehicleView, EligibleVehiclesView, DeliveryZonesListView
+)
+from delivery.admin_dashboard import (
+    DeliveryTariffAnalyticsView, DeliveryZoneHealthCheckView
 )
 from .subscription import (
     get_subscription_status, get_available_plans, check_permission, purchase_plan
@@ -89,6 +94,7 @@ from b2b.api.views import (
     B2BProductPricingUpdateView, B2BProductPricingDeleteView,
     B2BProductPricingBulkCreateView
 )
+from .b2c_admin import B2CProductPricingListView
 from .orders_admin import (
     OrderStatsView, OrdersListView, OrderDetailView as AdminOrderDetailView,
     DeliveryAssignmentView, OrderStatusUpdateView as AdminOrderStatusUpdateView,
@@ -96,7 +102,7 @@ from .orders_admin import (
 )
 from .stores_admin import (
     StoresListView, StoreDetailView as AdminStoreDetailView, StoreCreateView as AdminStoreCreateView,
-    StoreUpdateView as AdminStoreUpdateView, StoreB2BSettingsUpdateView, StoreDeactivateView, StoreActivateView,
+    StoreUpdateView as AdminStoreUpdateView, StoreB2BSettingsUpdateView, StoreB2CSettingsUpdateView, StoreDeactivateView, StoreActivateView,
     StoreDeleteView, StoreProductsView as AdminStoreProductsView,
     StoreOrdersView as AdminStoreOrdersView, StoreDeliveryAgentsView
 )
@@ -138,6 +144,14 @@ urlpatterns = [
     path('dashboard/delivery/<int:delivery_id>/verify-pin/', DeliveryVerifyPINView.as_view(), name='delivery-verify-pin'),
     path('dashboard/delivery/<int:delivery_id>/complete/', DeliveryCompleteView.as_view(), name='delivery-complete'),
     
+    # Vehicle types endpoints
+    path('delivery/vehicle-types/', VehicleTypeListView.as_view(), name='vehicle-types-list'),
+    path('delivery/vehicle-types/<int:vehicle_type_id>/', VehicleTypeDetailView.as_view(), name='vehicle-type-detail'),
+    path('delivery/zones/', DeliveryZonesListView.as_view(), name='delivery-zones-list'),
+    path('delivery/calculate-price/', DeliveryCalculatePriceView.as_view(), name='delivery-calculate-price'),
+    path('delivery/validate-vehicle/', DeliveryValidateVehicleView.as_view(), name='delivery-validate-vehicle'),
+    path('delivery/eligible-vehicles/<int:order_id>/', EligibleVehiclesView.as_view(), name='eligible-vehicles'),
+    
     # Subscription / Forfaits (Dashboard)
     path('dashboard/subscription/status/', get_subscription_status, name='subscription-status'),
     path('dashboard/subscription/plans/', get_available_plans, name='subscription-plans'),
@@ -148,6 +162,8 @@ urlpatterns = [
     path('admin/summary/', AdminSummaryView.as_view(), name='admin-summary'),
     path('admin/users/', AdminUsersView.as_view(), name='admin-users'),
     path('admin/orders/', AdminOrdersView.as_view(), name='admin-orders'),
+    path('admin/delivery/tariff-analytics/', DeliveryTariffAnalyticsView.as_view(), name='delivery-tariff-analytics'),
+    path('admin/delivery/zone-health/', DeliveryZoneHealthCheckView.as_view(), name='delivery-zone-health'),
     path('admin/financials/', AdminFinancialsView.as_view(), name='admin-financials'),
     path('admin/store-categories/', AdminStoreCategoriesView.as_view(), name='admin-store-categories'),
     path('admin/stores/', AdminStoresView.as_view(), name='admin-stores'),
@@ -202,6 +218,7 @@ urlpatterns = [
     path('admin/stores/<int:store_id>/detail/', AdminStoreDetailView.as_view(), name='admin-stores-detail'),
     path('admin/stores/<int:store_id>/update/', AdminStoreUpdateView.as_view(), name='admin-stores-update'),
     path('admin/stores/<int:store_id>/b2b-settings/', StoreB2BSettingsUpdateView.as_view(), name='admin-stores-b2b-settings'),
+    path('admin/stores/<int:store_id>/b2c-settings/', StoreB2CSettingsUpdateView.as_view(), name='admin-stores-b2c-settings'),
     path('admin/stores/<int:store_id>/deactivate/', StoreDeactivateView.as_view(), name='admin-stores-deactivate'),
     path('admin/stores/<int:store_id>/activate/', StoreActivateView.as_view(), name='admin-stores-activate'),
     path('admin/stores/<int:store_id>/', StoreDeleteView.as_view(), name='admin-stores-delete'),
@@ -282,6 +299,7 @@ urlpatterns = [
     path('orders/<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
     path('orders/<int:order_id>/status/', OrderStatusUpdateView.as_view(), name='order-status-update'),
     path('orders/<int:order_id>/confirm-delivery/', ClientConfirmDeliveryView.as_view(), name='client-confirm-delivery'),
+    path('orders/<int:order_id>/select-vehicle/', OrderSelectVehicleView.as_view(), name='order-select-vehicle'),
 
     # Payments
     path('orders/<int:order_id>/payments/init/', PaymentInitView.as_view(), name='payment-init'),
@@ -314,6 +332,9 @@ urlpatterns = [
     path('b2b/pricing/bulk/', B2BProductPricingBulkCreateView.as_view(), name='b2b-pricing-bulk-create'),
     path('b2b/pricing/<int:pricing_id>/', B2BProductPricingUpdateView.as_view(), name='b2b-pricing-update'),
     path('b2b/pricing/<int:pricing_id>/delete/', B2BProductPricingDeleteView.as_view(), name='b2b-pricing-delete'),
+    
+    # B2C Endpoints
+    path('admin/b2c/pricing/<int:store_id>/', B2CProductPricingListView.as_view(), name='b2c-pricings'),
 
     path('', include(router.urls)),
     # Webhooks
@@ -324,4 +345,7 @@ urlpatterns = [
     
     # Store Finance Module (Store-level financial management)
     path('store/finance/', include('finance.urls')),
+    
+    # AI Module
+    path('ai/', include('api.v1.ai.urls')),
 ]

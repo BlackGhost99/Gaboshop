@@ -1,6 +1,6 @@
 """Stores Management API for admin dashboard."""
 
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Exists, OuterRef
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from stores.models import Store
 from orders.models import Order
 from users.models import User
+from b2b.models import B2BProfile
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -60,36 +61,38 @@ class StoresListView(APIView):
         else:  # date
             stores = stores.order_by('-created_at')
         
-        # Annotate with counts
+        # Optimize queries with select_related and prefetch_related
+        stores = stores.select_related('category', 'manager')
+        
+        # Annotate with counts and B2B profile existence
         stores = stores.annotate(
             products_count=Count('products'),
-            orders_count=Count('orders')
+            orders_count=Count('orders'),
+            has_b2b_profile=Exists(
+                B2BProfile.objects.filter(store_id=OuterRef('pk'))
+            )
         )
         
         data = []
         for store in stores:
             manager = store.manager
+            # has_b2b_profile is now an annotation, so we can access it directly
+            has_b2b_profile = store.has_b2b_profile
             data.append({
                 'id': store.id,
                 'name': store.name,
-                'description': store.description,
                 'category_id': store.category_id,
                 'category_name': store.category.name if store.category else None,
                 'city': store.city,
-                'address': store.address,
                 'zone': store.zone,
-                'phone': store.phone,
-                'email': store.email,
                 'manager_id': store.manager_id,
                 'manager_name': f"{manager.first_name} {manager.last_name}" if manager else None,
                 'products_count': store.products_count,
                 'orders_count': store.orders_count,
-                'subscription_plan': store.subscription_plan,
-                'commission_rate': float(store.commission_rate),
-                'delivery_fee': float(store.delivery_fee),
                 'is_active': store.is_active,
+                'is_b2b': store.is_b2b,
+                'has_b2b_profile': has_b2b_profile,
                 'created_at': store.created_at.isoformat(),
-                'updated_at': store.updated_at.isoformat() if store.updated_at else None,
             })
         
         return Response({
@@ -107,6 +110,20 @@ class StoreDetailView(APIView):
         store = get_object_or_404(Store, id=store_id)
         
         manager = store.manager
+        # Optimiser les requêtes pour les stats
+        orders_qs = store.orders.all()
+        products_count = store.products.count()
+        orders_count = orders_qs.count()
+        
+        # Calculer le revenu total et la moyenne en une seule requête
+        revenue_data = orders_qs.filter(status='delivered').aggregate(
+            total_revenue=Sum('total_amount')
+        )
+        total_revenue = float(revenue_data['total_revenue'] or 0)
+        
+        all_orders_revenue = orders_qs.aggregate(total=Sum('total_amount'))
+        average_order_value = float(all_orders_revenue['total'] or 0) / max(orders_count, 1)
+        
         data = {
             'id': store.id,
             'name': store.name,
@@ -120,29 +137,17 @@ class StoreDetailView(APIView):
             'email': store.email,
             'manager_id': store.manager_id,
             'manager_name': f"{manager.first_name} {manager.last_name}" if manager else None,
-            'subscription_plan': store.subscription_plan,
-            'commission_rate': float(store.commission_rate),
-            'delivery_fee': float(store.delivery_fee),
             'is_active': store.is_active,
             'is_verified': store.is_verified,
-            'is_b2c': store.is_b2c,
             'is_b2b': store.is_b2b,
-            'b2b_min_order_amount': float(store.b2b_min_order_amount) if hasattr(store, 'b2b_min_order_amount') else 0,
-            'b2b_delivery_delay': store.b2b_delivery_delay if hasattr(store, 'b2b_delivery_delay') else 24,
-            'store_type': store.store_type,
+            'b2b_min_order_amount': float(store.b2b_min_order_amount),
+            'b2b_delivery_delay': store.b2b_delivery_delay,
             'created_at': store.created_at.isoformat(),
-            'updated_at': store.updated_at.isoformat() if store.updated_at else None,
             'stats': {
-                'products_count': store.products.count(),
-                'orders_count': store.orders.count(),
-                'total_revenue': float(
-                    Order.objects.filter(store_id=store_id, status='delivered')
-                    .aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-                ),
-                'average_order_value': float(
-                    Order.objects.filter(store_id=store_id)
-                    .aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-                ) / max(store.orders.count(), 1),
+                'products_count': products_count,
+                'orders_count': orders_count,
+                'total_revenue': total_revenue,
+                'average_order_value': average_order_value,
             }
         }
         
@@ -184,9 +189,6 @@ class StoreCreateView(APIView):
                 zone=data.get('zone', ''),
                 phone=data.get('phone', ''),
                 email=data.get('email', ''),
-                commission_rate=float(data.get('commission_rate', 0)),
-                delivery_fee=float(data.get('delivery_fee', 0)),
-                subscription_plan=data.get('subscription_plan', 'starter'),
                 is_active=data.get('is_active', True),
             )
             
@@ -232,12 +234,6 @@ class StoreUpdateView(APIView):
                 store.phone = data['phone']
             if 'email' in data:
                 store.email = data['email']
-            if 'commission_rate' in data:
-                store.commission_rate = float(data['commission_rate'])
-            if 'delivery_fee' in data:
-                store.delivery_fee = float(data['delivery_fee'])
-            if 'subscription_plan' in data:
-                store.subscription_plan = data['subscription_plan']
             if 'is_active' in data:
                 store.is_active = data['is_active']
             
@@ -265,9 +261,23 @@ class StoreB2BSettingsUpdateView(APIView):
             store = get_object_or_404(Store, id=store_id)
             data = request.data
             
-            # Update B2B fields
+            # Sauvegarder l'ancienne valeur de is_b2b
+            old_is_b2b = store.is_b2b
+            
+            # Vérifier si is_b2b est activé ou désactivé
+            is_b2b_activated = False
+            is_b2b_deactivated = False
             if 'is_b2b' in data:
-                store.is_b2b = bool(data['is_b2b'])
+                new_is_b2b = bool(data['is_b2b'])
+                # Si on active B2B et qu'il n'était pas activé avant
+                if new_is_b2b and not old_is_b2b:
+                    is_b2b_activated = True
+                # Si on désactive B2B et qu'il était activé avant
+                elif not new_is_b2b and old_is_b2b:
+                    is_b2b_deactivated = True
+                store.is_b2b = new_is_b2b
+            
+            # Update B2B fields
             if 'b2b_min_order_amount' in data:
                 store.b2b_min_order_amount = float(data['b2b_min_order_amount'])
             if 'b2b_delivery_delay' in data:
@@ -275,16 +285,133 @@ class StoreB2BSettingsUpdateView(APIView):
             
             store.save()
             
+            # Si B2B est activé, créer/activer automatiquement le profil B2B
+            profile_created = False
+            profile_updated = False
+            if is_b2b_activated:
+                try:
+                    # S'assurer que b2b_min_order_amount a une valeur par défaut
+                    min_order = store.b2b_min_order_amount if store.b2b_min_order_amount else 0
+                    
+                    profile, created = B2BProfile.objects.get_or_create(
+                        store=store,
+                        defaults={
+                            'minimum_order_amount': min_order,
+                            'visible_to_all': True,
+                            'is_active': True,
+                        }
+                    )
+                    if created:
+                        profile_created = True
+                    else:
+                        # Mettre à jour le profil existant
+                        profile.is_active = True
+                        profile.minimum_order_amount = min_order
+                        profile.visible_to_all = True
+                        profile.save()
+                        profile_updated = True
+                except Exception as profile_error:
+                    # Si la création du profil échoue, on log l'erreur mais on continue
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Erreur lors de la création du profil B2B pour le magasin {store.id}: {str(profile_error)}")
+                    # On ne bloque pas la requête, mais on retourne un warning
+                    return Response({
+                        'success': False,
+                        'error': f'Le magasin a été mis à jour mais le profil B2B n\'a pas pu être créé: {str(profile_error)}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Si B2B est désactivé, désactiver aussi le profil B2B
+            if is_b2b_deactivated:
+                if hasattr(store, 'b2b_profile'):
+                    store.b2b_profile.is_active = False
+                    store.b2b_profile.save()
+            
+            # Recharger le store depuis la DB pour avoir la relation b2b_profile à jour
+            store.refresh_from_db()
+            
+            # Préparer la réponse avec les infos du profil B2B
+            response_data = {
+                'id': store.id,
+                'name': store.name,
+                'is_b2b': store.is_b2b,
+                'b2b_min_order_amount': float(store.b2b_min_order_amount),
+                'b2b_delivery_delay': store.b2b_delivery_delay,
+            }
+            
+            # Ajouter les infos du profil B2B si disponible
+            try:
+                if hasattr(store, 'b2b_profile') and store.b2b_profile:
+                    response_data['b2b_profile'] = {
+                        'id': store.b2b_profile.id,
+                        'is_active': store.b2b_profile.is_active,
+                        'minimum_order_amount': float(store.b2b_profile.minimum_order_amount),
+                        'visible_to_all': store.b2b_profile.visible_to_all,
+                    }
+            except B2BProfile.DoesNotExist:
+                pass
+            
+            message = 'Paramètres B2B mis à jour avec succès'
+            if profile_created:
+                message += ' - Profil B2B créé automatiquement'
+            elif profile_updated:
+                message += ' - Profil B2B activé automatiquement'
+            
             return Response({
                 'success': True,
-                'message': 'Paramètres B2B mis à jour avec succès',
-                'data': {
-                    'id': store.id,
-                    'name': store.name,
-                    'is_b2b': store.is_b2b,
-                    'b2b_min_order_amount': float(store.b2b_min_order_amount),
-                    'b2b_delivery_delay': store.b2b_delivery_delay,
-                }
+                'message': message,
+                'data': response_data
+            })
+        
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StoreB2CSettingsUpdateView(APIView):
+    """Mettre à jour les paramètres B2C d'un magasin"""
+    permission_classes = [IsPlatformAdmin]
+    
+    def patch(self, request, store_id):
+        try:
+            store = get_object_or_404(Store, id=store_id)
+            data = request.data
+            
+            # Sauvegarder l'ancienne valeur de is_b2c
+            old_is_b2c = store.is_b2c
+            
+            # Vérifier si is_b2c est activé ou désactivé
+            is_b2c_activated = False
+            is_b2c_deactivated = False
+            if 'is_b2c' in data:
+                new_is_b2c = bool(data['is_b2c'])
+                # Si on active B2C et qu'il n'était pas activé avant
+                if new_is_b2c and not old_is_b2c:
+                    is_b2c_activated = True
+                # Si on désactive B2C et qu'il était activé avant
+                elif not new_is_b2c and old_is_b2c:
+                    is_b2c_deactivated = True
+                store.is_b2c = new_is_b2c
+            
+            store.save()
+            
+            # Préparer la réponse
+            response_data = {
+                'id': store.id,
+                'name': store.name,
+                'is_b2c': store.is_b2c,
+                'is_b2b': store.is_b2b,
+            }
+            
+            message = 'Paramètres B2C mis à jour avec succès'
+            if is_b2c_activated:
+                message += ' - Le magasin peut maintenant vendre au détail'
+            elif is_b2c_deactivated:
+                message += ' - Le magasin ne peut plus vendre au détail'
+            
+            return Response({
+                'success': True,
+                'message': message,
+                'data': response_data
             })
         
         except Exception as e:

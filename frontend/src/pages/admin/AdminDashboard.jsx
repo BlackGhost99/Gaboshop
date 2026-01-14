@@ -68,6 +68,7 @@ import AdminOverviewSection from '../../components/AdminOverviewSection';
 import AdminDeliverySection from '../../components/AdminDeliverySection';
 import AdminSubscriptionsSection from '../../components/AdminSubscriptionsSection';
 import AdminB2BManagementSection from '../../components/AdminB2BManagementSection';
+import AdminB2CManagementSection from '../../components/AdminB2CManagementSection';
 import AdminCommissionsSection from '../../components/AdminCommissionsSection';
 import AdminReversementsSection from '../../components/AdminReversementsSection';
 import AdminClientCreditsSection from '../../components/AdminClientCreditsSection';
@@ -124,7 +125,7 @@ const AdminDashboard = () => {
   // Store CRUD
   const [showAddStore, setShowAddStore] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
-  const [newStore, setNewStore] = useState({ name: '', description: '', category_id: '', manager_id: '', phone: '', email: '', address: '', city: 'Libreville', zone: '', commission_rate: 0, delivery_fee: 0, subscription_plan: 'starter', is_active: true });
+  const [newStore, setNewStore] = useState({ name: '', description: '', category_id: '', manager_id: '', phone: '', email: '', address: '', city: 'Libreville', zone: '', is_active: true });
   const [storesListAdmin, setStoresListAdmin] = useState([]);
   const [storesFilter, setStoresFilter] = useState({ search: '', category: '', city: '', status: 'all', sort: 'date' });
 
@@ -346,7 +347,7 @@ const AdminDashboard = () => {
       const res = await createStoreAdmin(newStore);
       if (res?.success) {
         setShowAddStore(false);
-        setNewStore({ name: '', description: '', category_id: '', manager_id: '', phone: '', email: '', address: '', city: 'Libreville', zone: '', commission_rate: 0, delivery_fee: 0, subscription_plan: 'starter', is_active: true });
+        setNewStore({ name: '', description: '', category_id: '', manager_id: '', phone: '', email: '', address: '', city: 'Libreville', zone: '', is_active: true });
         loadStoresData();
         loadData(false);
       }
@@ -562,23 +563,9 @@ const AdminDashboard = () => {
   const viewStoreDetail = async (storeId) => {
     try {
       setB2bLoading(prev => ({ ...prev, [storeId]: true }));
-      const res = await getStoreDetailAdmin(storeId);
-      if (res?.success) {
-        // Charger aussi le profil B2B si disponible
-        let b2bProfile = null;
-        try {
-          const b2bRes = await getStoreB2BProfile(storeId);
-          if (b2bRes?.success) {
-            b2bProfile = b2bRes.data;
-          }
-        } catch (b2bErr) {
-          // Pas de profil B2B, c'est normal
-          console.log('Pas de profil B2B pour ce magasin');
-        }
-
-        setSelectedStoreDetail({ ...res.data, b2b_profile: b2bProfile });
-        setShowStoreDetailModal(true);
-      }
+      // Ouvrir directement le modal avec l'ID du store
+      // Le modal StoreDetailModal chargera les détails automatiquement
+      setSelectedStoreForDetail(storeId);
     } catch (err) {
       setActionError(err?.message || 'Erreur chargement magasin');
     } finally {
@@ -627,7 +614,7 @@ const AdminDashboard = () => {
       if (res?.success) {
         setActionSuccess('Profil B2B activé avec succès');
         loadStoresData();
-        if (selectedStoreDetail?.id === storeId) {
+        if (selectedStoreForDetail === storeId) {
           // Rafraîchir les détails si le modal est ouvert
           viewStoreDetail(storeId);
         }
@@ -650,7 +637,7 @@ const AdminDashboard = () => {
           if (res?.success) {
             setActionSuccess('Profil B2B désactivé avec succès');
             loadStoresData();
-            if (selectedStoreDetail?.id === storeId) {
+            if (selectedStoreForDetail === storeId) {
               viewStoreDetail(storeId);
             }
           }
@@ -671,7 +658,7 @@ const AdminDashboard = () => {
       if (res?.success) {
         setActionSuccess('Profil B2B créé avec succès');
         loadStoresData();
-        if (selectedStoreDetail?.id === storeId) {
+        if (selectedStoreForDetail === storeId) {
           viewStoreDetail(storeId);
         }
       }
@@ -2431,6 +2418,7 @@ const AdminDashboard = () => {
         {activeTab === 'finances' && financesSection}
         {activeTab === 'subscriptions' && <AdminSubscriptionsSection />}
         {activeTab === 'b2b_management' && <AdminB2BManagementSection />}
+        {activeTab === 'b2c_management' && <AdminB2CManagementSection />}
         {activeTab === 'commissions' && <AdminCommissionsSection />}
         {activeTab === 'reversements' && <AdminReversementsSection />}
         {activeTab === 'client_credits' && <AdminClientCreditsSection />}
@@ -3090,44 +3078,6 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Commission (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={newStore.commission_rate}
-                    onChange={(e) => setNewStore({ ...newStore, commission_rate: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Frais livraison (FCFA)</label>
-                  <input
-                    type="number"
-                    step="100"
-                    min="0"
-                    value={newStore.delivery_fee}
-                    onChange={(e) => setNewStore({ ...newStore, delivery_fee: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Plan d'abonnement</label>
-                  <select
-                    value={newStore.subscription_plan}
-                    onChange={(e) => setNewStore({ ...newStore, subscription_plan: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="starter">Starter</option>
-                    <option value="pro">Pro</option>
-                    <option value="business">Business</option>
-                  </select>
-                </div>
-              </div>
-
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -3289,44 +3239,6 @@ const AdminDashboard = () => {
                     onChange={(e) => setEditingStore({ ...editingStore, zone: e.target.value })}
                     className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Commission (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={editingStore.commission_rate}
-                    onChange={(e) => setEditingStore({ ...editingStore, commission_rate: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Frais livraison (FCFA)</label>
-                  <input
-                    type="number"
-                    step="100"
-                    min="0"
-                    value={editingStore.delivery_fee}
-                    onChange={(e) => setEditingStore({ ...editingStore, delivery_fee: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Plan d'abonnement</label>
-                  <select
-                    value={editingStore.subscription_plan}
-                    onChange={(e) => setEditingStore({ ...editingStore, subscription_plan: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="starter">Starter</option>
-                    <option value="pro">Pro</option>
-                    <option value="business">Business</option>
-                  </select>
                 </div>
               </div>
 

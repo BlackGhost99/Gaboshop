@@ -35,11 +35,33 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    
+    // Capturer les erreurs importantes (401, 403, 404, 500)
+    if (status && [401, 403, 404, 500].includes(status)) {
+      const errorData = {
+        status: status,
+        endpoint: error.config?.url || '',
+        method: error.config?.method || 'GET',
+        details: error.response?.data,
+        timestamp: new Date().toISOString(),
+      };
+      
+      // Stocker dans localStorage pour accès par l'IA
+      localStorage.setItem('last_api_error', JSON.stringify(errorData));
+      
+      // Déclencher un événement personnalisé pour notifier le contexte IA
+      window.dispatchEvent(new CustomEvent('api-error', { detail: errorData }));
+    }
+    
+    if (status === 401) {
       // Token expiré ou invalide
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('refresh_token');
+      localStorage.removeItem('last_api_error');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );

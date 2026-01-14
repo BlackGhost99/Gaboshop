@@ -83,28 +83,7 @@ class Store(models.Model):
 	is_active = models.BooleanField(default=True)
 	is_verified = models.BooleanField(default=False)
 	
-	# Capacités B2C/B2B
-	is_b2c = models.BooleanField(
-		default=True,
-		help_text="Le magasin peut-il vendre au détail (B2C) ?"
-	)
-	is_b2b = models.BooleanField(
-		default=False,
-		help_text="Le magasin peut-il vendre en gros (B2B) ?"
-	)
-	
-	# Options B2B (optionnel)
-	b2b_min_order_amount = models.DecimalField(
-		max_digits=10,
-		decimal_places=2,
-		default=0,
-		help_text="Montant minimum de commande B2B en FCFA"
-	)
-	b2b_delivery_delay = models.PositiveIntegerField(
-		default=24,
-		help_text="Délai de livraison B2B en heures"
-	)
-	
+	# Configuration B2B/B2C
 	STORE_TYPE_CHOICES = (
 		('retail', 'Détail (B2C)'),
 		('wholesaler', 'Grossiste (B2B)'),
@@ -117,12 +96,20 @@ class Store(models.Model):
 		help_text="Type de magasin: Détail (pour clients), Grossiste/Industrie (pour gérants)"
 	)
 	
-	# Configuration B2B/B2C
-	is_b2c = models.BooleanField(default=True, help_text="Le magasin peut vendre à des clients finaux")
-	is_b2b = models.BooleanField(default=False, help_text="Le magasin peut vendre à d'autres magasins (grossiste)")
+	# Capacités B2C/B2B (dérivées de store_type mais gardées pour compatibilité)
+	is_b2c = models.BooleanField(
+		default=True,
+		help_text="Le magasin peut-il vendre au détail (B2C) ?"
+	)
+	is_b2b = models.BooleanField(
+		default=False,
+		help_text="Le magasin peut-il vendre en gros (B2B) ?"
+	)
+	
+	# Options B2B
 	b2b_min_order_amount = models.DecimalField(
-		max_digits=10, 
-		decimal_places=2, 
+		max_digits=10,
+		decimal_places=2,
 		default=0,
 		help_text="Montant minimum de commande B2B en FCFA"
 	)
@@ -203,8 +190,15 @@ class Store(models.Model):
 	def get_current_plan(self):
 		"""
 		Récupère le plan ACTUEL du magasin
-		Retourne le plan d'abonnement ou None
+		Pour les stores B2B (grossistes), retourne B2BSubscriptionPlan
+		Pour les stores B2C, retourne SubscriptionPlan
+		Retourne le plan d'abonnement ou le plan Free par défaut
 		"""
+		# Si c'est un store B2B (grossiste), utiliser B2BSubscriptionPlan
+		if self.is_b2b:
+			return self.get_current_b2b_plan()
+		
+		# Sinon, utiliser SubscriptionPlan (B2C)
 		from payments.models import SubscriptionPlan
 		
 		subscription = self.get_active_subscription()
@@ -212,10 +206,30 @@ class Store(models.Model):
 		if subscription and subscription.plan:
 			return subscription.plan
 		
-		# Plan par défaut: Starter
+		# Plan par défaut: Free
 		try:
-			return SubscriptionPlan.objects.get(plan_type='starter')
+			return SubscriptionPlan.objects.get(plan_type='free')
 		except SubscriptionPlan.DoesNotExist:
+			return None
+	
+	def get_current_b2b_plan(self):
+		"""
+		Récupère le plan B2B ACTUEL du magasin (pour grossistes)
+		Retourne B2BSubscriptionPlan ou le plan Free B2B par défaut
+		"""
+		from b2b.models import B2BStoreSubscription, B2BSubscriptionPlan
+		
+		try:
+			b2b_subscription = self.b2b_subscription
+			if b2b_subscription and b2b_subscription.is_active() and b2b_subscription.plan:
+				return b2b_subscription.plan
+		except B2BStoreSubscription.DoesNotExist:
+			pass
+		
+		# Plan par défaut: B2B Free
+		try:
+			return B2BSubscriptionPlan.objects.get(plan_type='free')
+		except B2BSubscriptionPlan.DoesNotExist:
 			return None
 	
 	def is_subscription_active(self):

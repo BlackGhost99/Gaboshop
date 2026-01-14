@@ -24,10 +24,24 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductCategorySerializer(serializers.ModelSerializer):
     product_count = serializers.IntegerField(read_only=True)
     store_category = serializers.PrimaryKeyRelatedField(read_only=True)
+    commission_rate = serializers.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        required=True,
+        help_text="Taux de commission en % (0-100)"
+    )
 
     class Meta:
         model = ProductCategory
-        fields = ['id', 'name', 'description', 'order', 'product_count', 'store_category']
+        fields = ['id', 'name', 'description', 'order', 'product_count', 'store_category', 'commission_rate']
+    
+    def validate_commission_rate(self, value):
+        """Valide que le taux de commission est entre 0 et 100"""
+        if value < 0 or value > 100:
+            raise serializers.ValidationError(
+                _('Le taux de commission doit être entre 0 et 100.')
+            )
+        return value
 
 class ProductSerializer(serializers.ModelSerializer):
     """Serializer de base pour les produits"""
@@ -43,6 +57,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
+            'weight_kg', 'estimated_weight_kg',
             'image', 'image_2', 'image_3', 'created_at'
         ]
         read_only_fields = ['store', 'created_at']
@@ -62,6 +77,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
+            'weight_kg', 'estimated_weight_kg',
             'image', 'image_2', 'image_3', 'created_at', 'updated_at',
             'variants', 'images'
         ]
@@ -77,7 +93,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'category', 'price', 'compare_price',
             'stock', 'sku', 'barcode', 'is_featured', 'image',
-            'image_2', 'image_3'
+            'image_2', 'image_3', 'weight_kg'
         ]
     
     def validate(self, attrs):
@@ -93,6 +109,13 @@ class ProductCreateSerializer(serializers.ModelSerializer):
                 'compare_price': _('Le prix de comparaison doit être supérieur au prix actuel.')
             })
         
+        # Poids obligatoire et > 0
+        weight = attrs.get('weight_kg')
+        if weight is None or weight <= 0:
+            raise serializers.ValidationError({
+                'weight_kg': _('Le poids du produit est obligatoire et doit être supérieur à 0 (en kg).')
+            })
+        
         return attrs
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
@@ -102,7 +125,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'category', 'price', 'compare_price',
             'stock', 'sku', 'barcode', 'is_available', 'is_featured',
-            'image', 'image_2', 'image_3'
+            'image', 'image_2', 'image_3', 'weight_kg'
         ]
 
 

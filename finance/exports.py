@@ -14,7 +14,9 @@ def export_sales_csv(orders, store):
     Export sales data to CSV format
     """
     response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    filename = f'ventes_{store.slug}_{datetime.now().strftime("%Y%m%d")}.csv'
+    # Use store ID instead of slug (Store model doesn't have slug field)
+    store_identifier = str(store.id)
+    filename = f'ventes_{store_identifier}_{datetime.now().strftime("%Y%m%d")}.csv'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     # Add BOM for Excel UTF-8 support
@@ -101,7 +103,9 @@ def export_sales_pdf(orders, store, summary):
     
     # Create PDF
     response = HttpResponse(content_type='application/pdf')
-    filename = f'ventes_{store.slug}_{datetime.now().strftime("%Y%m%d")}.pdf'
+    # Use store ID instead of slug (Store model doesn't have slug field)
+    store_identifier = str(store.id)
+    filename = f'ventes_{store_identifier}_{datetime.now().strftime("%Y%m%d")}.pdf'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     # Generate PDF
@@ -121,7 +125,9 @@ def export_expenses_csv(expenses, store):
     Export expenses data to CSV format
     """
     response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    filename = f'depenses_{store.slug}_{datetime.now().strftime("%Y%m%d")}.csv'
+    # Use store ID instead of slug (Store model doesn't have slug field)
+    store_identifier = str(store.id)
+    filename = f'depenses_{store_identifier}_{datetime.now().strftime("%Y%m%d")}.csv'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     # Add BOM for Excel UTF-8 support
@@ -203,7 +209,9 @@ def export_expenses_pdf(expenses, store, summary):
     
     # Create PDF
     response = HttpResponse(content_type='application/pdf')
-    filename = f'depenses_{store.slug}_{datetime.now().strftime("%Y%m%d")}.pdf'
+    # Use store ID instead of slug (Store model doesn't have slug field)
+    store_identifier = str(store.id)
+    filename = f'depenses_{store_identifier}_{datetime.now().strftime("%Y%m%d")}.pdf'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     # Generate PDF

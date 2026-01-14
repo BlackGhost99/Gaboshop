@@ -6,9 +6,11 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     FinanceSummaryView,
     SalesListView,
-    SalesExportView,
+    SalesExportCSVView,
+    SalesExportPDFView,
     ExpenseViewSet,
-    ExpensesExportView,
+    ExpensesExportCSVView,
+    ExpensesExportPDFView,
     SupplierViewSet,
 )
 
@@ -24,13 +26,15 @@ urlpatterns = [
     
     # Sales endpoints
     path('sales/', SalesListView.as_view(), name='sales-list'),
-    path('sales/export/csv/', SalesExportView.as_view(), {'format': 'csv'}, name='sales-export-csv'),
-    path('sales/export/pdf/', SalesExportView.as_view(), {'format': 'pdf'}, name='sales-export-pdf'),
+    # IMPORTANT: Les routes d'export doivent être AVANT le router pour éviter les conflits
+    path('sales/export/csv/', SalesExportCSVView.as_view(), name='sales-export-csv'),
+    path('sales/export/pdf/', SalesExportPDFView.as_view(), name='sales-export-pdf'),
     
-    # Expenses export endpoints (CRUD is handled by the router)
-    path('expenses/export/csv/', ExpensesExportView.as_view(), {'format': 'csv'}, name='expenses-export-csv'),
-    path('expenses/export/pdf/', ExpensesExportView.as_view(), {'format': 'pdf'}, name='expenses-export-pdf'),
+    # Expenses export endpoints (DOIT être AVANT le router pour éviter les conflits)
+    path('expenses/export/csv/', ExpensesExportCSVView.as_view(), name='expenses-export-csv'),
+    path('expenses/export/pdf/', ExpensesExportPDFView.as_view(), name='expenses-export-pdf'),
     
     # Router URLs (includes expenses/ and suppliers/ CRUD)
+    # Le router doit être en dernier pour ne pas intercepter les routes d'export
     path('', include(router.urls)),
 ]

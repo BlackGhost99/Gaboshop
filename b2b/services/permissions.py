@@ -9,8 +9,8 @@ def can_access_b2b(user):
 	
 	Règles:
 	- Uniquement StoreUser (user_type='store_manager')
-	- Le magasin doit avoir is_b2c = True
 	- Le magasin doit avoir un plan Business (seuls les Business peuvent acheter en B2B)
+	- Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
 	
 	Args:
 		user: Instance de User
@@ -18,11 +18,16 @@ def can_access_b2b(user):
 	Returns:
 		bool: True si l'utilisateur peut accéder au B2B
 	"""
+	import logging
+	logger = logging.getLogger(__name__)
+	
 	if not user or not user.is_authenticated:
+		logger.debug(f"can_access_b2b: User non authentifié - {user}")
 		return False
 	
 	# Seuls les store_managers peuvent accéder au B2B
 	if user.user_type != 'store_manager':
+		logger.debug(f"can_access_b2b: User type incorrect - {user.user_type}")
 		return False
 	
 	# Vérifier que le user a un store actif
@@ -30,25 +35,45 @@ def can_access_b2b(user):
 	store = Store.objects.filter(manager=user, is_active=True).first()
 	
 	if not store:
+		logger.debug(f"can_access_b2b: Aucun magasin actif trouvé pour user {user.id}")
 		return False
+	
+	logger.debug(f"can_access_b2b: Store trouvé - ID: {store.id}, is_b2b: {store.is_b2b}, is_b2c: {store.is_b2c}")
 	
 	# Vérifier le plan de souscription
-	# Seul le plan Business donne accès au B2B (approvisionnement)
 	from payments.subscription_check import SubscriptionChecker
+	from b2b.models import B2BSubscriptionPlan
 	plan = SubscriptionChecker.get_current_plan(store)
 	
-	if not plan or not plan.can_access_b2b:
+	if not plan:
+		logger.warning(f"can_access_b2b: Aucun plan trouvé pour store {store.id}")
 		return False
 	
+	# Si c'est un plan B2B, vérifier que ce n'est pas Free
+	if isinstance(plan, B2BSubscriptionPlan):
+		if plan.plan_type == 'free':
+			logger.debug(f"can_access_b2b: Plan B2B Free - accès refusé pour approvisionnement")
+			return False
+		logger.debug(f"can_access_b2b: Plan B2B {plan.name} (plan_type: {plan.plan_type}) - accès autorisé")
+		return True
+	
+	# Pour les plans B2C, vérifier can_access_b2b
+	logger.debug(f"can_access_b2b: Plan trouvé - {plan.name} (plan_type: {plan.plan_type}), can_access_b2b: {getattr(plan, 'can_access_b2b', False)}")
+	
+	if not getattr(plan, 'can_access_b2b', False):
+		logger.debug(f"can_access_b2b: Plan {plan.name} n'a pas can_access_b2b=True")
+		return False
+	
+	logger.debug(f"can_access_b2b: Accès B2B autorisé pour store {store.id}")
 	return True
 
 
 def can_purchase_from_wholesaler(buyer_store, wholesaler_store):
 	"""
-	Vérifie si un magasin B2C peut acheter d'un grossiste
+	Vérifie si un magasin peut acheter d'un grossiste
 	
 	Règles:
-	- Le magasin acheteur doit être B2C (is_b2c=True)
+	- Le magasin acheteur doit avoir le plan business (can_access_b2b)
 	- Le grossiste doit être B2B (is_b2b=True)
 	- Un grossiste ne peut pas s'acheter lui-même
 	- Le profil B2B du grossiste doit être actif
@@ -63,9 +88,23 @@ def can_purchase_from_wholesaler(buyer_store, wholesaler_store):
 	if not buyer_store or not wholesaler_store:
 		return False, "Magasin invalide"
 	
-	# Le magasin acheteur doit être B2C
-	if not buyer_store.is_b2c:
-		return False, "Votre magasin n'est pas configuré pour le B2C"
+	# Vérifier que le magasin acheteur a accès au B2B (plan business)
+	from payments.subscription_check import SubscriptionChecker
+	from b2b.models import B2BSubscriptionPlan
+	plan = SubscriptionChecker.get_current_plan(buyer_store)
+	
+	if not plan:
+		return False, "Un forfait Business est requis pour accéder au B2B"
+	
+	# Si le store est B2B (grossiste), autoriser l'accès
+	if buyer_store.is_b2b:
+		pass  # Autoriser
+	# Si c'est un plan B2B, autoriser l'accès
+	elif isinstance(plan, B2BSubscriptionPlan):
+		pass  # Autoriser
+	# Pour les plans B2C, vérifier can_access_b2b
+	elif not getattr(plan, 'can_access_b2b', False):
+		return False, "Un forfait Business est requis pour accéder au B2B"
 	
 	# Le grossiste doit être B2B
 	if not wholesaler_store.is_b2b:

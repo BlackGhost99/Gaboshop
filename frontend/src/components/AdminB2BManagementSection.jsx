@@ -68,9 +68,10 @@ const AdminB2BManagementSection = () => {
     try {
       if (activeSubTab === 'profiles') {
         // Load B2B stores and their profiles
+        // Include stores that have is_b2b=True OR have a B2B profile
         const storesRes = await getStoresListAdmin({ status: 'active' });
         if (storesRes?.success) {
-          const b2bStores = (storesRes.data || []).filter(s => s.is_b2b);
+          const b2bStores = (storesRes.data || []).filter(s => s.is_b2b || s.has_b2b_profile);
           const profilesWithData = await Promise.all(
             b2bStores.map(async (store) => {
               try {
@@ -90,10 +91,34 @@ const AdminB2BManagementSection = () => {
         const res = await getB2BCategories();
         if (res?.success) setB2bCategories(res.data || []);
       } else if (activeSubTab === 'pricing') {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:93',message:'loadData pricing tab entry',data:{activeSubTab,selectedStoreForPricing,b2bPricingsType:typeof b2bPricings,b2bPricingsIsArray:Array.isArray(b2bPricings),b2bPricingsValue:b2bPricings},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
+        // #endregion
         if (selectedStoreForPricing) {
           const res = await getB2BProductPricings(selectedStoreForPricing);
-          if (res?.success) setB2bPricings(res.data || []);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:96',message:'API response received',data:{resSuccess:res?.success,resDataType:typeof res?.data,resDataIsArray:Array.isArray(res?.data),resDataPricingsType:typeof res?.data?.pricings,resDataPricingsIsArray:Array.isArray(res?.data?.pricings),resDataKeys:res?.data?Object.keys(res.data):null,resData:res?.data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,E'})}).catch(()=>{});
+          // #endregion
+          // L'API retourne { success: true, data: { pricings: [...], products_without_pricing: [...] } }
+          if (res?.success) {
+            // S'assurer que res.data.pricings est un tableau
+            const pricings = Array.isArray(res.data?.pricings) 
+              ? res.data.pricings 
+              : (Array.isArray(res.data) ? res.data : []);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:102',message:'Before setB2bPricings',data:{pricingsType:typeof pricings,pricingsIsArray:Array.isArray(pricings),pricingsLength:pricings?.length,pricingsValue:pricings},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,E'})}).catch(()=>{});
+            // #endregion
+            setB2bPricings(pricings);
+          } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:104',message:'API success=false, setting empty array',data:{resError:res?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            setB2bPricings([]);
+          }
         } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:107',message:'No selectedStoreForPricing, setting empty array',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
           setB2bPricings([]);
         }
       } else if (activeSubTab === 'orders') {
@@ -101,6 +126,9 @@ const AdminB2BManagementSection = () => {
         if (res?.success) setB2bOrders(res.data || []);
       }
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:114',message:'Exception in loadData',data:{errorMessage:err?.message,errorStack:err?.stack,activeSubTab,b2bPricingsType:typeof b2bPricings,b2bPricingsIsArray:Array.isArray(b2bPricings),b2bPricingsValue:b2bPricings},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       setError(err?.message || 'Erreur lors du chargement');
     } finally {
       setLoading(false);
@@ -420,14 +448,23 @@ const AdminB2BManagementSection = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {b2bPricings.length === 0 ? (
+                  {(() => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:433',message:'Render check b2bPricings',data:{b2bPricingsType:typeof b2bPricings,b2bPricingsIsArray:Array.isArray(b2bPricings),b2bPricingsValue:b2bPricings,b2bPricingsLength:b2bPricings?.length,checkResult:!Array.isArray(b2bPricings) || b2bPricings.length === 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                    // #endregion
+                    return !Array.isArray(b2bPricings) || b2bPricings.length === 0;
+                  })() ? (
                     <tr>
                       <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
                         Aucun prix trouvé
                       </td>
                     </tr>
                   ) : (
-                    b2bPricings.map(pricing => (
+                    (() => {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminB2BManagementSection.jsx:440',message:'Before b2bPricings.map',data:{b2bPricingsType:typeof b2bPricings,b2bPricingsIsArray:Array.isArray(b2bPricings),b2bPricingsValue:b2bPricings,b2bPricingsLength:b2bPricings?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                      // #endregion
+                      return b2bPricings.map(pricing => (
                       <tr key={pricing.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {pricing.product_name || '—'}
@@ -478,7 +515,8 @@ const AdminB2BManagementSection = () => {
                           </button>
                         </td>
                       </tr>
-                    ))
+                    ));
+                    })()
                   )}
                 </tbody>
               </table>

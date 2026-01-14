@@ -66,8 +66,8 @@ const B2BStoreSubscriptionModal = ({ isOpen, onClose, subscription = null, onSuc
     try {
       const res = await getStoresListAdmin({ status: 'active' });
       if (res?.success) {
-        // Filter only B2B stores
-        setStores((res.data || []).filter(store => store.is_b2b));
+        // Filter only B2B stores (is_b2b=True OR has_b2b_profile)
+        setStores((res.data || []).filter(store => store.is_b2b || store.has_b2b_profile));
       }
     } catch (err) {
       console.error('Error loading stores:', err);
@@ -88,7 +88,7 @@ const B2BStoreSubscriptionModal = ({ isOpen, onClose, subscription = null, onSuc
       }
 
       if (res?.success) {
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(res.data); // Passer les données mises à jour
         onClose();
       } else {
         setError(res?.error || res?.errors || 'Erreur lors de l\'enregistrement');

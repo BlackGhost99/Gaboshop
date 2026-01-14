@@ -78,8 +78,10 @@ class RegisterSerializer(serializers.ModelSerializer):
     vehicle_type = serializers.ChoiceField(choices=VEHICLE_CHOICES, write_only=True, required=False)
     vehicle_plate = serializers.CharField(write_only=True, required=False, allow_blank=True)
     # GPS requis pour les livreurs
-    position_lat = serializers.DecimalField(write_only=True, required=False, max_digits=9, decimal_places=6)
-    position_lng = serializers.DecimalField(write_only=True, required=False, max_digits=9, decimal_places=6)
+    # max_digits=18 permet jusqu'à 18 chiffres au total (ex: 180.123456789012345 = 18 chiffres)
+    # decimal_places=15 permet jusqu'à 15 décimales pour la précision GPS
+    position_lat = serializers.DecimalField(write_only=True, required=False, allow_null=True, max_digits=18, decimal_places=15)
+    position_lng = serializers.DecimalField(write_only=True, required=False, allow_null=True, max_digits=18, decimal_places=15)
     
     class Meta:
         model = User
@@ -87,10 +89,17 @@ class RegisterSerializer(serializers.ModelSerializer):
             'phone', 'email', 'first_name', 'last_name', 'user_type',
             'password', 'password_confirm', 'address', 'city', 'zone',
             'store_name', 'store_category_id', 'store_phone', 'store_address', 'store_city', 'store_zone', 'store_min_order_amount',
-            'vehicle_type', 'vehicle_plate'
+            'vehicle_type', 'vehicle_plate', 'position_lat', 'position_lng'
         ]
     
     def validate(self, attrs):
+        # #region agent log
+        try:
+            with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_py','timestamp':int(time.time()*1000),'location':'users/serializers.py:93','message':'validate method entered','data':{'attrs_keys':list(attrs.keys()),'user_type':attrs.get('user_type'),'has_position_lat':'position_lat' in attrs,'position_lat':attrs.get('position_lat'),'has_position_lng':'position_lng' in attrs,'position_lng':attrs.get('position_lng'),'position_lat_type':type(attrs.get('position_lat')).__name__ if 'position_lat' in attrs else None},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'C'})+'\n')
+        except:pass
+        # #endregion
+        
         # Validation et normalisation du numéro de téléphone (comme Login)
         phone = attrs.get('phone', '').strip().replace(' ', '')
         
@@ -133,6 +142,13 @@ class RegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'store': _(f'Champs requis pour le magasin: {", ".join(missing)}')
                 })
+            # Remove GPS fields for non-delivery users
+            attrs.pop('position_lat', None)
+            attrs.pop('position_lng', None)
+        elif user_type == 'client':
+            # Remove GPS fields for non-delivery users
+            attrs.pop('position_lat', None)
+            attrs.pop('position_lng', None)
         if user_type == 'delivery_agent':
 
             if not attrs.get('vehicle_plate'):
@@ -142,21 +158,30 @@ class RegisterSerializer(serializers.ModelSerializer):
             if not attrs.get('vehicle_type'):
                 attrs['vehicle_type'] = 'moto'
             # GPS activation required at signup for delivery agents
-            if 'position_lat' not in attrs or 'position_lng' not in attrs:
+            position_lat = attrs.get('position_lat')
+            position_lng = attrs.get('position_lng')
+            if not position_lat or not position_lng:
                 log_debug_info(
-                    'users/serializers.py:131',
-                    'GPS validation failed - missing coordinates',
+                    'users/serializers.py:151',
+                    'GPS validation failed - missing or null coordinates',
                     {
                         'has_position_lat': 'position_lat' in attrs,
                         'has_position_lng': 'position_lng' in attrs,
-                        'position_lat': attrs.get('position_lat'),
-                        'position_lng': attrs.get('position_lng')
+                        'position_lat': position_lat,
+                        'position_lng': position_lng
                     },
                     'A'
                 )
                 raise serializers.ValidationError({
                     'gps': _('Les coordonnées GPS (position_lat, position_lng) sont requises pour l\'inscription des livreurs.')
                 })
+        
+        # #region agent log
+        try:
+            with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_py','timestamp':int(time.time()*1000),'location':'users/serializers.py:169','message':'validate method completed successfully','data':{'user_type':user_type,'attrs_keys_after':list(attrs.keys())},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'C'})+'\n')
+        except:pass
+        # #endregion
 
         # Optional email uniqueness check: avoid multiple accounts with same email
         email = attrs.get('email', '').strip() if attrs.get('email') else ''

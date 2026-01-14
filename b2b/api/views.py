@@ -37,6 +37,79 @@ from b2b.api.serializers import (
 	B2BCatalogProductSerializer,
 	B2BCatalogCategorySerializer,
 )
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def get_detailed_b2b_access_error(user):
+	"""
+	Retourne un message d'erreur détaillé pour l'accès B2B
+	
+	Args:
+		user: Instance de User
+		
+	Returns:
+		tuple: (bool, dict) - (autorisé, dict avec code et message d'erreur)
+	"""
+	if not user or not user.is_authenticated:
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': 'Authentification requise pour accéder au B2B'
+		}
+	
+	if user.user_type != 'store_manager':
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': 'Seuls les gérants de magasin peuvent accéder au B2B'
+		}
+	
+	store = Store.objects.filter(manager=user, is_active=True).first()
+	
+	if not store:
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': 'Aucun magasin actif trouvé pour votre compte'
+		}
+	
+	from payments.subscription_check import SubscriptionChecker
+	from b2b.models import B2BSubscriptionPlan
+	plan = SubscriptionChecker.get_current_plan(store)
+	
+	if not plan:
+		logger.warning(f"get_detailed_b2b_access_error: Aucun plan trouvé pour store {store.id}")
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': 'Aucun plan d\'abonnement trouvé. Un forfait Business est requis pour accéder au B2B.'
+		}
+	
+	# Si c'est un plan B2B, vérifier que ce n'est pas Free
+	if isinstance(plan, B2BSubscriptionPlan):
+		if plan.plan_type == 'free':
+			logger.warning(f"get_detailed_b2b_access_error: Plan B2B Free - accès refusé pour store {store.id}")
+			return False, {
+				'code': status.HTTP_403_FORBIDDEN,
+				'message': 'L\'approvisionnement B2B n\'est pas disponible avec le plan Free. Passez au plan Pro ou Business pour accéder aux catalogues des grossistes.'
+			}
+		logger.debug(f"get_detailed_b2b_access_error: Plan B2B {plan.name} (plan_type: {plan.plan_type}) - accès autorisé")
+		return True, None
+	
+	# Pour les plans B2C, vérifier can_access_b2b
+	if not getattr(plan, 'can_access_b2b', False):
+		logger.warning(f"get_detailed_b2b_access_error: Plan {plan.name} (plan_type: {plan.plan_type}) n'a pas can_access_b2b=True pour store {store.id}")
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': f'Votre forfait actuel ({plan.name}) ne permet pas l\'accès au B2B. Un forfait Business est requis.'
+		}
+	
+	# Vérification finale avec can_access_b2b
+	if not can_access_b2b(user):
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
+		}
+	
+	return True, None
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -73,9 +146,10 @@ class WholesalerListView(ListAPIView):
 			return Store.objects.none()
 		
 		# Récupérer le magasin du gérant connecté
+		# Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
+		# On accepte tous les magasins actifs du manager, pas seulement ceux avec is_b2c=True
 		buyer_store = Store.objects.filter(
 			manager=user,
-			is_b2c=True,
 			is_active=True
 		).first()
 		
@@ -83,14 +157,15 @@ class WholesalerListView(ListAPIView):
 	
 	def list(self, request, *args, **kwargs):
 		"""Liste des grossistes avec vérification des permissions"""
-		if not can_access_b2b(request.user):
+		user = request.user
+		
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
 			return Response({
 				'success': False,
-				'error': {
-					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
-				}
-			}, status=status.HTTP_403_FORBIDDEN)
+				'error': error
+			}, status=error['code'])
 		
 		queryset = self.get_queryset()
 		serializer = self.get_serializer(queryset, many=True)
@@ -114,17 +189,22 @@ class WholesalerDetailView(RetrieveAPIView):
 		wholesaler_id = self.kwargs['id']
 		user = self.request.user
 		
-		# Vérifier les permissions
-		if not can_access_b2b(user):
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
 			from rest_framework.exceptions import PermissionDenied
-			raise PermissionDenied("Vous n'êtes pas autorisé à accéder au B2B")
+			raise PermissionDenied(error['message'])
 		
 		# Récupérer le magasin du gérant connecté
+		# Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
 		buyer_store = Store.objects.filter(
 			manager=user,
-			is_b2c=True,
 			is_active=True
 		).first()
+		
+		if not buyer_store:
+			from rest_framework.exceptions import PermissionDenied
+			raise PermissionDenied("Aucun magasin actif trouvé")
 		
 		wholesaler = get_object_or_404(Store, id=wholesaler_id, is_b2b=True, is_active=True)
 		
@@ -168,22 +248,29 @@ class WholesalerProductsView(ListAPIView):
 		wholesaler_id = self.kwargs['id']
 		user = request.user
 		
-		# Vérifier les permissions
-		if not can_access_b2b(user):
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
+			return Response({
+				'success': False,
+				'error': error
+			}, status=error['code'])
+		
+		# Récupérer le magasin du gérant connecté
+		# Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
+		buyer_store = Store.objects.filter(
+			manager=user,
+			is_active=True
+		).first()
+		
+		if not buyer_store:
 			return Response({
 				'success': False,
 				'error': {
-					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
+					'code': status.HTTP_404_NOT_FOUND,
+					'message': 'Aucun magasin actif trouvé'
 				}
-			}, status=status.HTTP_403_FORBIDDEN)
-		
-		# Récupérer le magasin du gérant connecté
-		buyer_store = Store.objects.filter(
-			manager=user,
-			is_b2c=True,
-			is_active=True
-		).first()
+			}, status=status.HTTP_404_NOT_FOUND)
 		
 		# Vérifier que le grossiste existe et est accessible
 		try:
@@ -244,15 +331,13 @@ class WholesalerCategoriesView(ListAPIView):
 		wholesaler_id = self.kwargs['id']
 		user = request.user
 		
-		# Vérifier les permissions
-		if not can_access_b2b(user):
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
 			return Response({
 				'success': False,
-				'error': {
-					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
-				}
-			}, status=status.HTTP_403_FORBIDDEN)
+				'error': error
+			}, status=error['code'])
 		
 		categories = get_b2b_categories(wholesaler_id)
 		serializer = self.get_serializer(categories, many=True)
@@ -280,22 +365,29 @@ class WholesalerCatalogView(APIView):
 		user = request.user
 		wholesaler_id = id
 		
-		# Vérifier les permissions
-		if not can_access_b2b(user):
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
+			return Response({
+				'success': False,
+				'error': error
+			}, status=error['code'])
+		
+		# Récupérer le magasin du gérant connecté
+		# Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
+		buyer_store = Store.objects.filter(
+			manager=user,
+			is_active=True
+		).first()
+		
+		if not buyer_store:
 			return Response({
 				'success': False,
 				'error': {
-					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
+					'code': status.HTTP_404_NOT_FOUND,
+					'message': 'Aucun magasin actif trouvé'
 				}
-			}, status=status.HTTP_403_FORBIDDEN)
-		
-		# Récupérer le magasin du gérant connecté
-		buyer_store = Store.objects.filter(
-			manager=user,
-			is_b2c=True,
-			is_active=True
-		).first()
+			}, status=status.HTTP_404_NOT_FOUND)
 		
 		# Récupérer le grossiste
 		try:
@@ -396,20 +488,18 @@ class B2BOrderCreateView(APIView):
 		"""Créer une commande B2B"""
 		user = request.user
 		
-		# Vérifier les permissions
-		if not can_access_b2b(user):
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
 			return Response({
 				'success': False,
-				'error': {
-					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
-				}
-			}, status=status.HTTP_403_FORBIDDEN)
+				'error': error
+			}, status=error['code'])
 		
 		# Récupérer le magasin du gérant connecté
+		# Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
 		buyer_store = Store.objects.filter(
 			manager=user,
-			is_b2c=True,
 			is_active=True
 		).first()
 		
@@ -418,7 +508,7 @@ class B2BOrderCreateView(APIView):
 				'success': False,
 				'error': {
 					'code': status.HTTP_404_NOT_FOUND,
-					'message': 'Aucun magasin B2C trouvé pour votre compte'
+					'message': 'Aucun magasin actif trouvé pour votre compte'
 				}
 			}, status=status.HTTP_404_NOT_FOUND)
 		
@@ -549,9 +639,9 @@ class MyB2BOrdersView(ListAPIView):
 			return Order.objects.none()
 		
 		# Récupérer le magasin du gérant connecté
+		# Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
 		buyer_store = Store.objects.filter(
 			manager=user,
-			is_b2c=True,
 			is_active=True
 		).first()
 		
@@ -566,14 +656,15 @@ class MyB2BOrdersView(ListAPIView):
 	
 	def list(self, request, *args, **kwargs):
 		"""Liste des commandes B2B"""
-		if not can_access_b2b(request.user):
+		user = request.user
+		
+		# Vérifier les permissions avec message détaillé
+		has_access, error = get_detailed_b2b_access_error(user)
+		if not has_access:
 			return Response({
 				'success': False,
-				'error': {
-					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Vous n\'êtes pas autorisé à accéder au B2B'
-				}
-			}, status=status.HTTP_403_FORBIDDEN)
+				'error': error
+			}, status=error['code'])
 		
 		queryset = self.get_queryset()
 		serializer = self.get_serializer(queryset, many=True)

@@ -170,23 +170,56 @@ class StoreDashboardView(APIView):
             })
 
         # Forfait / abonnement actif
+        # Vérifier d'abord les abonnements B2B pour les magasins B2B
         from payments.subscription_check import SubscriptionChecker
-        active_subscription = StoreSubscription.objects.filter(store=store, status='active').order_by('-end_date').first()
+        from b2b.models.subscription import B2BStoreSubscription
+
         subscription_payload = None
-        if active_subscription:
-            days_until_expiry = SubscriptionChecker.get_days_until_expiry(store)
-            plan_type = active_subscription.plan.plan_type if active_subscription.plan else 'free'
-            subscription_payload = {
-                'plan_name': active_subscription.plan_name,
-                'plan_type': plan_type,
-                'status': active_subscription.status,
-                'end_date': active_subscription.end_date,
-                'auto_renew': active_subscription.auto_renew,
-                'monthly_fee': active_subscription.monthly_fee,
-                'days_until_expiry': days_until_expiry,
-            }
-        else:
-            # Pas de souscription active, probablement Free par défaut
+        active_subscription = None
+
+        # Si le store est B2B, vérifier l'abonnement B2B en priorité
+        if store.is_b2b:
+            try:
+                b2b_subscription = B2BStoreSubscription.objects.get(
+                    store=store,
+                    status='active'
+                )
+                # Vérifier si l'abonnement n'est pas expiré
+                if b2b_subscription.is_active():
+                    active_subscription = b2b_subscription
+                    days_until_expiry = b2b_subscription.get_remaining_days()
+                    # Récupérer le plan_type depuis le plan B2B si disponible
+                    plan_type = b2b_subscription.plan.plan_type if b2b_subscription.plan else 'b2b_business'
+                    subscription_payload = {
+                        'plan_name': b2b_subscription.plan_name,
+                        'plan_type': plan_type,
+                        'status': b2b_subscription.status,
+                        'end_date': b2b_subscription.end_date.isoformat() if b2b_subscription.end_date else None,
+                        'auto_renew': b2b_subscription.auto_renew,
+                        'monthly_fee': float(b2b_subscription.monthly_fee),
+                        'days_until_expiry': days_until_expiry,
+                    }
+            except B2BStoreSubscription.DoesNotExist:
+                pass
+
+        # Si pas d'abonnement B2B trouvé, vérifier les abonnements B2C
+        if not active_subscription:
+            active_subscription = StoreSubscription.objects.filter(store=store, status='active').order_by('-end_date').first()
+            if active_subscription:
+                days_until_expiry = SubscriptionChecker.get_days_until_expiry(store)
+                plan_type = active_subscription.plan.plan_type if active_subscription.plan else 'free'
+                subscription_payload = {
+                    'plan_name': active_subscription.plan_name,
+                    'plan_type': plan_type,
+                    'status': active_subscription.status,
+                    'end_date': active_subscription.end_date.isoformat() if active_subscription.end_date else None,
+                    'auto_renew': active_subscription.auto_renew,
+                    'monthly_fee': float(active_subscription.monthly_fee),
+                    'days_until_expiry': days_until_expiry,
+                }
+
+        # Si aucun abonnement trouvé, utiliser le plan Free par défaut
+        if not subscription_payload:
             subscription_payload = {
                 'plan_name': 'Free',
                 'plan_type': 'free',
@@ -243,6 +276,33 @@ class StoreDashboardView(APIView):
 
         category_breakdown_daily = compute_category_breakdown(daily_orders)
         category_breakdown_monthly = compute_category_breakdown(monthly_orders_qs)
+
+        # Calculer les limites du plan pour les produits
+        plan = store.get_current_plan()
+        current_products = store.products.count()
+        
+        # Gérer les deux types de plans : B2B (max_b2b_products) et B2C (max_products)
+        from b2b.models.subscription import B2BSubscriptionPlan
+        if plan and isinstance(plan, B2BSubscriptionPlan):
+            max_products = getattr(plan, 'max_b2b_products', None)
+        else:
+            max_products = getattr(plan, 'max_products', None) if plan else None
+        
+        # Ajouter les informations de limites à subscription_payload
+        if subscription_payload:
+            subscription_payload['limits'] = {
+                'products': {
+                    'current': current_products,
+                    'max': max_products,
+                    'can_add_more': max_products is None or current_products < max_products,
+                    'message': f"Vous avez {current_products}/{max_products if max_products else '∞'} produits" if max_products else "Produits illimités",
+                }
+            }
+            subscription_payload['features'] = {
+                'max_products': max_products,
+                'current_products': current_products,
+                'can_add_more_products': max_products is None or current_products < max_products,
+            }
 
         return Response({
             'success': True,

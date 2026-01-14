@@ -56,10 +56,13 @@ const Register = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        // Round to 12 decimal places for GPS precision (~0.1mm) while staying within backend limits
+        const roundedLat = Number(latitude.toFixed(12));
+        const roundedLng = Number(longitude.toFixed(12));
         setForm((prev) => ({
           ...prev,
-          position_lat: latitude,
-          position_lng: longitude,
+          position_lat: roundedLat,
+          position_lng: roundedLng,
         }));
         setGpsLoading(false);
       },
@@ -93,17 +96,23 @@ const Register = () => {
       if (!isDelivery) {
         delete payload.vehicle_type;
         delete payload.vehicle_plate;
+        delete payload.position_lat;
+        delete payload.position_lng;
       }
 
       //#region agent log
-      fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:58',message:'Payload after cleanup, about to send to API',data:{payload:payload,user_type:form.user_type,is_delivery_agent:form.user_type==='delivery_agent',has_gps_fields:'position_lat' in payload && 'position_lng' in payload,position_lat:payload.position_lat,position_lng:payload.position_lng},timestamp:Date.now(),sessionId:'debug-session',runId:'initial-test',hypothesisId:'A'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:93','message':'Payload after cleanup, about to send to API','data':{'payload':payload,'user_type':form.user_type,'is_delivery_agent':form.user_type==='delivery_agent','has_gps_fields':'position_lat' in payload && 'position_lng' in payload,'position_lat':payload.position_lat,'position_lng':payload.position_lng,'payload_keys':Object.keys(payload)},'timestamp':Date.now(),'sessionId':'debug-session','runId':'initial-test','hypothesisId':'A'})}).catch(()=>{});
       //#endregion
 
       //#region agent log
-      fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:57',message:'About to call register API',data:{payload:payload,user_type:form.user_type,is_delivery_agent:form.user_type==='delivery_agent',has_gps_fields:'position_lat' in payload},timestamp:Date.now(),sessionId:'debug-session',runId:'initial-test',hypothesisId:'A'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:106','message':'About to call register API','data':{'payload':payload,'user_type':form.user_type},'timestamp':Date.now(),'sessionId':'debug-session','runId':'initial-test','hypothesisId':'B'})}).catch(()=>{});
       //#endregion
 
       const res = await register(payload);
+      
+      //#region agent log
+      fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:110','message':'Register API response received','data':{'success':res.success,'has_error':!!res.error,'error_message':res.error?.message,'error_details':res.error?.details},'timestamp':Date.now(),'sessionId':'debug-session','runId':'initial-test','hypothesisId':'C'})}).catch(()=>{});
+      //#endregion
       if (res.success && res.data?.tokens) {
         sessionStorage.setItem('token', res.data.tokens.access);
         sessionStorage.setItem('refresh_token', res.data.tokens.refresh);
@@ -118,6 +127,9 @@ const Register = () => {
         setError(res.error?.message || 'Inscription impossible.');
       }
     } catch (err) {
+      //#region agent log
+      fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Register.jsx:120','message':'Register API exception caught','data':{'error':err?.error,'error_message':err?.error?.message,'error_details':err?.error?.details,'error_code':err?.error?.code,'response_data':err?.response?.data},'timestamp':Date.now(),'sessionId':'debug-session','runId':'initial-test','hypothesisId':'D'})}).catch(()=>{});
+      //#endregion
       const msg = err?.error?.details ? JSON.stringify(err.error.details) : err?.error?.message || 'Erreur inscription';
       setError(msg);
     } finally {

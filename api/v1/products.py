@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
+from django.core.exceptions import PermissionDenied
 
 from products.models import Product, ProductCategory
 from products.serializers import (
@@ -14,6 +15,7 @@ from products.serializers import (
     ProductUpdateSerializer
 )
 from stores.models import Store
+from api.v1.admin import IsPlatformAdmin
 
 # Default templates per StoreCategory.name used as fallback suggestions
 DEFAULT_CATEGORY_TEMPLATES = {
@@ -170,6 +172,19 @@ class ProductCreateView(APIView):
                 }
             }, status=status.HTTP_403_FORBIDDEN)
 
+        # Vérifier les limites du forfait (scalable - vérifie en temps réel)
+        from payments.subscription_check import SubscriptionChecker
+        try:
+            SubscriptionChecker.check_can_add_product(store)
+        except PermissionDenied as e:
+            return Response({
+                'success': False,
+                'error': {
+                    'code': status.HTTP_403_FORBIDDEN,
+                    'message': str(e)
+                }
+            }, status=status.HTTP_403_FORBIDDEN)
+
         serializer = ProductCreateSerializer(
             data=request.data,
             context={'request': request}
@@ -240,13 +255,80 @@ class ProductDeleteView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def delete(self, request, pk):
+        # #region agent log
+        import json, time
+        try:
+            log_data = json.dumps({
+                'location': 'api/v1/products.py:243',
+                'message': 'ProductDeleteView.delete entry',
+                'data': {
+                    'product_id': pk,
+                    'user_id': request.user.id if request.user else None,
+                    'user_type': request.user.user_type if request.user else None,
+                    'username': request.user.username if request.user else None,
+                    'is_authenticated': request.user.is_authenticated if request.user else False
+                },
+                'timestamp': int(time.time() * 1000),
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'A,B,C'
+            })
+            with open('c:\\Users\\Admin\\source\\repos\\BlackGhost99\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+                f.write(log_data + '\n')
+        except: pass
+        # #endregion
+        
         # Vérifier que l'utilisateur est le gérant du magasin du produit
         try:
             product = Product.objects.get(
                 id=pk, 
                 store__manager=request.user
             )
+            # #region agent log
+            try:
+                import json, time
+                log_data = json.dumps({
+                    'location': 'api/v1/products.py:250',
+                    'message': 'Product found',
+                    'data': {
+                        'product_id': product.id,
+                        'product_name': product.name,
+                        'store_id': product.store.id,
+                        'store_name': product.store.name,
+                        'store_manager_id': product.store.manager.id if product.store.manager else None
+                    },
+                    'timestamp': int(time.time() * 1000),
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'A'
+                })
+                with open('c:\\Users\\Admin\\source\\repos\\BlackGhost99\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(log_data + '\n')
+            except: pass
+            # #endregion
         except Product.DoesNotExist:
+            # #region agent log
+            try:
+                import json, time
+                log_data = json.dumps({
+                    'location': 'api/v1/products.py:257',
+                    'message': 'Product not found or not authorized',
+                    'data': {
+                        'product_id': pk,
+                        'user_id': request.user.id if request.user else None,
+                        'user_type': request.user.user_type if request.user else None,
+                        'product_exists': Product.objects.filter(id=pk).exists(),
+                        'all_products_for_user': list(Product.objects.filter(store__manager=request.user).values_list('id', flat=True)) if request.user else []
+                    },
+                    'timestamp': int(time.time() * 1000),
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'B'
+                })
+                with open('c:\\Users\\Admin\\source\\repos\\BlackGhost99\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(log_data + '\n')
+            except: pass
+            # #endregion
             return Response({
                 'success': False,
                 'error': {
@@ -255,12 +337,94 @@ class ProductDeleteView(APIView):
                 }
             }, status=status.HTTP_403_FORBIDDEN)
 
-        product.delete()
-
-        return Response({
-            'success': True,
-            'message': 'Produit supprimé avec succès.'
-        }, status=status.HTTP_200_OK)
+        # Vérifier si le produit a des commandes associées
+        from orders.models import OrderItem
+        from django.db.models import ProtectedError
+        
+        has_orders = OrderItem.objects.filter(product=product).exists()
+        
+        if has_orders:
+            # Soft delete : désactiver le produit au lieu de le supprimer
+            product.is_available = False
+            product.save()
+            return Response({
+                'success': True,
+                'message': 'Produit désactivé avec succès (le produit ne peut pas être supprimé car il a des commandes associées).'
+            }, status=status.HTTP_200_OK)
+        
+        # Hard delete : supprimer le produit s'il n'a pas de commandes
+        try:
+            product.delete()
+            # #region agent log
+            try:
+                import json, time
+                log_data = json.dumps({
+                    'location': 'api/v1/products.py:276',
+                    'message': 'Product deleted successfully',
+                    'data': {'product_id': pk},
+                    'timestamp': int(time.time() * 1000),
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'A'
+                })
+                with open('c:\\Users\\Admin\\source\\repos\\BlackGhost99\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(log_data + '\n')
+            except: pass
+            # #endregion
+            return Response({
+                'success': True,
+                'message': 'Produit supprimé avec succès.'
+            }, status=status.HTTP_200_OK)
+        except ProtectedError as e:
+            # #region agent log
+            try:
+                import json, time
+                log_data = json.dumps({
+                    'location': 'api/v1/products.py:282',
+                    'message': 'ProtectedError during delete',
+                    'data': {'product_id': pk, 'error': str(e)},
+                    'timestamp': int(time.time() * 1000),
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'C'
+                })
+                with open('c:\\Users\\Admin\\source\\repos\\BlackGhost99\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(log_data + '\n')
+            except: pass
+            # #endregion
+            # Si une autre relation protège le produit
+            return Response({
+                'success': False,
+                'error': {
+                    'code': status.HTTP_400_BAD_REQUEST,
+                    'message': 'Ce produit ne peut pas être supprimé car il est utilisé dans d\'autres enregistrements. Il a été désactivé à la place.'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # #region agent log
+            try:
+                import json, time, traceback
+                log_data = json.dumps({
+                    'location': 'api/v1/products.py:290',
+                    'message': 'Exception during delete',
+                    'data': {'product_id': pk, 'error_type': type(e).__name__, 'error_message': str(e), 'error_traceback': traceback.format_exc()},
+                    'timestamp': int(time.time() * 1000),
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'D'
+                })
+                with open('c:\\Users\\Admin\\source\\repos\\BlackGhost99\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(log_data + '\n')
+            except: pass
+            # #endregion
+            # Gérer toute autre exception
+            return Response({
+                'success': False,
+                'error': {
+                    'code': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    'message': f'Erreur lors de la suppression du produit : {str(e)}'
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class StoreProductCategoryListView(ListAPIView):
     """
@@ -314,20 +478,22 @@ class StoreProductCategoryListView(ListAPIView):
 class StoreProductCategoryCreateView(APIView):
     """
     Création d'une catégorie de produit pour un magasin
+    RÉSERVÉ UNIQUEMENT À L'ADMIN - Les stores ne peuvent plus créer de catégories
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsPlatformAdmin]
 
     def post(self, request, store_id):
+        # Seul l'admin peut créer des catégories
         try:
-            store = Store.objects.get(id=store_id, manager=request.user)
+            store = Store.objects.get(id=store_id)
         except Store.DoesNotExist:
             return Response({
                 'success': False, 
                 'error': {
-                    'code': status.HTTP_403_FORBIDDEN,
-                    'message': 'Vous n\'êtes pas autorisé à ajouter des catégories à ce magasin.'
+                    'code': status.HTTP_404_NOT_FOUND,
+                    'message': 'Magasin non trouvé.'
                 }
-            }, status=status.HTTP_403_FORBIDDEN)
+            }, status=status.HTTP_404_NOT_FOUND)
         
         serializer = ProductCategorySerializer(data=request.data)
         if serializer.is_valid():

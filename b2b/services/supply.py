@@ -37,7 +37,31 @@ def get_available_wholesalers(buyer_store=None):
 	# Pour l'instant, on retourne tous les profils visible_to_all=True
 	# ou ceux accessibles au magasin acheteur
 	
-	return queryset.order_by('name')
+	# Trier par priorité du plan B2B (catalog_priority desc, puis featured_in_catalog desc, puis name)
+	# Joindre B2BStoreSubscription et B2BSubscriptionPlan pour accéder aux champs de priorité
+	from b2b.models import B2BStoreSubscription, B2BSubscriptionPlan
+	from django.db.models import Case, When, Value, IntegerField, BooleanField
+	
+	queryset = queryset.select_related('b2b_subscription', 'b2b_subscription__plan')
+	
+	# Annoter avec catalog_priority et featured_in_catalog depuis le plan B2B
+	queryset = queryset.annotate(
+		catalog_priority_value=Case(
+			When(b2b_subscription__plan__catalog_priority__isnull=False,
+				 then='b2b_subscription__plan__catalog_priority'),
+			default=Value(0),
+			output_field=IntegerField()
+		),
+		featured_value=Case(
+			When(b2b_subscription__plan__featured_in_catalog=True,
+				 then=Value(1)),
+			default=Value(0),
+			output_field=IntegerField()
+		)
+	)
+	
+	# Trier par priorité décroissante, puis featured décroissant, puis nom
+	return queryset.order_by('-catalog_priority_value', '-featured_value', 'name')
 
 
 def get_b2b_products(wholesaler_id, category_id=None, search=None):

@@ -38,20 +38,13 @@ class SubscriptionChecker:
     def get_current_plan(store):
         """
         Récupère le plan ACTUEL du magasin
+        Gère à la fois les plans B2C (SubscriptionPlan) et B2B (B2BSubscriptionPlan)
         
         Returns:
-            SubscriptionPlan ou le plan par défaut (Starter)
+            SubscriptionPlan, B2BSubscriptionPlan ou le plan par défaut (Free)
         """
-        subscription = SubscriptionChecker.get_active_subscription(store)
-        
-        if subscription and subscription.plan:
-            return subscription.plan
-        
-        # Plan par défaut: Starter
-        try:
-            return SubscriptionPlan.objects.get(plan_type='starter')
-        except SubscriptionPlan.DoesNotExist:
-            return None
+        # Utiliser la méthode du modèle Store qui gère correctement B2B et B2C
+        return store.get_current_plan()
     
     @staticmethod
     def is_subscription_active(store):
@@ -106,15 +99,35 @@ class SubscriptionChecker:
         if not plan:
             raise PermissionDenied("Aucun forfait trouvé. Veuillez vous abonner.")
         
-        # Si max_products est None → illimité
-        if plan.max_products is not None:
-            product_count = store.products.count()
-            if product_count >= plan.max_products:
-                raise PermissionDenied(
-                    f"Votre forfait {plan.name} ne permet que {plan.max_products} produits. "
-                    f"Vous en avez déjà {product_count}. "
-                    f"Passez à un forfait supérieur pour ajouter plus de produits."
-                )
+        # Vérifier si c'est un plan B2B ou B2C
+        from b2b.models import B2BSubscriptionPlan
+        is_b2b_plan = isinstance(plan, B2BSubscriptionPlan)
+        
+        if is_b2b_plan:
+            # Pour les stores B2B, vérifier max_b2b_products
+            # IMPORTANT: Compter TOUS les produits du store B2B, pas seulement ceux avec prix B2B
+            # Car un store B2B peut créer des produits sans prix B2B, et ils comptent dans la limite
+            max_products = getattr(plan, 'max_b2b_products', None)
+            if max_products is not None:
+                # Compter TOUS les produits du store (scalable et logique)
+                total_product_count = store.products.count()
+                
+                if total_product_count >= max_products:
+                    raise PermissionDenied(
+                        f"Votre forfait {plan.name} ne permet que {max_products} produit{'s' if max_products > 1 else ''} B2B. "
+                        f"Vous en avez déjà {total_product_count}. "
+                        f"Passez à un forfait supérieur pour ajouter plus de produits."
+                    )
+        else:
+            # Pour les stores B2C, vérifier max_products
+            if plan.max_products is not None:
+                product_count = store.products.count()
+                if product_count >= plan.max_products:
+                    raise PermissionDenied(
+                        f"Votre forfait {plan.name} ne permet que {plan.max_products} produits. "
+                        f"Vous en avez déjà {product_count}. "
+                        f"Passez à un forfait supérieur pour ajouter plus de produits."
+                    )
     
     @staticmethod
     def check_can_access_statistics(store):

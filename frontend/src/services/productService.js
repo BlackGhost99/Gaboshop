@@ -47,8 +47,21 @@ export const updateProduct = async (productId, productData) => {
 };
 
 export const deleteProduct = async (productId) => {
-    const response = await api.delete(`/products/${productId}/delete/`);
-    return response.data;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'productService.js:49',message:'deleteProduct API call',data:{productId,url:`/products/${productId}/delete/`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    try {
+        const response = await api.delete(`/products/${productId}/delete/`);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'productService.js:52',message:'deleteProduct API success',data:{productId,status:response.status,data:response.data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        return response.data;
+    } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'productService.js:56',message:'deleteProduct API error',data:{productId,errorStatus:error?.response?.status,errorData:error?.response?.data,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C,D'})}).catch(()=>{});
+        // #endregion
+        throw error;
+    }
 };
 
 export const getStoreCategories = async (storeId) => {

@@ -4,16 +4,42 @@ import logging
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from delivery.models import Delivery
+from delivery.models import Delivery, VehicleType, CityDistance, DeliveryZone
 from delivery.serializers import (
 	DeliverySerializer, DeliveryAssignSerializer,
-	DeliveryStatusUpdateSerializer, DeliveryConfirmSerializer
+	DeliveryStatusUpdateSerializer, DeliveryConfirmSerializer,
+	VehicleTypeSerializer, DeliveryCalculatePriceSerializer,
+	DeliveryCalculatePriceResponseSerializer, DeliveryValidateVehicleSerializer,
+	DeliveryValidateVehicleResponseSerializer, DeliveryZoneSerializer
 )
+from delivery.services import (
+	DeliveryRulesService, DeliveryPricingService, DeliveryAssignmentService
+)
+# Importer DeliveryService depuis le fichier services.py (pas le package)
+# Utiliser importlib pour charger le fichier directement
+import sys
+import importlib.util
+import os
+
+# Chemin absolu vers le fichier services.py
+delivery_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'delivery')
+services_file_path = os.path.abspath(os.path.join(delivery_dir, 'services.py'))
+
+# Charger le fichier services.py comme module séparé
+spec = importlib.util.spec_from_file_location("delivery_services_file_module", services_file_path)
+delivery_services_file_module = importlib.util.module_from_spec(spec)
+sys.modules["delivery_services_file_module"] = delivery_services_file_module
+spec.loader.exec_module(delivery_services_file_module)
+
+# Extraire DeliveryService et auto_assign_delivery du fichier
+DeliveryService = delivery_services_file_module.DeliveryService
+auto_assign_delivery = delivery_services_file_module.auto_assign_delivery
+
 from orders.models import Order
 from core.validators import (
 	is_valid_delivery_transition, 
@@ -24,7 +50,6 @@ from core.validators import (
 from core.models import AuditLog
 from django.db import transaction
 from notifications.service import NotificationService
-from delivery.services import auto_assign_delivery
 
 class DeliveryProfileUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1201,3 +1226,186 @@ class DeliveryCompleteView(APIView):
 				'success': False,
 				'error': str(e)
 			}, status=status.HTTP_400_BAD_REQUEST)
+
+# Vehicle Types Endpoints
+
+
+class VehicleTypeListView(ListAPIView):
+	"""Liste des types de véhicules actifs"""
+	permission_classes = [permissions.IsAuthenticated]
+	serializer_class = VehicleTypeSerializer
+	
+	def get_queryset(self):
+		return VehicleType.objects.filter(is_active=True).order_by('max_weight_kg')
+	
+	def list(self, request, *args, **kwargs):
+		queryset = self.filter_queryset(self.get_queryset())
+		serializer = self.get_serializer(queryset, many=True)
+		return Response({
+			'success': True,
+			'data': serializer.data
+		})
+
+
+class VehicleTypeDetailView(APIView):
+	"""Détails d'un type de véhicule"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def get(self, request, vehicle_type_id):
+		try:
+			vehicle_type = VehicleType.objects.get(id=vehicle_type_id, is_active=True)
+			serializer = VehicleTypeSerializer(vehicle_type)
+			return Response({
+				'success': True,
+				'data': serializer.data
+			})
+		except VehicleType.DoesNotExist:
+			return Response({
+				'success': False,
+				'error': 'Type de véhicule introuvable'
+			}, status=status.HTTP_404_NOT_FOUND)
+
+
+class DeliveryCalculatePriceView(APIView):
+	"""Calcule le prix de livraison pour une commande et un type de véhicule"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def post(self, request):
+		serializer = DeliveryCalculatePriceSerializer(data=request.data)
+		
+		if not serializer.is_valid():
+			return Response({
+				'success': False,
+				'error': {
+					'code': status.HTTP_400_BAD_REQUEST,
+					'message': 'Données invalides',
+					'details': serializer.errors
+				}
+			}, status=status.HTTP_400_BAD_REQUEST)
+		
+		try:
+			order = serializer.validated_data['order']
+			vehicle_type = serializer.validated_data['vehicle_type']
+			distance_km = serializer.validated_data.get('distance_km')
+			
+			price = DeliveryPricingService.calculate_delivery_price(order, vehicle_type, distance_km)
+			is_intercity = DeliveryRulesService.is_intercity_delivery(order)
+			
+			if distance_km is None:
+				distance_km = DeliveryPricingService.estimate_distance(order.store, order)
+			
+			response_data = {
+				'price': price,
+				'vehicle_type': VehicleTypeSerializer(vehicle_type).data,
+				'is_intra_city': not is_intercity,
+				'distance_km': distance_km
+			}
+			
+			return Response({'success': True, 'data': response_data})
+			
+		except Exception as e:
+			logger.error(f"Erreur calcul prix livraison: {e}")
+			return Response({
+				'success': False,
+				'error': {'code': status.HTTP_500_INTERNAL_SERVER_ERROR, 'message': f'Erreur: {str(e)}'}
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeliveryValidateVehicleView(APIView):
+	"""Valide le choix d'un véhicule pour une commande"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def post(self, request):
+		serializer = DeliveryValidateVehicleSerializer(data=request.data)
+		
+		if not serializer.is_valid():
+			return Response({
+				'success': False,
+				'error': {'code': status.HTTP_400_BAD_REQUEST, 'message': 'Données invalides', 'details': serializer.errors}
+			}, status=status.HTTP_400_BAD_REQUEST)
+		
+		try:
+			order = serializer.validated_data['order']
+			vehicle_type = serializer.validated_data['vehicle_type']
+			is_valid, error_message, minimum_required = DeliveryRulesService.validate_vehicle_selection(order, vehicle_type)
+			
+			response_data = {
+				'is_valid': is_valid,
+				'error_message': error_message,
+				'minimum_required_vehicle_type': VehicleTypeSerializer(minimum_required).data if minimum_required else None
+			}
+			
+			return Response({'success': True, 'data': response_data})
+			
+		except Exception as e:
+			logger.error(f"Erreur validation véhicule: {e}")
+			return Response({
+				'success': False,
+				'error': {'code': status.HTTP_500_INTERNAL_SERVER_ERROR, 'message': f'Erreur: {str(e)}'}
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class EligibleVehiclesView(APIView):
+	"""Retourne la liste des véhicules éligibles pour une commande"""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	def get(self, request, order_id):
+		try:
+			order = Order.objects.get(id=order_id)
+			
+			if not (request.user.is_admin() or (request.user.is_client() and order.client == request.user) or (request.user.is_store_manager() and order.store.manager == request.user)):
+				return Response({'success': False, 'error': 'Non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+			
+			minimum_required = DeliveryRulesService.calculate_minimum_vehicle_type(order)
+			if not minimum_required:
+				return Response({'success': False, 'error': 'Aucun véhicule ne peut livrer cette commande'}, status=status.HTTP_400_BAD_REQUEST)
+			
+			eligible_vehicles = DeliveryRulesService.get_eligible_vehicle_types(order)
+			recommended_vehicle = minimum_required
+			
+			response_data = {
+				'minimum_required': VehicleTypeSerializer(minimum_required).data,
+				'eligible_vehicles': [VehicleTypeSerializer(vt).data for vt in eligible_vehicles],
+				'recommended_vehicle': VehicleTypeSerializer(recommended_vehicle).data
+			}
+			
+			return Response({'success': True, 'data': response_data})
+			
+		except Order.DoesNotExist:
+			return Response({'success': False, 'error': 'Commande introuvable'}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			logger.error(f"Erreur récupération véhicules éligibles: {e}")
+			return Response({
+				'success': False,
+				'error': {'code': status.HTTP_500_INTERNAL_SERVER_ERROR, 'message': f'Erreur: {str(e)}'}
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeliveryZonesListView(ListAPIView):
+	"""
+	API endpoint pour lister les zones de livraison avec leurs tarifs de véhicule.
+	GET /api/v1/delivery/zones/ - Liste toutes les zones avec leurs tarifs
+	GET /api/v1/delivery/zones/?city=Libreville - Filtre par ville
+	GET /api/v1/delivery/zones/?active=true - Filtre par statut actif
+	"""
+	queryset = DeliveryZone.objects.prefetch_related('vehicle_rates__vehicle').all()
+	serializer_class = DeliveryZoneSerializer
+	permission_classes = [permissions.AllowAny]
+	
+	def get_queryset(self):
+		"""Filter zones by city and active status"""
+		queryset = super().get_queryset()
+		
+		# Filter by city if provided
+		city = self.request.query_params.get('city', None)
+		if city:
+			queryset = queryset.filter(city__iexact=city)
+		
+		# Filter by active status if provided
+		active = self.request.query_params.get('active', None)
+		if active and active.lower() in ['true', '1', 'yes']:
+			queryset = queryset.filter(is_active=True)
+		elif active and active.lower() in ['false', '0', 'no']:
+			queryset = queryset.filter(is_active=False)
+		
+		return queryset.order_by('city', 'name')

@@ -405,13 +405,48 @@ class StoreSubscriptionUpdateView(APIView):
     
     def patch(self, request, subscription_id):
         try:
-            subscription = StoreSubscription.objects.get(id=subscription_id)
-            serializer = StoreSubscriptionSerializer(subscription, data=request.data, partial=True)
+            subscription = StoreSubscription.objects.select_related('store', 'plan').get(id=subscription_id)
+            
+            # Créer une copie mutable de request.data
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            
+            # Si le plan change, mettre à jour automatiquement plan_name et monthly_fee
+            plan_id = data.get('plan_id')
+            if plan_id is not None:
+                from payments.models import SubscriptionPlan
+                if plan_id:
+                    try:
+                        plan = SubscriptionPlan.objects.get(id=plan_id)
+                        # Mettre à jour plan_name et monthly_fee depuis le nouveau plan
+                        data['plan_name'] = plan.name
+                        data['monthly_fee'] = float(plan.price)
+                        # Convertir plan_id en plan pour le serializer (le serializer attend 'plan', pas 'plan_id')
+                        data['plan'] = plan_id
+                    except SubscriptionPlan.DoesNotExist:
+                        return Response({
+                            'success': False,
+                            'error': 'Plan introuvable'
+                        }, status=status.HTTP_404_NOT_FOUND)
+                else:
+                    # Si plan_id est vide, c'est le plan Free
+                    data['plan_name'] = 'Free'
+                    data['monthly_fee'] = 0
+                    data['plan'] = None
+                
+                # Supprimer plan_id car le serializer n'attend que 'plan'
+                if 'plan_id' in data:
+                    del data['plan_id']
+            
+            serializer = StoreSubscriptionSerializer(subscription, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                # Recharger l'objet depuis la DB pour avoir toutes les données à jour
+                subscription.refresh_from_db()
+                # Réutiliser le serializer avec l'objet rafraîchi pour avoir tous les champs calculés
+                updated_serializer = StoreSubscriptionSerializer(subscription)
                 return Response({
                     'success': True,
-                    'data': serializer.data
+                    'data': updated_serializer.data
                 })
             return Response({
                 'success': False,
@@ -529,13 +564,47 @@ class B2BStoreSubscriptionUpdateView(APIView):
     
     def patch(self, request, subscription_id):
         try:
-            subscription = B2BStoreSubscription.objects.get(id=subscription_id)
-            serializer = B2BStoreSubscriptionSerializer(subscription, data=request.data, partial=True)
+            subscription = B2BStoreSubscription.objects.select_related('store', 'plan').get(id=subscription_id)
+            
+            # Créer une copie mutable de request.data
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            
+            # Si le plan change, mettre à jour automatiquement plan_name et monthly_fee
+            plan_id = data.get('plan_id')
+            if plan_id is not None:
+                if plan_id:
+                    try:
+                        plan = B2BSubscriptionPlan.objects.get(id=plan_id, is_active=True)
+                        # Mettre à jour plan_name et monthly_fee depuis le nouveau plan
+                        data['plan_name'] = plan.name
+                        data['monthly_fee'] = float(plan.price)
+                        # Convertir plan_id en plan pour le serializer (le serializer attend 'plan', pas 'plan_id')
+                        data['plan'] = plan_id
+                    except B2BSubscriptionPlan.DoesNotExist:
+                        return Response({
+                            'success': False,
+                            'error': 'Plan introuvable'
+                        }, status=status.HTTP_404_NOT_FOUND)
+                else:
+                    # Si plan_id est vide, c'est le plan Free
+                    data['plan_name'] = 'B2B Free'
+                    data['monthly_fee'] = 0
+                    data['plan'] = None
+                
+                # Supprimer plan_id car le serializer n'attend que 'plan'
+                if 'plan_id' in data:
+                    del data['plan_id']
+            
+            serializer = B2BStoreSubscriptionSerializer(subscription, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                # Recharger l'objet depuis la DB pour avoir toutes les données à jour
+                subscription.refresh_from_db()
+                # Réutiliser le serializer avec l'objet rafraîchi pour avoir tous les champs calculés
+                updated_serializer = B2BStoreSubscriptionSerializer(subscription)
                 return Response({
                     'success': True,
-                    'data': serializer.data
+                    'data': updated_serializer.data
                 })
             return Response({
                 'success': False,

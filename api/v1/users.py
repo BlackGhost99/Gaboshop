@@ -22,45 +22,41 @@ class RegisterView(APIView):
 	permission_classes = [permissions.AllowAny]
 
 	def post(self, request):
-		# Debug log: RegisterView post method entered
-		import json
-		import time
+		# #region agent log
+		import json,time
 		try:
-			with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
-				log_entry = {
-					'id': f'log_{int(time.time() * 1000)}_backend',
-					'timestamp': int(time.time() * 1000),
-					'location': 'api/v1/users.py:24',
-					'message': 'RegisterView post method entered',
-					'data': {'request_data': dict(request.data) if hasattr(request.data, 'dict') else str(request.data)},
-					'sessionId': 'debug-session',
-					'runId': 'initial-test',
-					'hypothesisId': 'A'
-				}
-				f.write(json.dumps(log_entry) + '\n')
-		except Exception as e:
-			pass  # Silently fail if logging fails
+			with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_backend','timestamp':int(time.time()*1000),'location':'api/v1/users.py:24','message':'RegisterView post method entered','data':{'request_data':dict(request.data) if hasattr(request.data,'dict') else str(request.data),'user_type':request.data.get('user_type'),'has_position_lat':'position_lat' in request.data,'position_lat':request.data.get('position_lat'),'has_position_lng':'position_lng' in request.data,'position_lng':request.data.get('position_lng')},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'A'})+'\n')
+		except:pass
+		# #endregion
 
 		serializer = RegisterSerializer(data=request.data)
 
-		# Debug log: Serializer created, about to validate
+		# #region agent log
 		try:
-			with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
-				log_entry = {
-					'id': f'log_{int(time.time() * 1000)}_backend',
-					'timestamp': int(time.time() * 1000),
-					'location': 'api/v1/users.py:28',
-					'message': 'Serializer created, about to validate',
-					'data': {'is_valid_before_check': serializer.is_valid()},
-					'sessionId': 'debug-session',
-					'runId': 'initial-test',
-					'hypothesisId': 'A'
-				}
-				f.write(json.dumps(log_entry) + '\n')
+			with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_backend','timestamp':int(time.time()*1000),'location':'api/v1/users.py:44','message':'Serializer created, about to validate','data':{'initial_data_keys':list(serializer.initial_data.keys()) if hasattr(serializer,'initial_data') else [],'position_lat_in_initial':serializer.initial_data.get('position_lat') if hasattr(serializer,'initial_data') else None,'position_lng_in_initial':serializer.initial_data.get('position_lng') if hasattr(serializer,'initial_data') else None,'all_initial_data':dict(serializer.initial_data) if hasattr(serializer,'initial_data') else {}},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'B'})+'\n')
 		except Exception as e:
-			pass
+			try:
+				with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+					f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_backend','timestamp':int(time.time()*1000),'location':'api/v1/users.py:44','message':'Exception logging initial_data','data':{'error':str(e)},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'B'})+'\n')
+			except:pass
+		# #endregion
 
-		if serializer.is_valid():
+		# #region agent log
+		is_valid_result = None
+		try:
+			is_valid_result = serializer.is_valid()
+			with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_backend','timestamp':int(time.time()*1000),'location':'api/v1/users.py:42','message':'is_valid() called','data':{'is_valid':is_valid_result,'has_errors':bool(serializer.errors),'error_keys':list(serializer.errors.keys()) if serializer.errors else [],'errors':dict(serializer.errors) if serializer.errors else {}},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'F'})+'\n')
+		except Exception as e:
+			import traceback
+			with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_backend','timestamp':int(time.time()*1000),'location':'api/v1/users.py:42','message':'Exception during is_valid()','data':{'error_type':type(e).__name__,'error_message':str(e),'traceback':traceback.format_exc()},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'F'})+'\n')
+			raise
+		# #endregion
+
+		if is_valid_result:
 			# Debug log: Serializer is valid, about to save
 			try:
 				with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
@@ -151,22 +147,12 @@ class RegisterView(APIView):
 			}, status=status.HTTP_201_CREATED)
 
 
-		# Debug log: Serializer validation failed
+		# #region agent log
 		try:
-			with open(r'c:\Users\BlackGhost\Desktop\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
-				log_entry = {
-					'id': f'log_{int(time.time() * 1000)}_backend',
-					'timestamp': int(time.time() * 1000),
-					'location': 'api/v1/users.py:86',
-					'message': 'Serializer validation failed',
-					'data': {'errors': serializer.errors, 'request_data': dict(request.data) if hasattr(request.data, 'dict') else str(request.data)},
-					'sessionId': 'debug-session',
-					'runId': 'initial-test',
-					'hypothesisId': 'E'
-				}
-				f.write(json.dumps(log_entry) + '\n')
-		except Exception as e:
-			pass
+			with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
+				f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_backend','timestamp':int(time.time()*1000),'location':'api/v1/users.py:154','message':'Serializer validation failed','data':{'errors':serializer.errors,'error_keys':list(serializer.errors.keys()) if serializer.errors else [],'request_data':dict(request.data) if hasattr(request.data,'dict') else str(request.data),'user_type':request.data.get('user_type'),'position_lat_value':request.data.get('position_lat'),'position_lng_value':request.data.get('position_lng')},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'E'})+'\n')
+		except:pass
+		# #endregion
 
 		print("REGISTRATION ERRORS:", serializer.errors)
 		return Response({

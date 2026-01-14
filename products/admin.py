@@ -16,8 +16,24 @@ class ProductCategoryAdmin(admin.ModelAdmin):
     product_count.short_description = 'Nombre de produits'
 
 
+from django import forms
+
+
+class ProductAdminForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = '__all__'
+
+    def clean_weight_kg(self):
+        weight = self.cleaned_data.get('weight_kg')
+        if weight is None or weight <= 0:
+            raise forms.ValidationError('Le poids du produit est obligatoire et doit être supérieur à 0 (kg).')
+        return weight
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
+    form = ProductAdminForm
     list_display = (
         'name',
         'store',
@@ -35,7 +51,7 @@ class ProductAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at', 'discount_percentage_display')
     fieldsets = (
         ('Informations Produit', {
-            'fields': ('store', 'category', 'name', 'description', 'sku', 'barcode')
+            'fields': ('store', 'category', 'name', 'description', 'sku', 'barcode', 'weight_kg')
         }),
         ('Prix et Stock', {
             'fields': ('price', 'compare_price', 'stock', 'discount_percentage_display')

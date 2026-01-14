@@ -499,12 +499,69 @@ class SubscriptionPlansAPIView(APIView):
 
     def get(self, request):
         from payments.subscription_check import SubscriptionChecker
+        from b2b.models import B2BSubscriptionPlan, B2BStoreSubscription
         
+        store = Store.objects.filter(manager=request.user).first()
+        
+        # Si le store est B2B, retourner les plans B2B
+        if store and store.is_b2b:
+            plans_qs = B2BSubscriptionPlan.objects.filter(is_active=True).order_by('display_order', 'price')
+            plans_data = []
+            
+            for plan in plans_qs:
+                # Récupérer toutes les features et les convertir en liste de strings
+                all_features = plan.get_all_features()
+                features_list = [f['title'] for f in all_features if f.get('enabled', True)]
+                
+                plans_data.append({
+                    'id': plan.id,
+                    'name': plan.name,
+                    'slug': plan.slug,
+                    'plan_type': plan.plan_type,
+                    'price': float(plan.price),
+                    'actual_price': float(plan.price),
+                    'price_label': f"{int(plan.price)} F/mois" if plan.price > 0 else "Gratuit",
+                    'description': plan.description,
+                    'tagline': plan.tagline,
+                    'features': features_list,  # Liste de strings pour le frontend
+                    'is_popular': plan.is_popular,
+                })
+            
+            # Récupérer le plan actuel B2B
+            current_plan = None
+            try:
+                b2b_sub = B2BStoreSubscription.objects.get(store=store, status='active')
+                if b2b_sub.is_active() and b2b_sub.plan:
+                    plan_obj = b2b_sub.plan
+                    all_features = plan_obj.get_all_features()
+                    features_list = [f['title'] for f in all_features if f.get('enabled', True)]
+                    
+                    current_plan = {
+                        'id': plan_obj.id,
+                        'name': plan_obj.name,
+                        'plan_type': plan_obj.plan_type,
+                        'price': float(b2b_sub.monthly_fee),
+                        'end_date': b2b_sub.end_date.isoformat() if b2b_sub.end_date else None,
+                        'status': b2b_sub.status,
+                        'auto_renew': b2b_sub.auto_renew,
+                        'features': features_list,
+                        'days_until_expiry': b2b_sub.get_remaining_days(),
+                    }
+            except B2BStoreSubscription.DoesNotExist:
+                pass
+            
+            return Response({
+                'success': True,
+                'plans': plans_data,
+                'current_plan': current_plan,
+                'store_type': 'b2b' if store.is_b2b else 'b2c'
+            })
+        
+        # Sinon, retourner les plans B2C (comportement existant)
         plans_qs = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
         plans_data = SubscriptionPlanSerializer(plans_qs, many=True).data
         
         # Ajouter le prix dynamique pour Business selon le type de store
-        store = Store.objects.filter(manager=request.user).first()
         if store:
             for plan in plans_data:
                 if plan['plan_type'] == 'business':

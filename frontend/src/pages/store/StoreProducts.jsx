@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StoreLayout from '../../components/StoreLayout';
+import ConfirmModal from '../../components/ConfirmModal';
 import { getStoreDashboard } from '../../services/dashboardService';
 import { 
     getStoreProducts, 
@@ -9,6 +10,7 @@ import {
     createProduct, 
     updateProduct,
     deleteProduct
+    // createStoreCategory - DÉSACTIVÉ: Seul l'admin peut créer des catégories
 } from '../../services/productService';
 
 const StoreProducts = () => {
@@ -17,17 +19,33 @@ const StoreProducts = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showProductModal, setShowProductModal] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [confirmDeleteProduct, setConfirmDeleteProduct] = useState(null);
+    const [deletingProductId, setDeletingProductId] = useState(null);
     
     // Form states
     const [newProduct, setNewProduct] = useState({
         name: '', description: '', price: '', stock: '', category: '', image: null
     });
+    const [newCategory, setNewCategory] = useState({
+        name: '', description: '', commission_rate: '8.00', order: 0
+    });
     const [viewingProduct, setViewingProduct] = useState(null);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [toast, setToast] = useState(null);
+    const [subscriptionInfo, setSubscriptionInfo] = useState(null);
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        // #region agent log
+        if (toast) {
+            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:38',message:'Toast state changed',data:{toastExists:!!toast,toastMessage:toast?.message,toastType:toast?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,D'})}).catch(()=>{});
+        }
+        // #endregion
+    }, [toast]);
 
     const fetchData = async () => {
         try {
@@ -38,13 +56,27 @@ const StoreProducts = () => {
                 setStore(storeInfo);
                 const storeId = storeInfo.id;
                 
+                // Utiliser les informations de subscription du dashboard (qui incluent maintenant les limites)
+                if (dashboardData.data.subscription) {
+                    setSubscriptionInfo({
+                        subscription: dashboardData.data.subscription,
+                        features: dashboardData.data.subscription.features,
+                        limits: dashboardData.data.subscription.limits,
+                    });
+                }
+                
                 const [productsRes, storeCategoriesRes, allCategoriesRes] = await Promise.all([
                     getManagerStoreProducts(storeId),
                     getStoreCategories(storeId),
                     getAllCategories()
                 ]);
 
-                if (productsRes.success) setProducts(productsRes.data.products || []);
+                if (productsRes.success) {
+                    // Filtrer les produits désactivés (is_available=false) après suppression
+                    const allProducts = productsRes.data.products || [];
+                    const activeProducts = allProducts.filter(p => p.is_available !== false);
+                    setProducts(activeProducts);
+                }
                 // Prefer global list when available, otherwise use store-specific
                 if (allCategoriesRes && allCategoriesRes.success) {
                     setCategories(allCategoriesRes.data || []);
@@ -59,7 +91,45 @@ const StoreProducts = () => {
         }
     };
 
-    // Note: merchants cannot create categories from the frontend.
+    // Fonction désactivée - Seul l'admin peut créer des catégories
+    // const handleCreateCategory = async (e) => {
+    //     e.preventDefault();
+    //     if (!store) return;
+    //     
+    //     try {
+    //         const categoryData = {
+    //             name: newCategory.name,
+    //             description: newCategory.description || '',
+    //             commission_rate: parseFloat(newCategory.commission_rate),
+    //             order: parseInt(newCategory.order) || 0
+    //         };
+    //         
+    //         const res = await createStoreCategory(store.id, categoryData);
+    //         if (res.success) {
+    //             setCategories([...categories, res.data]);
+    //             setShowCategoryModal(false);
+    //             setNewCategory({ name: '', description: '', commission_rate: '8.00', order: 0 });
+    //             alert('Catégorie créée avec succès!');
+    //         }
+    //     } catch (error) {
+    //         console.error("Error creating category", error);
+    //         const message = error.error?.details 
+    //             ? Object.values(error.error.details).flat().join('\n')
+    //             : (error.error?.message || "Erreur lors de la création de la catégorie");
+    //         alert(message);
+    //     }
+    // };
+
+    const showToast = (message, type = 'success') => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:105',message:'showToast entry',data:{message,type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+        // #endregion
+        setToast({ message, type });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:108',message:'showToast after setToast',data:{message,type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        setTimeout(() => setToast(null), 5000);
+    };
 
     const handleViewProduct = (product) => {
         setViewingProduct(product);
@@ -114,13 +184,55 @@ const StoreProducts = () => {
         }
     };
     
-    const handleDeleteProduct = async (productId) => {
-        if(!window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) return;
+    const handleDeleteProduct = (productId) => {
+        // Ouvrir le modal de confirmation
+        setConfirmDeleteProduct(productId);
+    }
+
+    const confirmDelete = async () => {
+        if (!confirmDeleteProduct || deletingProductId) return;
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:157',message:'confirmDelete entry',data:{productId:confirmDeleteProduct},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
+        // #endregion
+        
+        setDeletingProductId(confirmDeleteProduct);
         try {
-            await deleteProduct(productId);
-            setProducts(products.filter(p => p.id !== productId));
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:162',message:'Before deleteProduct API call',data:{productId:confirmDeleteProduct},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            
+            const response = await deleteProduct(confirmDeleteProduct);
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:165',message:'deleteProduct API response',data:{responseSuccess:response?.success,responseMessage:response?.message,responseError:response?.error,responseFull:response},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+            // #endregion
+            
+            if (response?.success) {
+                // Retirer immédiatement le produit de la liste (même s'il est désactivé au lieu d'être supprimé)
+                setProducts(prevProducts => prevProducts.filter(p => p.id !== confirmDeleteProduct));
+                // Rafraîchir la liste depuis le backend pour avoir les données à jour
+                await fetchData();
+                setConfirmDeleteProduct(null);
+            } else {
+                const errorMsg = response?.error?.message || response?.error || 'Erreur lors de la suppression du produit';
+                alert(errorMsg);
+                setConfirmDeleteProduct(null);
+            }
         } catch (error) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:173',message:'Error in confirmDelete',data:{errorMessage:error?.message,errorResponse:error?.response?.data,errorStatus:error?.response?.status,errorFull:JSON.stringify(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
+            // #endregion
             console.error("Error deleting product", error);
+            const errorMessage = error?.response?.data?.error?.message 
+                || error?.response?.data?.error
+                || error?.response?.data?.message 
+                || error?.message 
+                || 'Erreur lors de la suppression du produit';
+            alert(errorMessage);
+            setConfirmDeleteProduct(null);
+        } finally {
+            setDeletingProductId(null);
         }
     }
 
@@ -147,12 +259,49 @@ const StoreProducts = () => {
     const hasCategories = Array.isArray(categories) && categories.length > 0;
 
     return (
+        <>
         <StoreLayout title="Gestion des Produits">
             <div className="mb-6 flex justify-between">
                 <h2 className="text-2xl font-bold">Mes Produits</h2>
                 <div className="space-x-2">
+                    {/* Bouton désactivé - Seul l'admin peut créer des catégories */}
+                    {/* <button 
+                        onClick={() => setShowCategoryModal(true)}
+                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                    >
+                        + Nouvelle Catégorie
+                    </button> */}
                     <button 
-                        onClick={() => setShowProductModal(true)}
+                        onClick={async () => {
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:264',message:'Button onClick triggered',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                            // #endregion
+                            
+                            // Vérifier si le magasin peut ajouter des produits
+                            const canAdd = subscriptionInfo?.features?.can_add_more_products ?? subscriptionInfo?.limits?.products?.can_add_more ?? true;
+                            
+                            if (!canAdd) {
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:270',message:'Product limit reached',data:{canAdd,subscriptionInfo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                                // #endregion
+                                
+                                const currentProducts = subscriptionInfo?.limits?.products?.current ?? subscriptionInfo?.features?.current_products ?? 0;
+                                const maxProducts = subscriptionInfo?.limits?.products?.max ?? subscriptionInfo?.features?.max_products ?? null;
+                                const planName = subscriptionInfo?.subscription?.plan_name ?? subscriptionInfo?.plan?.name ?? 'votre forfait';
+                                
+                                let message = `Vous avez atteint la limite de produits de ${planName}. `;
+                                if (maxProducts !== null) {
+                                    message += `Vous avez ${currentProducts}/${maxProducts} produits. `;
+                                }
+                                message += `Passez à un forfait supérieur pour ajouter plus de produits.`;
+                                
+                                showToast(message, 'error');
+                                return;
+                            }
+                            
+                            setShowProductModal(true);
+                            showToast('Formulaire de création de produit ouvert', 'success');
+                        }}
                         className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
                     >
                         + Nouveau Produit
@@ -263,8 +412,76 @@ const StoreProducts = () => {
                 </div>
             )}
 
-            {/* Category Modal */}
-            {/* Category creation removed: merchants cannot add categories from frontend */}
+            {/* Category Modal - DÉSACTIVÉ - Seul l'admin peut créer des catégories */}
+            {/* {showCategoryModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+                        <h3 className="text-lg font-bold mb-4">Nouvelle Catégorie</h3>
+                        <form onSubmit={handleCreateCategory}>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-1">Nom *</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full border rounded p-2"
+                                    value={newCategory.name}
+                                    onChange={e => setNewCategory({...newCategory, name: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-1">Description</label>
+                                <textarea 
+                                    className="w-full border rounded p-2"
+                                    value={newCategory.description}
+                                    onChange={e => setNewCategory({...newCategory, description: e.target.value})}
+                                    rows="3"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-1">Taux de commission (%) *</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    className="w-full border rounded p-2"
+                                    value={newCategory.commission_rate}
+                                    onChange={e => setNewCategory({...newCategory, commission_rate: e.target.value})}
+                                    required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Valeur entre 0 et 100</p>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-1">Ordre d'affichage</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full border rounded p-2"
+                                    value={newCategory.order}
+                                    onChange={e => setNewCategory({...newCategory, order: e.target.value})}
+                                />
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCategoryModal(false);
+                                        setNewCategory({ name: '', description: '', commission_rate: '8.00', order: 0 });
+                                    }}
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                                >
+                                    Annuler
+                                </button>
+                                <button 
+                                    type="submit"
+                                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                                >
+                                    Créer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )} */}
 
             {/* Product Modal */}
             {showProductModal && (
@@ -365,7 +582,57 @@ const StoreProducts = () => {
                     </div>
                 </div>
             )}
+
+            {/* Modal de confirmation de suppression */}
+            <ConfirmModal
+                isOpen={!!confirmDeleteProduct}
+                onClose={() => {
+                    if (!deletingProductId) {
+                        setConfirmDeleteProduct(null);
+                    }
+                }}
+                title="Supprimer le produit"
+                message="Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible."
+                confirmText={deletingProductId ? "Suppression en cours..." : "Supprimer"}
+                cancelText="Annuler"
+                onConfirm={confirmDelete}
+                variant="danger"
+                autoClose={false}
+                loading={!!deletingProductId}
+            />
+
         </StoreLayout>
+        {/* Toast Notification - Rendered outside StoreLayout to avoid overflow issues */}
+        {toast && (
+            <div className="fixed bottom-5 right-5 z-[100] animate-slide-in-right max-w-md">
+                <div
+                    className={`px-6 py-4 rounded-lg shadow-2xl border-2 text-white font-semibold ${
+                        toast.type === 'success' 
+                            ? 'bg-green-600 border-green-500' 
+                            : 'bg-red-600 border-red-500'
+                    }`}
+                >
+                    <div className="flex items-start gap-3">
+                        {toast.type === 'success' ? (
+                            <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        )}
+                        <div className="flex-1">
+                            <p className="font-bold text-lg mb-1">
+                                {toast.type === 'success' ? 'Succès' : 'Limite atteinte'}
+                            </p>
+                            <p className="text-sm leading-relaxed">{toast.message}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 
