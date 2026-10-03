@@ -27,7 +27,7 @@ def test_catalog_api_contract():
     # Récupérer un utilisateur de test B2C
     stores = Store.objects.filter(is_b2c=True, is_b2b=False, is_active=True)
     if not stores.exists():
-        print("❌ Aucun store B2C trouvé")
+        print("? Aucun store B2C trouvé")
         return
 
     buyer_store = stores.first()

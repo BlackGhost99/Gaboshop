@@ -50,26 +50,14 @@ def create_b2b_subscription_plans():
             'applies_to': 'b2b_wholesaler',
             'custom_features': [
                 {
-                    'title': '2 produits B2B maximum',
-                    'description': 'Publiez jusqu\'à 2 produits dans le catalogue B2B',
-                    'category': 'limits',
-                    'enabled': True
-                },
-                {
-                    'title': 'Commandes illimitées',
-                    'description': 'Recevez autant de commandes que vous voulez',
-                    'category': 'orders',
-                    'enabled': True
-                },
-                {
                     'title': 'Commission 8%',
-                    'description': 'GABOSHOP prélève 8% sur chaque commande B2B',
+                    'description': 'GABOSHOP preleve 8% sur chaque commande B2B',
                     'category': 'pricing',
                     'enabled': True
                 },
                 {
                     'title': 'Interface simple',
-                    'description': 'Interface de base pour gérer vos commandes',
+                    'description': 'Interface de base pour gerer vos commandes',
                     'category': 'interface',
                     'enabled': True
                 }
@@ -217,27 +205,27 @@ def create_b2b_subscription_plans():
         
         if created:
             created_count += 1
-            print(f"✅ Plan créé: {plan.name} ({plan.price} FCFA/mois)")
+            print(f"? Plan créé: {plan.name} ({plan.price} FCFA/mois)")
         else:
             updated_count += 1
-            print(f"🔄 Plan mis à jour: {plan.name} ({plan.price} FCFA/mois)")
+            print(f"?? Plan mis à jour: {plan.name} ({plan.price} FCFA/mois)")
     
-    print(f"\n📊 Résumé:")
+    print(f"\n?? Résumé:")
     print(f"   - Plans créés: {created_count}")
     print(f"   - Plans mis à jour: {updated_count}")
     print(f"   - Total: {created_count + updated_count}")
     
     # Afficher les fonctionnalités de chaque plan
-    print(f"\n📋 Fonctionnalités par plan:")
+    print(f"\n?? Fonctionnalités par plan:")
     for plan in B2BSubscriptionPlan.objects.all().order_by('display_order'):
         print(f"\n{plan.name}:")
         features = plan.get_all_features()
         for feature in features:
-            print(f"  ✓ {feature['title']}")
+            print(f"  ? {feature['title']}")
 
 
 if __name__ == '__main__':
-    print("🚀 Création des plans d'abonnement B2B...\n")
+    print("?? Création des plans d'abonnement B2B...\n")
     create_b2b_subscription_plans()
-    print("\n✅ Terminé!")
+    print("\n? Terminé!")
 

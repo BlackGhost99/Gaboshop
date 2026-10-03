@@ -16,7 +16,9 @@ from .models import (
 class PaymentSerializer(serializers.ModelSerializer):
     """Serializer pour les paiements"""
     order_number = serializers.CharField(source='order.order_number', read_only=True)
-    client_phone = serializers.CharField(source='order.client.phone', read_only=True)
+    client_phone = serializers.CharField(read_only=True)
+    order_client_phone = serializers.CharField(source='order.client.phone', read_only=True)
+    client_name = serializers.CharField(read_only=True)
     store_name = serializers.CharField(source='order.store.name', read_only=True)
     amount_display = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -25,7 +27,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = [
-            'id', 'order', 'order_number', 'client_phone', 'store_name',
+            'id', 'order', 'order_number', 'client_phone', 'order_client_phone', 'client_name', 'store_name',
             'payment_method', 'payment_method_display', 'status', 'status_display',
             'amount', 'amount_display', 'transaction_id', 'operator_reference',
             'created_at', 'updated_at', 'completed_at'

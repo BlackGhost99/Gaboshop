@@ -337,7 +337,6 @@ class B2BOrderCreateView(APIView):
 				city=validated_data.get('city', 'Libreville'),
 				items_total=totals['items_total'],
 				delivery_fee=totals['delivery_fee'],
-				service_fee=totals['service_fee'],
 				total_amount=totals['total_amount'],
 				status='created'
 			)
@@ -654,4 +653,3 @@ class B2BProfileDeactivateView(APIView):
 			'data': serializer.data,
 			'message': 'Profil B2B désactivé avec succès'
 		})
-

@@ -22,6 +22,8 @@ class ProductAPITests(TestCase):
             'name': 'API Prod',
             'price': '1500.00',
             'stock': 5,
+            'weight_kg': '1.00',
+            'length_m': '0.50',
             'category': self.product_category.id,
             'store': self.store.id
         }

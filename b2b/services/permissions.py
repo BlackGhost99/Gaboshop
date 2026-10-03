@@ -9,7 +9,7 @@ def can_access_b2b(user):
 	
 	Règles:
 	- Uniquement StoreUser (user_type='store_manager')
-	- Le magasin doit avoir un plan Business (seuls les Business peuvent acheter en B2B)
+	- Le magasin doit avoir un plan Pro ou Business (seuls les plans Pro/Business peuvent acheter en B2B)
 	- Un magasin peut être à la fois B2B (vendeur) et B2C (acheteur)
 	
 	Args:
@@ -94,7 +94,7 @@ def can_purchase_from_wholesaler(buyer_store, wholesaler_store):
 	plan = SubscriptionChecker.get_current_plan(buyer_store)
 	
 	if not plan:
-		return False, "Un forfait Business est requis pour accéder au B2B"
+		return False, "Un forfait Pro ou Business est requis pour accéder au B2B"
 	
 	# Si le store est B2B (grossiste), autoriser l'accès
 	if buyer_store.is_b2b:
@@ -104,7 +104,7 @@ def can_purchase_from_wholesaler(buyer_store, wholesaler_store):
 		pass  # Autoriser
 	# Pour les plans B2C, vérifier can_access_b2b
 	elif not getattr(plan, 'can_access_b2b', False):
-		return False, "Un forfait Business est requis pour accéder au B2B"
+		return False, "Un forfait Pro ou Business est requis pour accéder au B2B"
 	
 	# Le grossiste doit être B2B
 	if not wholesaler_store.is_b2b:

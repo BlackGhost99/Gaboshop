@@ -90,7 +90,7 @@ class AIPermissionChecker:
             if user.user_type == "store_manager" and store:
                 plan = SubscriptionChecker.get_current_plan(store)
                 if plan and action == "access_b2b":
-                    reason += " Un forfait Business est requis pour accéder au B2B."
+                    reason += " Un forfait Pro ou Business est requis pour accéder au B2B."
             return False, reason
         
         return True, None

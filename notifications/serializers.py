@@ -15,13 +15,14 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_user_name(self, obj):
         """Obtenir le nom complet de l'utilisateur de manière sécurisée"""
-        if not obj.user:
-            return "Système"
+        user = getattr(obj, "user", None)
+        if not user:
+            return "Systeme"
         try:
-            if hasattr(obj.user, 'get_full_name'):
-                full_name = obj.user.get_full_name()
-                return full_name if full_name else obj.user.email
-            return obj.user.email
+            if hasattr(user, 'get_full_name'):
+                full_name = user.get_full_name()
+                return full_name if full_name else (getattr(user, "email", "") or "Utilisateur")
+            return getattr(user, "email", "") or "Utilisateur"
         except Exception:
             return "Utilisateur"
 

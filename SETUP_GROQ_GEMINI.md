@@ -1,6 +1,6 @@
 # Configuration des Providers IA Gratuits
 
-## 🚀 Configuration Rapide
+## ?? Configuration Rapide
 
 ### Option 1: Groq (RECOMMANDÉ - Gratuit, Rapide)
 
@@ -43,7 +43,7 @@
 
 ---
 
-## 📝 Modèles Disponibles
+## ?? Modèles Disponibles
 
 ### Groq
 - `llama-3.1-8b-instant` (rapide, recommandé)
@@ -56,7 +56,7 @@
 
 ---
 
-## ✅ Test Rapide
+## ? Test Rapide
 
 Après configuration, redémarrez le serveur Django et testez l'IA dans l'interface.
 

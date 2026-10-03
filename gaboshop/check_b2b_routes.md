@@ -31,7 +31,7 @@ Dans votre navigateur ou avec curl :
 GET http://localhost:8000/api/v1/b2b/profiles/3/
 ```
 
-**Si vous obtenez une page HTML 404** : La route n'est pas chargée → Redémarrer Django
+**Si vous obtenez une page HTML 404** : La route n'est pas chargée ? Redémarrer Django
 
 **Si vous obtenez un JSON 404** : La route fonctionne, mais le profil n'existe pas (normal pour un nouveau store)
 

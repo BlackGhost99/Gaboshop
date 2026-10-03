@@ -1,6 +1,6 @@
 # Operator Fee System - Quick Reference
 
-## Status: ✅ PRODUCTION READY
+## Status: ? PRODUCTION READY
 
 The scalable operator fee system is fully implemented, tested, and ready for deployment.
 
@@ -30,20 +30,20 @@ The scalable operator fee system is fully implemented, tested, and ready for dep
   "items_total": "15000.00",
   "delivery_fee": "2000.00",
   "service_fee": "500.00",
-  "operator_fee": "510.00",           ← NEW FIELD
+  "operator_fee": "510.00",           ? NEW FIELD
   "tax_amount": "0.00",
   "payment_fees": "0.00",
   "total_amount": "18010.00",
   "invoice_breakdown": {
     "summary": {
-      "operator_fee": "510.00"         ← NEW
+      "operator_fee": "510.00"         ? NEW
     },
     "payment_breakdown": {
       "lines": [
         {"description": "Sous-total (articles)", "amount": "15000.00"},
         {"description": "Frais de livraison", "amount": "2000.00"},
         {"description": "Frais de service plateforme", "amount": "500.00"},
-        {"description": "Frais opérateur Mobile Money (Airtel/Moov)", "amount": "510.00"},  ← NEW
+        {"description": "Frais opérateur Mobile Money (Airtel/Moov)", "amount": "510.00"},  ? NEW
         {"description": "TOTAL A PAYER", "amount": "18010.00"}
       ]
     }
@@ -172,12 +172,12 @@ For detailed information:
 
 ## Key Points
 
-✅ **Works automatically** - No manual fee entry needed  
-✅ **Shows on invoice** - Transparent to customers  
-✅ **Easy to modify** - Change rates in one place  
-✅ **Fully tested** - All test cases passed  
-✅ **Production ready** - No breaking changes  
-✅ **Database migrated** - Column exists and ready  
+? **Works automatically** - No manual fee entry needed  
+? **Shows on invoice** - Transparent to customers  
+? **Easy to modify** - Change rates in one place  
+? **Fully tested** - All test cases passed  
+? **Production ready** - No breaking changes  
+? **Database migrated** - Column exists and ready  
 
 ---
 

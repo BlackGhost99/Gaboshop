@@ -102,7 +102,7 @@ const AdminProductsSection = ({
 
       {/* Filtres */}
       <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
-        <h3 className="font-semibold mb-3 text-sm">🔍 Recherche et Filtres</h3>
+        <h3 className="font-semibold mb-3 text-sm">?? Recherche et Filtres</h3>
         <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
           <input
             type="text"
@@ -223,7 +223,7 @@ const AdminProductsSection = ({
           onClick={() => setShowAddProduct(true)}
           className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-semibold hover:bg-indigo-700"
         >
-          ➕ Ajouter un produit
+          ? Ajouter un produit
         </button>
       </div>
 
@@ -268,7 +268,7 @@ const AdminProductsSection = ({
                     <img src={product.image} alt={product.name} className="h-12 w-12 object-cover rounded" />
                   ) : (
                     <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                      📦
+                      ??
                     </div>
                   )}
                 </td>
@@ -303,14 +303,14 @@ const AdminProductsSection = ({
                       className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
                       title="Voir détails"
                     >
-                      🔍
+                      ??
                     </button>
                     <button
                       onClick={() => setEditingProduct(product)}
                       className="p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded"
                       title="Modifier"
                     >
-                      ✏️
+                      ??
                     </button>
                     {product.is_available ? (
                       <button
@@ -318,7 +318,7 @@ const AdminProductsSection = ({
                         className="p-1.5 text-orange-600 hover:text-orange-900 hover:bg-orange-50 rounded"
                         title="Désactiver"
                       >
-                        🚫
+                        ??
                       </button>
                     ) : (
                       <button
@@ -326,7 +326,7 @@ const AdminProductsSection = ({
                         className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 rounded"
                         title="Activer"
                       >
-                        ✅
+                        ?
                       </button>
                     )}
                     <button
@@ -334,7 +334,7 @@ const AdminProductsSection = ({
                       className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
                       title="Supprimer"
                     >
-                      🗑️
+                      ???
                     </button>
                   </div>
                 </td>

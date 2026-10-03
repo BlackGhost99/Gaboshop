@@ -80,7 +80,7 @@ def get_detailed_b2b_access_error(user):
 		logger.warning(f"get_detailed_b2b_access_error: Aucun plan trouvé pour store {store.id}")
 		return False, {
 			'code': status.HTTP_403_FORBIDDEN,
-			'message': 'Aucun plan d\'abonnement trouvé. Un forfait Business est requis pour accéder au B2B.'
+			'message': 'Aucun plan d\'abonnement trouvé. Un forfait Pro ou Business est requis pour accéder au B2B.'
 		}
 	
 	# Si c'est un plan B2B, vérifier que ce n'est pas Free
@@ -99,7 +99,7 @@ def get_detailed_b2b_access_error(user):
 		logger.warning(f"get_detailed_b2b_access_error: Plan {plan.name} (plan_type: {plan.plan_type}) n'a pas can_access_b2b=True pour store {store.id}")
 		return False, {
 			'code': status.HTTP_403_FORBIDDEN,
-			'message': f'Votre forfait actuel ({plan.name}) ne permet pas l\'accès au B2B. Un forfait Business est requis.'
+			'message': f'Votre forfait actuel ({plan.name}) ne permet pas l\'accès au B2B. Un forfait Pro ou Business est requis.'
 		}
 	
 	# Vérification finale avec can_access_b2b
@@ -590,7 +590,6 @@ class B2BOrderCreateView(APIView):
 				city=validated_data.get('city', 'Libreville'),
 				items_total=totals['items_total'],
 				delivery_fee=totals['delivery_fee'],
-				service_fee=totals['service_fee'],
 				total_amount=totals['total_amount'],
 				status='confirmed',  # B2B orders start as confirmed (credit/invoice payment)
 				confirmed_at=timezone.now()
@@ -611,6 +610,15 @@ class B2BOrderCreateView(APIView):
 			# Calculer la commission
 			order.calculate_commission()
 			order.save()
+
+			from payments.direct_service import create_arrangement
+			create_arrangement(
+				order,
+				validated_data.get('payment_flow', 'direct_split'),
+				validated_data.get('payment_method', 'cash'),
+				validated_data.get('delivery_payment_method', 'cash'),
+				user,
+			)
 		
 		# Serializer la commande créée
 		order_serializer = B2BOrderSerializer(order)
@@ -731,7 +739,7 @@ class B2BProfileCreateView(APIView):
 			is_active=request.data.get('is_active', True),
 		)
 		
-		store.is_b2b = True
+		store.set_market_mode('b2b')
 		store.save()
 		
 		serializer = B2BProfileSerializer(b2b_profile)
@@ -796,7 +804,7 @@ class B2BProfileActivateView(APIView):
 				profile.visible_to_all = request.data['visible_to_all']
 			profile.save()
 		
-		store.is_b2b = True
+		store.set_market_mode('b2b')
 		store.save()
 		
 		serializer = B2BProfileSerializer(profile)

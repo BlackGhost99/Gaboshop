@@ -25,7 +25,7 @@ class EmailService:
         """
         try:
             if not settings.EMAIL_HOST_USER:
-                logger.warning("⚠️ Email non configuré - Simulation")
+                logger.warning("?? Email non configuré - Simulation")
                 return EmailService._simulate_send(to_email, template_name, context)
             
             # Rendre le template HTML
@@ -45,11 +45,11 @@ class EmailService:
             email.attach_alternative(html_content, "text/html")
             email.send()
             
-            logger.info(f"✅ Email envoyé à {to_email}: {template_name}")
+            logger.info(f"? Email envoyé à {to_email}: {template_name}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erreur envoi email: {e}")
+            logger.error(f"? Erreur envoi email: {e}")
             return False
     
     @staticmethod
@@ -67,10 +67,10 @@ class EmailService:
             )
             return True
         except Exception as e:
-            logger.error(f"❌ Erreur envoi email texte: {e}")
+            logger.error(f"? Erreur envoi email texte: {e}")
             return False
     
     @staticmethod
     def _simulate_send(to_email, template_name, context):
-        logger.info(f"🎯 Email simulé à {to_email}: {template_name} - {context}")
+        logger.info(f"?? Email simulé à {to_email}: {template_name} - {context}")
         return True

@@ -1,0 +1,147 @@
+version: "3.8"
+
+services:
+  # Redis pour Celery + cache
+  redis:
+    image: redis:7-alpine
+    container_name: gaboshop_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - gaboshop_network
+
+  # Django Backend
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gaboshop_backend
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo '🔧 Migrations Django...' &&
+        python manage.py migrate --noinput &&
+        echo '📦 Collectstatic...' &&
+        python manage.py collectstatic --noinput --clear &&
+        echo '🚀 Démarrage serveur Django...' &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    volumes:
+      - .:/app
+      - /app/__pycache__
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "True"
+      DJANGO_SETTINGS_MODULE: Gaboshop.settings
+      REDIS_URL: redis://redis:6379/0
+      
+      # Singpay Config
+      SINGPAY_BASE_URL: ${SINGPAY_BASE_URL:-https://gateway.singpay.ga/v1}
+      SINGPAY_CLIENT_ID: ${SINGPAY_CLIENT_ID:-}
+      SINGPAY_CLIENT_SECRET: ${SINGPAY_CLIENT_SECRET:-}
+      SINGPAY_WALLET_ID: ${SINGPAY_WALLET_ID:-}
+      SINGPAY_DISBURSEMENT_ID: ${SINGPAY_DISBURSEMENT_ID:-}
+      SINGPAY_TIMEOUT: ${SINGPAY_TIMEOUT:-30}
+      SINGPAY_ENABLE_TRANSFER: ${SINGPAY_ENABLE_TRANSFER:-False}
+      PAYMENT_SIMULATION_MODE: ${PAYMENT_SIMULATION_MODE:-False}
+      
+      # DB
+      SQLITE_PATH: /app/db.sqlite3
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - gaboshop_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gaboshop_celery
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    environment:
+      DEBUG: "False"
+      DJANGO_SETTINGS_MODULE: Gaboshop.settings
+      REDIS_URL: redis://redis:6379/0
+      
+      # Singpay Config
+      SINGPAY_BASE_URL: ${SINGPAY_BASE_URL:-https://gateway.singpay.ga/v1}
+      SINGPAY_CLIENT_ID: ${SINGPAY_CLIENT_ID:-}
+      SINGPAY_CLIENT_SECRET: ${SINGPAY_CLIENT_SECRET:-}
+      SINGPAY_WALLET_ID: ${SINGPAY_WALLET_ID:-}
+      SINGPAY_DISBURSEMENT_ID: ${SINGPAY_DISBURSEMENT_ID:-}
+      SINGPAY_TIMEOUT: ${SINGPAY_TIMEOUT:-30}
+      
+      SQLITE_PATH: /app/db.sqlite3
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - gaboshop_network
+
+  # React Frontend (Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gaboshop_frontend
+    restart: unless-stopped
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_PROXY_TARGET: http://web:8000
+      CHOKIDAR_USEPOLLING: "true"
+      NODE_ENV: development
+    depends_on:
+      - web
+    networks:
+      - gaboshop_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  redis_data:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local
+  frontend_node_modules:
+    driver: local
+
+networks:
+  gaboshop_network:
+    driver: bridge

@@ -1,7 +1,7 @@
-# Configuration Admindelivery par zone ✅
+# Configuration Admindelivery par zone ?
 
 **Date:** 14 Janvier 2026  
-**Statut:** ✅ Implémentée et testée
+**Statut:** ? Implémentée et testée
 
 ---
 
@@ -10,11 +10,11 @@
 Un système complet a été implémenté permettant aux administrateurs de configurer les tarifs de livraison par **zone géographique** et par **type de véhicule**. Les tarifs sont dynamiquement appliqués lors du calcul des coûts de commande.
 
 ### Caractéristiques clés
-✅ **Zones configurables** — Créer/modifier des zones (Centre-Ville, Louis, Mont-Bouët, Libreville, Owendo, etc.)  
-✅ **Tarifs par véhicule** — Définir des prix spécifiques pour chaque type de véhicule (Moto, Voiture, Camionnette, Camion)  
-✅ **Surcharges inter-ville** — Configurer des surcharges pour livraisons hors-zone  
-✅ **Interface admin intuitive** — Inline editing pour rapid configuration  
-✅ **Fallback automatique** — Si aucun tarif trouvé, utilise tarif store par défaut  
+? **Zones configurables** — Créer/modifier des zones (Centre-Ville, Louis, Mont-Bouët, Libreville, Owendo, etc.)  
+? **Tarifs par véhicule** — Définir des prix spécifiques pour chaque type de véhicule (Moto, Voiture, Camionnette, Camion)  
+? **Surcharges inter-ville** — Configurer des surcharges pour livraisons hors-zone  
+? **Interface admin intuitive** — Inline editing pour rapid configuration  
+? **Fallback automatique** — Si aucun tarif trouvé, utilise tarif store par défaut  
 
 ---
 
@@ -53,7 +53,7 @@ Une migration auto-générée a été créée:
 delivery/migrations/0008_deliveryzone_zonevehiclerate.py
 ```
 
-**Statut:** ✅ Appliquée avec succès
+**Statut:** ? Appliquée avec succès
 
 ---
 
@@ -69,7 +69,7 @@ delivery/migrations/0008_deliveryzone_zonevehiclerate.py
   - Configuration (surcharge inter-ville, description)
   - Métadonnées (dates, collapse)
 
-**Accès:** Django Admin → Delivery → Zones de Livraison
+**Accès:** Django Admin ? Delivery ? Zones de Livraison
 
 ### **ZoneVehicleRateAdmin** (Gestion des tarifs)
 - **Affichage:** Zone, Véhicule, Prix base, Prix/km, Statut
@@ -80,7 +80,7 @@ delivery/migrations/0008_deliveryzone_zonevehiclerate.py
   - Tarification (base, prix/km, notes)
   - Métadonnées (collapse)
 
-**Accès:** Django Admin → Delivery → Tarifs Zones + Véhicules
+**Accès:** Django Admin ? Delivery ? Tarifs Zones + Véhicules
 
 ### **VehicleTypeAdmin** (Mise à jour)
 - **Inlines:** Tarifs par véhicule (ZoneVehicleRateInline)
@@ -128,7 +128,7 @@ def calculate_dynamic_delivery_cost(self, total_weight):
 ## Workflow d'administration
 
 ### **Étape 1: Créer une zone**
-1. Aller à Django Admin → Delivery → Zones de Livraison
+1. Aller à Django Admin ? Delivery ? Zones de Livraison
 2. Cliquer "Ajouter Zone de Livraison"
 3. Remplir:
    - **Nom:** "Centre-Ville" ou "Mont-Bouët"
@@ -150,7 +150,7 @@ def calculate_dynamic_delivery_cost(self, total_weight):
 8. Sauvegarder
 
 **Option B: Depuis la page des tarifs**
-1. Aller à Django Admin → Delivery → Tarifs Zones + Véhicules
+1. Aller à Django Admin ? Delivery ? Tarifs Zones + Véhicules
 2. Cliquer "Ajouter Tarif Zone + Véhicule"
 3. Sélectionner Zone et Véhicule
 4. Entrer prix de base et prix/km
@@ -186,17 +186,17 @@ Zone 3: "Owendo" (Owendo)
 1. Order.calculate_dynamic_delivery_cost(total_weight=3kg)
 
 2. Sélectionne véhicule:
-   3kg ≤ 5kg → Moto (multiplier = 1.0)
+   3kg = 5kg ? Moto (multiplier = 1.0)
 
 3. Récupère tarif zone:
    Zone = "Centre-Ville"
-   ZoneVehicleRate(zone, vehicle=Moto) → base_price = 2000 FCFA
+   ZoneVehicleRate(zone, vehicle=Moto) ? base_price = 2000 FCFA
 
 4. Calcule coût:
    cost = 2000 FCFA × 1.0 = 2000 FCFA
 
 5. Vérifi si inter-ville:
-   Client en "Centre-Ville", magasin aussi → pas de surcharge
+   Client en "Centre-Ville", magasin aussi ? pas de surcharge
 
 6. Résultat final:
    delivery_cost = 2000 FCFA
@@ -210,7 +210,7 @@ Zone 3: "Owendo" (Owendo)
    cost = 2000 FCFA × 1.0 = 2000 FCFA
    
 5. Vérifi si inter-ville:
-   Client en "Owendo" ≠ Magasin en "Libreville" → SURCHARGE
+   Client en "Owendo" ? Magasin en "Libreville" ? SURCHARGE
    surcharge = 1000 FCFA (inter_city_surcharge de la zone)
    
 6. Résultat final:
@@ -256,7 +256,7 @@ Zone 3: "Owendo" (Owendo)
 
 ## Tests
 
-✅ **Tous les tests passent:**
+? **Tous les tests passent:**
 ```
 Ran 7 tests in 19.884s
 OK
@@ -293,6 +293,6 @@ Tests validés:
 
 ---
 
-**Prêt pour la production! 🚀**
+**Prêt pour la production! ??**
 
 Tous les tarifs sont gérés depuis l'admin Django. Aucune modification code requise pour ajuster les prix.

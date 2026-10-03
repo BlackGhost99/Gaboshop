@@ -218,6 +218,9 @@ class B2BOrderCreateSerializer(serializers.Serializer):
 	delivery_zone = serializers.CharField()
 	city = serializers.CharField(default='Libreville')
 	notes = serializers.CharField(required=False, allow_blank=True)
+	payment_flow = serializers.CharField(required=False, default='direct_split')
+	payment_method = serializers.CharField(required=False, default='cash')
+	delivery_payment_method = serializers.CharField(required=False, allow_blank=True, default='cash')
 	
 	def validate_items(self, value):
 		"""Valider qu'il y a au moins un item"""
@@ -243,6 +246,11 @@ class B2BOrderCreateSerializer(serializers.Serializer):
 			raise serializers.ValidationError({
 				'wholesaler_id': 'Le profil B2B de ce grossiste n\'est pas actif.'
 			})
+
+		from payments.configuration import available_payment_options
+		_, options = available_payment_options(wholesaler, True)
+		if not any(option['flow'] == attrs.get('payment_flow') and option['method'] == attrs.get('payment_method') for option in options):
+			raise serializers.ValidationError({'payment_method': 'Circuit ou moyen de paiement non autorisé pour ce grossiste.'})
 		
 		# Valider chaque item
 		for item in items:
@@ -297,12 +305,12 @@ class B2BOrderSerializer(serializers.ModelSerializer):
 			'id', 'order_number', 'store', 'store_name', 'store_zone',
 			'source_store', 'source_store_name', 'is_b2b',
 			'status', 'status_display', 'items_total', 'delivery_fee',
-			'service_fee', 'tax_amount', 'payment_fees', 'total_amount',
+			'tax_amount', 'payment_fees', 'total_amount',
 			'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
 			'notes', 'items', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at'
 		]
 		read_only_fields = [
-			'id', 'order_number', 'items_total', 'total_amount', 'service_fee',
+			'id', 'order_number', 'items_total', 'total_amount',
 			'payment_fees', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at'
 		]
 	

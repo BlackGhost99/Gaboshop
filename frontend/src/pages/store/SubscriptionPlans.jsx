@@ -9,6 +9,9 @@ const SubscriptionPlans = () => {
   const [subscribing, setSubscribing] = useState(null);
   const [toast, setToast] = useState(null);
   const [storeType, setStoreType] = useState(null);
+  const [paymentProvider, setPaymentProvider] = useState('cinetpay');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [lastIntent, setLastIntent] = useState(null);
 
   useEffect(() => {
     fetchPlans();
@@ -22,7 +25,11 @@ const SubscriptionPlans = () => {
       setStoreType(response.data.store_type);
     } catch (err) {
       console.error('Erreur chargement plans:', err);
-      showToast('Erreur lors du chargement des plans', 'error');
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        'Erreur lors du chargement des plans';
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -35,21 +42,33 @@ const SubscriptionPlans = () => {
 
     setSubscribing(planId);
     try {
-      const response = await api.post('/payments/subscriptions/subscribe/', {
+      const isMobileMoney = paymentProvider === 'airtel' || paymentProvider === 'moov';
+      if (isMobileMoney && !phoneNumber.trim()) {
+        showToast('Le numéro de téléphone est requis pour Mobile Money', 'error');
+        setSubscribing(null);
+        return;
+      }
+
+      const response = await api.post('/payments/subscriptions/intent/', {
         plan_id: planId,
-        payment_method: 'admin_validation'
+        provider: paymentProvider,
+        phone_number: isMobileMoney ? phoneNumber.trim() : undefined
       });
 
       if (response.data.success) {
-        showToast(response.data.message, 'success');
-        // Refresh plans after subscription
-        setTimeout(() => fetchPlans(), 2000);
+        const intent = response.data.payment_intent;
+        setLastIntent(intent);
+        if (intent?.payment_url) {
+          window.open(intent.payment_url, '_blank', 'noopener,noreferrer');
+        }
+        showToast('Paiement initié. Finalisez le paiement pour activer votre plan.', 'success');
+        setTimeout(() => fetchPlans(), 2500);
       } else {
-        showToast(response.data.error || 'Erreur lors de la souscription', 'error');
+        showToast(response.data.detail || response.data.error || 'Erreur lors de la souscription', 'error');
       }
     } catch (err) {
       console.error('Erreur souscription:', err);
-      showToast(err.response?.data?.error || 'Erreur lors de la souscription', 'error');
+      showToast(err.response?.data?.detail || err.response?.data?.error || 'Erreur lors de la souscription', 'error');
     } finally {
       setSubscribing(null);
     }
@@ -62,11 +81,11 @@ const SubscriptionPlans = () => {
 
   const getPlanIcon = (planType) => {
     const icons = {
-      free: '🆓',
-      pro: '💼',
-      business: '👑'
+      free: '??',
+      pro: '??',
+      business: '??'
     };
-    return icons[planType] || '📦';
+    return icons[planType] || '??';
   };
 
   const getPlanColor = (planType) => {
@@ -107,8 +126,45 @@ const SubscriptionPlans = () => {
             Choisissez le plan adapté à votre business
           </h2>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Développez votre activité avec des fonctionnalités premium, commissions réduites et visibilité maximale sur GABOSHOP
+            Développez votre activité avec des fonctionnalités premium, 0% de commission sur l'alimentaire (gratuit) et le vrai bénéfice sur le non-alimentaire, avec une visibilité maximale sur GABOSHOP
           </p>
+        </div>
+
+        {/* Payment Method */}
+        <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Mode de paiement</h3>
+              <p className="text-sm text-slate-600">
+                Airtel Money, Moov Money ou carte bancaire (CinetPay).
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={paymentProvider}
+                onChange={(event) => setPaymentProvider(event.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="cinetpay">Carte bancaire</option>
+                <option value="airtel">Airtel Money</option>
+                <option value="moov">Moov Money</option>
+              </select>
+              {(paymentProvider === 'airtel' || paymentProvider === 'moov') && (
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(event) => setPhoneNumber(event.target.value)}
+                  placeholder="Téléphone Mobile Money"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+                />
+              )}
+            </div>
+          </div>
+          {lastIntent && (
+            <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Paiement en attente. Référence: <span className="font-semibold text-slate-900">{lastIntent.reference}</span>
+            </div>
+          )}
         </div>
 
         {/* Current Plan Banner */}
@@ -124,9 +180,9 @@ const SubscriptionPlans = () => {
                     {currentPlan.days_until_expiry > 7 ? (
                       <>Expire le {new Date(currentPlan.end_date).toLocaleDateString('fr-FR')}</>
                     ) : currentPlan.days_until_expiry > 0 ? (
-                      <span className="text-orange-700 font-semibold">⚠️ Expire dans {currentPlan.days_until_expiry} jour{currentPlan.days_until_expiry > 1 ? 's' : ''}</span>
+                      <span className="text-orange-700 font-semibold">?? Expire dans {currentPlan.days_until_expiry} jour{currentPlan.days_until_expiry > 1 ? 's' : ''}</span>
                     ) : (
-                      <span className="text-red-700 font-semibold">❌ Plan expiré</span>
+                      <span className="text-red-700 font-semibold">? Plan expiré</span>
                     )}
                   </p>
                 )}
@@ -134,7 +190,7 @@ const SubscriptionPlans = () => {
               {currentPlan.plan_type === 'free' && (
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Passez au plan Business pour débloquer :</p>
-                  <p className="text-xs text-indigo-600 font-semibold mt-1">✓ Accès B2B ✓ Commission 0-2% ✓ Analytics avancés</p>
+                  <p className="text-xs text-indigo-600 font-semibold mt-1">? Accès B2B ? Commission 0-2% ? Analytics avancés</p>
                 </div>
               )}
             </div>
@@ -157,12 +213,12 @@ const SubscriptionPlans = () => {
                 {/* Badge "Recommandé" ou "Actuel" */}
                 {isHighlighted && !isCurrent && (
                   <div className="absolute top-4 right-4 bg-indigo-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
-                    ⭐ RECOMMANDÉ
+                    ? RECOMMANDÉ
                   </div>
                 )}
                 {isCurrent && (
                   <div className="absolute top-4 right-4 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
-                    ✓ ACTUEL
+                    ? ACTUEL
                   </div>
                 )}
 
@@ -215,7 +271,7 @@ const SubscriptionPlans = () => {
                       disabled
                       className="w-full py-4 px-6 bg-green-100 text-green-700 rounded-lg font-bold cursor-default border-2 border-green-300"
                     >
-                      ✓ Plan actif
+                      ? Plan actif
                     </button>
                   ) : (
                     <button
@@ -255,9 +311,8 @@ const SubscriptionPlans = () => {
             <div>
               <h4 className="font-bold text-blue-900 mb-2">À propos des paiements</h4>
               <p className="text-sm text-blue-800">
-                Les souscriptions sont actuellement validées manuellement par notre équipe. 
-                Après avoir cliqué sur "Souscrire", votre demande sera traitée dans les 24h. 
-                Vous recevrez une notification une fois votre plan activé.
+                Après paiement via Airtel, Moov ou carte bancaire, votre plan est activé automatiquement.
+                Si vous ne voyez pas le changement immédiatement, rafraîchissez la page.
               </p>
             </div>
           </div>

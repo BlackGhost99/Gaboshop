@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from . import webhooks
 from .views import (
     CreatePaymentAPIView,
@@ -7,9 +7,11 @@ from .views import (
     RefundAPIView,
     SubscriptionPlansAPIView,
     SubscribeToPlanView,
+    SubscriptionPaymentIntentAPIView,
 )
 
 urlpatterns = [
+    path('', include('payments.direct_urls')),
     # Anciens webhooks (conservés pour compatibilité)
     path('webhooks/airtel/', webhooks.airtel_money_webhook, name='webhook_airtel'),
     path('webhooks/moov/', webhooks.moov_money_webhook, name='webhook_moov'),
@@ -46,4 +48,6 @@ urlpatterns = [
     
     # Souscrire à un plan
     path("subscriptions/subscribe/", SubscribeToPlanView.as_view(), name="subscribe-to-plan"),
+    # Souscription par paiement (Airtel/Moov/Cinetpay)
+    path("subscriptions/intent/", SubscriptionPaymentIntentAPIView.as_view(), name="subscribe-payment-intent"),
 ]

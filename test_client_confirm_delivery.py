@@ -24,7 +24,7 @@ User = get_user_model()
 
 def print_test(message, result):
     """Helper pour afficher les résultats des tests"""
-    symbol = "✓" if result == "PASS" else "✗"
+    symbol = "?" if result == "PASS" else "?"
     color = "\033[92m" if result == "PASS" else "\033[91m"
     reset = "\033[0m"
     print(f"{color}{symbol} {message}{reset}")
@@ -47,7 +47,7 @@ def run_tests():
     User.objects.filter(email='other-client@example.com').delete()
 
     # Créer des utilisateurs de test
-    print("\n📝 Création des utilisateurs de test...")
+    print("\n?? Création des utilisateurs de test...")
     client = User.objects.create_user(
         email='test-client-confirm@example.com',
         phone='+241077700001',
@@ -95,7 +95,7 @@ def run_tests():
     )
 
     # Créer une commande
-    print("\n📦 Création d'une commande de test...")
+    print("\n?? Création d'une commande de test...")
     order = Order.objects.create(
         order_number='TEST-CLIENT-CONFIRM-001',
         client=client,
@@ -260,19 +260,19 @@ def run_tests():
         print_test("Devrait rejeter si pas delivered", "FAIL")
 
     print("\n" + "="*60)
-    print("✅ RÉSUMÉ FINAL")
+    print("? RÉSUMÉ FINAL")
     print("="*60)
-    print("✓ Client peut confirmer réception de SA commande")
-    print("✓ client_received_status passe à True")
-    print("✓ Audit trail créé avec CLIENT_CONFIRM_DELIVERY")
-    print("✓ Notification envoyée au livreur")
-    print("✓ Sécurité: autre client ne peut pas confirmer")
-    print("✓ Validation: preuve de livraison requise")
-    print("✓ Validation: statut 'delivered' requis")
-    print("\n🎯 Intégration complète: Backend + Frontend prêts!")
+    print("? Client peut confirmer réception de SA commande")
+    print("? client_received_status passe à True")
+    print("? Audit trail créé avec CLIENT_CONFIRM_DELIVERY")
+    print("? Notification envoyée au livreur")
+    print("? Sécurité: autre client ne peut pas confirmer")
+    print("? Validation: preuve de livraison requise")
+    print("? Validation: statut 'delivered' requis")
+    print("\n?? Intégration complète: Backend + Frontend prêts!")
     
     # Cleanup
-    print("\n🧹 Nettoyage final...")
+    print("\n?? Nettoyage final...")
     other_client.delete()
 
 if __name__ == '__main__':

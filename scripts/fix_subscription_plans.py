@@ -63,9 +63,8 @@ free_defaults = {
     'max_orders_per_month': 50,
     'max_products_non_food': 5,
     
-    # Frais de service
-    'service_fee_client_amount': 500,
-    'service_fee_to_wholesaler_amount': 1000,
+    'service_fee_client_amount': 0,
+    'service_fee_to_wholesaler_amount': 0,
     
     # Commissions
     'commission_reduction_percent': 0,
@@ -113,11 +112,7 @@ free_defaults = {
     
     'description': 'Gratuit pour démarrer, avec limitations.',
     'features_json': [
-        "20 produits maximum",
-        "50 commandes/mois",
         "5 produits non-alimentaires max",
-        "Frais de service: 500 F/commande",
-        "Frais B2B: 1000 F/commande grossiste",
         "Commission standard",
         "Voir rapports basiques (ventes jour/mois)",
         "Historique limité à 30 jours",
@@ -146,15 +141,14 @@ else:
 pro_defaults = {
     'name': 'Pro',
     'slug': 'pro',
-    'price': Decimal('30000.00'),
+    'price': Decimal('20000.00'),
     
     # Limites
     'max_products': None,
     'max_orders_per_month': None,
     'max_products_non_food': None,
     
-    # Frais de service
-    'service_fee_client_amount': 500,
+    'service_fee_client_amount': 0,
     'service_fee_to_wholesaler_amount': 0,
     
     # Commissions
@@ -163,7 +157,7 @@ pro_defaults = {
     
     # Fonctionnalités
     'can_sell_non_food_products': True,
-    'can_access_b2b': False,
+    'can_access_b2b': True,
     'has_b2b_visibility': False,
     'can_offer_express_delivery': True,
     'has_advanced_delivery_tracking': False,
@@ -203,10 +197,6 @@ pro_defaults = {
     
     'description': 'Pour les commerces en croissance.',
     'features_json': [
-        "Produits illimités",
-        "Commandes illimitées",
-        "Frais de service: 500 F/commande",
-        "Frais B2B: 0 F (gratuit)",
         "Commission réduite -40%",
         "Livraison express disponible",
         "Rapports détaillés (par commande/catégorie)",
@@ -243,8 +233,7 @@ business_defaults = {
     'max_orders_per_month': None,
     'max_products_non_food': None,
     
-    # Frais de service
-    'service_fee_client_amount': 500,
+    'service_fee_client_amount': 0,
     'service_fee_to_wholesaler_amount': 0,
     
     # Commissions
@@ -293,10 +282,6 @@ business_defaults = {
     
     'description': 'Le plan ultime pour maximiser votre potentiel.',
     'features_json': [
-        "Produits illimités",
-        "Commandes illimitées",
-        "Frais de service: 500 F/commande",
-        "Frais B2B: 0 F (gratuit)",
         "Commission préférentielle (0% alimentaire, 2% reste)",
         "Accès complet approvisionnement B2B",
         "Livraison express + suivi avancé",

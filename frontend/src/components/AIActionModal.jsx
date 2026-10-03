@@ -78,12 +78,6 @@ const AIActionModal = ({ isOpen, onClose, actionData, onConfirm, onCancel, isLoa
                   <span className="text-gray-900">{totals.delivery_fee?.toLocaleString('fr-FR')} FCFA</span>
                 </div>
               )}
-              {totals.service_fee > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Frais de service:</span>
-                  <span className="text-gray-900">{totals.service_fee?.toLocaleString('fr-FR')} FCFA</span>
-                </div>
-              )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>Total:</span>
                 <span className="text-indigo-600">{totals.total?.toLocaleString('fr-FR')} FCFA</span>
@@ -95,7 +89,7 @@ const AIActionModal = ({ isOpen, onClose, actionData, onConfirm, onCancel, isLoa
           {requires_confirmation && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <p className="text-sm text-yellow-800">
-                ⚠️ Veuillez vérifier les détails avant de confirmer.
+                ?? Veuillez vérifier les détails avant de confirmer.
               </p>
             </div>
           )}

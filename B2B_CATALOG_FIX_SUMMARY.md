@@ -1,6 +1,6 @@
-# 🔧 Correction du problème de clignotement B2B
+# ?? Correction du problème de clignotement B2B
 
-## 🐛 Problème identifié
+## ?? Problème identifié
 
 **Symptôme :** Interface qui clignote en continu avec des "interférences" visuelles (skeleton loading qui ne finit jamais)
 
@@ -9,16 +9,16 @@
 ### Cycle vicieux détecté :
 
 ```javascript
-// ❌ AVANT (code problématique)
+// ? AVANT (code problématique)
 useEffect(() => {
     const fetchCatalog = async () => {
         const response = await getWholesalerCatalog(...);
         
         // Ces lignes modifiaient des états dans les dépendances du useEffect
-        setPagination(response.data.pagination);  // ⚠️ Déclenche le useEffect
-        setSelectedWholesaler(prev => ({...prev, ...data})); // ⚠️ Déclenche le useEffect
+        setPagination(response.data.pagination);  // ?? Déclenche le useEffect
+        setSelectedWholesaler(prev => ({...prev, ...data})); // ?? Déclenche le useEffect
     };
-}, [selectedWholesaler, pagination.page]); // ⚠️ Dépendances modifiées dans le useEffect
+}, [selectedWholesaler, pagination.page]); // ?? Dépendances modifiées dans le useEffect
 ```
 
 **Résultat :**
@@ -26,30 +26,30 @@ useEffect(() => {
 2. Appel API
 3. Modification de `pagination` et `selectedWholesaler`
 4. Ces modifications re-déclenchent le useEffect
-5. Boucle infinie → Loading continu → Clignotement
+5. Boucle infinie ? Loading continu ? Clignotement
 
 ---
 
-## ✅ Solution appliquée
+## ? Solution appliquée
 
 ### 1. Modification de la mise à jour de la pagination
 
 ```javascript
-// ✅ APRÈS (code corrigé)
+// ? APRÈS (code corrigé)
 setPagination(prev => ({
     ...prev,
     // Ne met à jour QUE les champs qui ne sont PAS dans les dépendances
     total_products: response.data.pagination.total_products,
     total_pages: response.data.pagination.total_pages,
     page_size: response.data.pagination.page_size,
-    // ⚠️ On ne touche PAS à prev.page pour éviter le re-trigger
+    // ?? On ne touche PAS à prev.page pour éviter le re-trigger
 }));
 ```
 
 ### 2. Suppression de la mise à jour de `selectedWholesaler`
 
 ```javascript
-// ❌ Retiré - inutile et causait des re-renders
+// ? Retiré - inutile et causait des re-renders
 if (response.data?.wholesaler) {
     setSelectedWholesaler(prev => ({...prev, ...response.data.wholesaler}));
 }
@@ -58,7 +58,7 @@ if (response.data?.wholesaler) {
 ### 3. Utilisation de `selectedWholesaler?.id` dans les dépendances
 
 ```javascript
-// ✅ Utiliser l'ID primitif au lieu de l'objet complet
+// ? Utiliser l'ID primitif au lieu de l'objet complet
 }, [selectedWholesaler?.id, view, selectedCategory, pagination.page]);
 ```
 
@@ -73,7 +73,7 @@ useEffect(() => {
 
 ---
 
-## 📋 Changements effectués
+## ?? Changements effectués
 
 ### Fichier : `frontend/src/pages/store/B2BProcurement.jsx`
 
@@ -82,42 +82,42 @@ useEffect(() => {
 - L236-243 : Ajout de formatage pour le montant minimum et protection contre valeurs undefined
 
 **Optimisations ajoutées :**
-1. ✅ Élimination de la boucle de re-render
-2. ✅ Formatage des montants avec `.toLocaleString()` (ex: "50000" → "50 000")
-3. ✅ Protection contre valeurs `undefined` dans l'affichage
-4. ✅ Ajout d'un `eslint-disable` pour clarifier l'intention sur les dépendances
+1. ? Élimination de la boucle de re-render
+2. ? Formatage des montants avec `.toLocaleString()` (ex: "50000" ? "50 000")
+3. ? Protection contre valeurs `undefined` dans l'affichage
+4. ? Ajout d'un `eslint-disable` pour clarifier l'intention sur les dépendances
 
 ---
 
-## 🧪 Comment tester
+## ?? Comment tester
 
 1. **Rafraîchir l'application** (F5 ou Ctrl+R)
 2. **Aller dans "Approvisionnement (B2B)"**
 3. **Cliquer sur un grossiste (ex: BERNABE)**
 4. **Vérifier que :**
-   - ✅ Les produits se chargent UNE SEULE FOIS
-   - ✅ Plus de clignotement
-   - ✅ Les skeleton loaders disparaissent après le chargement
-   - ✅ Le montant minimum s'affiche correctement formaté
-   - ✅ Le compteur de produits s'affiche
+   - ? Les produits se chargent UNE SEULE FOIS
+   - ? Plus de clignotement
+   - ? Les skeleton loaders disparaissent après le chargement
+   - ? Le montant minimum s'affiche correctement formaté
+   - ? Le compteur de produits s'affiche
 
 ---
 
-## 🎯 Résultat attendu
+## ?? Résultat attendu
 
-### Avant (❌)
+### Avant (?)
 ```
-[Loading...] → [Loading...] → [Loading...] → [Loading...] → ∞
+[Loading...] ? [Loading...] ? [Loading...] ? [Loading...] ? 8
 ```
 
-### Après (✅)
+### Après (?)
 ```
-[Loading...] → [Produits affichés] → Stable ✨
+[Loading...] ? [Produits affichés] ? Stable ?
 ```
 
 ---
 
-## 📝 Notes techniques
+## ?? Notes techniques
 
 ### Pourquoi ne pas inclure toutes les dépendances dans useEffect ?
 
@@ -132,7 +132,7 @@ Pour ce cas, la solution 1 est la plus simple et la plus claire.
 
 ---
 
-## 🚀 Prochaines étapes
+## ?? Prochaines étapes
 
 Si vous rencontrez encore des problèmes :
 

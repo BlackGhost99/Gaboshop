@@ -31,12 +31,12 @@ class MockPaymentService:
             # Confirmer le paiement
             PaymentService.confirm_payment(payment.transaction_id, 'SUCCESS')
             
-            logger.info(f"🎯 Paiement simulé réussi pour #{order.order_number}")
+            logger.info(f"?? Paiement simulé réussi pour #{order.order_number}")
             
             return payment
             
         except Exception as e:
-            logger.error(f"❌ Erreur simulation paiement: {e}")
+            logger.error(f"? Erreur simulation paiement: {e}")
             raise
     
     @staticmethod
@@ -54,10 +54,10 @@ class MockPaymentService:
                 operator_reference="MOCK_REF_FAILED"
             )
             
-            logger.info(f"🎯 Paiement simulé échoué pour #{order.order_number}")
+            logger.info(f"?? Paiement simulé échoué pour #{order.order_number}")
             
             return payment
             
         except Exception as e:
-            logger.error(f"❌ Erreur simulation échec paiement: {e}")
+            logger.error(f"? Erreur simulation échec paiement: {e}")
             raise

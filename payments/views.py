@@ -6,12 +6,15 @@ Vues pour l'intégration CinetPay / Airtel Money / Moov Money
 """
 
 import logging
+from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.utils import timezone
+from django.db import connection
+from django.db.utils import OperationalError
 from datetime import timedelta
 
 from .models import PaymentIntent, PaymentTransaction, SubscriptionPlan, StoreSubscription
@@ -27,6 +30,114 @@ from stores.models import Store
 from orders.models import Order
 
 logger = logging.getLogger(__name__)
+
+
+def _b2b_subscription_tables_ready():
+    try:
+        tables = connection.introspection.table_names()
+        return 'b2b_b2bsubscriptionplan' in tables and 'b2b_b2bstoresubscription' in tables
+    except OperationalError:
+        return False
+    except Exception:
+        return False
+
+
+def _get_subscription_price(store, plan):
+    if isinstance(plan, SubscriptionPlan) and plan.plan_type == 'business':
+        if store.is_b2b:
+            return int(Decimal('80000.00'))
+        return int(Decimal('50000.00'))
+    return int(Decimal(plan.price))
+
+
+def _activate_subscription_from_intent(intent):
+    meta = intent.metadata or {}
+    if meta.get('purpose') != 'store_subscription':
+        return None
+    if meta.get('subscription_activated'):
+        return None
+
+    store_id = meta.get('store_id')
+    plan_id = meta.get('plan_id')
+    subscription_kind = meta.get('subscription_kind')
+    if not store_id or not plan_id or not subscription_kind:
+        logger.warning("Subscription intent missing metadata: %s", intent.reference)
+        return None
+
+    store = Store.objects.filter(id=store_id).first()
+    if not store or store.manager_id != intent.user_id:
+        logger.warning("Subscription intent store mismatch: %s", intent.reference)
+        return None
+
+    start_date = timezone.now().date()
+    end_date = start_date + timedelta(days=30)
+
+    if subscription_kind == 'b2b':
+        from b2b.models import B2BSubscriptionPlan, B2BStoreSubscription
+
+        if not _b2b_subscription_tables_ready():
+            logger.warning("B2B subscription tables missing for intent %s", intent.reference)
+            return None
+
+        if not store.is_b2b:
+            logger.warning("Store is not B2B for intent %s", intent.reference)
+            return None
+
+        plan = B2BSubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
+        if not plan or plan.plan_type == 'free':
+            logger.warning("Invalid B2B plan for intent %s", intent.reference)
+            return None
+
+        subscription = getattr(store, 'b2b_subscription', None)
+        if subscription:
+            subscription.plan = plan
+            subscription.plan_name = plan.name
+            subscription.monthly_fee = plan.price
+            subscription.status = 'active'
+            subscription.start_date = start_date
+            subscription.end_date = end_date
+            subscription.auto_renew = True
+            subscription.save()
+        else:
+            subscription = B2BStoreSubscription.objects.create(
+                store=store,
+                plan=plan,
+                plan_name=plan.name,
+                monthly_fee=plan.price,
+                status='active',
+                start_date=start_date,
+                end_date=end_date,
+                auto_renew=True
+            )
+
+        store.subscription_plan = plan.plan_type
+        store.save(update_fields=['subscription_plan'])
+    else:
+        plan = SubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
+        if not plan or plan.plan_type == 'free':
+            logger.warning("Invalid B2C plan for intent %s", intent.reference)
+            return None
+
+        StoreSubscription.objects.filter(store=store, status='active').update(status='expired')
+        subscription = StoreSubscription.objects.create(
+            store=store,
+            plan=plan,
+            plan_name=plan.name,
+            monthly_fee=_get_subscription_price(store, plan),
+            status='active',
+            start_date=start_date,
+            end_date=end_date,
+            auto_renew=True
+        )
+
+        store.subscription_plan = plan.plan_type
+        store.save(update_fields=['subscription_plan'])
+
+    meta['subscription_activated'] = True
+    meta['subscription_id'] = subscription.id
+    intent.metadata = meta
+    intent.save(update_fields=['metadata'])
+    return subscription
 
 
 class CreatePaymentAPIView(APIView):
@@ -163,6 +274,167 @@ class CreatePaymentAPIView(APIView):
             "provider": intent.provider
         }, status=status.HTTP_201_CREATED)
 
+
+class SubscriptionPaymentIntentAPIView(APIView):
+    """
+    Creer un PaymentIntent pour une souscription (B2C/B2B)
+    POST /api/v1/payments/subscriptions/intent/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.is_store_manager():
+            return Response(
+                {"detail": "Seuls les gerants peuvent souscrire"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        store = Store.objects.filter(manager=request.user).first()
+        if not store:
+            return Response(
+                {"detail": "Aucun magasin trouve"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        plan_id = request.data.get("plan_id")
+        provider = request.data.get("provider", "cinetpay")
+        operator = request.data.get("operator")
+        phone = request.data.get("phone_number")
+        channels = request.data.get("channels", "ALL")
+        lang = request.data.get("lang", "FR")
+
+        if not plan_id:
+            return Response({"detail": "plan_id requis"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if provider in ("card", "credit_card"):
+            provider = "cinetpay"
+
+        # Compat legacy: provider=airtel|moov -> provider=singpay + operator
+        if provider in ("airtel", "moov"):
+            operator = provider
+            provider = "singpay"
+
+        if provider not in ("cinetpay", "singpay"):
+            return Response({"detail": "Provider non supporte"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if provider == "singpay":
+            if operator not in ("airtel", "moov"):
+                return Response(
+                    {"detail": "operator requis pour SingPay (airtel|moov)"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if not phone:
+                return Response(
+                    {"detail": "phone_number requis pour Mobile Money"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if phone.startswith("0"):
+                phone = "+241" + phone[1:]
+
+        subscription_kind = "b2b" if store.is_b2b else "b2c"
+
+        if subscription_kind == "b2b":
+            from b2b.models import B2BSubscriptionPlan
+
+            if not _b2b_subscription_tables_ready():
+                return Response(
+                    {"detail": "Tables B2B manquantes. Lancez les migrations pour activer les plans."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+
+            plan = B2BSubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
+            if not plan or plan.plan_type == "free":
+                return Response(
+                    {"detail": "Plan B2B introuvable ou invalide"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            amount = int(Decimal(plan.price))
+        else:
+            plan = SubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
+            if not plan or plan.plan_type == "free":
+                return Response(
+                    {"detail": "Plan B2C introuvable ou invalide"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            amount = _get_subscription_price(store, plan)
+
+        metadata = {
+            "purpose": "store_subscription",
+            "plan_id": int(plan.id),
+            "store_id": int(store.id),
+            "subscription_kind": subscription_kind,
+        }
+        if provider == "singpay":
+            metadata["operator"] = operator
+
+        intent = PaymentIntent.objects.create(
+            user=request.user,
+            amount=amount,
+            currency="XAF",
+            provider=provider,
+            expires_at=timezone.now() + timedelta(minutes=30),
+            metadata=metadata
+        )
+
+        if provider == "cinetpay":
+            payload = build_cinetpay_payload(intent, channels, lang)
+            response = call_cinetpay_init(payload)
+            intent.raw_response = response
+            if isinstance(response, dict) and response.get("data"):
+                data = response["data"]
+                intent.payment_token = data.get("payment_token", "")
+                intent.payment_url = data.get("payment_url", "")
+                intent.status = "PENDING"
+            else:
+                intent.status = "FAILED"
+            intent.save()
+            PaymentTransaction.objects.create(intent=intent, status=intent.status, raw_response=response)
+        else:
+            if operator == "airtel":
+                response = call_airtel_money_init(
+                    phone=phone,
+                    amount=intent.amount,
+                    reference=intent.reference,
+                    metadata=intent.metadata
+                )
+            else:
+                response = call_moov_money_init(
+                    phone=phone,
+                    amount=intent.amount,
+                    reference=intent.reference,
+                    metadata=intent.metadata
+                )
+
+            intent.raw_response = response
+            if isinstance(response, dict) and not response.get("error"):
+                intent.payment_url = response.get("payment_url", "")
+                intent.status = "PENDING"
+            else:
+                intent.status = "FAILED"
+            intent.save()
+            PaymentTransaction.objects.create(intent=intent, status=intent.status, raw_response=response)
+
+        if intent.status == "FAILED":
+            return Response({"detail": "Impossible d'initialiser le paiement"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "success": True,
+            "payment_intent": {
+                "reference": intent.reference,
+                "status": intent.status,
+                "provider": intent.provider,
+                "operator": operator if intent.provider == "singpay" else None,
+                "amount": intent.amount,
+                "currency": intent.currency,
+                "payment_url": intent.payment_url,
+            },
+            "subscription": {
+                "plan_id": plan.id,
+                "plan_name": plan.name,
+                "subscription_kind": subscription_kind,
+            }
+        }, status=status.HTTP_201_CREATED)
+
     def _handle_moov(self, intent, request):
         """Initialiser un paiement Moov Money"""
         phone = request.data.get("phone_number")
@@ -216,7 +488,14 @@ class ProviderCallbackAPIView(APIView):
     def post(self, request, provider="cinetpay"):
         """Traiter la notification du provider"""
         payload = request.data
-        
+        singpay_payload = payload.get('paymentResult') or payload.get('paiementResult')
+        if singpay_payload:
+            transaction = singpay_payload.get('transaction') or {}
+            status_payload = singpay_payload.get('status') or {}
+        else:
+            transaction = payload.get('transaction') or {}
+            status_payload = payload.get('status') or {}
+
         logger.info(f"📨 Callback reçu: {provider} | Payload: {payload}")
 
         # Vérifier la signature si disponible
@@ -233,9 +512,13 @@ class ProviderCallbackAPIView(APIView):
 
         # Extraire la référence
         reference = (
-            payload.get("transaction_id") or
-            (payload.get("data") or {}).get("transaction_id") or
-            payload.get("transaction")
+            payload.get('transaction_id')
+            or (payload.get('data') or {}).get('transaction_id')
+            or transaction.get('reference')
+            or payload.get('reference')
+            or transaction.get('id')
+            or transaction.get('_id')
+            or (payload.get('transaction') if isinstance(payload.get('transaction'), str) else None)
         )
         if not reference:
             logger.error(f"❌ Reference manquante dans callback {provider}")
@@ -256,16 +539,27 @@ class ProviderCallbackAPIView(APIView):
 
         # Extraire les données de transaction
         provider_tx_id = (
-            payload.get("api_response_id") or
-            (payload.get("data") or {}).get("api_response_id") or
-            f"{provider}-{reference}"
+            transaction.get('airtel_money_id')
+            or transaction.get('id')
+            or transaction.get('_id')
+            or payload.get('api_response_id')
+            or (payload.get('data') or {}).get('api_response_id')
+            or f"{provider}-{reference}"
         )
         amount = int(float((
-            payload.get("amount") or
-            (payload.get("data") or {}).get("amount") or 0
+            payload.get("amount")
+            or (payload.get("data") or {}).get("amount")
+            or transaction.get("amount")
+            or 0
         )))
         status_str = (
-            (payload.get("status") or (payload.get("data") or {}).get("status") or "")
+            (payload.get('status')
+             or (payload.get('data') or {}).get('status')
+             or status_payload.get('code')
+             or status_payload.get('result_code')
+             or status_payload.get('message')
+             or transaction.get('result')
+             or '')
             .upper()
         )
 
@@ -301,11 +595,16 @@ class ProviderCallbackAPIView(APIView):
             )
 
         # Vérifier le statut de succès
-        accepted_statuses = ("ACCEPTED", "APPROVED", "SUCCESS", "OK", "00")
+        accepted_statuses = ("ACCEPTED", "APPROVED", "SUCCESS", "OK", "00", "TS")
+        normalized_result = str(transaction.get('result') or '').upper()
+        status_step = str(transaction.get('status') or '').upper()
         is_success = (
-            status_str in accepted_statuses or
-            payload.get("code") in ("00", "201") or
-            (payload.get("message") and "CREATED" in str(payload.get("message")).upper())
+            status_str in accepted_statuses
+            or normalized_result == "SUCCESS"
+            or payload.get('code') in ("00", "201")
+            or str(status_payload.get('code') or status_payload.get('result_code') or '').upper() in ("00", "201", "SUCCESS", "OK")
+            or status_payload.get('success') is True
+            or (payload.get('message') and "CREATED" in str(payload.get('message')).upper())
         )
 
         if is_success:
@@ -316,6 +615,8 @@ class ProviderCallbackAPIView(APIView):
             tx.processed = True
             tx.raw_response = payload
             tx.save()
+
+            _activate_subscription_from_intent(intent)
 
             # Business logic: marquer la commande comme payée
             order = intent.order
@@ -347,6 +648,14 @@ class ProviderCallbackAPIView(APIView):
                 status=status.HTTP_200_OK
             )
         else:
+            if status_step in ("START", "PARTENAIRE"):
+                tx.status = "PENDING"
+                tx.raw_response = payload
+                tx.save()
+                return Response(
+                    {"detail": "Payment pending"},
+                    status=status.HTTP_200_OK
+                )
             logger.warning(f"❌ Paiement échoué: {intent.reference} | Status: {status_str}")
             tx.status = "FAILED"
             tx.raw_response = payload
@@ -392,6 +701,9 @@ class CheckPaymentAPIView(APIView):
             result = call_airtel_money_check(transaction_id)
         elif provider == "moov":
             result = call_moov_money_check(transaction_id)
+        elif provider == "singpay":
+            # SingPay status endpoint is shared in current integration.
+            result = call_airtel_money_check(transaction_id)
         else:
             return Response(
                 {"detail": "Provider non supporté"},
@@ -417,7 +729,11 @@ class RefundAPIView(APIView):
     def post(self, request):
         """Initier un remboursement"""
         reference = request.data.get("reference")
-        amount = int(request.data.get("amount", 0))
+        try:
+            amount = Decimal(str(request.data.get("amount", 0)))
+        except Exception:
+            amount = Decimal('0')
+        component = request.data.get('component', 'products')
         
         if not reference:
             return Response(
@@ -445,12 +761,25 @@ class RefundAPIView(APIView):
                 {"detail": f"Ne peut pas rembourser un paiement en statut {intent.status}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        if amount > Decimal(str(intent.amount)):
+            return Response(
+                {"detail": "Le remboursement dépasse le paiement d'origine"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if intent.order and hasattr(intent.order, 'payment_arrangement'):
+            from payments.direct_service import record_refund
+            obligation = intent.order.payment_arrangement.obligations.filter(kind=component).first()
+            if not obligation or amount > obligation.remaining_amount:
+                return Response(
+                    {"detail": "Le remboursement dépasse le solde remboursable du composant"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         logger.info(f"💰 Refund initié: {reference} | Montant: {amount}")
 
         # Appeler le provider
         if intent.provider == "cinetpay":
-            res = call_cinetpay_refund(reference, amount)
+            res = call_cinetpay_refund(reference, int(amount))
         elif intent.provider == "airtel":
             return Response(
                 {"detail": "Refund non supporté pour Airtel dans cette version"},
@@ -474,11 +803,19 @@ class RefundAPIView(APIView):
             raw_response=res
         )
 
-        intent.status = "REFUNDED"
-        intent.save()
+        if amount >= Decimal(str(intent.amount)):
+            intent.status = "REFUNDED"
+            intent.save(update_fields=['status'])
+
+        if intent.order and hasattr(intent.order, 'payment_arrangement'):
+            record_refund(
+                intent.order, component, amount, request.user,
+                reference=f'{reference}-{PaymentTransaction.objects.filter(intent=intent).count()}',
+                reason=request.data.get('reason', 'Remboursement fournisseur'),
+            )
 
         # Mettre à jour la commande
-        if intent.order and hasattr(intent.order, 'mark_as_refunded'):
+        if amount >= Decimal(str(intent.amount)) and intent.order and hasattr(intent.order, 'mark_as_refunded'):
             try:
                 intent.order.mark_as_refunded(amount)
                 logger.info(f"✅ Commande #{intent.order.id} marquée comme remboursée")
@@ -505,6 +842,11 @@ class SubscriptionPlansAPIView(APIView):
         
         # Si le store est B2B, retourner les plans B2B
         if store and store.is_b2b:
+            if not _b2b_subscription_tables_ready():
+                return Response({
+                    'success': False,
+                    'error': 'Tables B2B manquantes. Appliquez les migrations B2B pour activer les plans.'
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
             plans_qs = B2BSubscriptionPlan.objects.filter(is_active=True).order_by('display_order', 'price')
             plans_data = []
             
@@ -564,17 +906,18 @@ class SubscriptionPlansAPIView(APIView):
         # Ajouter le prix dynamique pour Business selon le type de store
         if store:
             for plan in plans_data:
+                price_value = float(plan.get('price') or 0)
                 if plan['plan_type'] == 'business':
                     # Prix dynamique: 50k B2C, 80k B2B
-                    if store.is_b2b or store.store_type in ['wholesaler', 'industry']:
+                    if store.is_b2b:
                         plan['actual_price'] = 80000.00
                         plan['price_label'] = '80 000 F/mois (B2B)'
                     else:
                         plan['actual_price'] = 50000.00
                         plan['price_label'] = '50 000 F/mois (B2C)'
                 else:
-                    plan['actual_price'] = float(plan['price'])
-                    plan['price_label'] = f"{int(plan['price'])} F/mois" if plan['price'] > 0 else "Gratuit"
+                    plan['actual_price'] = price_value
+                    plan['price_label'] = f"{int(price_value)} F/mois" if price_value > 0 else "Gratuit"
 
         current_plan = None
         if store:
@@ -935,3 +1278,4 @@ class PayoutStatisticsView(APIView):
                 'by_type': by_type
             }
         })
+

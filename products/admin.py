@@ -30,6 +30,14 @@ class ProductAdminForm(forms.ModelForm):
             raise forms.ValidationError('Le poids du produit est obligatoire et doit être supérieur à 0 (kg).')
         return weight
 
+    def clean_length_m(self):
+        length = self.cleaned_data.get('length_m')
+        if length is None or length <= 0:
+            raise forms.ValidationError('La longueur du produit est obligatoire et doit être supérieure à 0 (m).')
+        if length > 5:
+            raise forms.ValidationError('La longueur du produit ne doit pas dépasser 5 m.')
+        return length
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -51,7 +59,7 @@ class ProductAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at', 'discount_percentage_display')
     fieldsets = (
         ('Informations Produit', {
-            'fields': ('store', 'category', 'name', 'description', 'sku', 'barcode', 'weight_kg')
+            'fields': ('store', 'category', 'name', 'description', 'sku', 'barcode', 'weight_kg', 'length_m')
         }),
         ('Prix et Stock', {
             'fields': ('price', 'compare_price', 'stock', 'discount_percentage_display')
@@ -75,11 +83,11 @@ class ProductAdmin(admin.ModelAdmin):
     
     def stock_display(self, obj):
         if obj.stock == 0:
-            return format_html('<span style="color: red;">⛔ {}</span>', obj.stock)
+            return format_html('<span style="color: red;">? {}</span>', obj.stock)
         elif obj.stock < 10:
-            return format_html('<span style="color: orange;">⚠️ {}</span>', obj.stock)
+            return format_html('<span style="color: orange;">?? {}</span>', obj.stock)
         else:
-            return format_html('<span style="color: green;">✅ {}</span>', obj.stock)
+            return format_html('<span style="color: green;">? {}</span>', obj.stock)
     stock_display.short_description = 'Stock'
     
     def is_available_display(self, obj):

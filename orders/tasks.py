@@ -1,82 +1,57 @@
 from celery import shared_task
 from django.utils import timezone
-from django.db import transaction
 import logging
 from datetime import timedelta
+from django.db.models import Q
 
 from orders.models import Order
-from delivery.services import DeliveryService
-from notifications.service import NotificationService
+from delivery.assignment_flow import start_delivery_assignment
 
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3)
 def assigner_livreurs_automatique(self):
     """
-    Tâche automatique pour assigner des livreurs aux commandes prêtes
-    Exécutée toutes les 5 minutes
+    Tache automatique pour assigner des livreurs aux commandes pretes
+    Executee toutes les 5 minutes
     """
     try:
-        with transaction.atomic():
-            # Récupérer les commandes prêtes sans livreur assigné
-            commandes_pretes = Order.objects.filter(
-                status='ready',
-                delivery__isnull=True
-            ).select_related('store', 'delivery')
-            
-            if not commandes_pretes:
-                logger.info("🤖 Aucune commande prête pour assignation automatique")
-                return {"assignées": 0, "total": 0}
-            
-            commandes_assignees = 0
-            
-            for commande in commandes_pretes:
-                try:
-                    # Trouver les livreurs disponibles proches
-                    livreurs_disponibles = DeliveryService.find_available_delivery_agents(
-                        commande.store,
-                        max_distance_km=15  # 15km max autour du magasin
-                    )
-                    
-                    if not livreurs_disponibles:
-                        logger.warning(f"🚫 Aucun livreur disponible pour {commande.store.name}")
-                        continue
-                    
-                    # Prendre le livreur le plus proche
-                    meilleur_livreur = livreurs_disponibles[0]['agent']
-                    
-                    # Assigner le livreur
-                    livraison = DeliveryService.assign_delivery_agent(
-                        commande, 
-                        meilleur_livreur
-                    )
-                    
-                    if livraison:
-                        commandes_assignees += 1
-                        logger.info(
-                            f"✅ Livreur auto-assigné: {meilleur_livreur.phone} "
-                            f"à la commande #{commande.order_number}"
-                        )
-                        
-                except Exception as e:
-                    logger.error(
-                        f"❌ Erreur assignation commande #{commande.order_number}: {e}"
-                    )
-                    continue
-            
-            resultat = {
-                "assignées": commandes_assignees,
-                "total": len(commandes_pretes),
-                "timestamp": timezone.now().isoformat()
-            }
-            
-            logger.info(f"🤖 Assignation auto terminée: {resultat}")
-            return resultat
-            
+        commandes_pretes = Order.objects.filter(status='ready').filter(
+            Q(delivery__isnull=True)
+            | Q(delivery__delivery_agent__isnull=True)
+            | Q(delivery__status='waiting')
+        ).select_related('store', 'delivery')
+
+        if not commandes_pretes:
+            logger.info("Aucune commande prete pour assignation automatique")
+            return {"assignees": 0, "total": 0}
+
+        commandes_assignees = 0
+
+        for commande in commandes_pretes:
+            try:
+                livraison = start_delivery_assignment(commande)
+                if livraison:
+                    commandes_assignees += 1
+            except Exception as e:
+                logger.error(
+                    f"Erreur assignation commande #{commande.order_number}: {e}"
+                )
+                continue
+
+        resultat = {
+            "assignees": commandes_assignees,
+            "total": len(commandes_pretes),
+            "timestamp": timezone.now().isoformat(),
+        }
+
+        logger.info("Assignation auto terminee: %s", resultat)
+        return resultat
+
     except Exception as e:
-        logger.error(f"❌ Erreur tâche assignation auto: {e}")
-        # Retry après 5 minutes
+        logger.error(f"Erreur tache assignation auto: {e}")
         self.retry(countdown=300, exc=e)
+
 
 @shared_task
 def nettoyer_paniers_abandonnes():
@@ -106,22 +81,22 @@ def nettoyer_paniers_abandonnes():
                     commande.save()
                     
                     logger.info(
-                        f"🗑️ Commande abandonnée annulée: #{commande.order_number} "
+                        f"??? Commande abandonnée annulée: #{commande.order_number} "
                         f"(crée le {commande.created_at})"
                     )
                     
                 except Exception as e:
-                    logger.error(f"❌ Erreur annulation commande #{commande.order_number}: {e}")
+                    logger.error(f"? Erreur annulation commande #{commande.order_number}: {e}")
                     continue
             
-            logger.info(f"🧹 Nettoyage terminé: {count} paniers abandonnés supprimés")
+            logger.info(f"?? Nettoyage terminé: {count} paniers abandonnés supprimés")
         else:
-            logger.info("🧹 Aucun panier abandonné à nettoyer")
+            logger.info("?? Aucun panier abandonné à nettoyer")
         
         return {"supprimés": count}
         
     except Exception as e:
-        logger.error(f"❌ Erreur nettoyage paniers: {e}")
+        logger.error(f"? Erreur nettoyage paniers: {e}")
         return {"erreur": str(e)}
 
 @shared_task
@@ -145,7 +120,7 @@ def notifier_retard_livraison():
             try:
                 # Notifier le client du retard
                 message_retard = (
-                    f"⚠️ Votre commande #{commande.order_number} prend plus de temps que prévu.\n"
+                    f"?? Votre commande #{commande.order_number} prend plus de temps que prévu.\n"
                     f"Notre livreur est en route. Désolé pour ce retard !\n"
                     f"Livreur: {commande.delivery.delivery_agent.phone if commande.delivery.delivery_agent else 'En attente'}"
                 )
@@ -159,14 +134,14 @@ def notifier_retard_livraison():
                 )
                 
                 notifications_envoyees += 1
-                logger.info(f"⚠️ Notification retard envoyée pour #{commande.order_number}")
+                logger.info(f"?? Notification retard envoyée pour #{commande.order_number}")
                 
             except Exception as e:
-                logger.error(f"❌ Erreur notification retard #{commande.order_number}: {e}")
+                logger.error(f"? Erreur notification retard #{commande.order_number}: {e}")
                 continue
         
         return {"notifications_retard": notifications_envoyees}
         
     except Exception as e:
-        logger.error(f"❌ Erreur tâche retards: {e}")
+        logger.error(f"? Erreur tâche retards: {e}")
         return {"erreur": str(e)}

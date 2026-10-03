@@ -97,8 +97,8 @@ const StoreDetail = () => {
 
                             <div className="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
                                 <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Ouvert</span>
-                                {store.address && <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">📍 {store.address}</span>}
-                                {store.phone && <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">📞 {store.phone}</span>}
+                                {store.address && <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">?? {store.address}</span>}
+                                {store.phone && <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">?? {store.phone}</span>}
                             </div>
                         </div>
                     </div>

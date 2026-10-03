@@ -64,3 +64,4 @@ class ProductModelTests(TestCase):
 		serializer = ProductCreateSerializer(data=data, context={'request': None})
 		self.assertFalse(serializer.is_valid())
 		self.assertIn('weight_kg', serializer.errors)
+		self.assertIn('length_m', serializer.errors)

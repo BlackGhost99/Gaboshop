@@ -34,7 +34,7 @@ def test_catalog_endpoint():
     # Récupérer un utilisateur de test
     user = get_test_user()
     if not user:
-        print("❌ Aucun utilisateur B2C trouvé pour les tests")
+        print("? Aucun utilisateur B2C trouvé pour les tests")
         return
 
     print(f"Utilisateur de test: {user.username} ({user.email})")
@@ -44,7 +44,7 @@ def test_catalog_endpoint():
         wholesaler = Store.objects.get(id=3, is_b2b=True, is_active=True)
         print(f"Grossiste: {wholesaler.name} (ID: {wholesaler.id})")
     except Store.DoesNotExist:
-        print("❌ Grossiste B2B non trouvé")
+        print("? Grossiste B2B non trouvé")
         return
 
     # Tester directement les services B2B

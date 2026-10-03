@@ -31,16 +31,16 @@ BLUE = '\033[94m'
 RESET = '\033[0m'
 
 def print_success(msg):
-    print(f"{GREEN}✓{RESET} {msg}")
+    print(f"{GREEN}?{RESET} {msg}")
 
 def print_error(msg):
-    print(f"{RED}✗{RESET} {msg}")
+    print(f"{RED}?{RESET} {msg}")
 
 def print_info(msg):
-    print(f"{BLUE}ℹ{RESET} {msg}")
+    print(f"{BLUE}?{RESET} {msg}")
 
 def print_warning(msg):
-    print(f"{YELLOW}⚠{RESET} {msg}")
+    print(f"{YELLOW}?{RESET} {msg}")
 
 def print_header(msg):
     print(f"\n{BLUE}{'='*60}{RESET}")
@@ -237,7 +237,7 @@ class Phase2AuditTrailTester:
         ).first()
         
         if update_log and update_log.old_value == old_name and update_log.new_value == 'Test Store Updated':
-            print_success(f"Store update tracked: '{old_name}' → '{update_log.new_value}'")
+            print_success(f"Store update tracked: '{old_name}' ? '{update_log.new_value}'")
             self.passed += 1
         else:
             print_error("Store update values not tracked correctly")
@@ -281,7 +281,7 @@ class Phase2AuditTrailTester:
         final_count = AuditLog.objects.filter(object_type='payment').count()
         
         if final_count == initial_count + 2:
-            print_success("Payment audit logs created: 2 entries (initiated → completed)")
+            print_success("Payment audit logs created: 2 entries (initiated ? completed)")
             self.passed += 1
         else:
             print_error(f"Expected 2 payment audit logs, got {final_count - initial_count}")
@@ -464,11 +464,11 @@ class Phase2AuditTrailTester:
         
         if self.failed == 0:
             print(f"\n{GREEN}{'='*60}{RESET}")
-            print(f"{GREEN}🎉 ALL TESTS PASSED! Phase 2 Audit Trail is working! 🎉{RESET}")
+            print(f"{GREEN}?? ALL TESTS PASSED! Phase 2 Audit Trail is working! ??{RESET}")
             print(f"{GREEN}{'='*60}{RESET}\n")
         else:
             print(f"\n{YELLOW}{'='*60}{RESET}")
-            print(f"{YELLOW}⚠ Some tests failed. Review the logs above. ⚠{RESET}")
+            print(f"{YELLOW}? Some tests failed. Review the logs above. ?{RESET}")
             print(f"{YELLOW}{'='*60}{RESET}\n")
         
         # Show recent audit logs

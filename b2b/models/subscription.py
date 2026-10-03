@@ -2,6 +2,8 @@
 Modèles pour les abonnements B2B des grossistes
 """
 from django.db import models
+import re
+import unicodedata
 from django.utils import timezone
 from decimal import Decimal
 
@@ -147,6 +149,28 @@ class B2BSubscriptionPlan(models.Model):
     
     def get_all_features(self):
         """Retourne toutes les fonctionnalités du plan"""
+        def normalize_text(value):
+            text = (value or '').strip().lower()
+            text = unicodedata.normalize('NFD', text)
+            text = re.sub(r'[\u0300-\u036f]', '', text)
+            text = re.sub(r'[^a-z0-9]+', ' ', text)
+            return ' '.join(text.split())
+
+        def feature_key(value):
+            normalized = normalize_text(value)
+            if not normalized:
+                return ''
+            match = re.search(r'\d+', normalized)
+            if 'produit' in normalized:
+                key = 'produits_b2b'
+                if match:
+                    return f"{key}:{match.group(0)}"
+            if 'commande' in normalized and match:
+                return f"commandes:{match.group(0)}"
+            if 'client' in normalized and match:
+                return f"clients:{match.group(0)}"
+            return normalized
+
         features = []
         
         # Limites
@@ -301,8 +325,18 @@ class B2BSubscriptionPlan(models.Model):
                     'category': custom_feature.get('category', 'custom'),
                     'enabled': True
                 })
-        
-        return features
+
+        unique = []
+        seen = set()
+        for item in features:
+            title = item.get('title', '')
+            key = feature_key(title)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append(item)
+
+        return unique
 
 
 class B2BStoreSubscription(models.Model):
@@ -383,4 +417,3 @@ class B2BStoreSubscription(models.Model):
             self.end_date = timezone.now().date() + timedelta(days=duration_days)
         self.status = 'active'
         self.save()
-

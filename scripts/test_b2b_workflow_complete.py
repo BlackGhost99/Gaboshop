@@ -108,7 +108,7 @@ def test_b2b_workflow():
             city=buyer_store.city,
             items_total=b2b_pricing.b2b_price * order_quantity,
             delivery_fee=wholesaler.delivery_fee,
-            service_fee=200,
+            service_fee=0,
             total_amount=(b2b_pricing.b2b_price * order_quantity) + wholesaler.delivery_fee + 200,
             status='confirmed',  # B2B orders start confirmed
             confirmed_at=timezone.now()

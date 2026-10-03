@@ -171,7 +171,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-gray-400">
           <p>&copy; {year} GABOSHOP. Tous droits réservés.</p>
           <div className="flex gap-4 mt-4 md:mt-0">
-            <span>🇬🇦 Libreville, Gabon</span>
+            <span>???? Libreville, Gabon</span>
             <span>•</span>
             <span>+241 XXX XXXX</span>
             <span>•</span>

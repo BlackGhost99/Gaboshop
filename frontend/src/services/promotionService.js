@@ -53,7 +53,7 @@ export const getPromotions = async () => {
       title: product.name,
       subtitle: `${product.store_name || 'Magasin'} - Jusqu'à -${product.discount_percentage || 0}%`,
       cta: 'Voir l\'offre',
-      icon: '🎉',
+      icon: '??',
       image: product.image,
       product_id: product.id,
       discount: product.discount_percentage || 0,
@@ -94,7 +94,7 @@ export const getCategories = async () => {
     return data.map((cat) => ({
       id: cat.id,
       name: cat.name,
-      icon: cat.icon || '📦',
+      icon: cat.icon || '??',
       color: cat.color || 'bg-gray-100',
       textColor: cat.text_color || 'text-gray-700',
       slug: cat.slug || `category-${cat.id}`,

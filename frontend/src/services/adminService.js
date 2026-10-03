@@ -286,6 +286,11 @@ export const updateStoreB2CSettings = async (storeId, payload) => {
   return res.data;
 };
 
+export const updateStoreMarketMode = async (storeId, payload) => {
+  const res = await api.patch(`/admin/stores/${storeId}/market-mode/`, payload);
+  return res.data;
+};
+
 // Products Admin Management API
 export const getProductStats = async () => {
   const res = await api.get('/admin/products/stats/');

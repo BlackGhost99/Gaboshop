@@ -269,14 +269,14 @@ const Navbar = ({ userRole, userName }) => {
                                   selectedNotification.notif_type === 'warning' ? 'bg-yellow-100 text-yellow-700' :
                                   'bg-gray-100 text-gray-700'
                               }`}>
-                                  {selectedNotification.notif_type === 'delivery' && '🚚 Livraison'}
-                                  {selectedNotification.notif_type === 'order' && '📦 Commande'}
-                                  {selectedNotification.notif_type === 'payment' && '💰 Paiement'}
-                                  {selectedNotification.notif_type === 'warning' && '⚠️ Alerte'}
-                                  {selectedNotification.notif_type === 'info' && 'ℹ️ Info'}
+                                  {selectedNotification.notif_type === 'delivery' && '?? Livraison'}
+                                  {selectedNotification.notif_type === 'order' && '?? Commande'}
+                                  {selectedNotification.notif_type === 'payment' && '?? Paiement'}
+                                  {selectedNotification.notif_type === 'warning' && '?? Alerte'}
+                                  {selectedNotification.notif_type === 'info' && '?? Info'}
                               </span>
                               {selectedNotification.is_read && (
-                                  <span className="text-xs text-gray-500">✓ Lu</span>
+                                  <span className="text-xs text-gray-500">? Lu</span>
                               )}
                           </div>
 

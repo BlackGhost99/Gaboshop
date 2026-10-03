@@ -1,6 +1,7 @@
 """API v1: orders endpoints."""
 
 import logging
+from django.db import transaction
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -50,7 +51,8 @@ class OrderCreateView(APIView):
 		)
         
 		if serializer.is_valid():
-			order = serializer.save()
+			with transaction.atomic():
+				order = serializer.save()
             
 			return Response({
 				'success': True,
@@ -169,6 +171,10 @@ class OrderStatusUpdateView(APIView):
 			)
 			
 			if serializer.is_valid():
+				if request.data.get('status') == 'ready':
+					from payments.direct_service import can_dispatch
+					if not can_dispatch(order):
+						return Response({'success': False, 'error': {'code': 409, 'message': 'Le paiement requis avant expédition n’est pas confirmé.'}}, status=status.HTTP_409_CONFLICT)
 				serializer.save()
 				order.refresh_from_db()
 
@@ -177,7 +183,7 @@ class OrderStatusUpdateView(APIView):
 					try:
 						auto_assign_delivery(order)
 					except Exception as assign_err:
-						logger.error(f"❌ Auto-assignation livreur échouée pour {order.order_number}: {assign_err}")
+						logger.error(f"? Auto-assignation livreur échouée pour {order.order_number}: {assign_err}")
 				
 				return Response({
 					'success': True,
@@ -459,4 +465,3 @@ class OrderSelectVehicleView(APIView):
 				'success': False,
 				'error': f'Erreur: {str(e)}'
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-

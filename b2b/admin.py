@@ -167,22 +167,22 @@ class B2BSubscriptionPlanAdmin(admin.ModelAdmin):
     
     def max_products_display(self, obj):
         if obj.max_b2b_products is None:
-            return format_html('<span style="color: blue;">∞ Illimité</span>')
+            return format_html('<span style="color: blue;">8 Illimité</span>')
         return f"{obj.max_b2b_products} produits"
     max_products_display.short_description = 'Limite produits'
     
     def features_summary(self, obj):
         features = []
         if obj.can_view_detailed_reports or obj.has_advanced_analytics:
-            features.append('📊 Analytics')
+            features.append('?? Analytics')
         if obj.has_priority_support:
-            features.append('🎧 Support VIP')
+            features.append('?? Support VIP')
         if obj.can_create_promotions:
-            features.append('🎁 Promotions')
+            features.append('?? Promotions')
         if obj.has_api_access:
-            features.append('🔌 API')
+            features.append('?? API')
         if obj.featured_in_catalog:
-            features.append('⭐ Featured')
+            features.append('? Featured')
         return ' | '.join(features) if features else '-'
     features_summary.short_description = 'Fonctionnalités'
 
@@ -307,6 +307,6 @@ class B2BStoreSubscriptionAdmin(admin.ModelAdmin):
     
     def auto_renew_display(self, obj):
         if obj.auto_renew:
-            return format_html('<span style="color: green;">✓ Oui</span>')
-        return format_html('<span style="color: gray;">✗ Non</span>')
+            return format_html('<span style="color: green;">? Oui</span>')
+        return format_html('<span style="color: gray;">? Non</span>')
     auto_renew_display.short_description = 'Auto-renouvellement'

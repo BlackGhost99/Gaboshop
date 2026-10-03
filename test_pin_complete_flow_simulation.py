@@ -28,14 +28,14 @@ import json
 User = get_user_model()
 
 def print_test(title, result):
-    symbol = "✓" if result == "PASS" else "✗"
+    symbol = "?" if result == "PASS" else "?"
     color = "\033[92m" if result == "PASS" else "\033[91m"
     reset = "\033[0m"
     print(f"{color}{symbol} {title}{reset}")
 
 def cleanup():
     """Nettoyer les données de test"""
-    print("\n🧹 Nettoyage des données précédentes...")
+    print("\n?? Nettoyage des données précédentes...")
     DeliveryProof.objects.filter(delivery__order__order_number__startswith='TEST-PIN-FLOW').delete()
     Delivery.objects.filter(order__order_number__startswith='TEST-PIN-FLOW').delete()
     Order.objects.filter(order_number__startswith='TEST-PIN-FLOW').delete()
@@ -48,7 +48,7 @@ def setup_test_data():
     import random
     import time
     
-    print("\n📝 Création des données de test...")
+    print("\n?? Création des données de test...")
     
     # Générer des numéros de téléphone uniques
     timestamp = int(time.time() * 1000) % 999999
@@ -65,7 +65,7 @@ def setup_test_data():
         first_name='Client',
         last_name='PIN'
     )
-    print(f"  ✓ Client créé: {client.email}")
+    print(f"  ? Client créé: {client.email}")
     
     livreur = User.objects.create_user(
         email=f'test-pin-livreur-{timestamp}@example.com',
@@ -75,7 +75,7 @@ def setup_test_data():
         first_name='Livreur',
         last_name='PIN'
     )
-    print(f"  ✓ Livreur créé: {livreur.email}")
+    print(f"  ? Livreur créé: {livreur.email}")
     
     manager = User.objects.create_user(
         email=f'test-pin-manager-{timestamp}@example.com',
@@ -85,7 +85,7 @@ def setup_test_data():
         first_name='Manager',
         last_name='PIN'
     )
-    print(f"  ✓ Manager créé: {manager.email}")
+    print(f"  ? Manager créé: {manager.email}")
     
     # Store
     category = StoreCategory.objects.first() or StoreCategory.objects.create(name='Test')
@@ -97,7 +97,7 @@ def setup_test_data():
         phone=f'+241{timestamp:09d}',
         commission_rate=Decimal('8.00')  # Ensure commission_rate is Decimal
     )
-    print(f"  ✓ Store créé: {store.name}")
+    print(f"  ? Store créé: {store.name}")
     
     # Produit
     product = Product.objects.create(
@@ -106,7 +106,7 @@ def setup_test_data():
         price=Decimal('50000'),
         stock=10
     )
-    print(f"  ✓ Produit créé: {product.name}")
+    print(f"  ? Produit créé: {product.name}")
     
     # Commande
     order = Order.objects.create(
@@ -123,7 +123,7 @@ def setup_test_data():
         commission_rate=Decimal('5'),  # Add as Decimal, not float
         status='confirmed'
     )
-    print(f"  ✓ Commande créée: {order.order_number}")
+    print(f"  ? Commande créée: {order.order_number}")
     
     # Livraison - Supprime d'abord si elle existe (OneToOne constraint)
     Delivery.objects.filter(order=order).delete()
@@ -132,15 +132,15 @@ def setup_test_data():
         delivery_agent=livreur,
         status='pending'
     )
-    print(f"  ✓ Livraison créée (ID={delivery.id}, PIN={delivery.delivery_code})")
+    print(f"  ? Livraison créée (ID={delivery.id}, PIN={delivery.delivery_code})")
     
     return client, livreur, manager, store, product, order, delivery
 
 def test_complete_flow():
-    """Test le flux complet PIN → Upload → Complete"""
+    """Test le flux complet PIN ? Upload ? Complete"""
     
     print("\n" + "="*70)
-    print("TEST: Flux complet PIN → Upload Preuve → Confirmer Livraison")
+    print("TEST: Flux complet PIN ? Upload Preuve ? Confirmer Livraison")
     print("="*70)
     
     cleanup()
@@ -158,7 +158,7 @@ def test_complete_flow():
     # ÉTAPE 1: Livreur accepte la livraison
     # ============================================================================
     print("\n" + "-"*70)
-    print("ÉTAPE 1: Livreur accepte la livraison (→ statut 'accepted')")
+    print("ÉTAPE 1: Livreur accepte la livraison (? statut 'accepted')")
     print("-"*70)
     
     test_client.force_login(livreur)
@@ -282,15 +282,15 @@ def test_complete_flow():
     # RÉSUMÉ
     # ============================================================================
     print("\n" + "="*70)
-    print("✅ RÉSUMÉ FINAL")
+    print("? RÉSUMÉ FINAL")
     print("="*70)
-    print(f"✓ Livraison créée avec PIN: {delivery.delivery_code}")
-    print(f"✓ Livreur acceptée → statut: {delivery.status}")
-    print(f"✓ PIN vérifié en frontend")
-    print(f"✓ Preuve uploadée (photo + GPS + PIN)")
-    print(f"✓ Livraison confirmée → statut: delivered")
-    print(f"✓ Commande mise à jour → statut: {order.status}")
-    print("\n🎉 Flux complet PIN fonctionnel!")
+    print(f"? Livraison créée avec PIN: {delivery.delivery_code}")
+    print(f"? Livreur acceptée ? statut: {delivery.status}")
+    print(f"? PIN vérifié en frontend")
+    print(f"? Preuve uploadée (photo + GPS + PIN)")
+    print(f"? Livraison confirmée ? statut: delivered")
+    print(f"? Commande mise à jour ? statut: {order.status}")
+    print("\n?? Flux complet PIN fonctionnel!")
     
     return True
 
@@ -299,7 +299,7 @@ if __name__ == '__main__':
         success = test_complete_flow()
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n❌ Erreur: {str(e)}")
+        print(f"\n? Erreur: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

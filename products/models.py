@@ -71,6 +71,13 @@ class Product(models.Model):
 		blank=True,
 		help_text="Poids du produit en kg"
 	)
+	length_m = models.DecimalField(
+		max_digits=6,
+		decimal_places=2,
+		null=True,
+		blank=True,
+		help_text="Longueur du produit en mètres"
+	)
 	estimated_weight_kg = models.DecimalField(
 		max_digits=8,
 		decimal_places=2,

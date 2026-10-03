@@ -5,12 +5,48 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { getClientDashboard } from '../../services/dashboardService';
 import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils/helpers';
 import { createOrder } from '../../services/orderService';
-import { initPayment, simulatePaymentSuccess } from '../../services/paymentService';
+import { getPaymentOptions, initPayment } from '../../services/paymentService';
 import { getProductDetails } from '../../services/productService';
 
 const CART_KEY = 'gaboshop_cart';
 const envBase = import.meta.env.VITE_API_URL;
 const API_BASE = envBase ? `${envBase.replace(/\/$/, '')}/api/v1` : '/api/v1';
+const DEFAULT_WEIGHT_KG = 0.5;
+const DEFAULT_LENGTH_M = 0.5;
+
+const flattenApiErrors = (value, parentPath = '') => {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => {
+      if (typeof entry === 'string') {
+        return parentPath ? [`${parentPath}: ${entry}`] : [entry];
+      }
+      const nextPath = parentPath || `[${index}]`;
+      return flattenApiErrors(entry, nextPath);
+    });
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([key, nested]) => {
+      const nextPath = parentPath ? `${parentPath}.${key}` : key;
+      return flattenApiErrors(nested, nextPath);
+    });
+  }
+
+  if (value === null || value === undefined) return [];
+  return parentPath ? [`${parentPath}: ${String(value)}`] : [String(value)];
+};
+
+const getReadableApiErrorMessage = (details, fallbackMessage = '') => {
+  const lines = flattenApiErrors(details).filter(Boolean);
+  if (lines.length) return lines.join(' | ');
+  return fallbackMessage || '';
+};
+
+const isStoreClosedMessage = (message) => {
+  if (typeof message !== 'string') return false;
+  const normalized = message.toLowerCase();
+  return normalized.includes('magasin') && normalized.includes('ferm');
+};
 
 const ClientDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -22,75 +58,65 @@ const ClientDashboard = () => {
   const [submitting, setSubmitting] = useState({});
   const [toast, setToast] = useState(null);
   const [storeAlerts, setStoreAlerts] = useState({});
+  const [paymentOptions, setPaymentOptions] = useState({});
   const [zones, setZones] = useState([]);
   const [zonesLoading, setZonesLoading] = useState(true);
 
-  // Helper: Calculate service fee (5% of subtotal by default, configurable by store plan)
-  const calculateServiceFee = (subtotal) => {
-    try {
-      // Default: 5% service fee (can be overridden per store)
-      // In production, this should come from the store's subscription plan
-      const serviceFeeRate = 0.05; // 5%
-      return Math.round(subtotal * serviceFeeRate);
-    } catch (err) {
-      console.warn('Erreur calcul frais service', err);
-      return 500; // Fallback
-    }
-  };
-
-  // Helper: Calculate operator fee (3% of items + delivery)
-  const calculateOperatorFee = (subtotal, deliveryCost) => {
-    try {
-      // Operator fee: 3% on (items + delivery)
-      const operatorFeeRate = 0.03; // 3%
-      const baseAmount = subtotal + deliveryCost;
-      return Math.round(baseAmount * operatorFeeRate);
-    } catch (err) {
-      console.warn('Erreur calcul frais opérateur', err);
-      return Math.round((subtotal + deliveryCost) * 0.03);
-    }
-  };
-
   // Helper: Calculate total amount
-  const calculateTotal = (subtotal, deliveryCost, serviceFee, operatorFee) => {
-    return subtotal + deliveryCost + serviceFee + operatorFee;
+  const calculateTotal = (subtotal, deliveryCost) => {
+    return subtotal + deliveryCost;
+  };
+
+  const selectVehicleType = (totalWeight, totalLength) => {
+    if (totalWeight <= 30 && totalLength <= 0.5) return 'MOTO';
+    if (totalWeight <= 80 && totalLength <= 1) return 'CAR';
+    if (totalWeight <= 150 && totalLength <= 2) return 'VAN';
+    return 'TRUCK';
+  };
+
+  const getTotals = (items) => {
+    const totals = items.reduce((acc, item) => {
+      const qty = item.quantity || 0;
+      const weight = parseFloat(item.weight_kg);
+      const length = parseFloat(item.length_m);
+      acc.totalWeight += (Number.isFinite(weight) ? weight : DEFAULT_WEIGHT_KG) * qty;
+      acc.totalLength += (Number.isFinite(length) ? length : DEFAULT_LENGTH_M) * qty;
+      return acc;
+    }, { totalWeight: 0, totalLength: 0 });
+    return totals;
   };
 
   // Helper: Calculate delivery cost based on zone and items
-  const calculateDeliveryCost = (city, items) => {
+  const calculateDeliveryCost = (zoneName, city, items) => {
     try {
-      if (!city || !items || !items.length) return 0;
+      if (!items || !items.length) return 0;
       
-      // Find zone by city
-      const zoneForCity = zones.find(z => z.city?.toLowerCase() === city?.toLowerCase());
-      if (!zoneForCity || !zoneForCity.rates || !zoneForCity.rates.length) {
+      const normalizedZone = zoneName?.trim().toLowerCase();
+      let zoneForDelivery = normalizedZone
+        ? zones.find(z => z.name?.toLowerCase() === normalizedZone)
+        : null;
+
+      if (!zoneForDelivery && city) {
+        zoneForDelivery = zones.find(z => z.city?.toLowerCase() === city?.toLowerCase());
+      }
+
+      if (!zoneForDelivery || !zoneForDelivery.rates || !zoneForDelivery.rates.length) {
         // Fallback: use a default estimate
         return 3000; // Placeholder if zone not configured
       }
       
-      // Calculate total weight
-      const totalWeight = items.reduce((sum, item) => sum + (parseFloat(item.weight_kg) || 0) * item.quantity, 0);
+      const { totalWeight, totalLength } = getTotals(items);
       
-      // Select vehicle based on weight (same logic as backend)
-      let selectedRate = null;
-      if (totalWeight <= 5) {
-        selectedRate = zoneForCity.rates.find(r => r.vehicle_type === 'BIKE');
-      } else if (totalWeight <= 20) {
-        selectedRate = zoneForCity.rates.find(r => r.vehicle_type === 'MOTO');
-      } else {
-        selectedRate = zoneForCity.rates.find(r => r.vehicle_type === 'VAN');
-      }
+      // Select vehicle based on weight + length (same logic as backend)
+      const vehicleType = selectVehicleType(totalWeight, totalLength);
+      const selectedRate = zoneForDelivery.rates.find(r => r.vehicle_type === vehicleType);
       
       if (!selectedRate) {
         return 3000; // Fallback
       }
       
-      // Estimate distance = 2km for intra-city
-      const estimatedKm = 2;
       const baseCost = parseFloat(selectedRate.base_price) || 0;
-      const perKmCost = (parseFloat(selectedRate.price_per_km) || 0) * estimatedKm;
-      
-      return Math.round(baseCost + perKmCost);
+      return Math.round(baseCost);
     } catch (err) {
       console.warn('Erreur calcul frais livraison', err);
       return 3000;
@@ -179,7 +205,7 @@ const ClientDashboard = () => {
       const defaults = {};
       parsed.forEach((it) => {
         const key = it.store_name || 'Magasin';
-        if (!defaults[key]) defaults[key] = { city: 'Libreville', address: '', phone: '', zone: '', notes: '' };
+        if (!defaults[key]) defaults[key] = { city: 'Libreville', address: '', phone: '', payment_phone: '', zone: '', notes: '', payment_flow: '', payment_method: '' };
       });
       setStoreForms(defaults);
     } catch (e) {
@@ -196,7 +222,7 @@ const ClientDashboard = () => {
       const updated = { ...prev };
       Object.keys(cartByStore).forEach((name) => {
         if (!updated[name]) {
-          updated[name] = { city: 'Libreville', address: '', phone: '', zone: '', notes: '' };
+          updated[name] = { city: 'Libreville', address: '', phone: '', payment_phone: '', zone: '', notes: '', payment_flow: '', payment_method: '' };
         }
       });
       return updated;
@@ -204,8 +230,28 @@ const ClientDashboard = () => {
   }, [cartByStore]);
 
   useEffect(() => {
-    // Backfill store_id for legacy cart items
-    const missing = cartItems.filter((it) => !it.store_id);
+    let active = true;
+    Object.entries(cartByStore).forEach(async ([storeName, group]) => {
+      const storeId = group.items?.[0]?.store_id;
+      if (!storeId) return;
+      try {
+        const response = await getPaymentOptions(storeId, storeForms[storeName]?.delivery_requested !== false);
+        const options = response?.data?.options || [];
+        if (!active) return;
+        setPaymentOptions((prev) => ({...prev, [storeName]: options}));
+        if (options.length && !storeForms[storeName]?.payment_flow) {
+          setStoreForms((prev) => ({...prev, [storeName]: {...prev[storeName], payment_flow: options[0].flow, payment_method: options[0].method}}));
+        }
+      } catch (error) {
+        if (active) setPaymentOptions((prev) => ({...prev, [storeName]: []}));
+      }
+    });
+    return () => { active = false; };
+  }, [cartByStore]);
+
+  useEffect(() => {
+    // Backfill store_id/weight/length for legacy cart items
+    const missing = cartItems.filter((it) => !it.store_id || !it.weight_kg || !it.length_m);
     if (!missing.length) return;
     let active = true;
     const run = async () => {
@@ -219,6 +265,13 @@ const ClientDashboard = () => {
             if (idx !== -1) {
               updated[idx] = { ...updated[idx], store_id: data.store, store_name: data.store_name || updated[idx].store_name };
             }
+          }
+          const idx = updated.findIndex((i) => i.id === miss.id);
+          if (idx !== -1) {
+            const next = { ...updated[idx] };
+            if (!next.weight_kg && data?.weight_kg) next.weight_kg = data.weight_kg;
+            if (!next.length_m && data?.length_m) next.length_m = data.length_m;
+            updated[idx] = next;
           }
         } catch (e) {
           console.warn('Impossible de récupérer le store du produit', miss.id, e);
@@ -263,8 +316,11 @@ const ClientDashboard = () => {
         city: prev[storeName]?.city ?? 'Libreville',
         address: prev[storeName]?.address ?? '',
         phone: prev[storeName]?.phone ?? '',
+        payment_phone: prev[storeName]?.payment_phone ?? '',
         zone: prev[storeName]?.zone ?? '',
         notes: prev[storeName]?.notes ?? '',
+        payment_flow: prev[storeName]?.payment_flow ?? '',
+        payment_method: prev[storeName]?.payment_method ?? '',
         delivery_requested: prev[storeName]?.delivery_requested ?? true,
         [field]: value,
       },
@@ -287,7 +343,10 @@ const ClientDashboard = () => {
     const city = form.city?.trim() || 'Libreville';
     const delivery_address = form.address?.trim();
     const delivery_phone = form.phone?.trim();
+    const payment_phone = form.payment_phone?.trim() || delivery_phone;
     const delivery_zone = form.zone?.trim();
+    const payment_flow = form.payment_flow;
+    const payment_method = form.payment_method;
 
     // Front validations avant envoi au backend
     if (!delivery_address) {
@@ -296,6 +355,10 @@ const ClientDashboard = () => {
     }
     if (!delivery_phone || delivery_phone.length < 6) {
       setToast({ type: 'error', message: 'Renseignez un numéro de téléphone valide.' });
+      return;
+    }
+    if (payment_flow === 'platform_online' && (!payment_phone || payment_phone.length < 6)) {
+      setToast({ type: 'error', message: 'Renseignez un numéro Mobile Money valide.' });
       return;
     }
     if (!delivery_zone) {
@@ -311,6 +374,8 @@ const ClientDashboard = () => {
       delivery_zone,
       delivery_requested: form.delivery_requested !== false,
       notes: form.notes || '',
+      payment_flow,
+      payment_method,
       items: items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
     };
 
@@ -320,23 +385,28 @@ const ClientDashboard = () => {
       if (res.success) {
         const orderId = res.data?.id;
         let paymentInfo = null;
+        let paymentSteps = null;
+        let payerPhoneUsed = payment_phone;
+        let paymentInitFailed = false;
+        let paymentInitError = '';
 
-        // Auto-init + auto-confirme le paiement via le webhook interne (mode test)
-        if (orderId) {
+        // Init paiement reel selon le moyen choisi
+        if (orderId && payment_flow === 'platform_online') {
           try {
-            const payRes = await initPayment(orderId, { payment_method: 'cash' });
+            const payRes = await initPayment(orderId, {
+              payment_method,
+              phone_number: payment_phone,
+            });
             paymentInfo = payRes?.data?.payment || payRes?.payment || null;
-
-            // Pour le mode cash, considère comme confirmé même si aucune transaction simulée n'est renvoyée
-            if (!paymentInfo && payRes?.success) {
-              paymentInfo = { status: 'success', payment_method: 'cash' };
-            }
-
-            if (paymentInfo?.transaction_id) {
-              await simulatePaymentSuccess(paymentInfo.transaction_id, paymentInfo.amount);
-            }
+            paymentSteps = payRes?.data?.next_steps || null;
+            payerPhoneUsed = payRes?.data?.payer_phone || payment_phone;
           } catch (payErr) {
-            console.warn('Simulation paiement échouée', payErr);
+            console.warn('Initialisation paiement echouee', payErr);
+            paymentInitFailed = true;
+            paymentInitError = getReadableApiErrorMessage(
+              payErr?.error?.details,
+              payErr?.error?.message || String(payErr)
+            );
           }
         }
 
@@ -347,18 +417,26 @@ const ClientDashboard = () => {
           delete next[storeName];
           return next;
         });
-        setToast({
-          type: 'success',
-          message: paymentInfo ? 'Commande créée et paiement confirmé (mode test).' : 'Commande créée.',
-        });
+        let toastType = 'success';
+        let toastMessage = 'Commande creee.';
+
+        if (paymentInitFailed) {
+          toastType = 'warning';
+          toastMessage = paymentInitError
+            ? `Commande creee, mais le paiement a echoue: ${paymentInitError}`
+            : 'Commande creee, mais le paiement n a pas pu etre initialise. Reessayez depuis Mes commandes.';
+        } else if (paymentInfo) {
+          const providerLabel = payment_method === 'moov_money' ? 'Moov Money' : 'Airtel Money';
+          const providerHint = paymentSteps?.message || `Paiement ${providerLabel} initialise.`;
+          toastMessage = `${providerHint} Numero payeur: ${payerPhoneUsed}. Verifiez votre telephone et confirmez avec votre PIN.`;
+        }
+
+        setToast({ type: toastType, message: toastMessage });
       } else {
         const details = res.error?.details;
-        // Rendre l'erreur explicite si le backend renvoie des détails
-        const detailMsg = details
-          ? Object.values(details).flat().join(' | ')
-          : res.error?.message;
+        const detailMsg = getReadableApiErrorMessage(details, res.error?.message);
 
-        const closed = typeof detailMsg === 'string' && detailMsg.toLowerCase().includes('magasin est actuellement fermé');
+        const closed = isStoreClosedMessage(detailMsg);
         // Champs manquants côté backend
         const missingFields = details && typeof details === 'object'
           ? Object.entries(details)
@@ -377,10 +455,8 @@ const ClientDashboard = () => {
       }
     } catch (err) {
       const details = err?.error?.details;
-      const msg = details
-        ? Object.values(details).flat().join(' | ')
-        : err?.error?.message || err;
-      const closed = typeof msg === 'string' && msg.toLowerCase().includes('magasin est actuellement fermé');
+      const msg = getReadableApiErrorMessage(details, err?.error?.message || String(err));
+      const closed = isStoreClosedMessage(msg);
       const missingFields = details && typeof details === 'object'
         ? Object.entries(details)
             .filter(([, errs]) => Array.isArray(errs) && errs.some((e) => String(e).toLowerCase().includes('requis') || String(e).toLowerCase().includes('required')))
@@ -514,7 +590,7 @@ const ClientDashboard = () => {
                           {formatDateTime(order.created_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                          {formatCurrency(order.total)}
+                          {formatCurrency(order.total_amount)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.className}`}>
@@ -626,7 +702,7 @@ const ClientDashboard = () => {
                       className="h-5 w-5 text-blue-600 border-gray-300 rounded cursor-pointer"
                     />
                     <label htmlFor={`delivery-${storeName}`} className="flex-1 cursor-pointer">
-                      <p className="font-semibold text-gray-900">🚚 Livraison souhaitée</p>
+                      <p className="font-semibold text-gray-900">&#x1F69A; Livraison souhaitée</p>
                       <p className="text-xs text-gray-600">Activée par défaut. Désactiver pour retrait au magasin.</p>
                     </label>
                   </div>
@@ -637,6 +713,12 @@ const ClientDashboard = () => {
                       placeholder="Téléphone"
                       value={storeForms[storeName]?.phone || ''}
                       onChange={(e) => handleChangeForm(storeName, 'phone', e.target.value)}
+                    />
+                    <input
+                      className="w-full border border-gray-200 rounded-md px-3 py-2"
+                      placeholder="Téléphone payeur (Mobile Money)"
+                      value={storeForms[storeName]?.payment_phone || ''}
+                      onChange={(e) => handleChangeForm(storeName, 'payment_phone', e.target.value)}
                     />
                     <input
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
@@ -656,6 +738,25 @@ const ClientDashboard = () => {
                       value={storeForms[storeName]?.address || ''}
                       onChange={(e) => handleChangeForm(storeName, 'address', e.target.value)}
                     />
+                    <select
+                      className="w-full border border-gray-200 rounded-md px-3 py-2"
+                      value={`${storeForms[storeName]?.payment_flow || ''}|${storeForms[storeName]?.payment_method || ''}`}
+                      onChange={(e) => {
+                        const [flow, method] = e.target.value.split('|');
+                        handleChangeForm(storeName, 'payment_flow', flow);
+                        handleChangeForm(storeName, 'payment_method', method);
+                      }}
+                    >
+                      {!paymentOptions[storeName]?.length && <option value="|">Aucune option disponible</option>}
+                      {(paymentOptions[storeName] || []).map((option) => (
+                        <option key={`${option.flow}-${option.method}`} value={`${option.flow}|${option.method}`}>
+                          {option.label} — {option.method.replace('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="md:col-span-2 text-xs text-gray-500 -mt-1">
+                      Le paiement en ligne déclenche un prompt opérateur. Les autres circuits sont suivis par reçus confirmés.
+                    </div>
                     <textarea
                       className="md:col-span-2 w-full border border-gray-200 rounded-md px-3 py-2"
                       placeholder="Notes"
@@ -687,26 +788,12 @@ const ClientDashboard = () => {
                       {/* Delivery fee */}
                       {storeForms[storeName]?.delivery_requested !== false && (
                         <div className="flex justify-between text-amber-700">
-                          <span>🚚 Frais de livraison</span>
+                          <span>&#x1F69A; Frais de livraison</span>
                           <span className="font-semibold">
-                            {!zonesLoading ? formatCurrency(calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items)) : 'Calcul...'}
+                            {!zonesLoading ? formatCurrency(calculateDeliveryCost(storeForms[storeName]?.zone, storeForms[storeName]?.city || 'Libreville', data.items)) : 'Calcul...'}
                           </span>
                         </div>
                       )}
-                      
-                      {/* Service fee */}
-                      <div className="flex justify-between text-blue-700">
-                        <span>💳 Frais de service (plateforme)</span>
-                        <span className="font-semibold">{formatCurrency(calculateServiceFee(data.total))}</span>
-                      </div>
-                      
-                      {/* Operator fee */}
-                      <div className="flex justify-between text-green-700">
-                        <span>📱 Frais opérateur (paiement)</span>
-                        <span className="font-semibold">
-                          {!zonesLoading ? formatCurrency(calculateOperatorFee(data.total, calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items))) : 'Calcul...'}
-                        </span>
-                      </div>
                       
                       {/* TOTAL */}
                       <div className="pt-2 border-t border-gray-300 flex justify-between font-bold text-gray-900 text-sm">
@@ -715,9 +802,7 @@ const ClientDashboard = () => {
                           {!zonesLoading ? formatCurrency(
                             calculateTotal(
                               data.total,
-                              storeForms[storeName]?.delivery_requested !== false ? calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items) : 0,
-                              calculateServiceFee(data.total),
-                              calculateOperatorFee(data.total, storeForms[storeName]?.delivery_requested !== false ? calculateDeliveryCost(storeForms[storeName]?.city || 'Libreville', data.items) : 0)
+                              storeForms[storeName]?.delivery_requested !== false ? calculateDeliveryCost(storeForms[storeName]?.zone, storeForms[storeName]?.city || 'Libreville', data.items) : 0
                             )
                           ) : 'Calcul...'}
                         </span>
@@ -764,3 +849,5 @@ const ClientDashboard = () => {
 };
 
 export default ClientDashboard;
+
+

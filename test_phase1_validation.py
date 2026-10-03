@@ -68,13 +68,13 @@ def test_phase1_validation():
 			status='pending'
 		)
 		
-		print(f"   ✓ Created manager: {store_manager.email}")
-		print(f"   ✓ Created driver: {delivery_agent.email}")
-		print(f"   ✓ Created order: #{order.id} (status: {order.status})")
-		print(f"   ✓ Created delivery: #{delivery.id} (status: {delivery.status})")
+		print(f"   ? Created manager: {store_manager.email}")
+		print(f"   ? Created driver: {delivery_agent.email}")
+		print(f"   ? Created order: #{order.id} (status: {order.status})")
+		print(f"   ? Created delivery: #{delivery.id} (status: {delivery.status})")
 		
 	except Exception as e:
-		print(f"   ✗ Setup failed: {str(e)}")
+		print(f"   ? Setup failed: {str(e)}")
 		return False
 	
 	# Test 1: Valid delivery acceptance
@@ -89,19 +89,19 @@ def test_phase1_validation():
 		audit_logs = AuditLog.objects.filter(object_type='delivery', object_id=delivery.id)
 		print(f"   Audit logs created: {audit_logs.count()}")
 		for log in audit_logs:
-			print(f"     - {log.get_action_type_display()}: {log.old_value} → {log.new_value}")
+			print(f"     - {log.get_action_type_display()}: {log.old_value} ? {log.new_value}")
 		
 		# Verify status changed
 		delivery.refresh_from_db()
 		print(f"   Delivery status now: {delivery.status}")
 		
 		if response.status_code == 200 and delivery.status == 'accepted':
-			print("   ✓ Valid acceptance succeeded with audit logging")
+			print("   ? Valid acceptance succeeded with audit logging")
 		else:
-			print("   ✗ Acceptance failed or status not updated")
+			print("   ? Acceptance failed or status not updated")
 			
 	except Exception as e:
-		print(f"   ✗ Error: {str(e)}")
+		print(f"   ? Error: {str(e)}")
 	
 	# Test 2: Invalid status transition (try to accept already accepted delivery)
 	print("\n3. Testing invalid status transition...")
@@ -119,12 +119,12 @@ def test_phase1_validation():
 		print(f"   Suspicious logs: {suspicious_logs.count()}")
 		
 		if response.status_code in [400, 403]:
-			print("   ✓ Invalid transition rejected correctly")
+			print("   ? Invalid transition rejected correctly")
 		else:
-			print("   ✗ Should have been rejected")
+			print("   ? Should have been rejected")
 			
 	except Exception as e:
-		print(f"   ✗ Error: {str(e)}")
+		print(f"   ? Error: {str(e)}")
 	
 	# Test 3: Unauthorized access
 	print("\n4. Testing unauthorized access prevention...")
@@ -152,12 +152,12 @@ def test_phase1_validation():
 		print(f"   Suspicious logs: {suspicious_logs.count()}")
 		
 		if response.status_code == 403 and suspicious_logs.count() > 0:
-			print("   ✓ Unauthorized access blocked and logged as suspicious")
+			print("   ? Unauthorized access blocked and logged as suspicious")
 		else:
-			print("   ✗ Should have been blocked and marked suspicious")
+			print("   ? Should have been blocked and marked suspicious")
 			
 	except Exception as e:
-		print(f"   ✗ Error: {str(e)}")
+		print(f"   ? Error: {str(e)}")
 	
 	# Summary
 	print("\n" + "="*70)
@@ -167,7 +167,7 @@ def test_phase1_validation():
 	suspicious_logs = AuditLog.objects.filter(is_suspicious=True).count()
 	print(f"Total audit logs: {total_logs}")
 	print(f"Suspicious logs: {suspicious_logs}")
-	print("\nPhase 1 Status Validation: ✓ IMPLEMENTED")
+	print("\nPhase 1 Status Validation: ? IMPLEMENTED")
 	print("  - Validators framework active")
 	print("  - Audit logging active")
 	print("  - Status transitions enforced")

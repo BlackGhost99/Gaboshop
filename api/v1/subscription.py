@@ -72,7 +72,7 @@ def get_subscription_status(request):
                     'current': current_products,
                     'max': max_products,
                     'can_add_more': max_products is None or current_products < max_products,
-                    'message': f"Vous avez {current_products}/{max_products if max_products else '∞'} produits" if max_products else "Produits illimités",
+                    'message': f"Vous avez {current_products}/{max_products if max_products else '8'} produits" if max_products else "Produits illimités",
                 }
             },
             'all_features': SubscriptionChecker.get_plan_features(store),

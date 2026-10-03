@@ -33,7 +33,7 @@ def test_subscription_plan_fields():
     
     plan = SubscriptionPlan.objects.filter(plan_type='business').first()
     if not plan:
-        print("❌ Plan Business introuvable")
+        print("? Plan Business introuvable")
         return False
     
     # Vérifier les champs Finance B2B
@@ -54,9 +54,9 @@ def test_subscription_plan_fields():
     for field in fields_to_check:
         if hasattr(plan, field):
             value = getattr(plan, field)
-            print(f"  ✓ {field}: {value}")
+            print(f"  ? {field}: {value}")
         else:
-            print(f"  ❌ {field}: CHAMP MANQUANT")
+            print(f"  ? {field}: CHAMP MANQUANT")
             all_ok = False
     
     return all_ok
@@ -70,7 +70,7 @@ def test_b2b_subscription_plan_fields():
     
     plan = B2BSubscriptionPlan.objects.filter(plan_type='business').first()
     if not plan:
-        print("❌ Plan B2B Business introuvable")
+        print("? Plan B2B Business introuvable")
         return False
     
     # Vérifier les champs Finance
@@ -88,17 +88,17 @@ def test_b2b_subscription_plan_fields():
     for field in fields_to_check:
         if hasattr(plan, field):
             value = getattr(plan, field)
-            print(f"  ✓ {field}: {value}")
+            print(f"  ? {field}: {value}")
         else:
-            print(f"  ❌ {field}: CHAMP MANQUANT")
+            print(f"  ? {field}: CHAMP MANQUANT")
             all_ok = False
     
     # Vérifier que catalog_priority a le bon help_text
     field = plan._meta.get_field('catalog_priority')
     if 'Distribution prioritaire' in field.help_text:
-        print(f"  ✓ catalog_priority help_text: OK")
+        print(f"  ? catalog_priority help_text: OK")
     else:
-        print(f"  ❌ catalog_priority help_text: {field.help_text}")
+        print(f"  ? catalog_priority help_text: {field.help_text}")
         all_ok = False
     
     return all_ok
@@ -164,9 +164,9 @@ def test_finance_services():
         all_ok = True
         for field in finance_b2b_fields:
             if field in features:
-                print(f"  ✓ {field}: {features[field]}")
+                print(f"  ? {field}: {features[field]}")
             else:
-                print(f"  ❌ {field}: MANQUANT")
+                print(f"  ? {field}: MANQUANT")
                 all_ok = False
         
         # Nettoyer
@@ -176,7 +176,7 @@ def test_finance_services():
         
         return all_ok
     else:
-        print("❌ Plan Business introuvable")
+        print("? Plan Business introuvable")
         return False
 
 
@@ -231,17 +231,17 @@ def test_b2b_quotas():
         # Tester check_b2b_buyer_quotas
         authorized, quotas = check_b2b_buyer_quotas(store)
         
-        print(f"  ✓ Autorisation: {authorized}")
-        print(f"  ✓ Quotas: {quotas}")
+        print(f"  ? Autorisation: {authorized}")
+        print(f"  ? Quotas: {quotas}")
         
         # Vérifier que les quotas sont bien récupérés
         # Si authorized est False, vérifier que c'est à cause d'un plan manquant ou d'une limite
         if authorized:
             if 'max_suppliers' in quotas and 'max_monthly_orders' in quotas:
-                print(f"  ✓ Quotas récupérés correctement")
+                print(f"  ? Quotas récupérés correctement")
                 all_ok = True
             else:
-                print(f"  ❌ Quotas incomplets")
+                print(f"  ? Quotas incomplets")
                 all_ok = False
         else:
             # Si pas autorisé, vérifier que c'est à cause d'un plan manquant (normal si pas de plan)
@@ -252,19 +252,19 @@ def test_b2b_quotas():
                     from payments.subscription_check import SubscriptionChecker
                     plan = SubscriptionChecker.get_current_plan(store)
                     if plan:
-                        print(f"  ✓ Plan trouvé: {plan.name}")
-                        print(f"  ✓ Quotas max_suppliers: {getattr(plan, 'max_b2b_suppliers', None)}")
-                        print(f"  ✓ Quotas max_monthly_orders: {getattr(plan, 'max_b2b_monthly_orders', None)}")
+                        print(f"  ? Plan trouvé: {plan.name}")
+                        print(f"  ? Quotas max_suppliers: {getattr(plan, 'max_b2b_suppliers', None)}")
+                        print(f"  ? Quotas max_monthly_orders: {getattr(plan, 'max_b2b_monthly_orders', None)}")
                         all_ok = True
                     else:
-                        print(f"  ⚠ Plan non trouvé, mais fonction check_b2b_buyer_quotas fonctionne")
+                        print(f"  ? Plan non trouvé, mais fonction check_b2b_buyer_quotas fonctionne")
                         all_ok = True  # La fonction fonctionne, c'est juste qu'il n'y a pas de plan
                 else:
                     # Limite atteinte, donc les quotas sont bien récupérés
-                    print(f"  ✓ Quotas récupérés (limite atteinte)")
+                    print(f"  ? Quotas récupérés (limite atteinte)")
                     all_ok = True
             else:
-                print(f"  ❌ Erreur inattendue")
+                print(f"  ? Erreur inattendue")
                 all_ok = False
         
         # Nettoyer
@@ -274,7 +274,7 @@ def test_b2b_quotas():
         
         return all_ok
     else:
-        print("❌ Plan Pro introuvable")
+        print("? Plan Pro introuvable")
         return False
 
 
@@ -300,12 +300,12 @@ def test_applies_to():
         if plan:
             actual_value = getattr(plan, 'applies_to', None)
             if actual_value == expected_value:
-                print(f"  ✓ {plan_name}: applies_to = {actual_value}")
+                print(f"  ? {plan_name}: applies_to = {actual_value}")
             else:
-                print(f"  ❌ {plan_name}: applies_to = {actual_value} (attendu: {expected_value})")
+                print(f"  ? {plan_name}: applies_to = {actual_value} (attendu: {expected_value})")
                 all_ok = False
         else:
-            print(f"  ❌ Plan {plan_name} introuvable")
+            print(f"  ? Plan {plan_name} introuvable")
             all_ok = False
     
     # B2BSubscriptionPlan
@@ -313,12 +313,12 @@ def test_applies_to():
     if b2b_plan:
         actual_value = getattr(b2b_plan, 'applies_to', None)
         if actual_value == 'b2b_wholesaler':
-            print(f"  ✓ B2B Business: applies_to = {actual_value}")
+            print(f"  ? B2B Business: applies_to = {actual_value}")
         else:
-            print(f"  ❌ B2B Business: applies_to = {actual_value} (attendu: b2b_wholesaler)")
+            print(f"  ? B2B Business: applies_to = {actual_value} (attendu: b2b_wholesaler)")
             all_ok = False
     else:
-        print("  ❌ Plan B2B Business introuvable")
+        print("  ? Plan B2B Business introuvable")
         all_ok = False
     
     return all_ok
@@ -347,19 +347,19 @@ def main():
     
     for test_name, result in results:
         if result:
-            print(f"  ✓ {test_name}: PASSÉ")
+            print(f"  ? {test_name}: PASSÉ")
             passed += 1
         else:
-            print(f"  ❌ {test_name}: ÉCHOUÉ")
+            print(f"  ? {test_name}: ÉCHOUÉ")
             failed += 1
     
     print(f"\n  Total: {passed} passés, {failed} échoués")
     
     if failed == 0:
-        print("\n  ✅ TOUS LES TESTS SONT PASSÉS !")
+        print("\n  ? TOUS LES TESTS SONT PASSÉS !")
         return 0
     else:
-        print("\n  ❌ CERTAINS TESTS ONT ÉCHOUÉ")
+        print("\n  ? CERTAINS TESTS ONT ÉCHOUÉ")
         return 1
 
 

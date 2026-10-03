@@ -285,7 +285,7 @@ const B2BPricingModal = ({ isOpen, onClose, store, onSuccess }) => {
 															value={editingPricing.max_quantity || ''}
 															onChange={(e) => setEditingPricing({ ...editingPricing, max_quantity: e.target.value ? parseInt(e.target.value) : null })}
 															className="w-16 border rounded px-2 py-1 text-sm"
-															placeholder="∞"
+															placeholder="8"
 														/>
 													</td>
 													<td className="px-3 py-2">
@@ -300,13 +300,13 @@ const B2BPricingModal = ({ isOpen, onClose, store, onSuccess }) => {
 															onClick={handleUpdatePricing}
 															className="text-green-600 hover:text-green-800 mr-2"
 														>
-															✓
+															?
 														</button>
 														<button
 															onClick={() => setEditingPricing(null)}
 															className="text-gray-600 hover:text-gray-800"
 														>
-															✗
+															?
 														</button>
 													</td>
 												</>
@@ -315,7 +315,7 @@ const B2BPricingModal = ({ isOpen, onClose, store, onSuccess }) => {
 													<td className="px-3 py-2 text-sm font-medium">{pricing.product_name}</td>
 													<td className="px-3 py-2 text-sm">{parseFloat(pricing.b2b_price).toLocaleString('fr-FR')} FCFA</td>
 													<td className="px-3 py-2 text-sm">{pricing.min_quantity}</td>
-													<td className="px-3 py-2 text-sm">{pricing.max_quantity || '∞'}</td>
+													<td className="px-3 py-2 text-sm">{pricing.max_quantity || '8'}</td>
 													<td className="px-3 py-2">
 														<span className={`px-2 py-1 text-xs rounded-full ${pricing.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
 															{pricing.is_active ? 'Oui' : 'Non'}
@@ -326,13 +326,13 @@ const B2BPricingModal = ({ isOpen, onClose, store, onSuccess }) => {
 															onClick={() => setEditingPricing({ ...pricing })}
 															className="text-indigo-600 hover:text-indigo-800 mr-2"
 														>
-															✏️
+															??
 														</button>
 														<button
 															onClick={() => handleDeletePricing(pricing.id)}
 															className="text-red-600 hover:text-red-800"
 														>
-															🗑️
+															???
 														</button>
 													</td>
 												</>

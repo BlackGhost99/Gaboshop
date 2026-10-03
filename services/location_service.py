@@ -61,7 +61,7 @@ class LocationService:
             return [agent for agent, distance in agents_with_distance[:limit]]
             
         except Exception as e:
-            logger.error(f"❌ Erreur recherche livreurs: {e}")
+            logger.error(f"? Erreur recherche livreurs: {e}")
             return []
     
     @staticmethod

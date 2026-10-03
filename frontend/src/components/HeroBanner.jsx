@@ -12,27 +12,27 @@ const HeroBanner = ({ promotions = [] }) => {
   const defaultPromotions = [
     {
       id: 1,
-      title: 'Offres du jour',
-      subtitle: 'Jusqu\'à -50% sur une sélection',
-      cta: 'Voir les offres',
-      bg: 'bg-gradient-to-r from-cta-500 to-orange-400',
-      icon: '🎉',
+      title: 'Boutiques locales',
+      subtitle: 'Decouvrez les magasins et leurs produits du quotidien',
+      cta: 'Voir les boutiques',
+      bg: 'bg-gradient-to-r from-slate-900 to-emerald-600',
+      icon: 'SHOP',
     },
     {
       id: 2,
-      title: 'Livraison gratuite',
-      subtitle: 'Dès 50 000 FCFA d\'achat',
-      cta: 'Découvrir',
-      bg: 'bg-gradient-to-r from-primary-600 to-blue-400',
-      icon: '🚚',
+      title: 'Catalogue B2C',
+      subtitle: 'Produits pour la maison, la famille, et plus',
+      cta: 'Explorer',
+      bg: 'bg-gradient-to-r from-emerald-500 to-teal-400',
+      icon: 'B2C',
     },
     {
       id: 3,
-      title: 'Nouveautés',
-      subtitle: 'Découvrez les derniers produits',
-      cta: 'Explorer',
-      bg: 'bg-gradient-to-r from-accent-500 to-green-400',
-      icon: '✨',
+      title: 'Business & Pro',
+      subtitle: 'Les boutiques premium mises en avant',
+      cta: 'Decouvrir',
+      bg: 'bg-gradient-to-r from-amber-500 to-orange-400',
+      icon: 'PRO',
     },
   ];
 
@@ -61,8 +61,8 @@ const HeroBanner = ({ promotions = [] }) => {
           >
             <div className="absolute inset-0 bg-black/20" />
             <div className="relative h-full flex flex-col items-center justify-center text-center px-6 py-8">
-              <div className="text-5xl md:text-6xl mb-4">{slide.icon || '💼'}</div>
-              <h2 className="text-2xl md:text-4xl font-bold text-white mb-2">
+              <div className="text-5xl md:text-6xl mb-4">{slide.icon || '??'}</div>
+              <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 font-display">
                 {slide.title}
               </h2>
               <p className="text-base md:text-lg text-white/90 mb-6 max-w-lg">

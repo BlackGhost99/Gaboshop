@@ -42,7 +42,7 @@ class OrderAdmin(admin.ModelAdmin):
 			'fields': ('order_number', 'client', 'store', 'is_b2b', 'source_store', 'status', 'notes')
 		}),
 		('Montants', {
-			'fields': ('items_total_display', 'delivery_fee', 'service_fee', 'tax_amount', 'payment_fees', 'total_amount_display')
+			'fields': ('items_total_display', 'delivery_fee', 'tax_amount', 'payment_fees', 'total_amount_display')
 		}),
 		('Livraison', {
 			'fields': ('city', 'delivery_address', 'delivery_phone', 'delivery_zone')

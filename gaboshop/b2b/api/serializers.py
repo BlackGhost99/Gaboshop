@@ -149,13 +149,13 @@ class B2BOrderSerializer(serializers.ModelSerializer):
 		fields = [
 			'id', 'order_number', 'status', 'delivery_type',
 			'wholesaler_name', 'source_store_name', 'client_name',
-			'items_total', 'delivery_fee', 'service_fee', 'total_amount',
+			'items_total', 'delivery_fee', 'total_amount',
 			'delivery_address', 'delivery_phone', 'delivery_zone', 'city',
 			'notes', 'created_at', 'confirmed_at', 'delivered_at'
 		]
 		read_only_fields = [
 			'order_number', 'status', 'items_total', 'delivery_fee',
-			'service_fee', 'total_amount', 'created_at', 'confirmed_at', 'delivered_at'
+			'total_amount', 'created_at', 'confirmed_at', 'delivered_at'
 		]
 
 

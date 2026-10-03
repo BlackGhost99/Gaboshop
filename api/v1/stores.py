@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
+from django.core.exceptions import PermissionDenied
 
 from stores.models import Store, StoreCategory
 from stores.serializers import (
@@ -40,12 +41,14 @@ class StoreListView(ListAPIView):
 		
 		# B2B Visibility Logic
 		user = self.request.user
+		apply_priority = False
 		if user.is_authenticated and hasattr(user, 'user_type') and user.user_type == 'store_manager':
-			# Gérants: Voient Grossistes et Industries (pour s'approvisionner)
-			queryset = queryset.filter(store_type__in=['wholesaler', 'industry'])
+			# Store managers: see B2B wholesalers
+			queryset = queryset.filter(is_b2b=True)
 		else:
-			# Clients (et autres): Voient uniquement le Détail
-			queryset = queryset.filter(store_type='retail')
+			# Clients (and others): see B2C stores only
+			queryset = queryset.filter(is_b2b=False)
+			apply_priority = True
         
 		# Filtrer par ville si spécifiée
 		city = self.request.query_params.get('city')
@@ -57,6 +60,23 @@ class StoreListView(ListAPIView):
 		if zone:
 			queryset = queryset.filter(zone__iexact=zone)
         
+		if apply_priority:
+			from django.db.models import OuterRef, Subquery, Value, IntegerField
+			from django.db.models.functions import Coalesce
+			from django.utils import timezone
+			from payments.models import StoreSubscription
+
+			today = timezone.now().date()
+			priority_subquery = StoreSubscription.objects.filter(
+				store=OuterRef('pk'),
+				status='active',
+				end_date__gte=today
+			).order_by('-end_date').values('plan__priority_listing')[:1]
+
+			queryset = queryset.annotate(
+				priority_listing=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0))
+			).order_by('-priority_listing', '-created_at')
+
 		return queryset.select_related('category')
     
 	def list(self, request, *args, **kwargs):
@@ -156,6 +176,20 @@ class StoreUpdateView(APIView):
 				}
 			}, status=status.HTTP_403_FORBIDDEN)
         
+		from payments.subscription_check import SubscriptionChecker
+		custom_fields = ['description', 'banner_image']
+		if any(field in request.data for field in custom_fields):
+			try:
+				SubscriptionChecker.check_can_customize_store(store)
+			except PermissionDenied as e:
+				return Response({
+					'success': False,
+					'error': {
+						'code': status.HTTP_403_FORBIDDEN,
+						'message': str(e)
+					}
+				}, status=status.HTTP_403_FORBIDDEN)
+
 		from stores.serializers import StoreUpdateSerializer
 		serializer = StoreUpdateSerializer(
 			store, 

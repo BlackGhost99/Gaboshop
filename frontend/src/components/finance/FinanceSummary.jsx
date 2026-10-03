@@ -106,10 +106,6 @@ const FinanceSummary = ({ summary, planFeatures, onRefresh, loading }) => {
                 <dt>Commission Gaboshop</dt>
                 <dd className="font-medium">-{formatCurrency(sales.total_commission)}</dd>
               </div>
-              <div className="flex justify-between text-sm text-red-600">
-                <dt>Frais de service</dt>
-                <dd className="font-medium">-{formatCurrency(sales.total_service_fees)}</dd>
-              </div>
               <div className="flex justify-between text-sm border-t border-gray-200 pt-2 font-semibold">
                 <dt className="text-gray-900">Net reçu</dt>
                 <dd className="text-green-600">{formatCurrency(sales.net_received)}</dd>

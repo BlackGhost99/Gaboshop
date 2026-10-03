@@ -1,7 +1,7 @@
-# Implémentation de la bascule "Livraison souhaitée" ✅
+# Implémentation de la bascule "Livraison souhaitée" ?
 
 **Date:** 14 Janvier 2026  
-**Statut:** ✅ Complétée
+**Statut:** ? Complétée
 
 ## Résumé
 La fonctionnalité "Livraison souhaitée" a été implémentée en front-end et en back-end, permettant aux clients de basculer la livraison (ON par défaut) et d'afficher les frais de manière claire.
@@ -14,10 +14,10 @@ La fonctionnalité "Livraison souhaitée" a été implémentée en front-end et 
 **Fichier:** `frontend/src/pages/client/ClientDashboard.jsx`
 
 #### Changements:
-- ✅ Ajout du toggle "Livraison souhaitée" avec état ON par défaut
-- ✅ Intégration du champ `delivery_requested` dans l'état du formulaire avec valeur par défaut `true`
-- ✅ Ajout du champ `delivery_requested` dans le payload de création de commande
-- ✅ Ajout d'une section "Détail du devis" montrant:
+- ? Ajout du toggle "Livraison souhaitée" avec état ON par défaut
+- ? Intégration du champ `delivery_requested` dans l'état du formulaire avec valeur par défaut `true`
+- ? Ajout du champ `delivery_requested` dans le payload de création de commande
+- ? Ajout d'une section "Détail du devis" montrant:
   - Sous-total (articles)
   - Frais de livraison (calculé selon véhicule et poids)
   - Frais de service (plateforme)
@@ -26,7 +26,7 @@ La fonctionnalité "Livraison souhaitée" a été implémentée en front-end et 
   
 #### UI Éléments:
 ```jsx
-// Toggle bleu avec icône 🚚
+// Toggle bleu avec icône ??
 <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-md px-4 py-3">
   <input type="checkbox" id={`delivery-${storeName}`} 
     checked={storeForms[storeName]?.delivery_requested !== false}
@@ -38,9 +38,9 @@ La fonctionnalité "Livraison souhaitée" a été implémentée en front-end et 
 // Détail des frais
 <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
   - Sous-total (articles)
-  - 🚚 Frais de livraison (calculé)
-  - 💳 Frais de service (plateforme)
-  - 📱 Frais opérateur (paiement)
+  - ?? Frais de livraison (calculé)
+  - ?? Frais de service (plateforme)
+  - ?? Frais opérateur (paiement)
   - TOTAL
 </div>
 ```
@@ -49,34 +49,34 @@ La fonctionnalité "Livraison souhaitée" a été implémentée en front-end et 
 **Fichier:** `frontend/src/components/b2b/B2BOrderForm.jsx`
 
 #### Changements:
-- ✅ Ajout du champ `delivery_requested` en état initial (default: `true`)
-- ✅ Ajout du toggle "Livraison souhaitée" avec le même design que le client dashboard
-- ✅ Le toggle est placé après le sélecteur de type de livraison
+- ? Ajout du champ `delivery_requested` en état initial (default: `true`)
+- ? Ajout du toggle "Livraison souhaitée" avec le même design que le client dashboard
+- ? Le toggle est placé après le sélecteur de type de livraison
 
 ### 3. Backend - Serializer
 **Fichier:** `orders/serializers.py`
 
 #### Changements:
-- ✅ Ajout du champ `delivery_requested` à la liste `fields` de `OrderCreateSerializer`
-- ✅ Permet l'acceptation du champ lors de la création de commande via API
+- ? Ajout du champ `delivery_requested` à la liste `fields` de `OrderCreateSerializer`
+- ? Permet l'acceptation du champ lors de la création de commande via API
 
 ---
 
 ## Fonctionnalités
 
-### ✅ Livraison ON par défaut
+### ? Livraison ON par défaut
 - Par défaut, le toggle est **activé** pour toutes les nouvelles commandes
 - L'utilisateur peut le désactiver manuellement pour un retrait au magasin
 
-### ✅ Affichage du détail des frais
+### ? Affichage du détail des frais
 Une section "Détail du devis" affiche:
 - **Sous-total:** Somme des articles commandés
-- **🚚 Frais de livraison:** "Calculé selon véhicule" (la valeur exacte est calculée à la confirmation par le backend basé sur le poids)
-- **💳 Frais de service:** "Voir à la confirmation" (frais de plateforme appliqués par le backend)
-- **📱 Frais opérateur:** "Voir à la confirmation" (frais de paiement appliqués par le backend)
+- **?? Frais de livraison:** "Calculé selon véhicule" (la valeur exacte est calculée à la confirmation par le backend basé sur le poids)
+- **?? Frais de service:** "Voir à la confirmation" (frais de plateforme appliqués par le backend)
+- **?? Frais opérateur:** "Voir à la confirmation" (frais de paiement appliqués par le backend)
 - **TOTAL:** Affiché à la confirmation
 
-### ✅ Communication claire
+### ? Communication claire
 Un message explicatif indique:
 > "Les frais finaux seront calculés en fonction du poids des produits et de votre zone de livraison."
 
@@ -109,19 +109,19 @@ Un message explicatif indique:
 ## Backend - Intégration
 
 Le backend utilise déjà:
-- ✅ Champ `delivery_requested` (BooleanField, default=True)
-- ✅ Logique `calculate_dynamic_delivery_cost()` qui:
+- ? Champ `delivery_requested` (BooleanField, default=True)
+- ? Logique `calculate_dynamic_delivery_cost()` qui:
   - Sélectionne le véhicule en fonction du poids total
   - Calcule le coût de livraison
   - Applique les surcharges inter-villes
-- ✅ `Order.calculate_totals()` qui applique dynamiquement les frais si `delivery_requested=True`
-- ✅ `OrderSerializer` qui expose le breakdown avec tous les frais
+- ? `Order.calculate_totals()` qui applique dynamiquement les frais si `delivery_requested=True`
+- ? `OrderSerializer` qui expose le breakdown avec tous les frais
 
 ---
 
 ## Tests
 
-✅ Tous les tests passent:
+? Tous les tests passent:
 ```
 Ran 7 tests in 16.246s
 OK
@@ -136,7 +136,7 @@ Tests validés:
 ## Prochaines étapes (optionnel)
 
 1. **Data migration pour poids existants**: Backfiller les produits sans poids
-2. **Tests E2E**: Vérifier le flux complet client → commande → confirmation
+2. **Tests E2E**: Vérifier le flux complet client ? commande ? confirmation
 3. **Affichage du breakdown réel**: Une fois la commande créée, afficher les frais calculés
 4. **Configuration admin**: Permettre l'ajustement des frais et des mappings véhicules
 
@@ -152,4 +152,4 @@ Tests validés:
 
 ---
 
-**Prêt pour le déploiement! ✨**
+**Prêt pour le déploiement! ?**

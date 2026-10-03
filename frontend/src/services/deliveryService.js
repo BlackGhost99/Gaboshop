@@ -10,6 +10,36 @@ export const getAssignedOrders = async () => {
   }
 };
 
+export const getAvailableDeliveries = async () => {
+  try {
+    const response = await api.get('/dashboard/delivery/available/');
+    return response.data;
+  } catch (error) {
+    console.error('Erreur recuperation livraisons disponibles:', error);
+    return { success: false, data: [] };
+  }
+};
+
+export const claimDelivery = async (deliveryId) => {
+  try {
+    const response = await api.post(`/dashboard/delivery/${deliveryId}/claim/`);
+    return response.data;
+  } catch (error) {
+    console.error('Erreur reclamation livraison:', error);
+    return { success: false, error: error.response?.data?.error || 'Erreur lors de la reclamation' };
+  }
+};
+
+export const updateAvailability = async (isAvailable) => {
+  try {
+    const response = await api.post('/dashboard/delivery/availability/', { is_available: isAvailable });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur mise a jour disponibilite:', error);
+    return { success: false, error: error.response?.data?.error || 'Erreur lors de la mise a jour' };
+  }
+};
+
 export const acceptDelivery = async (deliveryId) => {
   try {
     const response = await api.post(`/dashboard/delivery/${deliveryId}/accept/`);

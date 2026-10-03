@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='order',
             name='status',
-            field=models.CharField(choices=[('created', '🟡 Créée'), ('pending_payment', '🟡 En attente de paiement'), ('paid', '🟢 Payée'), ('confirmed', '🔵 Confirmée'), ('preparing', '👨\u200d🍳 En préparation'), ('ready', '✅ Prête pour livraison'), ('assigned', '🚗 Livreur assigné'), ('in_transit', '📦 En cours de livraison'), ('delivered', '🎉 Livrée'), ('cancelled', '❌ Annulée'), ('refunded', '💸 Remboursée')], default='created', max_length=20),
+            field=models.CharField(choices=[('created', '?? Créée'), ('pending_payment', '?? En attente de paiement'), ('paid', '?? Payée'), ('confirmed', '?? Confirmée'), ('preparing', '??\u200d?? En préparation'), ('ready', '? Prête pour livraison'), ('assigned', '?? Livreur assigné'), ('in_transit', '?? En cours de livraison'), ('delivered', '?? Livrée'), ('cancelled', '? Annulée'), ('refunded', '?? Remboursée')], default='created', max_length=20),
         ),
         migrations.AlterField(
             model_name='order',

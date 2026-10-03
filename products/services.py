@@ -38,11 +38,11 @@ class ProductService:
                     **{k: v for k, v in product_data.items() if k != 'request_user'}
                 )
                 
-                logger.info(f"📦 Produit créé: {product.name} dans {store.name}")
+                logger.info(f"?? Produit créé: {product.name} dans {store.name}")
                 return product
                 
         except Exception as e:
-            logger.error(f"❌ Erreur création produit: {e}")
+            logger.error(f"? Erreur création produit: {e}")
             raise
     
     @staticmethod
@@ -65,14 +65,14 @@ class ProductService:
                 
                 # Log de l'ajustement de stock
                 logger.info(
-                    f"📊 Stock ajusté: {product.name} "
-                    f"({old_stock} → {new_stock}) - Raison: {reason}"
+                    f"?? Stock ajusté: {product.name} "
+                    f"({old_stock} ? {new_stock}) - Raison: {reason}"
                 )
                 
                 return product
                 
         except Product.DoesNotExist:
-            logger.error(f"❌ Produit {product_id} non trouvé")
+            logger.error(f"? Produit {product_id} non trouvé")
             raise ValueError("Produit non trouvé")
     
     @staticmethod

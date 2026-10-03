@@ -6,6 +6,8 @@ Applique automatiquement les limites selon le plan actif du magasin
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from decimal import Decimal
+import re
+import unicodedata
 from .models import StoreSubscription, SubscriptionPlan
 
 
@@ -15,6 +17,17 @@ class SubscriptionChecker:
     Utilisé par les API et les vues pour appliquer les restrictions automatiquement
     """
     
+    @staticmethod
+    def _get_monthly_order_limit(plan):
+        """Compat B2C/B2B: max_orders_per_month or max_monthly_orders."""
+        if not plan:
+            return None
+        if hasattr(plan, 'max_orders_per_month'):
+            return getattr(plan, 'max_orders_per_month')
+        if hasattr(plan, 'max_monthly_orders'):
+            return getattr(plan, 'max_monthly_orders')
+        return None
+
     @staticmethod
     def get_active_subscription(store):
         """
@@ -130,6 +143,69 @@ class SubscriptionChecker:
                     )
     
     @staticmethod
+    def _normalize_text(value):
+        text = (value or '').strip().lower()
+        text = unicodedata.normalize('NFD', text)
+        text = re.sub(r'[\u0300-\u036f]', '', text)
+        return text
+
+    @staticmethod
+    def _is_food_category(category):
+        if not category:
+            return False
+        store_category = getattr(category, 'store_category', None)
+        combined = f"{getattr(category, 'name', '')} {getattr(store_category, 'name', '')}"
+        normalized = SubscriptionChecker._normalize_text(combined)
+        food_keywords = [
+            'aliment', 'boisson', 'epicer', 'fruit', 'legume',
+            'viande', 'poisson', 'boulanger', 'patisser',
+            'charcut', 'lait'
+        ]
+        return any(keyword in normalized for keyword in food_keywords)
+
+    @staticmethod
+    def check_can_add_non_food_product(store, category=None, exclude_product_id=None):
+        """
+        Limite le nombre de produits non alimentaires pour les plans B2C.
+        """
+        plan = SubscriptionChecker.get_current_plan(store)
+
+        if not plan:
+            raise PermissionDenied("Aucun forfait trouvÇ¸. Veuillez vous abonner.")
+
+        from b2b.models import B2BSubscriptionPlan
+        if isinstance(plan, B2BSubscriptionPlan):
+            return
+
+        if not getattr(plan, 'can_sell_non_food_products', True):
+            raise PermissionDenied(
+                f"La vente de produits non alimentaires n'est pas autorisÇ¸e avec votre forfait {plan.name}."
+            )
+
+        max_non_food = getattr(plan, 'max_products_non_food', None)
+        if max_non_food is None:
+            return
+
+        if SubscriptionChecker._is_food_category(category):
+            return
+
+        products_qs = store.products.select_related('category', 'category__store_category')
+        if exclude_product_id:
+            products_qs = products_qs.exclude(id=exclude_product_id)
+
+        non_food_count = 0
+        for product in products_qs:
+            if not SubscriptionChecker._is_food_category(product.category):
+                non_food_count += 1
+
+        if non_food_count >= max_non_food:
+            raise PermissionDenied(
+                f"Votre forfait {plan.name} ne permet que {max_non_food} produits non-alimentaires. "
+                f"Vous en avez dÇ¸jÇÿ {non_food_count}. "
+                f"Passez Çÿ un forfait supÇ¸rieur pour ajouter plus de produits."
+            )
+
+    @staticmethod
     def check_can_access_statistics(store):
         """
         📊 Vérifiez si le magasin peut accéder aux statistiques
@@ -187,7 +263,8 @@ class SubscriptionChecker:
         🛒 Vérifie si le store peut créer une commande ce mois
         """
         plan = SubscriptionChecker.get_current_plan(store)
-        if plan and plan.max_orders_per_month:
+        monthly_limit = SubscriptionChecker._get_monthly_order_limit(plan)
+        if plan and monthly_limit:
             # Compter commandes ce mois
             from django.utils import timezone
             from orders.models import Order
@@ -196,10 +273,10 @@ class SubscriptionChecker:
                 store=store,
                 created_at__gte=month_start
             ).count()
-            if order_count >= plan.max_orders_per_month:
+            if order_count >= monthly_limit:
                 raise PermissionDenied(
-                    f"Vous avez atteint la limite de {plan.max_orders_per_month} commandes/mois "
-                    f"de votre plan {plan.name}. Passez au plan Business pour des commandes illimitées."
+                    f"Vous avez atteint la limite de {monthly_limit} commandes/mois "
+                    f"de votre plan {plan.name}. Passez au plan Pro ou Business pour des commandes illimitées."
                 )
     
     @staticmethod
@@ -210,29 +287,33 @@ class SubscriptionChecker:
         plan = SubscriptionChecker.get_current_plan(store)
         if not plan or not plan.can_access_b2b:
             raise PermissionDenied(
-                f"L'accès au catalogue B2B (approvisionnement) est réservé au plan Business. "
-                f"Passez au plan Business pour commander chez les grossistes."
+                f"L'acc?s au catalogue B2B (approvisionnement) est r?serv? aux plans Pro ou Business. "
+                f"Passez au plan Pro ou Business pour commander chez les grossistes."
             )
     
     @staticmethod
-    def get_service_fee_b2b(store):
+    def check_can_offer_express_delivery(store):
         """
-        💰 Retourne les frais de service B2B selon le plan
+        VÇ¸rifie si le magasin peut proposer la livraison express.
         """
         plan = SubscriptionChecker.get_current_plan(store)
-        
-        if plan and hasattr(plan, 'service_fee_to_wholesaler_amount'):
-            return Decimal(str(plan.service_fee_to_wholesaler_amount))
-        else:
-            # Fallback pour compatibilité
-            return Decimal('1000.00')
+        if not plan or not getattr(plan, 'can_offer_express_delivery', False):
+            raise PermissionDenied(
+                "La livraison express n'est pas disponible avec votre forfait actuel. "
+                "Passez au plan Pro ou Business pour l'activer."
+            )
+
+    @staticmethod
+    def get_service_fee_b2b(store):
+        """Retourne 0 (frais desactives)."""
+        return Decimal('0.00')
     
     @staticmethod
     def get_subscription_price(store):
         """
         💵 Retourne le prix de la souscription selon le type de store
         Business: 50 000 F (B2C) ou 80 000 F (B2B)
-        Pro: 30 000 F
+        Pro: 20 000 F
         Free: 0 F
         """
         plan = SubscriptionChecker.get_current_plan(store)
@@ -241,7 +322,7 @@ class SubscriptionChecker:
         
         # Plan Business a un prix différent selon le type de store
         if plan.plan_type == 'business':
-            if store.is_b2b or store.store_type in ['wholesaler', 'industry']:
+            if store.is_b2b:
                 return Decimal('80000.00')  # B2B
             else:
                 return Decimal('50000.00')  # B2C
@@ -276,3 +357,4 @@ def check_subscription_permission(permission_type):
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator
+

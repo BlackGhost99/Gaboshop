@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from payments.models import Payment, Reversement
 from payments.services import PaymentService
+from payments.utils import call_singpay_status
 from orders.models import Order
 from django.db import models
 
@@ -14,64 +15,71 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, max_retries=3)
 def verifier_paiements_en_attente(self):
     """
-    Vérifier les paiements en attente et confirmer les succès
-    Exécutée toutes les 2 minutes
+    Verifier les paiements en attente et confirmer les succes
+    Executee toutes les 2 minutes
     """
     try:
         with transaction.atomic():
             # Paiements en attente depuis plus de 5 minutes
             delai_verification = timezone.now() - timedelta(minutes=5)
-            
+
             paiements_verifies = Payment.objects.filter(
                 status='pending',
                 created_at__lt=delai_verification
             ).select_related('order')
-            
+
             if not paiements_verifies:
-                logger.info("💳 Aucun paiement en attente à vérifier")
+                logger.info("Aucun paiement en attente a verifier")
                 return {"verifies": 0}
-            
+
             paiements_confirmes = 0
             paiements_echoues = 0
-            
+
             for paiement in paiements_verifies:
                 try:
-                    # 🔄 EN PRODUCTION: Appeler l'API de l'opérateur pour vérifier le statut
-                    # Pour le MVP, on simule une confirmation automatique
-                    
-                    # Simulation: 90% de succès, 10% d'échec
-                    import random
-                    if random.random() < 0.9:  # 90% de chance de succès
-                        # Paiement réussi
-                        resultat = PaymentService.confirm_payment(
+                    # Appeler SingPay pour verifier le statut
+                    singpay_res = call_singpay_status(paiement.transaction_id)
+                    status_payload = singpay_res.get("status") or {}
+                    raw_status = (
+                        status_payload.get("code")
+                        or status_payload.get("result_code")
+                        or status_payload.get("message")
+                        or singpay_res.get("status")
+                        or ""
+                    )
+                    normalized = str(raw_status).upper()
+
+                    if normalized in ("00", "TS", "SUCCESS", "APPROVED", "COMPLETED"):
+                        PaymentService.confirm_payment(
                             paiement.transaction_id,
                             'SUCCESS'
                         )
                         paiements_confirmes += 1
-                        logger.info(f"✅ Paiement confirmé: #{paiement.order.order_number}")
-                    else:
-                        # Paiement échoué
+                        logger.info(f"Paiement confirme: #{paiement.order.order_number}")
+                    elif normalized in ("TF", "FAILED", "ERROR", "KO"):
                         paiement.status = 'failed'
                         paiement.save()
                         paiements_echoues += 1
-                        logger.warning(f"❌ Paiement échoué: #{paiement.order.order_number}")
-                        
+                        logger.warning(f"Paiement echoue: #{paiement.order.order_number}")
+                    else:
+                        logger.info(f"Paiement en attente: #{paiement.order.order_number}")
+
                 except Exception as e:
-                    logger.error(f"❌ Erreur vérification paiement {paiement.transaction_id}: {e}")
+                    logger.error(f"Erreur verification paiement {paiement.transaction_id}: {e}")
                     continue
-            
+
             resultat = {
                 "verifies": len(paiements_verifies),
                 "confirmes": paiements_confirmes,
                 "echoues": paiements_echoues,
                 "timestamp": timezone.now().isoformat()
             }
-            
-            logger.info(f"🔍 Vérification paiements terminée: {resultat}")
+
+            logger.info(f"Verification paiements terminee: {resultat}")
             return resultat
-            
+
     except Exception as e:
-        logger.error(f"❌ Erreur tâche vérification paiements: {e}")
+        logger.error(f"Erreur tache verification paiements: {e}")
         self.retry(countdown=120, exc=e)
 
 @shared_task
@@ -108,12 +116,12 @@ def traiter_reversements_automatiques():
                     montant_total += resultat['reversement'].net_amount
                     
                     logger.info(
-                        f"💰 Reversement traité pour {magasin.name}: "
+                        f"?? Reversement traité pour {magasin.name}: "
                         f"{resultat['reversement'].net_amount} FCFA"
                     )
                     
             except Exception as e:
-                logger.error(f"❌ Erreur reversement {magasin.name}: {e}")
+                logger.error(f"? Erreur reversement {magasin.name}: {e}")
                 continue
         
         resultat_final = {
@@ -123,11 +131,11 @@ def traiter_reversements_automatiques():
             "timestamp": timezone.now().isoformat()
         }
         
-        logger.info(f"🏦 Reversements automatiques terminés: {resultat_final}")
+        logger.info(f"?? Reversements automatiques terminés: {resultat_final}")
         return resultat_final
         
     except Exception as e:
-        logger.error(f"❌ Erreur tâche reversements: {e}")
+        logger.error(f"? Erreur tâche reversements: {e}")
         return {"erreur": str(e)}
 
 @shared_task
@@ -183,16 +191,16 @@ def generer_rapport_financier_quotidien():
             "timestamp": timezone.now().isoformat()
         }
         
-        logger.info(f"📊 Rapport financier généré: {rapport}")
+        logger.info(f"?? Rapport financier généré: {rapport}")
         
-        # 🔔 EN PRODUCTION: Envoyer le rapport par email à l'admin
+        # ?? EN PRODUCTION: Envoyer le rapport par email à l'admin
         # from django.core.mail import send_mail
         # send_mail(...)
         
         return rapport
         
     except Exception as e:
-        logger.error(f"❌ Erreur génération rapport: {e}")
+        logger.error(f"? Erreur génération rapport: {e}")
         return {"erreur": str(e)}
 
 
@@ -203,7 +211,7 @@ def generer_rapport_financier_quotidien():
 @shared_task(bind=True, max_retries=3)
 def check_expired_subscriptions(self):
     """
-    ⏰ Vérifier et marquer les forfaits expirés
+    ? Vérifier et marquer les forfaits expirés
     Exécutée quotidiennement à minuit
     
     - Marque les abonnements expirés
@@ -227,12 +235,12 @@ def check_expired_subscriptions(self):
             subscription.save()
             count += 1
             
-            logger.info(f"✅ Abonnement #{subscription.id} marqué comme expiré")
+            logger.info(f"? Abonnement #{subscription.id} marqué comme expiré")
             
             # Envoyer une notification au magasin
             send_subscription_expiry_notification.delay(subscription.id)
         
-        logger.info(f"✅ {count} abonnements marqués comme expirés")
+        logger.info(f"? {count} abonnements marqués comme expirés")
         
         return {
             'status': 'success',
@@ -241,14 +249,14 @@ def check_expired_subscriptions(self):
         }
     
     except Exception as exc:
-        logger.error(f"❌ Erreur lors de la vérification des expirations: {exc}")
+        logger.error(f"? Erreur lors de la vérification des expirations: {exc}")
         raise self.retry(exc=exc, countdown=60)
 
 
 @shared_task(bind=True, max_retries=3)
 def send_subscription_expiry_notification(self, subscription_id):
     """
-    📧 Envoyer une notification d'expiration au commerçant
+    ?? Envoyer une notification d'expiration au commerçant
     """
     try:
         from payments.models import StoreSubscription
@@ -263,7 +271,7 @@ def send_subscription_expiry_notification(self, subscription_id):
         
         plan_name = subscription.plan.name if subscription.plan else subscription.plan_name
         
-        subject = f"⏰ Votre abonnement {plan_name} a expiré - Gaboshop"
+        subject = f"? Votre abonnement {plan_name} a expiré - Gaboshop"
         message = f"""
 Bonjour {manager.first_name or 'Commerçant'},
 
@@ -286,18 +294,18 @@ Cordialement,
             fail_silently=True
         )
         
-        logger.info(f"📧 Notification d'expiration envoyée à {manager.email}")
+        logger.info(f"?? Notification d'expiration envoyée à {manager.email}")
         return {'status': 'sent', 'email': manager.email}
     
     except Exception as exc:
-        logger.error(f"❌ Erreur lors de l'envoi de notification: {exc}")
+        logger.error(f"? Erreur lors de l'envoi de notification: {exc}")
         raise self.retry(exc=exc, countdown=60)
 
 
 @shared_task(bind=True, max_retries=3)
 def send_subscription_expiry_reminder(self):
     """
-    🔔 Rappel d'expiration : Envoyer une notification 7 jours avant l'expiration
+    ?? Rappel d'expiration : Envoyer une notification 7 jours avant l'expiration
     Exécutée quotidiennement
     """
     try:
@@ -323,7 +331,7 @@ def send_subscription_expiry_reminder(self):
             
             plan_name = subscription.plan.name if subscription.plan else subscription.plan_name
             
-            subject = f"⏰ Rappel : Votre abonnement {plan_name} expire dans 7 jours"
+            subject = f"? Rappel : Votre abonnement {plan_name} expire dans 7 jours"
             message = f"""
 Bonjour {manager.first_name or 'Commerçant'},
 
@@ -345,9 +353,9 @@ Cordialement,
             )
             
             count += 1
-            logger.info(f"🔔 Rappel d'expiration envoyé à {manager.email}")
+            logger.info(f"?? Rappel d'expiration envoyé à {manager.email}")
         
-        logger.info(f"✅ {count} rappels d'expiration envoyés")
+        logger.info(f"? {count} rappels d'expiration envoyés")
         
         return {
             'status': 'success',
@@ -355,5 +363,5 @@ Cordialement,
         }
     
     except Exception as exc:
-        logger.error(f"❌ Erreur lors de l'envoi des rappels: {exc}")
+        logger.error(f"? Erreur lors de l'envoi des rappels: {exc}")
         raise self.retry(exc=exc, countdown=60)

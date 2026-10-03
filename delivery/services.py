@@ -28,8 +28,8 @@ class DeliveryService:
         try:
             with transaction.atomic():
                 # Vérifications
-                if order.status != 'ready':
-                    raise ValueError("La commande doit être prête pour livraison.")
+                if order.status not in ['ready', 'assigned']:
+                    raise ValueError("La commande doit etre prete pour livraison.")
                 
                 if not delivery_agent.is_available:
                     raise ValueError("Le livreur n'est pas disponible.")
@@ -54,14 +54,14 @@ class DeliveryService:
                 NotificationService.notify_delivery_assigned(delivery)
                 
                 logger.info(
-                    f"🚗 Livraison assignée: #{delivery.tracking_number} "
+                    f"?? Livraison assignée: #{delivery.tracking_number} "
                     f"à {delivery_agent.phone}"
                 )
                 
                 return delivery
                 
         except Exception as e:
-            logger.error(f"❌ Erreur assignation livraison: {e}")
+            logger.error(f"? Erreur assignation livraison: {e}")
             raise
 
     @staticmethod
@@ -71,7 +71,7 @@ class DeliveryService:
         """
         try:
             if not store.latitude or not store.longitude:
-                logger.warning(f"📍 Coordonnées manquantes pour {store.name}")
+                logger.warning(f"?? Coordonnées manquantes pour {store.name}")
                 return []
             
             # Trouver les livreurs les plus proches
@@ -102,7 +102,7 @@ class DeliveryService:
             return sorted(available_agents, key=lambda x: x['distance_km'])
             
         except Exception as e:
-            logger.error(f"❌ Erreur recherche livreurs: {e}")
+            logger.error(f"? Erreur recherche livreurs: {e}")
             return []
 
     @staticmethod
@@ -136,14 +136,14 @@ class DeliveryService:
                 delivery.order.save()
             
             logger.info(
-                f"📦 Statut livraison #{delivery.tracking_number} mis à jour: "
-                f"{old_status} → {new_status}"
+                f"?? Statut livraison #{delivery.tracking_number} mis à jour: "
+                f"{old_status} ? {new_status}"
             )
             
             return delivery
             
         except Exception as e:
-            logger.error(f"❌ Erreur mise à jour livraison: {e}")
+            logger.error(f"? Erreur mise à jour livraison: {e}")
             raise
 
     @staticmethod
@@ -168,14 +168,14 @@ class DeliveryService:
                 delivery.delivery_agent.save()
                 
                 logger.info(
-                    f"✅ Livraison confirmée: #{delivery.tracking_number} "
+                    f"? Livraison confirmée: #{delivery.tracking_number} "
                     f"Note: {delivery.rating}/5"
                 )
                 
                 return delivery
                 
         except Exception as e:
-            logger.error(f"❌ Erreur confirmation livraison: {e}")
+            logger.error(f"? Erreur confirmation livraison: {e}")
             raise
 
     @staticmethod
@@ -215,56 +215,15 @@ class DeliveryService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur calcul métriques: {e}")
+            logger.error(f"? Erreur calcul métriques: {e}")
             return None
 
 
 def auto_assign_delivery(order):
-    """Assigner automatiquement un livreur disponible à la commande prête.
-
-    Cette fonction est compatible avec l'usage direct depuis les vues/admins.
-    """
-    try:
-        with transaction.atomic():
-            # Verrouiller la livraison si existante
-            try:
-                delivery = Delivery.objects.select_for_update().get(order=order)
-            except Delivery.DoesNotExist:
-                delivery, _ = Delivery.objects.get_or_create(order=order)
-
-            if delivery.delivery_agent is not None:
-                return delivery
-
-            # Chercher un profil de livreur disponible
-            profile = (
-                DeliveryProfile.objects
-                .select_for_update()
-                .filter(status='available')
-                .select_related('user')
-                .first()
-            )
-
-            if not profile:
-                logger.info(f"auto_assign: pas de livreur disponible pour order {order.id}")
-                return None
-
-            # Assigner via le service existant
-            delivery = DeliveryService.assign_delivery_agent(order, profile.user)
-
-            # Marquer le profil occupé
-            try:
-                profile.status = 'busy'
-                profile.save()
-            except Exception:
-                logger.exception('Impossible de mettre à jour le statut du profil livreur')
-
-            delivery.is_auto_assigned = True
-            delivery.assigned_at = delivery.assigned_at or timezone.now()
-            delivery.save()
-
-            logger.info(f"Auto-assign: livraison {delivery.id} → livreur {profile.user.id}")
-            return delivery
-
-    except Exception:
-        logger.exception('Erreur auto_assign_delivery')
-        return None
+	"""Assigner automatiquement un livreur disponible a la commande prete."""
+	try:
+		from delivery.assignment_flow import start_delivery_assignment
+		return start_delivery_assignment(order)
+	except Exception:
+		logger.exception('Erreur auto_assign_delivery')
+		return None

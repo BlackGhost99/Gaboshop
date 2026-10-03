@@ -32,7 +32,6 @@ def export_sales_csv(orders, store):
         'Téléphone',
         'Montant HT',
         'Frais de livraison',
-        'Frais de service',
         'Commission',
         'Montant total',
         'Net reçu',
@@ -44,7 +43,7 @@ def export_sales_csv(orders, store):
     for order in orders:
         net_received = (
             order.items_total + order.delivery_fee 
-            - order.service_fee - order.commission_amount
+            - order.commission_amount
         )
         
         writer.writerow([
@@ -54,7 +53,6 @@ def export_sales_csv(orders, store):
             order.client.phone if order.client else 'N/A',
             f"{order.items_total:.2f}",
             f"{order.delivery_fee:.2f}",
-            f"{order.service_fee:.2f}",
             f"{order.commission_amount:.2f}",
             f"{order.total_amount:.2f}",
             f"{net_received:.2f}",
@@ -74,7 +72,7 @@ def export_sales_pdf(orders, store, summary):
     for order in orders:
         net_received = (
             order.items_total + order.delivery_fee 
-            - order.service_fee - order.commission_amount
+            - order.commission_amount
         )
         orders_data.append({
             'date': order.created_at.strftime('%d/%m/%Y %H:%M'),
@@ -82,7 +80,6 @@ def export_sales_pdf(orders, store, summary):
             'client': order.client.get_full_name() if order.client else 'N/A',
             'items_total': order.items_total,
             'delivery_fee': order.delivery_fee,
-            'service_fee': order.service_fee,
             'commission': order.commission_amount,
             'total': order.total_amount,
             'net': net_received,

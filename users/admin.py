@@ -9,9 +9,9 @@ User = get_user_model()
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
 	model = User
-	list_display = ('phone', 'email', 'first_name', 'last_name', 'city', 'is_staff', 'user_type', 'is_verified')
+	list_display = ('phone', 'email', 'first_name', 'last_name', 'city', 'is_staff', 'user_type', 'is_verified', 'singpay_disbursement_id')
 	list_filter = ('is_staff', 'is_superuser', 'is_active', 'user_type', 'city')
-	search_fields = ('phone', 'email', 'first_name', 'last_name', 'city')
+	search_fields = ('phone', 'email', 'first_name', 'last_name', 'city', 'singpay_disbursement_id')
 	ordering = ('-date_joined',)
 
 	# Make date_joined readonly in the admin form
@@ -22,7 +22,7 @@ class CustomUserAdmin(UserAdmin):
 		('Personal info', {'fields': ('first_name', 'last_name', 'email', 'city')}),
 		('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
 		('Important dates', {'fields': ('last_login',)}),
-		('GABOSHOP info', {'fields': ('user_type', 'is_verified', 'is_available', 'current_location')}),
+		('GABOSHOP info', {'fields': ('user_type', 'is_verified', 'is_available', 'current_location', 'singpay_disbursement_id')}),
 	)
 
 	add_fieldsets = (

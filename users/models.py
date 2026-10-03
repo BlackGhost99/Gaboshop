@@ -94,6 +94,11 @@ class User(AbstractUser):
 	# Pour les livreurs
 	is_available = models.BooleanField(default=True, help_text="Livreur disponible pour livraison")
 	current_location = models.CharField(max_length=255, blank=True, help_text="Localisation actuelle du livreur")
+	singpay_disbursement_id = models.CharField(
+		max_length=120,
+		blank=True,
+		help_text="ID de disbursement SingPay du livreur (utilise pour /transfer)"
+	)
 	city = models.CharField(max_length=100, default='Libreville', help_text="Ville de résidence ou d'opération")
     
 	# Pour tous les utilisateurs

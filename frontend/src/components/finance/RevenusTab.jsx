@@ -215,7 +215,7 @@ const RevenusTab = ({ planFeatures, dateFilters, onDateFilterChange }) => {
               type="number"
               value={filters.max_amount}
               onChange={(e) => handleFilterChange('max_amount', e.target.value)}
-              placeholder="∞"
+              placeholder="8"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
@@ -376,14 +376,14 @@ const RevenusTab = ({ planFeatures, dateFilters, onDateFilterChange }) => {
                     disabled={page === 1}
                     className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
-                    ←
+                    ?
                   </button>
                   <button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
                     className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
-                    →
+                    ?
                   </button>
                 </nav>
               </div>

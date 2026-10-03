@@ -23,22 +23,22 @@ export function TestPanel() {
   const runTests = async () => {
     setIsRunning(true);
     clearLog();
-    addLog('🔍 Démarrage des tests Phase 1...', 'info');
+    addLog('?? Démarrage des tests Phase 1...', 'info');
 
     try {
       // Import test function
       const { runPhase1Tests } = await import('../utils/testPhase1Validation');
       
-      addLog('📝 Exécution de la suite de tests...', 'info');
+      addLog('?? Exécution de la suite de tests...', 'info');
       const testResults = await runPhase1Tests();
       
-      addLog(`✓ Tests terminés: ${testResults.passed} réussis, ${testResults.failed} échoués`, 
+      addLog(`? Tests terminés: ${testResults.passed} réussis, ${testResults.failed} échoués`, 
         testResults.failed === 0 ? 'success' : 'warning');
       
       setResults(testResults);
       
     } catch (error) {
-      addLog(`✗ Erreur: ${error.message}`, 'error');
+      addLog(`? Erreur: ${error.message}`, 'error');
     } finally {
       setIsRunning(false);
     }
@@ -57,7 +57,7 @@ export function TestPanel() {
           className="test-toggle-btn"
           title="Ouvrir/Fermer le panel de test"
         >
-          🧪
+          ??
         </button>
       </div>
 
@@ -65,8 +65,8 @@ export function TestPanel() {
       {isOpen && (
         <div className="test-panel">
           <div className="test-panel-header">
-            <h3>🧪 Test Phase 1 - Status Validation</h3>
-            <button className="close-btn" onClick={togglePanel}>✕</button>
+            <h3>?? Test Phase 1 - Status Validation</h3>
+            <button className="close-btn" onClick={togglePanel}>?</button>
           </div>
 
           <div className="test-panel-content">
@@ -77,14 +77,14 @@ export function TestPanel() {
                 disabled={isRunning}
                 className="run-tests-btn"
               >
-                {isRunning ? '⏳ Exécution...' : '▶️ Exécuter les tests'}
+                {isRunning ? '? Exécution...' : '?? Exécuter les tests'}
               </button>
               <button 
                 onClick={clearLog}
                 disabled={isRunning || testLog.length === 0}
                 className="clear-log-btn"
               >
-                🗑️ Effacer
+                ??? Effacer
               </button>
             </div>
 
@@ -110,14 +110,14 @@ export function TestPanel() {
             {/* Results Summary */}
             {results && (
               <div className="test-results">
-                <div className="results-header">📊 Résumé des tests:</div>
+                <div className="results-header">?? Résumé des tests:</div>
                 <div className="results-stats">
                   <div className="stat passed">
-                    <span className="stat-label">✓ Réussis:</span>
+                    <span className="stat-label">? Réussis:</span>
                     <span className="stat-value">{results.passed}</span>
                   </div>
                   <div className="stat failed">
-                    <span className="stat-label">✗ Échoués:</span>
+                    <span className="stat-label">? Échoués:</span>
                     <span className="stat-value">{results.failed}</span>
                   </div>
                   <div className="stat total">
@@ -132,7 +132,7 @@ export function TestPanel() {
                     {results.details.map((detail, idx) => (
                       <div key={idx} className={`detail-item ${detail.passed ? 'success' : 'error'}`}>
                         <span className="detail-icon">
-                          {detail.passed ? '✓' : '✗'}
+                          {detail.passed ? '?' : '?'}
                         </span>
                         <div className="detail-info">
                           <div className="detail-name">{detail.name}</div>
@@ -148,7 +148,7 @@ export function TestPanel() {
             {/* Info Section */}
             <div className="test-info">
               <details>
-                <summary>📖 À propos de ces tests</summary>
+                <summary>?? À propos de ces tests</summary>
                 <div className="info-content">
                   <p>Cette suite de tests valide l'implémentation de Phase 1:</p>
                   <ul>

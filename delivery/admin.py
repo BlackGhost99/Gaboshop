@@ -16,6 +16,7 @@ class DeliveryAdmin(admin.ModelAdmin):
 		'delivery_agent_display',
 		'vehicle_type_display',
 		'status_display',
+		'auto_assignment_enabled',
 		'delivery_fee_display',
 		'agent_commission_display',
 		'assigned_at',
@@ -27,7 +28,7 @@ class DeliveryAdmin(admin.ModelAdmin):
 	inlines = [DeliveryTrackingInline]
 	fieldsets = (
 		('Informations Livraison', {
-			'fields': ('tracking_number', 'order', 'delivery_agent', 'status')
+			'fields': ('tracking_number', 'order', 'delivery_agent', 'status', 'auto_assignment_enabled')
 		}),
 		('Véhicules', {
 			'fields': (
@@ -118,7 +119,7 @@ class ZoneVehicleRateInline(admin.TabularInline):
 @admin.register(VehicleType)
 class VehicleTypeAdmin(admin.ModelAdmin):
 	list_display = (
-		'name', 'max_weight_kg', 'max_items', 'max_distance_km',
+		'name', 'max_weight_kg', 'max_length_m', 'max_items', 'max_distance_km',
 		'allow_intercity', 'is_active'
 	)
 	list_filter = ('is_active', 'allow_intercity', 'name')
@@ -129,7 +130,7 @@ class VehicleTypeAdmin(admin.ModelAdmin):
 			'fields': ('name', 'is_active')
 		}),
 		('Capacités', {
-			'fields': ('max_weight_kg', 'max_items', 'max_distance_km', 'allow_intercity')
+			'fields': ('max_weight_kg', 'max_length_m', 'max_items', 'max_distance_km', 'allow_intercity')
 		}),
 		('Tarifs intra-ville', {
 			'fields': ('base_price_intra_city', 'price_per_km_intra_city')
@@ -230,4 +231,3 @@ class DeliveryProfileAdmin(admin.ModelAdmin):
 			'classes': ('collapse',)
 		}),
 	)
-

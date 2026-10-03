@@ -1,12 +1,12 @@
-# 🎯 Système de Gestion des Forfaits en Temps Réel - Guide d'Implémentation
+# ?? Système de Gestion des Forfaits en Temps Réel - Guide d'Implémentation
 
-## 📋 Vue d'ensemble
+## ?? Vue d'ensemble
 
 Ce système implémente une **gestion de forfaits professionnelle et automatisée** comme Shopify, Odoo ou Wix. Chaque action du commerçant est contrôlée par son forfait en temps réel.
 
 ---
 
-## 🏗️ Architecture
+## ??? Architecture
 
 ### 1. **Modèles Django**
 - `SubscriptionPlan` : Définit les capacités (Starter, Pro, Business)
@@ -29,7 +29,7 @@ Ce système implémente une **gestion de forfaits professionnelle et automatisé
 
 ---
 
-## 🚀 Comment utiliser le système
+## ?? Comment utiliser le système
 
 ### Scénario 1 : Empêcher l'ajout d'un produit si le forfait est dépassé
 
@@ -228,7 +228,7 @@ def handle_flutterwave_webhook(request):
 
 ---
 
-## 📅 Tâches CRON Automatiques
+## ?? Tâches CRON Automatiques
 
 ### Configuration dans `celery_beat` (si vous utilisez Celery)
 
@@ -258,38 +258,38 @@ from payments.tasks import check_expired_subscriptions
 class Command(BaseCommand):
     def handle(self, *args, **options):
         result = check_expired_subscriptions()
-        self.stdout.write(f"✅ {result['message']}")
+        self.stdout.write(f"? {result['message']}")
 ```
 
 ---
 
-## 🎯 Différences de Plan
+## ?? Différences de Plan
 
-### 🟦 Starter (Gratuit ou très bon marché)
-- ✅ 20 produits max
-- ❌ Pas de statistiques
-- ❌ Pas de personnalisation
-- ❌ Pas de produits sponsorisés
-- ❌ Support basique
+### ?? Starter (Gratuit ou très bon marché)
+- ? 20 produits max
+- ? Pas de statistiques
+- ? Pas de personnalisation
+- ? Pas de produits sponsorisés
+- ? Support basique
 
-### 🟩 Pro (25 000 FCFA/mois)
-- ✅ Produits illimités
-- ✅ Statistiques avancées
-- ✅ Personnalisation de boutique
-- ✅ Produits sponsorisés
-- ✅ Support VIP
-- ✅ Meilleure visibilité
+### ?? Pro (25 000 FCFA/mois)
+- ? Produits illimités
+- ? Statistiques avancées
+- ? Personnalisation de boutique
+- ? Produits sponsorisés
+- ? Support VIP
+- ? Meilleure visibilité
 
-### 🟧 Business (50 000 FCFA/mois)
-- ✅ Tout de Pro +
-- ✅ Bannière personnalisée
-- ✅ Support dédié
-- ✅ Priorité maximale dans les résultats
-- ✅ Intégrations avancées
+### ?? Business (50 000 FCFA/mois)
+- ? Tout de Pro +
+- ? Bannière personnalisée
+- ? Support dédié
+- ? Priorité maximale dans les résultats
+- ? Intégrations avancées
 
 ---
 
-## 💾 Structure des Données
+## ?? Structure des Données
 
 ### StoreSubscription
 ```python
@@ -327,7 +327,7 @@ class Command(BaseCommand):
 
 ---
 
-## 🔥 Points Clés à Retenir
+## ?? Points Clés à Retenir
 
 1. **Toujours utiliser `SubscriptionChecker`** pour les vérifications
 2. **Les permissions sont vérifiées en temps réel** : pas de cache
@@ -338,17 +338,17 @@ class Command(BaseCommand):
 
 ---
 
-## 🚨 Erreurs Courantes
+## ?? Erreurs Courantes
 
-❌ **Mauvais** : Vérifier le forfait via le champ `subscription_plan` du Store (obsolète)
+? **Mauvais** : Vérifier le forfait via le champ `subscription_plan` du Store (obsolète)
 ```python
-if store.subscription_plan == 'pro':  # ❌ NON!
+if store.subscription_plan == 'pro':  # ? NON!
     pass
 ```
 
-✅ **Bon** : Utiliser le système temps réel
+? **Bon** : Utiliser le système temps réel
 ```python
-if store.is_subscription_active():  # ✅ OUI!
+if store.is_subscription_active():  # ? OUI!
     plan = store.get_current_plan()
     if plan.has_statistics:
         pass
@@ -356,7 +356,7 @@ if store.is_subscription_active():  # ✅ OUI!
 
 ---
 
-## 📞 Support
+## ?? Support
 
 Pour toute question sur l'implémentation, consulter :
 - `payments/subscription_check.py` - Service de vérification

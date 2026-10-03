@@ -57,7 +57,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
-            'weight_kg', 'estimated_weight_kg',
+            'weight_kg', 'length_m', 'estimated_weight_kg',
             'image', 'image_2', 'image_3', 'created_at'
         ]
         read_only_fields = ['store', 'created_at']
@@ -77,7 +77,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
-            'weight_kg', 'estimated_weight_kg',
+            'weight_kg', 'length_m', 'estimated_weight_kg',
             'image', 'image_2', 'image_3', 'created_at', 'updated_at',
             'variants', 'images'
         ]
@@ -93,7 +93,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'category', 'price', 'compare_price',
             'stock', 'sku', 'barcode', 'is_featured', 'image',
-            'image_2', 'image_3', 'weight_kg'
+            'image_2', 'image_3', 'weight_kg', 'length_m'
         ]
     
     def validate(self, attrs):
@@ -115,6 +115,17 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'weight_kg': _('Le poids du produit est obligatoire et doit être supérieur à 0 (en kg).')
             })
+
+        # Longueur obligatoire et > 0
+        length = attrs.get('length_m')
+        if length is None or length <= 0:
+            raise serializers.ValidationError({
+                'length_m': _('La longueur du produit est obligatoire et doit être supérieure à 0 (en mètres).')
+            })
+        if length > 5:
+            raise serializers.ValidationError({
+                'length_m': _('La longueur du produit ne doit pas dépasser 5 mètres.')
+            })
         
         return attrs
 
@@ -125,9 +136,17 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'category', 'price', 'compare_price',
             'stock', 'sku', 'barcode', 'is_available', 'is_featured',
-            'image', 'image_2', 'image_3', 'weight_kg'
+            'image', 'image_2', 'image_3', 'weight_kg', 'length_m'
         ]
+
+    def validate_length_m(self, value):
+        if value is None:
+            return value
+        if value <= 0:
+            raise serializers.ValidationError(_('La longueur doit être supérieure à 0 (en mètres).'))
+        if value > 5:
+            raise serializers.ValidationError(_('La longueur ne doit pas dépasser 5 mètres.'))
+        return value
 
 
 # ProductCategoryTemplate serializer removed after merging templates into ProductCategory
-

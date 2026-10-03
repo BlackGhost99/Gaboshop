@@ -41,13 +41,13 @@ def envoyer_rapports_quotidiens():
                 
                 # Préparer le message
                 message_rapport = (
-                    f"📊 RAPPORT QUOTIDIEN - {magasin.name}\n"
-                    f"📅 Date: {hier.date()}\n"
-                    f"🛍️ Commandes: {stats['total_commandes'] or 0}\n"
-                    f"✅ Livrées: {stats['commandes_livrees'] or 0}\n"
-                    f"💰 Chiffre d'affaires: {stats['chiffre_affaires'] or 0} FCFA\n"
-                    f"🏪 Taux de livraison: {round((stats['commandes_livrees'] or 0) / (stats['total_commandes'] or 1) * 100, 1)}%\n"
-                    f"\nBonne journée ! 🚀"
+                    f"?? RAPPORT QUOTIDIEN - {magasin.name}\n"
+                    f"?? Date: {hier.date()}\n"
+                    f"??? Commandes: {stats['total_commandes'] or 0}\n"
+                    f"? Livrées: {stats['commandes_livrees'] or 0}\n"
+                    f"?? Chiffre d'affaires: {stats['chiffre_affaires'] or 0} FCFA\n"
+                    f"?? Taux de livraison: {round((stats['commandes_livrees'] or 0) / (stats['total_commandes'] or 1) * 100, 1)}%\n"
+                    f"\nBonne journée ! ??"
                 )
                 
                 # Envoyer via WhatsApp
@@ -55,16 +55,16 @@ def envoyer_rapports_quotidiens():
                 WhatsAppService.send_text_message(magasin.phone, message_rapport)
                 
                 rapports_envoyes += 1
-                logger.info(f"📤 Rapport envoyé à {magasin.name}")
+                logger.info(f"?? Rapport envoyé à {magasin.name}")
                 
             except Exception as e:
-                logger.error(f"❌ Erreur rapport {magasin.name}: {e}")
+                logger.error(f"? Erreur rapport {magasin.name}: {e}")
                 continue
         
         return {"rapports_envoyes": rapports_envoyes}
         
     except Exception as e:
-        logger.error(f"❌ Erreur tâche rapports: {e}")
+        logger.error(f"? Erreur tâche rapports: {e}")
         return {"erreur": str(e)}
 
 @shared_task
@@ -86,7 +86,7 @@ def envoyer_rappel_commandes_en_attente():
         for commande in commandes_en_attente:
             try:
                 message_rappel = (
-                    f"⏰ RAPPEL - Commande #{commande.order_number}\n"
+                    f"? RAPPEL - Commande #{commande.order_number}\n"
                     f"Votre commande de {commande.total_amount} FCFA est en attente de paiement.\n"
                     f"Pour finaliser, rendez-vous dans vos commandes.\n"
                     f"Après 24h, la commande sera automatiquement annulée."
@@ -96,14 +96,14 @@ def envoyer_rappel_commandes_en_attente():
                 WhatsAppService.send_text_message(commande.client.phone, message_rappel)
                 
                 rappels_envoyes += 1
-                logger.info(f"⏰ Rappel envoyé pour #{commande.order_number}")
+                logger.info(f"? Rappel envoyé pour #{commande.order_number}")
                 
             except Exception as e:
-                logger.error(f"❌ Erreur rappel #{commande.order_number}: {e}")
+                logger.error(f"? Erreur rappel #{commande.order_number}: {e}")
                 continue
         
         return {"rappels_envoyes": rappels_envoyes}
         
     except Exception as e:
-        logger.error(f"❌ Erreur tâche rappels: {e}")
+        logger.error(f"? Erreur tâche rappels: {e}")
         return {"erreur": str(e)}

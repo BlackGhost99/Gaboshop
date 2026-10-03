@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import PermissionDenied
 from .models import Order, OrderItem
 from products.models import Product
 
@@ -56,22 +57,23 @@ class OrderSerializer(serializers.ModelSerializer):
     client_confirmation_pending = serializers.SerializerMethodField()
     client_can_confirm = serializers.SerializerMethodField()
     invoice_breakdown = serializers.SerializerMethodField()
+    payment_arrangement = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'client', 'client_phone', 'store', 'store_name', 'store_zone',
-            'status', 'status_display', 'items_total', 'delivery_fee', 'delivery_cost', 'delivery_requested', 'vehicle_type', 'service_fee', 'operator_fee', 'tax_amount', 'payment_fees',
+            'status', 'status_display', 'items_total', 'delivery_fee', 'delivery_cost', 'delivery_requested', 'vehicle_type', 'operator_fee', 'tax_amount', 'payment_fees',
             'total_amount', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
             'notes', 'items', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
-            'invoice_breakdown'
+            'invoice_breakdown', 'payment_arrangement'
         ]
         read_only_fields = [
-            'id', 'order_number', 'client', 'items_total', 'total_amount', 'service_fee', 'operator_fee', 'payment_fees',
+            'id', 'order_number', 'client', 'items_total', 'total_amount', 'operator_fee', 'payment_fees',
             'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
-            'invoice_breakdown', 'delivery_cost', 'vehicle_type'
+            'invoice_breakdown', 'payment_arrangement', 'delivery_cost', 'vehicle_type'
         ]
 
     def _get_delivery(self, obj):
@@ -129,7 +131,6 @@ class OrderSerializer(serializers.ModelSerializer):
                 'delivery_fee': str(obj.delivery_fee),
                 'delivery_cost': str(obj.delivery_cost),
                 'vehicle_type': obj.vehicle_type or None,
-                'service_fee': str(obj.service_fee),
                 'operator_fee': str(obj.operator_fee),
                 'tax_amount': str(obj.tax_amount),
                 'payment_fees': str(obj.payment_fees),
@@ -153,12 +154,6 @@ class OrderSerializer(serializers.ModelSerializer):
                         'amount': obj.vehicle_type or '',
                         'currency': ''
                     },
-                    {
-                        'description': 'Frais de service plateforme',
-                        'amount': str(obj.service_fee),
-                        'currency': 'FCFA'
-                    },
-                    
                     *([{
                         'description': 'Frais opérateur Mobile Money (Airtel/Moov)',
                         'amount': str(obj.operator_fee),
@@ -184,19 +179,54 @@ class OrderSerializer(serializers.ModelSerializer):
             }
         }
 
+    def get_payment_arrangement(self, obj):
+        from payments.direct_service import payment_summary
+        return payment_summary(obj, self.context.get('request'))
+
 class OrderCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de commande"""
     items = OrderItemCreateSerializer(many=True, write_only=True)
+    delivery_type = serializers.ChoiceField(
+        choices=['standard', 'express'],
+        default='standard',
+        required=False,
+        allow_blank=False
+    )
+    delivery_requested = serializers.BooleanField(
+        default=True,
+        required=False
+    )
+    notes = serializers.CharField(
+        default='',
+        required=False,
+        allow_blank=True
+    )
+    city = serializers.CharField(
+        default='Libreville',
+        required=False,
+        allow_blank=False
+    )
+    payment_flow = serializers.CharField(write_only=True)
+    payment_method = serializers.CharField(write_only=True)
+    delivery_payment_method = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
     class Meta:
         model = Order
         fields = [
-            'store', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone', 'delivery_requested', 'notes', 'items'
+            'store', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
+            'delivery_type', 'delivery_requested', 'notes', 'items',
+            'payment_flow', 'payment_method', 'delivery_payment_method'
         ]
     
     def validate(self, attrs):
         store = attrs['store']
         items = attrs['items']
+        from payments.configuration import available_payment_options
+        _, options = available_payment_options(store, attrs.get('delivery_requested', True))
+        if not any(option['flow'] == attrs.get('payment_flow') and option['method'] == attrs.get('payment_method') for option in options):
+            raise serializers.ValidationError({'payment_method': _('Ce circuit ou moyen de paiement n’est pas autorisé.')})
+
+        from payments.subscription_check import SubscriptionChecker
         
         # Vérifier que le magasin est actif
         if not store.is_active:
@@ -210,6 +240,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 'store': _('Ce magasin est actuellement fermé.')
             })
         
+        # Vérifier la limite de commandes mensuelles
+        try:
+            SubscriptionChecker.check_can_create_order(store)
+        except PermissionDenied as e:
+            raise serializers.ValidationError({'store': str(e)})
+
         # Vérifier qu'il y a des articles
         if not items:
             raise serializers.ValidationError({
@@ -223,14 +259,24 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 'items': _(f'Le montant minimum de commande est {store.min_order_amount} FCFA.')
             })
         
+        delivery_type = attrs.get('delivery_type', 'standard')
+        if delivery_type == 'express':
+            try:
+                SubscriptionChecker.check_can_offer_express_delivery(store)
+            except PermissionDenied as e:
+                raise serializers.ValidationError({'delivery_type': str(e)})
+
         attrs['items_total'] = total
-        attrs['delivery_fee'] = store.delivery_fee
-        attrs['total_amount'] = total + store.delivery_fee
+        attrs['delivery_fee'] = store.delivery_fee_express if delivery_type == 'express' else store.delivery_fee
+        attrs['total_amount'] = total + attrs['delivery_fee']
         
         return attrs
     
     def create(self, validated_data):
         items_data = validated_data.pop('items')
+        payment_flow = validated_data.pop('payment_flow')
+        payment_method = validated_data.pop('payment_method')
+        delivery_payment_method = validated_data.pop('delivery_payment_method', '')
         request = self.context.get('request')
         
         # Créer la commande
@@ -253,12 +299,11 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             item_data['product'].reduce_stock(item_data['quantity'])
         
         # Recalculate totals (commission depends on created OrderItems)
-        try:
-            order.calculate_totals()
-        except Exception:
-            # Don't let a totals calculation error break creation flow; surface later
-            pass
+        operator = 'moov' if payment_method == 'moov_money' else 'airtel'
+        order.calculate_totals(operator=operator, payment_method=payment_method)
 
+        from payments.direct_service import create_arrangement
+        create_arrangement(order, payment_flow, payment_method, delivery_payment_method, request.user)
         return order
 
 class OrderStatusUpdateSerializer(serializers.ModelSerializer):
@@ -286,7 +331,7 @@ class OrderStatusUpdateSerializer(serializers.ModelSerializer):
         current_status = self.instance.status
         if value not in valid_transitions.get(current_status, []):
             raise serializers.ValidationError(
-                _(f'Transition invalide: {current_status} → {value}')
+                _(f'Transition invalide: {current_status} ? {value}')
             )
         
         return value

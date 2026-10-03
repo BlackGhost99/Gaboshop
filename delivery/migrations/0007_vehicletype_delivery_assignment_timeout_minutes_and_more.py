@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='delivery',
             name='distance_km',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Distance totale en km (store → client)', max_digits=8, null=True),
+            field=models.DecimalField(blank=True, decimal_places=2, help_text='Distance totale en km (store ? client)', max_digits=8, null=True),
         ),
         migrations.AddField(
             model_name='delivery',

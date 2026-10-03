@@ -3,7 +3,6 @@ import logging
 from decimal import Decimal
 from django.db.models import Q
 from delivery.models import VehicleType
-from orders.models import Order
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +12,8 @@ class DeliveryRulesService:
 	
 	# Poids par défaut si non renseigné (en kg)
 	DEFAULT_WEIGHT_PER_ITEM = Decimal('0.5')  # 500g par défaut
+	# Longueur par défaut si non renseignée (en mètres)
+	DEFAULT_LENGTH_PER_ITEM = Decimal('0.5')  # 50cm par défaut
 	
 	@staticmethod
 	def calculate_order_weight(order):
@@ -43,6 +44,54 @@ class DeliveryRulesService:
 		Compte le nombre total d'articles dans une commande
 		"""
 		return sum(item.quantity for item in order.items.all())
+
+	@staticmethod
+	def calculate_order_length(order):
+		"""
+		Calcule la longueur totale estimée d'une commande
+		"""
+		total_length = Decimal('0.00')
+		
+		for item in order.items.all():
+			product = item.product
+			quantity = Decimal(item.quantity)
+			
+			# Utiliser length_m si disponible, sinon valeur par défaut
+			if getattr(product, 'length_m', None):
+				item_length = product.length_m
+			else:
+				item_length = DeliveryRulesService.DEFAULT_LENGTH_PER_ITEM
+			
+			total_length += item_length * quantity
+		
+		return total_length
+
+	@staticmethod
+	def _vehicle_can_handle(vehicle_type, total_weight, total_length, items_count, is_intercity):
+		if total_weight > vehicle_type.max_weight_kg:
+			return False
+		if total_length > vehicle_type.max_length_m:
+			return False
+		if vehicle_type.max_items > 0 and items_count > vehicle_type.max_items:
+			return False
+		if is_intercity and not vehicle_type.allow_intercity:
+			return False
+		return True
+
+	@staticmethod
+	def select_vehicle_for_load(total_weight, total_length, items_count, is_intercity):
+		"""
+		Sélectionne le véhicule minimum requis selon poids + longueur
+		"""
+		vehicle_types = VehicleType.objects.filter(is_active=True).order_by('max_weight_kg')
+		
+		for vehicle_type in vehicle_types:
+			if DeliveryRulesService._vehicle_can_handle(
+				vehicle_type, total_weight, total_length, items_count, is_intercity
+			):
+				return vehicle_type
+		
+		return None
 	
 	@staticmethod
 	def is_intercity_delivery(order):
@@ -67,12 +116,14 @@ class DeliveryRulesService:
 		"""
 		try:
 			total_weight = DeliveryRulesService.calculate_order_weight(order)
+			total_length = DeliveryRulesService.calculate_order_length(order)
 			items_count = DeliveryRulesService.calculate_order_items_count(order)
 			is_intercity = DeliveryRulesService.is_intercity_delivery(order)
 			
 			logger.debug(
 				f"Calcul véhicule minimum - Poids: {total_weight}kg, "
-				f"Items: {items_count}, Inter-ville: {is_intercity}"
+				f"Longueur: {total_length}m, Items: {items_count}, "
+				f"Inter-ville: {is_intercity}"
 			)
 			
 			# Récupérer tous les véhicules actifs, triés par capacité croissante
@@ -80,24 +131,10 @@ class DeliveryRulesService:
 			
 			# Filtrer selon les règles
 			for vehicle_type in vehicle_types:
-				# Vérifier poids
-				if total_weight > vehicle_type.max_weight_kg:
+				if not DeliveryRulesService._vehicle_can_handle(
+					vehicle_type, total_weight, total_length, items_count, is_intercity
+				):
 					continue
-				
-				# Vérifier nombre d'items (0 = illimité)
-				if vehicle_type.max_items > 0 and items_count > vehicle_type.max_items:
-					continue
-				
-				# Règles spécifiques par type de véhicule
-				if vehicle_type.name == 'MOTO':
-					# Moto : jamais inter-ville
-					if is_intercity:
-						continue
-				
-				elif vehicle_type.name == 'TRUCK':
-					# Camion : inter-ville uniquement
-					if not is_intercity:
-						continue
 				
 				# Si on arrive ici, le véhicule convient
 				logger.info(
@@ -109,7 +146,8 @@ class DeliveryRulesService:
 			# Aucun véhicule ne convient
 			logger.warning(
 				f"Aucun véhicule disponible pour commande {order.order_number} "
-				f"(Poids: {total_weight}kg, Items: {items_count}, Inter-ville: {is_intercity})"
+				f"(Poids: {total_weight}kg, Longueur: {total_length}m, "
+				f"Items: {items_count}, Inter-ville: {is_intercity})"
 			)
 			return None
 			
@@ -123,33 +161,21 @@ class DeliveryRulesService:
 		Retourne la liste des types de véhicules éligibles pour une commande
 		"""
 		try:
-			minimum_vehicle = DeliveryRulesService.calculate_minimum_vehicle_type(order)
-			
-			if not minimum_vehicle:
-				return []
-			
-			# Récupérer tous les véhicules >= minimum requis
-			eligible = VehicleType.objects.filter(
-				is_active=True,
-				max_weight_kg__gte=minimum_vehicle.max_weight_kg
-			).order_by('max_weight_kg')
-			
-			# Filtrer selon les règles spécifiques
+			total_weight = DeliveryRulesService.calculate_order_weight(order)
+			total_length = DeliveryRulesService.calculate_order_length(order)
+			items_count = DeliveryRulesService.calculate_order_items_count(order)
 			is_intercity = DeliveryRulesService.is_intercity_delivery(order)
-			filtered = []
 			
-			for vehicle_type in eligible:
-				# Moto : jamais inter-ville
-				if vehicle_type.name == 'MOTO' and is_intercity:
-					continue
-				
-				# Camion : inter-ville uniquement
-				if vehicle_type.name == 'TRUCK' and not is_intercity:
-					continue
-				
-				filtered.append(vehicle_type)
+			eligible = []
+			vehicle_types = VehicleType.objects.filter(is_active=True).order_by('max_weight_kg')
 			
-			return filtered
+			for vehicle_type in vehicle_types:
+				if DeliveryRulesService._vehicle_can_handle(
+					vehicle_type, total_weight, total_length, items_count, is_intercity
+				):
+					eligible.append(vehicle_type)
+			
+			return eligible
 			
 		except Exception as e:
 			logger.error(f"Erreur récupération véhicules éligibles: {e}")
@@ -174,37 +200,19 @@ class DeliveryRulesService:
 			if not minimum_required:
 				return False, "Aucun véhicule ne peut livrer cette commande", None
 			
-			# Vérifier que le véhicule choisi est >= minimum requis
-			if vehicle_type.max_weight_kg < minimum_required.max_weight_kg:
+			total_weight = DeliveryRulesService.calculate_order_weight(order)
+			total_length = DeliveryRulesService.calculate_order_length(order)
+			items_count = DeliveryRulesService.calculate_order_items_count(order)
+			is_intercity = DeliveryRulesService.is_intercity_delivery(order)
+			
+			# Vérifier capacité véhicule
+			if not DeliveryRulesService._vehicle_can_handle(
+				vehicle_type, total_weight, total_length, items_count, is_intercity
+			):
 				return (
 					False,
 					f"Ce véhicule ne peut pas transporter cette commande. "
 					f"Véhicule minimum requis: {minimum_required.get_name_display()}",
-					minimum_required
-				)
-			
-			# Vérifier nombre d'items
-			items_count = DeliveryRulesService.calculate_order_items_count(order)
-			if vehicle_type.max_items > 0 and items_count > vehicle_type.max_items:
-				return (
-					False,
-					f"Ce véhicule ne peut transporter que {vehicle_type.max_items} articles maximum",
-					minimum_required
-				)
-			
-			# Vérifier inter-ville
-			is_intercity = DeliveryRulesService.is_intercity_delivery(order)
-			if vehicle_type.name == 'MOTO' and is_intercity:
-				return (
-					False,
-					"Les motos ne peuvent pas effectuer de livraisons inter-ville",
-					minimum_required
-				)
-			
-			if vehicle_type.name == 'TRUCK' and not is_intercity:
-				return (
-					False,
-					"Les camions sont réservés aux livraisons inter-ville uniquement",
 					minimum_required
 				)
 			

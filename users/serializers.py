@@ -5,8 +5,6 @@ from django.db import transaction
 from stores.models import Store, StoreCategory
 from .models import User, UserProfile, GerantProfile, LivreurProfile
 from .models import DeliveryAgentApiKey
-import json
-import time
 
 # Choices réutilisables pour les véhicules livreur
 VEHICLE_CHOICES = [
@@ -15,24 +13,6 @@ VEHICLE_CHOICES = [
     ('velo', 'Vélo'),
     ('voiture', 'Voiture'),
 ]
-
-def log_debug_info(location, message, data, hypothesis_id='A'):
-    """Log debug information to the log file for debugging sessions"""
-    try:
-        log_entry = {
-            'id': f'log_{int(time.time() * 1000)}_py',
-            'timestamp': int(time.time() * 1000),
-            'location': location,
-            'message': message,
-            'data': data,
-            'sessionId': 'debug-session',
-            'runId': 'initial-test',
-            'hypothesisId': hypothesis_id
-        }
-        with open('c:\\Users\\BlackGhost\\Desktop\\Gaboshop\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
-    except Exception:
-        pass  # Silently fail if logging doesn't work
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,7 +30,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'phone', 'email', 'first_name', 'last_name', 
-            'user_type', 'city', 'is_verified', 'is_available', 'current_location',
+            'user_type', 'city', 'is_verified', 'is_available', 'current_location', 'singpay_disbursement_id',
             'profile', 'date_joined'
         ]
         read_only_fields = ['id', 'date_joined', 'is_verified']
@@ -93,12 +73,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, attrs):
-        # #region agent log
-        try:
-            with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_py','timestamp':int(time.time()*1000),'location':'users/serializers.py:93','message':'validate method entered','data':{'attrs_keys':list(attrs.keys()),'user_type':attrs.get('user_type'),'has_position_lat':'position_lat' in attrs,'position_lat':attrs.get('position_lat'),'has_position_lng':'position_lng' in attrs,'position_lng':attrs.get('position_lng'),'position_lat_type':type(attrs.get('position_lat')).__name__ if 'position_lat' in attrs else None},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'C'})+'\n')
-        except:pass
-        # #endregion
         
         # Validation et normalisation du numéro de téléphone (comme Login)
         phone = attrs.get('phone', '').strip().replace(' ', '')
@@ -161,27 +135,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             position_lat = attrs.get('position_lat')
             position_lng = attrs.get('position_lng')
             if not position_lat or not position_lng:
-                log_debug_info(
-                    'users/serializers.py:151',
-                    'GPS validation failed - missing or null coordinates',
-                    {
-                        'has_position_lat': 'position_lat' in attrs,
-                        'has_position_lng': 'position_lng' in attrs,
-                        'position_lat': position_lat,
-                        'position_lng': position_lng
-                    },
-                    'A'
-                )
                 raise serializers.ValidationError({
                     'gps': _('Les coordonnées GPS (position_lat, position_lng) sont requises pour l\'inscription des livreurs.')
                 })
         
-        # #region agent log
-        try:
-            with open(r'c:\Users\Admin\source\repos\BlackGhost99\Gaboshop\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                f.write(json.dumps({'id':f'log_{int(time.time()*1000)}_py','timestamp':int(time.time()*1000),'location':'users/serializers.py:169','message':'validate method completed successfully','data':{'user_type':user_type,'attrs_keys_after':list(attrs.keys())},'sessionId':'debug-session','runId':'initial-test','hypothesisId':'C'})+'\n')
-        except:pass
-        # #endregion
 
         # Optional email uniqueness check: avoid multiple accounts with same email
         email = attrs.get('email', '').strip() if attrs.get('email') else ''

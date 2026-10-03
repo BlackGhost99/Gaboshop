@@ -3,12 +3,14 @@
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from orders.models import Order
 from delivery.models import Delivery
+from delivery.assignment_flow import ASSIGNMENT_TIMEOUT_MINUTES, enqueue_assignment_tasks
 from stores.models import Store
 from users.models import User
 from core.validators import is_valid_order_transition, can_user_change_order_status, is_valid_delivery_transition
@@ -236,19 +238,31 @@ class DeliveryAssignmentView(APIView):
             if not is_valid_delivery_transition(old_delivery_status, 'assigned'):
                 return Response({
                     "success": False,
-                    "error": f"Transition de livraison invalide: {delivery.get_status_display()} → Livreur assigné"
+                    "error": f"Transition de livraison invalide: {delivery.get_status_display()} ? Livreur assigné"
                 }, status=400)
             
             delivery.delivery_agent = agent
             delivery.status = 'assigned'  # Livreur assigné, en attente d'acceptation
             delivery.is_auto_assigned = auto_assign
+            delivery.auto_assignment_enabled = auto_assign
+            now = timezone.now()
+            if not delivery.assignment_started_at:
+                delivery.assignment_started_at = now
+            timeout_minutes = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
+            if timeout_minutes < ASSIGNMENT_TIMEOUT_MINUTES:
+                timeout_minutes = ASSIGNMENT_TIMEOUT_MINUTES
+                delivery.assignment_timeout_minutes = timeout_minutes
+            delivery.assignment_round = (delivery.assignment_round or 0) + 1
             delivery.save()
+            enqueue_assignment_tasks(
+                delivery.id, delivery.assignment_round, timeout_minutes, delivery.assignment_started_at
+            )
             
             # Mettre à jour le statut de la commande (valider la transition)
             if not is_valid_order_transition(order.status, 'assigned'):
                 return Response({
                     "success": False,
-                    "error": f"Transition de commande invalide: {order.get_status_display()} → Livreur assigné"
+                    "error": f"Transition de commande invalide: {order.get_status_display()} ? Livreur assigné"
                 }, status=400)
             
             order.status = 'assigned'
@@ -314,7 +328,7 @@ class OrderStatusUpdateView(APIView):
             if not is_valid_order_transition(order.status, new_status):
                 return Response({
                     "success": False,
-                    "error": f"Transition invalide: {order.get_status_display()} → {Order._meta.get_field('status').choices[next(i for i, (k, v) in enumerate(Order._meta.get_field('status').choices) if k == new_status)][1]}"
+                    "error": f"Transition invalide: {order.get_status_display()} ? {Order._meta.get_field('status').choices[next(i for i, (k, v) in enumerate(Order._meta.get_field('status').choices) if k == new_status)][1]}"
                 }, status=400)
             
             # VALIDATION 2: Vérifier les permissions de l'utilisateur
@@ -373,11 +387,20 @@ class OrdersCancelView(APIView):
         try:
             order = Order.objects.get(id=order_id)
             reason = request.data.get('reason', 'Annulation admin')
+            refund_amount = request.data.get('refund_amount')
+            if refund_amount and hasattr(order, 'payment_arrangement'):
+                from payments.direct_service import record_refund
+                record_refund(
+                    order,
+                    request.data.get('refund_component', 'products'),
+                    Decimal(str(refund_amount)),
+                    request.user,
+                    request.data.get('refund_reference') or f'CANCEL-{order.id}-{int(timezone.now().timestamp())}',
+                    reason,
+                )
             
             order.status = 'cancelled'
             order.save()
-            
-            # TODO: Logique de remboursement
             
             return Response({
                 "success": True,

@@ -51,7 +51,7 @@ class SalesSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'order_number', 'client_name', 'created_at',
-            'items_total', 'commission_amount', 'service_fee',
+            'items_total', 'commission_amount',
             'delivery_fee', 'total_amount', 'net_amount',
             'status', 'status_display', 'is_b2b'
         ]
@@ -63,14 +63,13 @@ class SalesSerializer(serializers.ModelSerializer):
     
     def get_net_amount(self, obj):
         """Montant net reçu par le store"""
-        return obj.items_total - obj.commission_amount - obj.service_fee
+        return obj.items_total - obj.commission_amount
 
 
 class SalesSummarySerializer(serializers.Serializer):
     """Serializer pour le résumé des ventes"""
     gross_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_commission = serializers.DecimalField(max_digits=12, decimal_places=2)
-    total_service_fees = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_delivery_fees = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_fees = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_received = serializers.DecimalField(max_digits=12, decimal_places=2)

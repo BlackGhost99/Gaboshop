@@ -1,11 +1,13 @@
 """API v1: delivery endpoints."""
 
 import logging
+from decimal import Decimal
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django.utils import timezone
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,11 @@ from delivery.serializers import (
 )
 from delivery.services import (
 	DeliveryRulesService, DeliveryPricingService, DeliveryAssignmentService
+)
+from delivery.assignment_flow import (
+	ASSIGNMENT_TIMEOUT_MINUTES,
+	assign_next_driver,
+	enqueue_assignment_tasks,
 )
 # Importer DeliveryService depuis le fichier services.py (pas le package)
 # Utiliser importlib pour charger le fichier directement
@@ -83,6 +90,42 @@ class DeliveryProfileUpdateView(APIView):
             }
         })
 
+
+class DeliveryAvailabilityView(APIView):
+	permission_classes = [permissions.IsAuthenticated]
+
+	def post(self, request):
+		user = request.user
+		if not user.is_delivery_agent():
+			return Response({'error': 'Acces reserve aux livreurs'}, status=status.HTTP_403_FORBIDDEN)
+
+		raw_value = request.data.get('is_available', None)
+		if raw_value is None:
+			return Response({'error': 'is_available requis'}, status=status.HTTP_400_BAD_REQUEST)
+
+		if isinstance(raw_value, bool):
+			is_available = raw_value
+		else:
+			is_available = str(raw_value).strip().lower() in ['true', '1', 'yes', 'y', 'on']
+
+		try:
+			profile = user.livreur_profile
+		except Exception:
+			return Response({'error': 'Profil livreur non trouve'}, status=status.HTTP_404_NOT_FOUND)
+
+		user.is_available = is_available
+		user.save(update_fields=['is_available'])
+
+		profile.disponible = is_available
+		profile.save(update_fields=['disponible'])
+
+		return Response({
+			'success': True,
+			'data': {
+				'is_available': is_available
+			}
+		})
+
 class DeliveryAssignView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
     
@@ -122,7 +165,20 @@ class DeliveryAssignView(APIView):
 			if serializer.is_valid():
 				delivery = serializer.save()
 				delivery.status = 'assigned'
+				delivery.auto_assignment_enabled = False
+				delivery.is_auto_assigned = False
+				now = timezone.now()
+				if not delivery.assignment_started_at:
+					delivery.assignment_started_at = now
+				timeout_minutes = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
+				if timeout_minutes < ASSIGNMENT_TIMEOUT_MINUTES:
+					timeout_minutes = ASSIGNMENT_TIMEOUT_MINUTES
+					delivery.assignment_timeout_minutes = timeout_minutes
+				delivery.assignment_round = (delivery.assignment_round or 0) + 1
 				delivery.save()
+				enqueue_assignment_tasks(
+					delivery.id, delivery.assignment_round, timeout_minutes, delivery.assignment_started_at
+				)
                 
 				# Mettre à jour le statut de la commande
 				order.status = 'assigned'
@@ -131,7 +187,7 @@ class DeliveryAssignView(APIView):
 				return Response({
 					'success': True,
 					'message': 'Livreur assigné avec succès.',
-					'data': DeliverySerializer(delivery).data
+					'data': DeliverySerializer(delivery, context={'request': request}).data
 				})
             
 			return Response({
@@ -187,7 +243,7 @@ class DeliveryStatusUpdateView(APIView):
 				return Response({
 					'success': True,
 					'message': 'Statut de livraison mis à jour.',
-					'data': DeliverySerializer(delivery).data
+					'data': DeliverySerializer(delivery, context={'request': request}).data
 				})
             
 			return Response({
@@ -230,7 +286,7 @@ class DeliveryConfirmView(APIView):
 				return Response({
 					'success': True,
 					'message': 'Livraison confirmée avec succès.',
-					'data': DeliverySerializer(delivery).data
+					'data': DeliverySerializer(delivery, context={'request': request}).data
 				})
             
 			return Response({
@@ -296,14 +352,20 @@ class AvailableDeliveriesView(ListAPIView):
 		if not user.is_delivery_agent():
 			return Delivery.objects.none()
 
-		# Filter waiting deliveries in the same city and that are ready
-		qs = Delivery.objects.filter(status='waiting')
-		# Optionally restrict by city
-		if hasattr(user, 'city') and user.city:
-			qs = qs.filter(city=user.city)
-
-		# Only include deliveries whose order status indicates ready for delivery
+		# Filter waiting deliveries and only show those open to all or not in auto-assignment
+		qs = Delivery.objects.filter(status='waiting', delivery_agent__isnull=True)
 		qs = qs.filter(order__status__in=['ready', 'paid', 'confirmed'])
+		if hasattr(user, 'city') and user.city:
+			qs = qs.filter(
+				Q(is_open_to_all=True) |
+				Q(auto_assignment_enabled=False, city=user.city)
+			)
+		else:
+			qs = qs.filter(
+				Q(is_open_to_all=True) |
+				Q(auto_assignment_enabled=False)
+			)
+
 		return qs.order_by('created_at')
 
 
@@ -327,18 +389,42 @@ class DeliveryClaimView(APIView):
 				if delivery.delivery_agent is not None or delivery.status != 'waiting':
 					return Response({'success': False, 'error': 'Livraison déjà prise ou non disponible'}, status=status.HTTP_400_BAD_REQUEST)
 
+				if delivery.auto_assignment_enabled and not delivery.is_open_to_all and delivery.assignment_started_at is not None:
+					return Response({'success': False, 'error': 'Livraison non ouverte aux livreurs'}, status=status.HTTP_400_BAD_REQUEST)
+
+				from payments.direct_service import can_courier_accept_collection, is_manual_order
+				if not can_courier_accept_collection(user, delivery.order):
+					return Response({'success': False, 'error': 'Plafond d’espèces détenues atteint pour ce livreur'}, status=status.HTTP_409_CONFLICT)
+
 				# Assign to current user (manual claim)
 				delivery.delivery_agent = user
 				delivery.status = 'assigned'
 				delivery.assigned_at = timezone.now()
 				delivery.is_auto_assigned = False
+				delivery.is_open_to_all = False
+				delivery.opened_at = None
+				now = timezone.now()
+				if not delivery.assignment_started_at:
+					delivery.assignment_started_at = now
+				timeout_minutes = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
+				if timeout_minutes < ASSIGNMENT_TIMEOUT_MINUTES:
+					timeout_minutes = ASSIGNMENT_TIMEOUT_MINUTES
+					delivery.assignment_timeout_minutes = timeout_minutes
+				delivery.assignment_round = (delivery.assignment_round or 0) + 1
 				# Compute agent commission if not set
 				try:
 					if delivery.order and delivery.order.delivery_fee:
-						delivery.agent_commission = delivery.order.delivery_fee * Decimal('0.8')
+						delivery.agent_commission = delivery.order.delivery_fee if is_manual_order(delivery.order) else delivery.order.delivery_fee * Decimal('0.8')
 				except Exception:
 					pass
 				delivery.save()
+				assignment_round = delivery.assignment_round
+				started_at = delivery.assignment_started_at
+				transaction.on_commit(
+					lambda: enqueue_assignment_tasks(
+						delivery.id, assignment_round, timeout_minutes, started_at
+					)
+				)
 
 				# Update order status
 				delivery.order.status = 'assigned'
@@ -350,7 +436,7 @@ class DeliveryClaimView(APIView):
 				except Exception:
 					pass
 
-			return Response({'success': True, 'message': 'Livraison réclamée avec succès', 'data': DeliverySerializer(delivery).data})
+			return Response({'success': True, 'message': 'Livraison réclamée avec succès', 'data': DeliverySerializer(delivery, context={'request': request}).data})
 
 		except Delivery.DoesNotExist:
 			return Response({'success': False, 'error': 'Livraison non trouvée'}, status=status.HTTP_404_NOT_FOUND)
@@ -395,6 +481,13 @@ class DeliveryAcceptAssignmentView(APIView):
 					'success': False,
 					'error': 'Vous ne pouvez accepter que vos propres commandes'
 				}, status=status.HTTP_403_FORBIDDEN)
+
+			from payments.direct_service import can_courier_accept_collection
+			if not can_courier_accept_collection(request.user, delivery.order):
+				return Response({
+					'success': False,
+					'error': 'Plafond d’espèces détenues atteint pour ce livreur'
+				}, status=status.HTTP_409_CONFLICT)
 			
 			# Vérifier que la transition de statut est valide
 			is_valid, error_msg = can_user_change_delivery_status(request.user, delivery.status, 'accepted')
@@ -422,6 +515,8 @@ class DeliveryAcceptAssignmentView(APIView):
 			
 			# Accepter la livraison
 			delivery.status = 'accepted'
+			delivery.accepted_at = timezone.now()
+			delivery.is_open_to_all = False
 			delivery.save()
 			
 			# Mettre à jour la commande
@@ -488,7 +583,7 @@ class DeliveryAcceptAssignmentView(APIView):
 					}
 				}
 				NotificationService._send_to_client(client.phone, client.email, template, message)
-				logger.info(f'✓ PIN envoyé au client {client.phone} pour livraison {delivery.id}')
+				logger.info(f'? PIN envoyé au client {client.phone} pour livraison {delivery.id}')
 			except Exception as e:
 				logger.error(f'Erreur lors de l\'envoi du PIN au client: {str(e)}')
 			
@@ -546,7 +641,7 @@ class DeliveryRejectAssignmentView(APIView):
 					object_type='delivery',
 					object_id=delivery_id,
 					old_value=delivery.status,
-					new_value='waiting',
+					new_value='rejected',
 					ip_address=get_client_ip(request),
 					user_agent=request.META.get('HTTP_USER_AGENT', ''),
 					reason='Unauthorized user attempted to reject delivery',
@@ -558,7 +653,7 @@ class DeliveryRejectAssignmentView(APIView):
 				}, status=status.HTTP_403_FORBIDDEN)
 			
 			# Vérifier que la transition de statut est valide
-			is_valid, error_msg = can_user_change_delivery_status(request.user, delivery.status, 'waiting')
+			is_valid, error_msg = can_user_change_delivery_status(request.user, delivery.status, 'rejected')
 			if not is_valid:
 				AuditLog.log_action(
 					action_type='delivery_status_change_rejected',
@@ -567,7 +662,7 @@ class DeliveryRejectAssignmentView(APIView):
 					object_type='delivery',
 					object_id=delivery_id,
 					old_value=delivery.status,
-					new_value='waiting',
+					new_value='rejected',
 					ip_address=get_client_ip(request),
 					user_agent=request.META.get('HTTP_USER_AGENT', ''),
 					reason=error_msg,
@@ -582,20 +677,13 @@ class DeliveryRejectAssignmentView(APIView):
 			old_order_status = delivery.order.status
 			
 			# Refuser la livraison
-			delivery.delivery_agent = None
-			delivery.status = 'waiting'
-			delivery.save()
-			
-			# Remettre la commande en attente
-			delivery.order.status = 'ready'
-			delivery.order.save()
-
-			# Tenter une réassignation automatique immédiatement
 			try:
-				auto_assign_delivery(delivery.order)
+				assign_next_driver(delivery.id, reason='rejected', force=True)
 			except Exception:
-				logger.exception('Erreur lors de l\'auto-assignation après refus de livraison')
-			
+				logger.exception('Erreur lors de la reassignment apres refus')
+
+			delivery.refresh_from_db()
+
 			# Enregistrer l'action dans l'audit
 			AuditLog.log_action(
 				action_type='delivery_status_change',
@@ -1174,9 +1262,13 @@ class DeliveryCompleteView(APIView):
 				reason='Order status updated when delivery completed'
 			)
 			
-			# 🎉 PAYER LE LIVREUR VIA AIRTEL MONEY
-			from payments.services import PaymentService
-			payout_result = PaymentService.payout_delivery_agent(delivery)
+			# Les circuits manuels sont acquittés par reçu; aucun transfert automatique.
+			from payments.direct_service import is_manual_order
+			if is_manual_order(delivery.order):
+				payout_result = {'success': False, 'message': 'Paiement manuel à confirmer par reçu.', 'transaction_id': None}
+			else:
+				from payments.services import PaymentService
+				payout_result = PaymentService.payout_delivery_agent(delivery)
 			
 			payment_status = 'success' if payout_result.get('success') else 'pending'
 			payment_message = payout_result.get('message', payout_result.get('error', ''))

@@ -153,7 +153,7 @@ def main():
         store = Store.objects.get(id=3, is_b2b=True, is_active=True)  # BERNABE
         print(f"Store B2B trouvé: {store.name} (ID: {store.id})")
     except Store.DoesNotExist:
-        print("❌ Store B2B non trouvé")
+        print("? Store B2B non trouvé")
         return
 
     # 1. Créer les catégories B2B

@@ -1,16 +1,16 @@
 # Analyse des Alternatives IA Gratuites pour Gaboshop
 
-## 📊 Analyse d'Alice (ICP)
+## ?? Analyse d'Alice (ICP)
 
 ### Pourquoi Alice n'est PAS adapté à notre cas
 
 **Alice** est un agent IA autonome sur Internet Computer Protocol (ICP) conçu pour :
-- ✅ Trading de tokens et DeFi
-- ✅ Opérations on-chain (blockchain)
-- ✅ Gestion de tokens (ALICE, BOB)
-- ✅ Décisions de marché décentralisées
+- ? Trading de tokens et DeFi
+- ? Opérations on-chain (blockchain)
+- ? Gestion de tokens (ALICE, BOB)
+- ? Décisions de marché décentralisées
 
-**❌ Problèmes pour Gaboshop :**
+**? Problèmes pour Gaboshop :**
 1. **Spécialisé blockchain** : Alice est conçu pour ICP, pas pour e-commerce
 2. **Pas d'API directe** : Pas d'endpoint REST simple pour notre backend Django
 3. **Complexité** : Nécessite intégration avec ICP, smart contracts, etc.
@@ -20,9 +20,9 @@
 
 ---
 
-## ✅ Alternatives Gratuites Recommandées
+## ? Alternatives Gratuites Recommandées
 
-### 1. **Groq API** ⭐ RECOMMANDÉ
+### 1. **Groq API** ? RECOMMANDÉ
 - **Gratuit** : 14,400 requêtes/jour (gratuit à vie)
 - **Ultra-rapide** : Réponses en < 1 seconde
 - **Modèles** : Llama 3, Mixtral, Gemma
@@ -31,7 +31,7 @@
 
 **Limites** : 14,400 requêtes/jour (suffisant pour développement/test)
 
-### 2. **Google Gemini API** ⭐ RECOMMANDÉ
+### 2. **Google Gemini API** ? RECOMMANDÉ
 - **Gratuit** : 60 requêtes/minute, 1,500 requêtes/jour
 - **Puissant** : Modèles Gemini Pro
 - **Pas de carte bancaire** requise initialement
@@ -47,7 +47,7 @@
 
 **Limites** : 1,000 requêtes/mois (limité mais gratuit)
 
-### 4. **Ollama (Local)** ⭐ MEILLEUR POUR PRIVACY
+### 4. **Ollama (Local)** ? MEILLEUR POUR PRIVACY
 - **100% gratuit** : Aucune limite
 - **Local** : Fonctionne sur votre serveur
 - **Modèles** : Llama 3, Mistral, Gemma, etc.
@@ -72,9 +72,9 @@
 
 ---
 
-## 🎯 Recommandation pour Gaboshop
+## ?? Recommandation pour Gaboshop
 
-### Option 1 : Groq (Développement/Test) ⭐
+### Option 1 : Groq (Développement/Test) ?
 - **Pourquoi** : Gratuit, rapide, facile à intégrer
 - **Quand** : Développement, tests, MVP
 - **Limite** : 14,400 requêtes/jour (suffisant)
@@ -91,16 +91,16 @@
 
 ---
 
-## 📝 Plan d'Implémentation
+## ?? Plan d'Implémentation
 
-1. ✅ **Groq** : Implémenter en premier (le plus simple)
-2. ✅ **Gemini** : Ajouter comme alternative
-3. ✅ **Ollama** : Option pour production locale
-4. ✅ **Améliorer LocalAI** : Fallback intelligent
+1. ? **Groq** : Implémenter en premier (le plus simple)
+2. ? **Gemini** : Ajouter comme alternative
+3. ? **Ollama** : Option pour production locale
+4. ? **Améliorer LocalAI** : Fallback intelligent
 
 ---
 
-## 🔧 Prochaines Étapes
+## ?? Prochaines Étapes
 
 1. Implémenter le support Groq
 2. Implémenter le support Gemini

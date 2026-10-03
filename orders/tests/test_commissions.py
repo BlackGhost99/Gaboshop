@@ -29,7 +29,7 @@ class CommissionCalculationTests(TestCase):
         # Ensure time and Decimal fields are correct to avoid comparison/type issues in tests
         self.store.opening_time = time(8, 0)
         self.store.closing_time = time(20, 0)
-        # Ensure delivery and service fees stored as Decimal values
+        # Ensure delivery fees stored as Decimal values
         self.store.delivery_fee = Decimal('2000.00')
         self.store.delivery_fee_express = Decimal('3500.00')
         self.store.service_fee = Decimal('0.00')

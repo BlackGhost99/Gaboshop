@@ -7,8 +7,45 @@ from .models import (
 	Forfait, ClientForfait, Payout, PaymentCallbackLog,
 	CategoryCommission
 )
+from .models import PaymentArrangement, PaymentObligation, PaymentReceipt, PaymentAdjustment, CommissionSettlement, SettlementAllocation
 
 from .models import CategoryCommissionChangeLog
+
+
+class PaymentObligationInline(admin.TabularInline):
+	model = PaymentObligation
+	extra = 0
+	readonly_fields = ('kind', 'payer', 'payee', 'amount', 'status', 'due_at')
+	can_delete = False
+
+
+@admin.register(PaymentArrangement)
+class PaymentArrangementAdmin(admin.ModelAdmin):
+	list_display = ('order', 'store', 'flow', 'method', 'products_amount', 'delivery_amount', 'commission_amount', 'created_at')
+	list_filter = ('flow', 'method', 'created_at')
+	search_fields = ('order__order_number', 'store__name')
+	readonly_fields = ('policy_snapshot', 'commission_rate', 'commission_amount', 'created_at')
+	inlines = (PaymentObligationInline,)
+
+
+@admin.register(PaymentReceipt)
+class PaymentReceiptAdmin(admin.ModelAdmin):
+	list_display = ('receipt_number', 'obligation', 'amount', 'method', 'status', 'actor', 'created_at')
+	list_filter = ('status', 'method', 'created_at')
+	search_fields = ('receipt_number', 'reference', 'obligation__arrangement__order__order_number')
+	readonly_fields = ('receipt_number', 'created_at')
+
+
+@admin.register(CommissionSettlement)
+class CommissionSettlementAdmin(admin.ModelAdmin):
+	list_display = ('receipt_number', 'store', 'amount', 'method', 'status', 'paid_at')
+	list_filter = ('status', 'method', 'paid_at')
+	search_fields = ('receipt_number', 'reference', 'store__name')
+	readonly_fields = ('receipt_number', 'created_at', 'confirmed_at')
+
+
+admin.site.register(PaymentAdjustment)
+admin.site.register(SettlementAllocation)
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
@@ -47,9 +84,9 @@ class PaymentAdmin(admin.ModelAdmin):
     
 	def payment_method_display(self, obj):
 		method_icons = {
-			'mobile_money': '📱',
-			'card': '💳',
-			'cash': '💵'
+			'mobile_money': '??',
+			'card': '??',
+			'cash': '??'
 		}
 		icon = method_icons.get(obj.payment_method, '')
 		return f"{icon} {obj.get_payment_method_display()}"
@@ -285,10 +322,10 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
 	def processed_badge(self, obj):
 		if obj.processed:
 			return format_html(
-				'<span style="color: green; font-weight: bold;">✓ Traité</span>'
+				'<span style="color: green; font-weight: bold;">? Traité</span>'
 			)
 		return format_html(
-			'<span style="color: orange; font-weight: bold;">⏳ En attente</span>'
+			'<span style="color: orange; font-weight: bold;">? En attente</span>'
 		)
 	processed_badge.short_description = 'Statut Traitement'
 
@@ -326,13 +363,6 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 				'max_b2b_monthly_orders',
 			),
 			'description': 'Limites pour les stores B2C qui achètent chez des grossistes'
-		}),
-		('Frais de Service', {
-			'fields': (
-				'service_fee_client_amount',
-				'service_fee_to_wholesaler_amount',
-			),
-			'description': 'Montants en FCFA facturés par commande'
 		}),
 		('Commissions', {
 			'fields': (
@@ -410,20 +440,20 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 	
 	def max_products_display(self, obj):
 		if obj.max_products is None:
-			return format_html('<span style="color: blue;">∞ Illimité</span>')
+			return format_html('<span style="color: blue;">8 Illimité</span>')
 		return f"{obj.max_products} produits"
 	max_products_display.short_description = 'Limite produits'
 	
 	def features_display(self, obj):
 		features = []
 		if obj.has_statistics:
-			features.append('📊 Stats')
+			features.append('?? Stats')
 		if obj.has_custom_page:
-			features.append('🎨 Page perso')
+			features.append('?? Page perso')
 		if obj.has_priority_support:
-			features.append('🎧 Support VIP')
+			features.append('?? Support VIP')
 		if obj.can_sponsor_products:
-			features.append('⭐ Sponsoring')
+			features.append('? Sponsoring')
 		return ' | '.join(features) if features else '-'
 	features_display.short_description = 'Fonctionnalités'
 
@@ -441,12 +471,13 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 	)
 	list_filter = ('status', 'auto_renew', 'start_date')
 	search_fields = ('store__name', 'plan__name', 'plan_name')
-	readonly_fields = ('created_at', 'updated_at', 'start_date')
+	readonly_fields = ('created_at', 'updated_at', 'start_date', 'plan_name', 'monthly_fee')
 	raw_id_fields = ('store', 'plan')
 	
 	fieldsets = (
 		('Magasin et Plan', {
-			'fields': ('store', 'plan', 'plan_name', 'monthly_fee')
+			'fields': ('store', 'plan', 'plan_name', 'monthly_fee'),
+			'description': "SǸlectionnez le magasin et le plan. Le nom du plan et le prix mensuel sont remplis automatiquement."
 		}),
 		('Statut et Dates', {
 			'fields': ('status', 'start_date', 'end_date', 'auto_renew')
@@ -456,6 +487,13 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 			'classes': ('collapse',)
 		}),
 	)
+
+	def save_model(self, request, obj, form, change):
+		# Auto-remplir plan_name et monthly_fee depuis le plan sǸlectionnǸ
+		if obj.plan:
+			obj.plan_name = obj.plan.name
+			obj.monthly_fee = obj.plan.price
+		super().save_model(request, obj, form, change)
 	
 	def store_link(self, obj):
 		return format_html(
@@ -499,8 +537,8 @@ class StoreSubscriptionAdmin(admin.ModelAdmin):
 	
 	def auto_renew_display(self, obj):
 		if obj.auto_renew:
-			return format_html('<span style="color: green;">✓ Oui</span>')
-		return format_html('<span style="color: gray;">✗ Non</span>')
+			return format_html('<span style="color: green;">? Oui</span>')
+		return format_html('<span style="color: gray;">? Non</span>')
 	auto_renew_display.short_description = 'Auto-renouvellement'
 
 
@@ -566,7 +604,7 @@ class ForfaitAdmin(admin.ModelAdmin):
 	
 	def max_priority_orders_display(self, obj):
 		if obj.max_priority_orders is None:
-			return format_html('<span style="color: blue;">∞ Illimité</span>')
+			return format_html('<span style="color: blue;">8 Illimité</span>')
 		return f"{obj.max_priority_orders} commandes"
 	max_priority_orders_display.short_description = 'Commandes prioritaires'
 	
@@ -642,16 +680,16 @@ class ClientForfaitAdmin(admin.ModelAdmin):
 	def expiration_date_display(self, obj):
 		from django.utils import timezone
 		if obj.expiration_date < timezone.now():
-			return format_html('<span style="color: red; font-weight: bold;">🔴 {}</span>', obj.expiration_date.date())
+			return format_html('<span style="color: red; font-weight: bold;">?? {}</span>', obj.expiration_date.date())
 		elif (obj.expiration_date - timezone.now()).days <= 7:
-			return format_html('<span style="color: orange; font-weight: bold;">🟠 {} (7j)</span>', obj.expiration_date.date())
-		return format_html('<span style="color: green;">🟢 {}</span>', obj.expiration_date.date())
+			return format_html('<span style="color: orange; font-weight: bold;">?? {} (7j)</span>', obj.expiration_date.date())
+		return format_html('<span style="color: green;">?? {}</span>', obj.expiration_date.date())
 	expiration_date_display.short_description = 'Expiration'
 	
 	def is_active_display(self, obj):
 		if obj.is_active():
-			return format_html('<span style="color: green; font-weight: bold;">✓ Actif</span>')
-		return format_html('<span style="color: red; font-weight: bold;">✗ Inactif</span>')
+			return format_html('<span style="color: green; font-weight: bold;">? Actif</span>')
+		return format_html('<span style="color: red; font-weight: bold;">? Inactif</span>')
 	is_active_display.short_description = 'Actif?'
 
 
@@ -713,8 +751,8 @@ class PaymentCallbackLogAdmin(admin.ModelAdmin):
 	
 	def signature_badge(self, obj):
 		if obj.signature_valid:
-			return format_html('<span style="color: green; font-weight: bold;">✓ Valide</span>')
-		return format_html('<span style="color: red; font-weight: bold;">✗ Invalide</span>')
+			return format_html('<span style="color: green; font-weight: bold;">? Valide</span>')
+		return format_html('<span style="color: red; font-weight: bold;">? Invalide</span>')
 	signature_badge.short_description = 'Signature'
 	
 	def received_at_display(self, obj):
@@ -776,9 +814,9 @@ class PayoutAdmin(admin.ModelAdmin):
 	
 	def payout_type_display(self, obj):
 		icons = {
-			'delivery': '🚚 Livreur',
-			'merchant': '🏪 Commerçant',
-			'refund': '↩️ Remboursement'
+			'delivery': '?? Livreur',
+			'merchant': '?? Commerçant',
+			'refund': '?? Remboursement'
 		}
 		return icons.get(obj.payout_type, obj.get_payout_type_display())
 	payout_type_display.short_description = 'Type'
@@ -799,11 +837,11 @@ class PayoutAdmin(admin.ModelAdmin):
 		}
 		color = colors.get(obj.status, 'black')
 		icons = {
-			'pending': '⏳',
-			'processing': '⚙️',
-			'paid': '✅',
-			'failed': '❌',
-			'cancelled': '⊘'
+			'pending': '?',
+			'processing': '??',
+			'paid': '?',
+			'failed': '?',
+			'cancelled': '?'
 		}
 		icon = icons.get(obj.status, '')
 		return format_html(

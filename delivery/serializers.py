@@ -17,7 +17,7 @@ class VehicleTypeSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = VehicleType
 		fields = [
-			'id', 'name', 'max_weight_kg', 'max_items', 'max_distance_km',
+			'id', 'name', 'max_weight_kg', 'max_length_m', 'max_items', 'max_distance_km',
 			'allow_intercity', 'base_price_intra_city', 'price_per_km_intra_city',
 			'base_price_inter_city', 'price_per_km_inter_city', 'is_active'
 		]
@@ -57,6 +57,19 @@ class DeliverySerializer(serializers.ModelSerializer):
             'assigned_at', 'picked_up_at', 'delivered_at',
             'minimum_required_vehicle_type', 'is_intra_city'
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if not request or not hasattr(request, 'user'):
+            return data
+        user = request.user
+        if getattr(user, 'is_store_manager', lambda: False)():
+            store = getattr(getattr(instance, 'order', None), 'store', None)
+            plan = store.get_current_plan() if store else None
+            if not getattr(plan, 'has_advanced_delivery_tracking', False):
+                data['tracking_history'] = []
+        return data
 
 class DeliveryAssignSerializer(serializers.ModelSerializer):
     """Serializer pour assigner un livreur"""

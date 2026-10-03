@@ -7,7 +7,7 @@ from decimal import Decimal
 def migrate_commission_multiplier_to_percent(apps, schema_editor):
     """
     Convertit commission_multiplier en commission_reduction_percent
-    Ex: multiplier 0.60 → reduction_percent 40 (car 1 - 0.60 = 0.40 = 40%)
+    Ex: multiplier 0.60 ? reduction_percent 40 (car 1 - 0.60 = 0.40 = 40%)
     """
     SubscriptionPlan = apps.get_model('payments', 'SubscriptionPlan')
     

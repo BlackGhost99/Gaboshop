@@ -3,6 +3,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
+from django.core.exceptions import PermissionDenied
 from orders.models import Order, OrderItem
 from products.models import Product
 # Persisted notifications service (DB + multi-canal)
@@ -32,6 +33,12 @@ class OrderService:
                 items_data = order_data.get('items', [])
                 if not items_data:
                     raise ValueError("La commande doit contenir des articles.")
+
+                from payments.subscription_check import SubscriptionChecker
+                try:
+                    SubscriptionChecker.check_can_create_order(store)
+                except PermissionDenied as e:
+                    raise ValueError(str(e))
                 
                 # Vérifier la disponibilité des produits
                 unavailable_products = ProductService.check_products_availability(items_data)
@@ -49,19 +56,29 @@ class OrderService:
                     raise ValueError(
                         f"Montant minimum non atteint: {items_total} < {store.min_order_amount}"
                     )
+
+                delivery_type = order_data.get('delivery_type', 'standard')
+                if delivery_type == 'express':
+                    try:
+                        SubscriptionChecker.check_can_offer_express_delivery(store)
+                    except PermissionDenied as e:
+                        raise ValueError(str(e))
+
+                delivery_fee = store.delivery_fee_express if delivery_type == 'express' else store.delivery_fee
                 
                 # Créer la commande
                 order = Order.objects.create(
                     client=client,
                     store=store,
+                    delivery_type=delivery_type,
                     delivery_address=order_data.get('delivery_address'),
                     delivery_phone=order_data.get('delivery_phone'),
                     delivery_zone=order_data.get('delivery_zone'),
                     notes=order_data.get('notes', ''),
                     items_total=items_total,
-                    delivery_fee=store.delivery_fee,
+                    delivery_fee=delivery_fee,
                     tax_amount=Decimal('0.00'),  # TVA? À configurer
-                    total_amount=items_total + store.delivery_fee
+                    total_amount=items_total + delivery_fee
                 )
                 
                 # Créer les OrderItems et mettre à jour les stocks
@@ -78,7 +95,7 @@ class OrderService:
                     # Réduire le stock
                     product.reduce_stock(item_data['quantity'])
                 
-                logger.info(f"🛒 Commande créée: #{order.order_number} - {order.total_amount} FCFA")
+                logger.info(f"?? Commande créée: #{order.order_number} - {order.total_amount} FCFA")
                 
                 # Notifier le magasin
                 NotificationService.notify_new_order(order)
@@ -86,7 +103,7 @@ class OrderService:
                 return order
                 
         except Exception as e:
-            logger.error(f"❌ Erreur création commande: {e}")
+            logger.error(f"? Erreur création commande: {e}")
             raise
     
     @staticmethod
@@ -102,7 +119,7 @@ class OrderService:
             
             if new_status not in valid_transitions:
                 raise ValueError(
-                    f"Transition non autorisée: {old_status} → {new_status}"
+                    f"Transition non autorisée: {old_status} ? {new_status}"
                 )
             
             # Mettre à jour le statut
@@ -120,14 +137,14 @@ class OrderService:
             NotificationService.notify_order_status_update(order, old_status, new_status)
             
             logger.info(
-                f"📦 Statut commande #{order.order_number} mis à jour: "
-                f"{old_status} → {new_status} par {user.phone}"
+                f"?? Statut commande #{order.order_number} mis à jour: "
+                f"{old_status} ? {new_status} par {user.phone}"
             )
             
             return order
             
         except Exception as e:
-            logger.error(f"❌ Erreur mise à jour statut: {e}")
+            logger.error(f"? Erreur mise à jour statut: {e}")
             raise
     
     @staticmethod
@@ -215,7 +232,7 @@ class OrderService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur calcul commission: {e}")
+            logger.error(f"? Erreur calcul commission: {e}")
             return None
     
     @staticmethod
@@ -241,11 +258,11 @@ class OrderService:
                 order.save()
                 
                 logger.info(
-                    f"❌ Commande #{order.order_number} annulée - Raison: {reason}"
+                    f"? Commande #{order.order_number} annulée - Raison: {reason}"
                 )
                 
                 return order
                 
         except Exception as e:
-            logger.error(f"❌ Erreur annulation commande: {e}")
+            logger.error(f"? Erreur annulation commande: {e}")
             raise

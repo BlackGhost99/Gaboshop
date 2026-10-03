@@ -35,7 +35,7 @@ class NotificationService:
                     order=order,
                     metadata={'reason': 'store_closed'},
                 )
-                logger.warning("⚠️ Magasin fermé, notification non envoyée")
+                logger.warning("?? Magasin fermé, notification non envoyée")
                 return False
 
             template = NotificationTemplates.new_order_store(order)
@@ -53,14 +53,14 @@ class NotificationService:
             )
             
             if success:
-                logger.info(f"📢 Notification nouvelle commande envoyée à {order.store.name}")
+                logger.info(f"?? Notification nouvelle commande envoyée à {order.store.name}")
             else:
-                logger.error(f"❌ Échec notification nouvelle commande à {order.store.name}")
+                logger.error(f"? Échec notification nouvelle commande à {order.store.name}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification nouvelle commande: {e}")
+            logger.error(f"? Erreur notification nouvelle commande: {e}")
             return False
     
     @staticmethod
@@ -73,7 +73,7 @@ class NotificationService:
             NotificationService._save_notification(
                 user=order.client,
                 title=f"Commande #{order.order_number}",
-                body=NotificationService._body_from_template(template, f"Statut mis à jour: {old_status} → {new_status}"),
+                body=NotificationService._body_from_template(template, f"Statut mis à jour: {old_status} ? {new_status}"),
                 notif_type='order',
                 order=order,
                 metadata={'from': old_status, 'to': new_status},
@@ -86,14 +86,14 @@ class NotificationService:
             )
             
             if success:
-                logger.info(f"📢 Notification statut envoyée à {order.client.phone}")
+                logger.info(f"?? Notification statut envoyée à {order.client.phone}")
             else:
-                logger.warning(f"⚠️ Échec notification statut à {order.client.phone}")
+                logger.warning(f"?? Échec notification statut à {order.client.phone}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification statut: {e}")
+            logger.error(f"? Erreur notification statut: {e}")
             return False
     
     @staticmethod
@@ -103,7 +103,7 @@ class NotificationService:
         """
         try:
             if not delivery.delivery_agent:
-                logger.warning("⚠️ Aucun livreur assigné pour notification")
+                logger.warning("?? Aucun livreur assigné pour notification")
                 return False
             
             template = NotificationTemplates.delivery_assigned_agent(delivery)
@@ -121,14 +121,14 @@ class NotificationService:
             )
             
             if success:
-                logger.info(f"📢 Notification livraison envoyée à {delivery.delivery_agent.phone}")
+                logger.info(f"?? Notification livraison envoyée à {delivery.delivery_agent.phone}")
             else:
-                logger.error(f"❌ Échec notification livraison à {delivery.delivery_agent.phone}")
+                logger.error(f"? Échec notification livraison à {delivery.delivery_agent.phone}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification livraison: {e}")
+            logger.error(f"? Erreur notification livraison: {e}")
             return False
     
     @staticmethod
@@ -154,12 +154,12 @@ class NotificationService:
             )
             
             if success:
-                logger.info(f"📢 Notification paiement réussi à {order.client.phone}")
+                logger.info(f"?? Notification paiement réussi à {order.client.phone}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification paiement réussi: {e}")
+            logger.error(f"? Erreur notification paiement réussi: {e}")
             return False
     
     @staticmethod
@@ -184,12 +184,12 @@ class NotificationService:
             )
             
             if success:
-                logger.info(f"📢 Notification paiement échoué à {order.client.phone}")
+                logger.info(f"?? Notification paiement échoué à {order.client.phone}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification paiement échoué: {e}")
+            logger.error(f"? Erreur notification paiement échoué: {e}")
             return False
     
     @staticmethod
@@ -215,12 +215,12 @@ class NotificationService:
             )
             
             if success:
-                logger.info(f"📢 Notification livraison en route à {delivery.order.client.phone}")
+                logger.info(f"?? Notification livraison en route à {delivery.order.client.phone}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification livraison en route: {e}")
+            logger.error(f"? Erreur notification livraison en route: {e}")
             return False
     
     # ===== MÉTHODES D'ENVOI SPÉCIALISÉES =====
@@ -230,7 +230,7 @@ class NotificationService:
         """Envoyer une notification à un magasin"""
         # Magasins préfèrent WhatsApp pour les commandes
         if not store_phone:
-            logger.warning("⚠️ Téléphone magasin manquant, notification non envoyée")
+            logger.warning("?? Téléphone magasin manquant, notification non envoyée")
             return False
         channels = ['whatsapp', 'sms']
         return NotificationService._send_notification(store_phone, None, template, channels)
@@ -280,7 +280,7 @@ class NotificationService:
                     break
                     
             except Exception as e:
-                logger.error(f"❌ Erreur canal {channel}: {e}")
+                logger.error(f"? Erreur canal {channel}: {e}")
                 continue
         
         return success
@@ -301,7 +301,7 @@ class NotificationService:
                 metadata=metadata or {},
             )
         except Exception as e:
-            logger.error(f"❌ Erreur enregistrement notification DB: {e}")
+            logger.error(f"? Erreur enregistrement notification DB: {e}")
             return None
 
     @staticmethod
@@ -310,13 +310,17 @@ class NotificationService:
         Notifier le livreur qu'il a reçu son paiement Airtel Money
         """
         try:
-            title = f"💰 Paiement reçu - Livraison #{delivery.id}"
+            title = f"?? Paiement reçu - Livraison #{delivery.id}"
             body = (
-                f"✅ Vous avez reçu {delivery.agent_commission} FCFA "
+                f"? Vous avez reçu {delivery.agent_commission} FCFA "
                 f"pour la livraison #{delivery.id} (Commande {delivery.order.order_number})\n"
                 f"{message}"
             )
             
+            transaction_id = getattr(payment, 'transaction_id', None)
+            if not transaction_id:
+                transaction_id = getattr(payment, 'transaction_reference', None)
+
             NotificationService._save_notification(
                 user=agent,
                 title=title,
@@ -326,7 +330,7 @@ class NotificationService:
                 metadata={
                     'amount': float(delivery.agent_commission),
                     'payment_id': payment.id,
-                    'transaction_id': payment.transaction_id,
+                    'transaction_id': transaction_id,
                     'delivery_id': delivery.id,
                     'order_number': delivery.order.order_number
                 },
@@ -334,20 +338,20 @@ class NotificationService:
             
             # Envoyer via SMS/WhatsApp
             success = NotificationService._send_to_agent(
-                agent.phone_number,
+                agent.phone,
                 body,
                 title
             )
             
             if success:
-                logger.info(f"💳 Notification paiement livreur envoyée à {agent.username}: {delivery.agent_commission}F")
+                logger.info(f"?? Notification paiement livreur envoyée à {agent.username}: {delivery.agent_commission}F")
             else:
-                logger.warning(f"⚠️ Échec notification paiement livreur à {agent.username}")
+                logger.warning(f"?? Échec notification paiement livreur à {agent.username}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur notification paiement livreur: {e}")
+            logger.error(f"? Erreur notification paiement livreur: {e}")
             return False
 
     @staticmethod

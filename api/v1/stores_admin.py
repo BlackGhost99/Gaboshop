@@ -13,6 +13,87 @@ from users.models import User
 from b2b.models import B2BProfile
 
 
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _normalize_market_mode(value):
+    if value is None:
+        return None
+    mode = str(value).strip().lower()
+    if mode in ('b2b', 'b2c'):
+        return mode
+    return None
+
+
+def _resolve_market_mode(data):
+    if not isinstance(data, dict):
+        return None
+    if 'market_mode' in data:
+        return _normalize_market_mode(data.get('market_mode'))
+    if 'is_b2b' in data:
+        return 'b2b' if _parse_bool(data.get('is_b2b')) else 'b2c'
+    if 'is_b2c' in data:
+        return 'b2c' if _parse_bool(data.get('is_b2c')) else 'b2b'
+    return None
+
+
+def _update_store_market_mode(store, data):
+    market_mode = _resolve_market_mode(data)
+
+    if 'b2b_min_order_amount' in data:
+        store.b2b_min_order_amount = float(data['b2b_min_order_amount'])
+    if 'b2b_delivery_delay' in data:
+        store.b2b_delivery_delay = int(data['b2b_delivery_delay'])
+
+    if market_mode:
+        store.set_market_mode(market_mode)
+
+    store.save()
+
+    profile_created = False
+    profile_updated = False
+    effective_mode = market_mode or store.market_mode
+
+    if effective_mode == 'b2b':
+        min_order = store.b2b_min_order_amount if store.b2b_min_order_amount else 0
+        profile, created = B2BProfile.objects.get_or_create(
+            store=store,
+            defaults={
+                'minimum_order_amount': min_order,
+                'visible_to_all': True,
+                'is_active': True,
+            }
+        )
+        if created:
+            profile_created = True
+        else:
+            needs_update = (
+                not profile.is_active
+                or profile.minimum_order_amount != min_order
+                or not profile.visible_to_all
+            )
+            if needs_update:
+                profile.is_active = True
+                profile.minimum_order_amount = min_order
+                profile.visible_to_all = True
+                profile.save()
+                profile_updated = True
+    elif market_mode == 'b2c':
+        if hasattr(store, 'b2b_profile') and store.b2b_profile:
+            store.b2b_profile.is_active = False
+            store.b2b_profile.save()
+
+    store.refresh_from_db()
+    return market_mode or store.market_mode, profile_created, profile_updated
+
+
 class IsPlatformAdmin(permissions.BasePermission):
     """Only platform admins can access"""
     def has_permission(self, request, view):
@@ -91,6 +172,8 @@ class StoresListView(APIView):
                 'orders_count': store.orders_count,
                 'is_active': store.is_active,
                 'is_b2b': store.is_b2b,
+                'is_b2c': store.is_b2c,
+                'market_mode': store.market_mode,
                 'has_b2b_profile': has_b2b_profile,
                 'created_at': store.created_at.isoformat(),
             })
@@ -140,6 +223,8 @@ class StoreDetailView(APIView):
             'is_active': store.is_active,
             'is_verified': store.is_verified,
             'is_b2b': store.is_b2b,
+            'is_b2c': store.is_b2c,
+            'market_mode': store.market_mode,
             'b2b_min_order_amount': float(store.b2b_min_order_amount),
             'b2b_delivery_delay': store.b2b_delivery_delay,
             'created_at': store.created_at.isoformat(),
@@ -252,168 +337,150 @@ class StoreUpdateView(APIView):
             return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class StoreB2BSettingsUpdateView(APIView):
-    """Mettre à jour les paramètres B2B d'un magasin"""
+class StoreMarketModeUpdateView(APIView):
+    """Update store market mode (unique B2B/B2C switch)."""
     permission_classes = [IsPlatformAdmin]
-    
+
     def patch(self, request, store_id):
         try:
             store = get_object_or_404(Store, id=store_id)
             data = request.data
-            
-            # Sauvegarder l'ancienne valeur de is_b2b
-            old_is_b2b = store.is_b2b
-            
-            # Vérifier si is_b2b est activé ou désactivé
-            is_b2b_activated = False
-            is_b2b_deactivated = False
-            if 'is_b2b' in data:
-                new_is_b2b = bool(data['is_b2b'])
-                # Si on active B2B et qu'il n'était pas activé avant
-                if new_is_b2b and not old_is_b2b:
-                    is_b2b_activated = True
-                # Si on désactive B2B et qu'il était activé avant
-                elif not new_is_b2b and old_is_b2b:
-                    is_b2b_deactivated = True
-                store.is_b2b = new_is_b2b
-            
-            # Update B2B fields
-            if 'b2b_min_order_amount' in data:
-                store.b2b_min_order_amount = float(data['b2b_min_order_amount'])
-            if 'b2b_delivery_delay' in data:
-                store.b2b_delivery_delay = int(data['b2b_delivery_delay'])
-            
-            store.save()
-            
-            # Si B2B est activé, créer/activer automatiquement le profil B2B
-            profile_created = False
-            profile_updated = False
-            if is_b2b_activated:
-                try:
-                    # S'assurer que b2b_min_order_amount a une valeur par défaut
-                    min_order = store.b2b_min_order_amount if store.b2b_min_order_amount else 0
-                    
-                    profile, created = B2BProfile.objects.get_or_create(
-                        store=store,
-                        defaults={
-                            'minimum_order_amount': min_order,
-                            'visible_to_all': True,
-                            'is_active': True,
-                        }
-                    )
-                    if created:
-                        profile_created = True
-                    else:
-                        # Mettre à jour le profil existant
-                        profile.is_active = True
-                        profile.minimum_order_amount = min_order
-                        profile.visible_to_all = True
-                        profile.save()
-                        profile_updated = True
-                except Exception as profile_error:
-                    # Si la création du profil échoue, on log l'erreur mais on continue
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Erreur lors de la création du profil B2B pour le magasin {store.id}: {str(profile_error)}")
-                    # On ne bloque pas la requête, mais on retourne un warning
-                    return Response({
-                        'success': False,
-                        'error': f'Le magasin a été mis à jour mais le profil B2B n\'a pas pu être créé: {str(profile_error)}'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Si B2B est désactivé, désactiver aussi le profil B2B
-            if is_b2b_deactivated:
-                if hasattr(store, 'b2b_profile'):
-                    store.b2b_profile.is_active = False
-                    store.b2b_profile.save()
-            
-            # Recharger le store depuis la DB pour avoir la relation b2b_profile à jour
-            store.refresh_from_db()
-            
-            # Préparer la réponse avec les infos du profil B2B
+
+            if 'market_mode' not in data:
+                return Response({'success': False, 'error': 'market_mode is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if _normalize_market_mode(data.get('market_mode')) is None:
+                return Response({'success': False, 'error': "market_mode must be 'b2b' or 'b2c'"}, status=status.HTTP_400_BAD_REQUEST)
+
+            market_mode, profile_created, profile_updated = _update_store_market_mode(store, data)
+
             response_data = {
                 'id': store.id,
                 'name': store.name,
+                'market_mode': store.market_mode,
                 'is_b2b': store.is_b2b,
+                'is_b2c': store.is_b2c,
                 'b2b_min_order_amount': float(store.b2b_min_order_amount),
                 'b2b_delivery_delay': store.b2b_delivery_delay,
             }
-            
-            # Ajouter les infos du profil B2B si disponible
-            try:
-                if hasattr(store, 'b2b_profile') and store.b2b_profile:
-                    response_data['b2b_profile'] = {
-                        'id': store.b2b_profile.id,
-                        'is_active': store.b2b_profile.is_active,
-                        'minimum_order_amount': float(store.b2b_profile.minimum_order_amount),
-                        'visible_to_all': store.b2b_profile.visible_to_all,
-                    }
-            except B2BProfile.DoesNotExist:
-                pass
-            
-            message = 'Paramètres B2B mis à jour avec succès'
+
+            if hasattr(store, 'b2b_profile') and store.b2b_profile:
+                response_data['b2b_profile'] = {
+                    'id': store.b2b_profile.id,
+                    'is_active': store.b2b_profile.is_active,
+                    'minimum_order_amount': float(store.b2b_profile.minimum_order_amount),
+                    'visible_to_all': store.b2b_profile.visible_to_all,
+                }
+
+            message = 'Store market mode updated'
+            if market_mode == 'b2b':
+                message = 'Store set to B2B'
+            elif market_mode == 'b2c':
+                message = 'Store set to B2C'
+
             if profile_created:
-                message += ' - Profil B2B créé automatiquement'
+                message += ' - B2B profile created'
             elif profile_updated:
-                message += ' - Profil B2B activé automatiquement'
-            
+                message += ' - B2B profile activated'
+
             return Response({
                 'success': True,
                 'message': message,
                 'data': response_data
             })
-        
+
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StoreB2BSettingsUpdateView(APIView):
+    """Update B2B settings for a store (legacy endpoint)."""
+    permission_classes = [IsPlatformAdmin]
+
+    def patch(self, request, store_id):
+        try:
+            store = get_object_or_404(Store, id=store_id)
+            data = request.data
+
+            if 'market_mode' in data and _normalize_market_mode(data.get('market_mode')) is None:
+                return Response({'success': False, 'error': "market_mode must be 'b2b' or 'b2c'"}, status=status.HTTP_400_BAD_REQUEST)
+
+            market_mode, profile_created, profile_updated = _update_store_market_mode(store, data)
+
+            response_data = {
+                'id': store.id,
+                'name': store.name,
+                'market_mode': store.market_mode,
+                'is_b2b': store.is_b2b,
+                'is_b2c': store.is_b2c,
+                'b2b_min_order_amount': float(store.b2b_min_order_amount),
+                'b2b_delivery_delay': store.b2b_delivery_delay,
+            }
+
+            if hasattr(store, 'b2b_profile') and store.b2b_profile:
+                response_data['b2b_profile'] = {
+                    'id': store.b2b_profile.id,
+                    'is_active': store.b2b_profile.is_active,
+                    'minimum_order_amount': float(store.b2b_profile.minimum_order_amount),
+                    'visible_to_all': store.b2b_profile.visible_to_all,
+                }
+
+            message = 'B2B settings updated'
+            if market_mode == 'b2c':
+                message = 'Store set to B2C'
+
+            if profile_created:
+                message += ' - B2B profile created'
+            elif profile_updated:
+                message += ' - B2B profile activated'
+
+            return Response({
+                'success': True,
+                'message': message,
+                'data': response_data
+            })
+
         except Exception as e:
             return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class StoreB2CSettingsUpdateView(APIView):
-    """Mettre à jour les paramètres B2C d'un magasin"""
+    """Update B2C settings for a store (legacy endpoint)."""
     permission_classes = [IsPlatformAdmin]
-    
+
     def patch(self, request, store_id):
         try:
             store = get_object_or_404(Store, id=store_id)
             data = request.data
-            
-            # Sauvegarder l'ancienne valeur de is_b2c
-            old_is_b2c = store.is_b2c
-            
-            # Vérifier si is_b2c est activé ou désactivé
-            is_b2c_activated = False
-            is_b2c_deactivated = False
-            if 'is_b2c' in data:
-                new_is_b2c = bool(data['is_b2c'])
-                # Si on active B2C et qu'il n'était pas activé avant
-                if new_is_b2c and not old_is_b2c:
-                    is_b2c_activated = True
-                # Si on désactive B2C et qu'il était activé avant
-                elif not new_is_b2c and old_is_b2c:
-                    is_b2c_deactivated = True
-                store.is_b2c = new_is_b2c
-            
-            store.save()
-            
-            # Préparer la réponse
+
+            if 'market_mode' in data and _normalize_market_mode(data.get('market_mode')) is None:
+                return Response({'success': False, 'error': "market_mode must be 'b2b' or 'b2c'"}, status=status.HTTP_400_BAD_REQUEST)
+
+            market_mode, profile_created, profile_updated = _update_store_market_mode(store, data)
+
             response_data = {
                 'id': store.id,
                 'name': store.name,
+                'market_mode': store.market_mode,
                 'is_b2c': store.is_b2c,
                 'is_b2b': store.is_b2b,
             }
-            
-            message = 'Paramètres B2C mis à jour avec succès'
-            if is_b2c_activated:
-                message += ' - Le magasin peut maintenant vendre au détail'
-            elif is_b2c_deactivated:
-                message += ' - Le magasin ne peut plus vendre au détail'
-            
+
+            message = 'B2C settings updated'
+            if market_mode == 'b2b':
+                message = 'Store set to B2B'
+
+            if profile_created:
+                message += ' - B2B profile created'
+            elif profile_updated:
+                message += ' - B2B profile activated'
+
             return Response({
                 'success': True,
                 'message': message,
                 'data': response_data
             })
-        
+
         except Exception as e:
             return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

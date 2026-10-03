@@ -41,7 +41,7 @@ from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
     DeliveryProofUploadView, DeliveryVerifyPINView,
-    AvailableDeliveriesView, DeliveryClaimView,
+    AvailableDeliveriesView, DeliveryClaimView, DeliveryAvailabilityView,
     VehicleTypeListView, VehicleTypeDetailView, DeliveryCalculatePriceView,
     DeliveryValidateVehicleView, EligibleVehiclesView, DeliveryZonesListView
 )
@@ -102,7 +102,7 @@ from .orders_admin import (
 )
 from .stores_admin import (
     StoresListView, StoreDetailView as AdminStoreDetailView, StoreCreateView as AdminStoreCreateView,
-    StoreUpdateView as AdminStoreUpdateView, StoreB2BSettingsUpdateView, StoreB2CSettingsUpdateView, StoreDeactivateView, StoreActivateView,
+    StoreUpdateView as AdminStoreUpdateView, StoreMarketModeUpdateView, StoreB2BSettingsUpdateView, StoreB2CSettingsUpdateView, StoreDeactivateView, StoreActivateView,
     StoreDeleteView, StoreProductsView as AdminStoreProductsView,
     StoreOrdersView as AdminStoreOrdersView, StoreDeliveryAgentsView
 )
@@ -135,6 +135,7 @@ urlpatterns = [
     path('dashboard/delivery/', DeliveryDashboardView.as_view(), name='dashboard-delivery'),
     path('dashboard/delivery/assigned-orders/', DeliveryAssignedOrdersView.as_view(), name='dashboard-delivery-assigned'),
     path('dashboard/delivery/available/', AvailableDeliveriesView.as_view(), name='dashboard-delivery-available'),
+    path('dashboard/delivery/availability/', DeliveryAvailabilityView.as_view(), name='delivery-availability'),
     path('dashboard/delivery/profile/update/', DeliveryProfileUpdateView.as_view(), name='delivery-profile-update'),
     path('dashboard/delivery/<int:delivery_id>/claim/', DeliveryClaimView.as_view(), name='delivery-claim'),
     path('dashboard/delivery/<int:delivery_id>/accept/', DeliveryAcceptAssignmentView.as_view(), name='delivery-accept'),
@@ -217,6 +218,7 @@ urlpatterns = [
     path('admin/stores/create/', AdminStoreCreateView.as_view(), name='admin-stores-create'),
     path('admin/stores/<int:store_id>/detail/', AdminStoreDetailView.as_view(), name='admin-stores-detail'),
     path('admin/stores/<int:store_id>/update/', AdminStoreUpdateView.as_view(), name='admin-stores-update'),
+    path('admin/stores/<int:store_id>/market-mode/', StoreMarketModeUpdateView.as_view(), name='admin-stores-market-mode'),
     path('admin/stores/<int:store_id>/b2b-settings/', StoreB2BSettingsUpdateView.as_view(), name='admin-stores-b2b-settings'),
     path('admin/stores/<int:store_id>/b2c-settings/', StoreB2CSettingsUpdateView.as_view(), name='admin-stores-b2c-settings'),
     path('admin/stores/<int:store_id>/deactivate/', StoreDeactivateView.as_view(), name='admin-stores-deactivate'),

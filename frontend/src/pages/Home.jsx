@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
 import { getPromotions, getCategories } from '../services/promotionService';
@@ -12,10 +12,18 @@ import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/helpers';
 
 const CART_KEY = 'gaboshop_cart';
+const normalizeText = (value) => (value || '').toString().toLowerCase();
+const formatPlanLabel = (plan) => {
+  const normalized = normalizeText(plan);
+  const labels = { starter: 'Starter', pro: 'Pro', business: 'Business' };
+  return labels[normalized] || (normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '');
+};
 
 const Home = () => {
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [stores, setStores] = useState([]);
+  const [allStores, setAllStores] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [categories, setCategories] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
@@ -23,8 +31,12 @@ const Home = () => {
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [storesLoading, setStoresLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState({ products: [], stores: [] });
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState(null);
+  const location = useLocation();
 
   const loadCartFromStorage = () => {
     try {
@@ -40,6 +52,7 @@ const Home = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setStoresLoading(true);
         const [productsRes, storesRes] = await Promise.all([
           getProducts(),
           getStores()
@@ -58,6 +71,7 @@ const Home = () => {
           }
         }
         setProducts(productsData);
+        setAllProducts(productsData);
 
         // Handle Stores Response
         let storesData = [];
@@ -69,13 +83,14 @@ const Home = () => {
           storesData = storesRes;
         }
         setStores(storesData);
+        setAllStores(storesData);
 
-        
       } catch (err) {
         setError('Erreur lors du chargement des données');
         console.error(err);
       } finally {
         setLoading(false);
+        setStoresLoading(false);
       }
     };
 
@@ -113,6 +128,19 @@ const Home = () => {
     fetchDynamicContent();
   }, []);
 
+  useEffect(() => {
+    if (!location.state?.scrollTo) return;
+    const targetId = location.state.scrollTo;
+    const scroll = () => {
+      const section = document.getElementById(targetId);
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    const timer = setTimeout(scroll, 120);
+    return () => clearTimeout(timer);
+  }, [location.state]);
+
   const fetchProducts = async (search = '', storeId = null) => {
     try {
       setLoading(true);
@@ -133,6 +161,9 @@ const Home = () => {
         }
       }
       setProducts(productsData);
+      if (!search && !storeId) {
+        setAllProducts(productsData);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -140,10 +171,115 @@ const Home = () => {
     }
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    fetchProducts(searchTerm, selectedStore);
+  const fetchStores = async (search = '') => {
+    try {
+      setStoresLoading(true);
+      const params = {};
+      if (search) params.search = search;
+      const response = await getStores(params);
+      let storesData = [];
+      if (response.success) {
+        storesData = response.data;
+      } else if (response.results) {
+        storesData = response.results;
+      } else if (Array.isArray(response)) {
+        storesData = response;
+      }
+      setStores(storesData);
+      if (!search) {
+        setAllStores(storesData);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setStoresLoading(false);
+    }
   };
+
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!term) {
+      setSearchResults({ products: [], stores: [] });
+      setStores(allStores);
+      return;
+    }
+
+    const normalized = normalizeText(term);
+    const localProducts = allProducts.filter((product) => {
+      const name = normalizeText(product.name);
+      const description = normalizeText(product.description);
+      const storeName = normalizeText(product.store_name);
+      return (
+        name.includes(normalized) ||
+        description.includes(normalized) ||
+        storeName.includes(normalized)
+      );
+    });
+    const localStores = allStores.filter((store) => {
+      const name = normalizeText(store.name);
+      const category = normalizeText(store.category_name);
+      const city = normalizeText(store.city);
+      const zone = normalizeText(store.zone);
+      return (
+        name.includes(normalized) ||
+        category.includes(normalized) ||
+        city.includes(normalized) ||
+        zone.includes(normalized)
+      );
+    });
+
+    setSearchResults({
+      products: localProducts.slice(0, 6),
+      stores: localStores.slice(0, 6)
+    });
+
+    if (term.length < 2) return;
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const [productsRes, storesRes] = await Promise.all([
+          getProducts({ search: term }),
+          getStores({ search: term })
+        ]);
+
+        if (!active) return;
+
+        let productsData = [];
+        if (productsRes.success) {
+          productsData = productsRes.data;
+        } else if (productsRes.results) {
+          productsData = productsRes.results.success ? productsRes.results.data : productsRes.results;
+        } else if (Array.isArray(productsRes)) {
+          productsData = productsRes;
+        }
+
+        let storesData = [];
+        if (storesRes.success) {
+          storesData = storesRes.data;
+        } else if (storesRes.results) {
+          storesData = storesRes.results;
+        } else if (Array.isArray(storesRes)) {
+          storesData = storesRes;
+        }
+
+        setSearchResults({
+          products: Array.isArray(productsData) ? productsData.slice(0, 6) : [],
+          stores: Array.isArray(storesData) ? storesData.slice(0, 6) : []
+        });
+      } catch (err) {
+        console.error('Erreur recherche globale:', err);
+      } finally {
+        if (active) setSearchLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchTerm, allProducts, allStores]);
 
   const handleViewDetails = (product) => {
     setSelectedProduct(product);
@@ -167,6 +303,8 @@ const Home = () => {
           name: product.name,
           price: product.price,
           image: product.image,
+          weight_kg: product.weight_kg,
+          length_m: product.length_m,
           store_name: product.store_name,
           store_id: product.store,
           quantity: 1
@@ -187,11 +325,45 @@ const Home = () => {
     }
   };
 
+  const handleSearchSubmit = (term) => {
+    const normalized = (term || '').trim();
+    if (!normalized) return;
+    setSearchTerm(normalized);
+    setSelectedStore(null);
+    fetchProducts(normalized, null);
+    fetchStores(normalized);
+    const section = document.getElementById('produits');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const premiumShowcase = useMemo(() => {
+    const premiumStores = allStores.filter((store) => {
+      const plan = normalizeText(store.subscription_plan);
+      return plan === 'business' || plan === 'pro';
+    });
+
+    return premiumStores.slice(0, 4).map((store) => {
+      const storeProducts = allProducts.filter((product) => product.store === store.id);
+      const featured =
+        storeProducts.find((product) => product.is_featured) || storeProducts[0] || null;
+      return { store, product: featured };
+    });
+  }, [allStores, allProducts]);
+
   return (
     <>
     <div className="min-h-screen bg-white">
       {/* New Navbar */}
-      <HomeNavbar cartCount={cart.length} />
+      <HomeNavbar
+        cartCount={cart.length}
+        searchTerm={searchTerm}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        onSearchChange={setSearchTerm}
+        onSearchSubmit={handleSearchSubmit}
+      />
 
       {/* Hero Banner with Carousel */}
       <HeroBanner promotions={promotions} />
@@ -199,16 +371,164 @@ const Home = () => {
       {/* Categories Grid */}
       <CategoriesGrid categories={categories} />
 
+      <section className="relative overflow-hidden py-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-white to-emerald-50" />
+        <div className="absolute -top-16 right-16 h-40 w-40 rounded-full bg-amber-200/40 blur-3xl" />
+        <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-emerald-200/40 blur-3xl" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <div className="rounded-3xl border border-amber-100 bg-white/80 p-6 shadow-lg backdrop-blur animate-fade-up">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-700 font-semibold">
+                    Boutiques Premium
+                  </p>
+                  <h2 className="text-2xl md:text-3xl font-bold text-slate-900 font-display">
+                    Business & Pro en avant
+                  </h2>
+                  <p className="text-sm text-slate-600 mt-2">
+                    Les meilleures boutiques, avec leurs produits phares pour nos clients B2C.
+                  </p>
+                </div>
+                <div className="hidden sm:flex flex-col items-end">
+                  <span className="text-xs text-slate-500">Boutiques actives</span>
+                  <span className="text-2xl font-bold text-slate-900">{premiumShowcase.length}</span>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {premiumShowcase.map(({ store, product }) => (
+                  <div
+                    key={store.id}
+                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-transform hover:-translate-y-1"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          {store.category_name || 'Boutique'}
+                        </p>
+                        <h3 className="text-base font-semibold text-slate-900">
+                          {store.name}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {store.city} {store.zone ? `- ${store.zone}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-semibold uppercase px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                        Plan {formatPlanLabel(store.subscription_plan)}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="h-14 w-14 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center">
+                        {product?.image ? (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-xs text-slate-400">Produit</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900 line-clamp-1">
+                          {product?.name || 'Catalogue en préparation'}
+                        </p>
+                        {product?.price ? (
+                          <p className="text-sm text-amber-700 font-semibold">
+                            {formatCurrency(product.price)}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-500">
+                            {store.total_products || 0} produit(s)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between">
+                      <Link
+                        to={`/stores/${store.id}`}
+                        className="text-sm font-semibold text-slate-900 hover:text-amber-700"
+                      >
+                        Voir boutique
+                      </Link>
+                      {product && (
+                        <button
+                          onClick={() => handleViewDetails(product)}
+                          className="text-xs font-semibold uppercase tracking-wide text-emerald-700 hover:text-emerald-800"
+                        >
+                          Voir produit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {premiumShowcase.length === 0 && (
+                  <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-center text-sm text-slate-500">
+                    Aucune boutique Business ou Pro disponible pour le moment.
+                  </div>
+                )}
+              </div>
+            </div>
+            <div
+              className="rounded-3xl bg-slate-900 text-white p-6 shadow-xl flex flex-col justify-between animate-fade-up"
+              style={{ animationDelay: '120ms' }}
+            >
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 9l9-6 9 6v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 22V12h6v10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-white/70">Boutique</p>
+                    <h3 className="text-2xl font-bold font-display">Toutes les boutiques</h3>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm text-white/80">
+                  Trouvez chaque boutique disponible, comparez les produits et passez commande en quelques clics.
+                </p>
+              </div>
+              <Link
+                to="/boutiques"
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-slate-900 px-4 py-3 text-sm font-semibold hover:bg-slate-100 transition-colors"
+              >
+                Voir toutes les boutiques
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-white/70">
+                <div className="rounded-xl bg-white/10 p-3">
+                  <p className="font-semibold text-white">+{allStores.length}</p>
+                  <p>Boutiques actives</p>
+                </div>
+                <div className="rounded-xl bg-white/10 p-3">
+                  <p className="font-semibold text-white">B2C</p>
+                  <p>Expérience client</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           
           {/* Sidebar - Magasins Partenaires (1/3) */}
           <div className="w-full lg:w-1/3">
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">
-                Magasins Partenaires
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2 font-display">
+                Boutiques locales
               </h2>
-              {loading ? (
+              {storesLoading ? (
                 <div className="flex justify-center py-4"><LoadingSpinner /></div>
               ) : (
                 <div className="space-y-4">
@@ -232,13 +552,22 @@ const Home = () => {
                           {store.name}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {store.category_name} • {store.city}
+                          {store.category_name} - {store.city}
                         </p>
                       </div>
-                      <div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Ouvert
+                      <div className="flex flex-col items-end gap-1">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            store.is_open ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {store.is_open ? 'Ouvert' : 'Fermé'}
                         </span>
+                        {store.subscription_plan && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                            {formatPlanLabel(store.subscription_plan)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -254,8 +583,8 @@ const Home = () => {
           <div className="w-full lg:w-2/3">
             
             {/* Section Promotions */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+            <div className="mb-8" id="promotions">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center font-display">
                 <span className="bg-red-100 text-red-600 p-2 rounded-full mr-3">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
@@ -266,7 +595,7 @@ const Home = () => {
               
               {/* Carousel simple pour les promos (produits avec réduction) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {products.filter(p => p.has_discount).slice(0, 2).map((product) => (
+                {allProducts.filter(p => p.has_discount).slice(0, 2).map((product) => (
                   <div key={product.id} className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg overflow-hidden text-white relative">
                     <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 font-bold px-3 py-1 rounded-bl-lg z-10">
                       -{product.discount_percentage}%
@@ -294,8 +623,8 @@ const Home = () => {
             </div>
 
             {/* Section Tous les Produits */}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Nos Produits</h2>
+            <div id="produits">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 font-display">Nos Produits</h2>
               
               {loading ? (
                 <LoadingSpinner />
@@ -404,7 +733,7 @@ const Home = () => {
       <div className="fixed bottom-4 right-4 z-50">
         <div className="bg-white shadow-xl border border-green-100 text-gray-900 rounded-lg px-4 py-3 flex items-center gap-3 animate-slide-up">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700">
-            ✓
+            ?
           </span>
           <span className="text-sm font-medium">{toast.message}</span>
         </div>
@@ -418,3 +747,4 @@ const Home = () => {
 };
 
 export default Home;
+

@@ -20,7 +20,8 @@ class StoreListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'category', 'category_name', 'city', 'zone', 
             'phone', 'logo', 'is_active', 'is_open', 'total_products',
-            'offers_delivery', 'delivery_fee', 'min_order_amount', 'commission_rate'
+            'offers_delivery', 'delivery_fee', 'min_order_amount', 'commission_rate',
+            'subscription_plan'
         ]
 
 class StoreDetailSerializer(serializers.ModelSerializer):

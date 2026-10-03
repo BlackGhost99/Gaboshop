@@ -18,6 +18,15 @@ export const getStoreDetails = async (id) => {
   }
 };
 
+export const getStoreCategories = async () => {
+  try {
+    const response = await api.get('/stores/categories/');
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
 export const updateStore = async (storeId, storeData) => {
   const response = await api.patch(`/stores/${storeId}/update/`, storeData, {
     headers: {

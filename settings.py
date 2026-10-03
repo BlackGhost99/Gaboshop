@@ -13,27 +13,78 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import os
+from django.core.exceptions import ImproperlyConfigured
+
+# Load .env values into process env for local/dev runs.
+# Existing environment variables keep priority.
+def _load_env_file(path):
+    try:
+        if not path.exists():
+            return
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            line = line.lstrip("\ufeff")
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):].strip()
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            key = key.lstrip("\ufeff")
+            if not key:
+                continue
+            value = value.strip()
+            if (value.startswith('"') and value.endswith('"')) or (
+                value.startswith("'") and value.endswith("'")
+            ):
+                value = value[1:-1]
+            current = os.environ.get(key)
+            if current is None or current == "":
+                os.environ[key] = value
+    except Exception:
+        # Keep startup resilient even if .env is malformed.
+        pass
+
+_load_env_file(Path(__file__).resolve().parent / ".env")
 
 # small helper to read environment variables in settings where a full
 # django-environ or decouple isn't configured. Use real env library in prod.
 def env(name, default=None):
     return os.environ.get(name, default)
 
+def env_bool(name, default=False):
+    value = env(name, None)
+    if value is None:
+        return default
+    return str(value).lower() in ("1", "true", "yes", "on")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# This settings.py lives at the repository root, so BASE_DIR must be its
+# parent (not parent.parent) to avoid resolving to "/" in Docker.
+BASE_DIR = Path(__file__).resolve().parent
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(v504-88060g^)_%d!8n(6w$g^znk2d(9ezkp024t$hu(if5fu'
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DJANGO_DEBUG", False)
 
-# Autoriser les requets locales (frontend React et API en dveloppement)
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
+# A secret must always come from the environment. This intentionally fails
+# fast so a production process cannot start with Django's insecure fallback.
+SECRET_KEY = env("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set.")
+
+# Allow local hosts by default; override with DJANGO_ALLOWED_HOSTS
+_default_allowed_hosts = ["localhost", "127.0.0.1", "testserver", "web"]
+_allowed_hosts_env = env("DJANGO_ALLOWED_HOSTS", "")
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
+else:
+    ALLOWED_HOSTS = _default_allowed_hosts
 
 
 # Application definition
@@ -72,6 +123,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -81,7 +133,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'gaboshop.urls'
+ROOT_URLCONF = 'urls'
 
 TEMPLATES = [
     {
@@ -107,7 +159,13 @@ WSGI_APPLICATION = 'wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        # Explicit path for SQLite to avoid accidentally using /db.sqlite3
+        # when BASE_DIR is resolved differently across environments.
+        'NAME': env('SQLITE_PATH', str(Path(__file__).resolve().parent / 'db.sqlite3')),
+        'OPTIONS': {
+            # Reduce transient "database is locked" errors under concurrent requests.
+            'timeout': int(env('SQLITE_TIMEOUT', 20)),
+        },
     }
 }
 
@@ -147,44 +205,25 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ] if (BASE_DIR / 'static').exists() else []
+
+if not DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Django REST Framework
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'users.authentication.ApiKeyAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
-}
-
-# Simple JWT settings (adjust lifetimes as needed)
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'AUTH_HEADER_TYPES': ('Bearer',),
-}
-
-# CORS
-# In development you can allow all origins. Lock this down for production.
-CORS_ALLOW_ALL_ORIGINS = True
-# Allow cookies (Authorization headers are allowed by default for JWT)
-CORS_ALLOW_CREDENTIALS = True
-
-# Example: whitelist specific origins in production instead of allowing all
-# CORS_ALLOWED_ORIGINS = [
-#     'https://example.com',
-#     'https://sub.example.com',
-# ]
 
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
@@ -192,6 +231,7 @@ AUTH_USER_MODEL = 'users.User'
 # === DRF CONFIGURATION ===
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'users.authentication.ApiKeyAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -215,29 +255,36 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-# CORS Configuration
-# In development allow all origins to avoid preflight CORS issues between
-# the frontend dev server (Vite) and Django backend. Lock this down in
-# production by setting CORS_ALLOW_ALL_ORIGINS = False and specifying
-# CORS_ALLOWED_ORIGINS explicitly.
-CORS_ALLOW_ALL_ORIGINS = True
-
-# If you prefer to whitelist specific origins instead, uncomment and use:
-# CORS_ALLOW_ALL_ORIGINS = False
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-#     "http://localhost:5173",
-#     "http://127.0.0.1:5173",
-# ]
-
-# Trusted origins for CSRF (keep if you need cross-site POSTs during dev)
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+# CORS is opt-in in production. Define the public frontend origin with
+# DJANGO_CORS_ALLOWED_ORIGINS (comma-separated) in the deployment environment.
+_local_frontend_origins = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
 ]
+_cors_env = env("DJANGO_CORS_ALLOWED_ORIGINS", "")
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_env.split(",") if origin.strip()]
+if DEBUG and not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS = _local_frontend_origins
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF origins follow the same explicit production policy.
+_csrf_env = env("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_env.split(",") if origin.strip()]
+if DEBUG and not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = _local_frontend_origins
+
+# Enable these only after HTTPS is terminated by the deployment proxy. The
+# defaults keep the current HTTP-only Docker topology functional while making
+# the required production controls configurable.
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", SECURE_SSL_REDIRECT)
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", SECURE_SSL_REDIRECT)
+SECURE_HSTS_SECONDS = int(env("DJANGO_SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
 
 # === FILE UPLOADS ===
 MEDIA_URL = '/media/'
@@ -289,7 +336,7 @@ ANTHROPIC_MODEL = env('ANTHROPIC_MODEL', default='claude-3-5-sonnet-20241022')
 # DeepSeek API Configuration (GRATUIT avec limites généreuses)
 # Pour obtenir une clé: https://platform.deepseek.com/
 # DeepSeek est GRATUIT avec 1M tokens/mois
-DEEPSEEK_API_KEY = env('DEEPSEEK_API_KEY', default='sk-db6bf344ff014abfb68dd97f777b9146')
+DEEPSEEK_API_KEY = env('DEEPSEEK_API_KEY', default='')
 DEEPSEEK_MODEL = env('DEEPSEEK_MODEL', default='deepseek-chat')
 DEEPSEEK_BASE_URL = env('DEEPSEEK_BASE_URL', default='https://api.deepseek.com/v1')
 
@@ -301,13 +348,13 @@ OPENAI_MODEL = env('OPENAI_MODEL', default='gpt-3.5-turbo')
 # Groq API Configuration (GRATUIT - 14,400 requêtes/jour)
 # Pour obtenir une clé: https://console.groq.com/
 # Groq est GRATUIT, ultra-rapide, pas de carte bancaire requise
-GROQ_API_KEY = env('GROQ_API_KEY', default='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')
+GROQ_API_KEY = env('GROQ_API_KEY', default='')
 GROQ_MODEL = env('GROQ_MODEL', default='llama-3.1-8b-instant')  # ou 'mixtral-8x7b-32768'
 
 # Google Gemini API Configuration (GRATUIT - 1,500 requêtes/jour)
 # Pour obtenir une clé: https://makersuite.google.com/app/apikey
 # Gemini est GRATUIT, puissant, pas de carte bancaire requise initialement
-GEMINI_API_KEY = env('GEMINI_API_KEY', default='AIzaSyBwD_d3-tR5rLFeDO3KKKqRUjd0-gIAAKc')
+GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
 GEMINI_MODEL = env('GEMINI_MODEL', default='models/gemini-2.0-flash')
 
 # Email Configuration (optionnel)
@@ -417,3 +464,18 @@ MOOV_MERCHANT_ID = env("MOOV_MERCHANT_ID", default="")
 MOOV_API_KEY = env("MOOV_API_KEY", default="")
 MOOV_API_URL = "https://api.moov.ga/v1/payment/request"
 MOOV_CHECK_URL = "https://api.moov.ga/v1/payment/status"
+
+# SingPay Configuration
+SINGPAY_BASE_URL = env('SINGPAY_BASE_URL', default='')
+SINGPAY_CLIENT_ID = env('SINGPAY_CLIENT_ID', default='')
+SINGPAY_CLIENT_SECRET = env('SINGPAY_CLIENT_SECRET', default='')
+SINGPAY_WALLET_ID = env('SINGPAY_WALLET_ID', default='')
+SINGPAY_DISBURSEMENT_ID = env('SINGPAY_DISBURSEMENT_ID', default='')
+SINGPAY_TIMEOUT = env('SINGPAY_TIMEOUT', default='30')
+SINGPAY_ENABLE_TRANSFER = env('SINGPAY_ENABLE_TRANSFER', default='False').lower() in ('1','true','yes')
+PAYMENT_SIMULATION_MODE = env('PAYMENT_SIMULATION_MODE', default='False').lower() in ('1', 'true', 'yes')
+PAYMENT_WEBHOOK_SECRET = env('PAYMENT_WEBHOOK_SECRET', default='')
+PAYMENT_WEBHOOK_SIGNATURE_REQUIRED = env_bool(
+    'PAYMENT_WEBHOOK_SIGNATURE_REQUIRED',
+    default=not DEBUG,
+)

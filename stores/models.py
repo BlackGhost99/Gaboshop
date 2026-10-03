@@ -67,10 +67,10 @@ class Store(models.Model):
 		help_text="Frais de livraison express en FCFA"
 	)
 	service_fee = models.DecimalField(
-		max_digits=8, 
-		decimal_places=2, 
+		max_digits=8,
+		decimal_places=2,
 		default=0.00,
-		help_text="Frais de service par commande (optionnel)"
+		help_text="Champ desactive (laisser a 0)"
 	)
 	min_order_amount = models.DecimalField(
 		max_digits=8, 
@@ -78,6 +78,7 @@ class Store(models.Model):
 		default=0.00,
 		help_text="Montant minimum de commande en FCFA"
 	)
+	payment_preferences = models.JSONField(default=dict, blank=True, help_text="Restrictions et instructions de paiement du commerce")
     
 	# Statut et métadonnées
 	is_active = models.BooleanField(default=True)
@@ -89,6 +90,7 @@ class Store(models.Model):
 		('wholesaler', 'Grossiste (B2B)'),
 		('industry', 'Industrie (B2B)'),
 	)
+	B2B_STORE_TYPES = {'wholesaler', 'industry'}
 	store_type = models.CharField(
 		max_length=20,
 		choices=STORE_TYPE_CHOICES,
@@ -145,6 +147,27 @@ class Store(models.Model):
     
 	def __str__(self):
 		return f"{self.name} ({self.zone})"
+	
+	def get_market_mode(self):
+		return 'b2b' if self.store_type in self.B2B_STORE_TYPES else 'b2c'
+	
+	@property
+	def market_mode(self):
+		return self.get_market_mode()
+	
+	def set_market_mode(self, mode):
+		mode_normalized = (mode or '').strip().lower()
+		if mode_normalized not in ('b2b', 'b2c'):
+			raise ValueError("market_mode must be 'b2b' or 'b2c'")
+		if mode_normalized == 'b2b':
+			self.is_b2b = True
+			self.is_b2c = False
+			if self.store_type == 'retail':
+				self.store_type = 'wholesaler'
+		else:
+			self.is_b2b = False
+			self.is_b2c = True
+			self.store_type = 'retail'
     
 	def is_open(self):
 		from django.utils import timezone

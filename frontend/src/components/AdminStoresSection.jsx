@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import StoreB2BModal from './StoreB2BModal';
+import StoreMarketModeModal from './StoreMarketModeModal';
 
 const AdminStoresSection = ({
   storesListAdmin,
@@ -83,7 +83,7 @@ const AdminStoresSection = ({
 
       {/* Filtres */}
       <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
-        <h3 className="font-semibold mb-3 text-sm">🔍 Recherche et Filtres</h3>
+        <h3 className="font-semibold mb-3 text-sm">?? Recherche et Filtres</h3>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <input
             type="text"
@@ -141,7 +141,7 @@ const AdminStoresSection = ({
           onClick={() => setShowAddStore(true)}
           className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-semibold hover:bg-indigo-700"
         >
-          ➕ Ajouter un Magasin
+          ? Ajouter un Magasin
         </button>
       </div>
 
@@ -231,14 +231,14 @@ const AdminStoresSection = ({
                       className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
                       title="Voir détails"
                     >
-                      🔍
+                      ??
                     </button>
                     <button
                       onClick={() => setEditingStore(store)}
                       className="p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded"
                       title="Modifier"
                     >
-                      ✏️
+                      ??
                     </button>
                     {store.is_active ? (
                       <button
@@ -246,7 +246,7 @@ const AdminStoresSection = ({
                         className="p-1.5 text-orange-600 hover:text-orange-900 hover:bg-orange-50 rounded"
                         title="Désactiver"
                       >
-                        🚫
+                        ??
                       </button>
                     ) : (
                       <button
@@ -254,7 +254,7 @@ const AdminStoresSection = ({
                         className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 rounded"
                         title="Activer"
                       >
-                        ✅
+                        ?
                       </button>
                     )}
                     <button
@@ -262,14 +262,14 @@ const AdminStoresSection = ({
                       className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
                       title="Supprimer"
                     >
-                      🗑️
+                      ???
                     </button>
                     <button
                       onClick={() => setSelectedStoreForB2B(store)}
                       className="p-1.5 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded"
                       title="Gérer B2B"
                     >
-                      🏪
+                      ??
                     </button>
                   </div>
                 </td>
@@ -287,7 +287,7 @@ const AdminStoresSection = ({
       </div>
 
       {/* Modal B2B */}
-      <StoreB2BModal
+      <StoreMarketModeModal
         isOpen={selectedStoreForB2B !== null}
         onClose={() => setSelectedStoreForB2B(null)}
         store={selectedStoreForB2B}

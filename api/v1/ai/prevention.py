@@ -57,7 +57,7 @@ class PreventionService:
                     })
         
         if warnings:
-            message = f"⚠️ {len(warnings)} produit(s) avec stock insuffisant. Vérifiez avant de payer."
+            message = f"?? {len(warnings)} produit(s) avec stock insuffisant. Vérifiez avant de payer."
             return False, message, alternatives
         
         return True, None, []
@@ -127,7 +127,7 @@ class PreventionService:
             if not order.store.is_open():
                 reasons.append("magasin fermé")
             
-            message = f"⚠️ Checkout bloqué: {', '.join(reasons)}. Risque: {int(total_risk * 100)}%"
+            message = f"?? Checkout bloqué: {', '.join(reasons)}. Risque: {int(total_risk * 100)}%"
             return False, message
         
         return True, None

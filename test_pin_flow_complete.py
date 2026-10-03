@@ -36,16 +36,16 @@ def print_section(title):
     print("="*70)
 
 def print_test(message, result, details=""):
-    symbol = "✓" if result == "PASS" else "✗"
+    symbol = "?" if result == "PASS" else "?"
     color = "\033[92m" if result == "PASS" else "\033[91m"
     reset = "\033[0m"
     print(f"{color}{symbol} {message}{reset}")
     if details:
-        print(f"  └─ {details}")
+        print(f"  +- {details}")
 
 def cleanup_test_data():
     """Nettoie les données de test"""
-    print_section("🧹 Nettoyage des données précédentes")
+    print_section("?? Nettoyage des données précédentes")
     
     DeliveryProof.objects.filter(delivery__order__order_number__startswith='TEST-PIN-FLOW').delete()
     Delivery.objects.filter(order__order_number__startswith='TEST-PIN-FLOW').delete()
@@ -54,11 +54,11 @@ def cleanup_test_data():
     Store.objects.filter(name='Test Store PIN Flow').delete()
     User.objects.filter(email__startswith='test-pin-flow').delete()
     User.objects.filter(email='other-client-pin@example.com').delete()
-    print("✓ Nettoyage complété")
+    print("? Nettoyage complété")
 
 def setup_test_data():
     """Crée les données de test"""
-    print_section("📝 Création des données de test")
+    print_section("?? Création des données de test")
     
     # Utilisateurs
     client = User.objects.create_user(
@@ -69,7 +69,7 @@ def setup_test_data():
         first_name='PIN',
         last_name='Client'
     )
-    print(f"✓ Client créé: {client.email}")
+    print(f"? Client créé: {client.email}")
     
     agent = User.objects.create_user(
         email='test-pin-flow-agent@example.com',
@@ -79,7 +79,7 @@ def setup_test_data():
         first_name='PIN',
         last_name='Agent'
     )
-    print(f"✓ Livreur créé: {agent.email}")
+    print(f"? Livreur créé: {agent.email}")
     
     manager = User.objects.create_user(
         email='test-pin-flow-manager@example.com',
@@ -89,7 +89,7 @@ def setup_test_data():
         first_name='PIN',
         last_name='Manager'
     )
-    print(f"✓ Manager créé: {manager.email}")
+    print(f"? Manager créé: {manager.email}")
     
     # Store et produit
     category = StoreCategory.objects.first() or StoreCategory.objects.create(name='Test Category')
@@ -99,7 +99,7 @@ def setup_test_data():
         category=category,
         city='Libreville'
     )
-    print(f"✓ Store créé: {store.name}")
+    print(f"? Store créé: {store.name}")
     
     product = Product.objects.create(
         store=store,
@@ -107,7 +107,7 @@ def setup_test_data():
         price=Decimal('50000'),
         quantity=10
     )
-    print(f"✓ Produit créé: {product.name}")
+    print(f"? Produit créé: {product.name}")
     
     return client, agent, manager, store, product
 
@@ -133,7 +133,7 @@ def test_pin_generation(agent):
         total_amount=Decimal('52000'),
         status='waiting'
     )
-    print(f"✓ Commande créée: {order.order_number}")
+    print(f"? Commande créée: {order.order_number}")
     
     # Créer une livraison
     delivery = Delivery.objects.create(
@@ -141,7 +141,7 @@ def test_pin_generation(agent):
         delivery_agent=agent,
         status='pending'
     )
-    print(f"✓ Livraison créée avec ID: {delivery.id}")
+    print(f"? Livraison créée avec ID: {delivery.id}")
     
     # Le PIN devrait être automatiquement généré
     if delivery.delivery_code and len(delivery.delivery_code) == 6:
@@ -167,7 +167,7 @@ def test_proof_upload_with_pin_verification(delivery):
     id_card_file = SimpleUploadedFile("id_card.jpg", b"fake image", content_type="image/jpeg")
     
     # Upload avec PIN correct
-    print("\n▶ Tentative 1: PIN CORRECT")
+    print("\n? Tentative 1: PIN CORRECT")
     from rest_framework.test import APIRequestFactory
     from rest_framework.request import Request
     from api.v1.delivery import DeliveryProofUploadView
@@ -219,7 +219,7 @@ def test_pin_validation_endpoint(delivery):
     factory = APIRequestFactory()
     
     # Test 1: PIN correct
-    print("\n▶ Test 1: PIN CORRECT")
+    print("\n? Test 1: PIN CORRECT")
     correct_pin = delivery.delivery_code
     
     request_data = {
@@ -244,7 +244,7 @@ def test_pin_validation_endpoint(delivery):
         else:
             print_test(f"PIN validation échouée: {response.data}", "FAIL")
     except ImportError:
-        print("⚠ Endpoint verify-pin non trouvé, en sautant ce test")
+        print("? Endpoint verify-pin non trouvé, en sautant ce test")
 
 def test_client_confirmation_with_pin():
     """Test 4: Confirmation client avec PIN"""
@@ -305,13 +305,13 @@ def test_client_confirmation_with_pin():
 
 def main():
     print("\n")
-    print("╔════════════════════════════════════════════════════════════════════╗")
+    print("+--------------------------------------------------------------------+")
     print("║                 TEST COMPLET DU FLUX PIN                           ║")
     print("║  1. Génération du PIN (6 chiffres)                                 ║")
     print("║  2. Upload de preuve avec vérification PIN                         ║")
     print("║  3. Validation PIN endpoint                                        ║")
     print("║  4. Confirmation client avec PIN                                   ║")
-    print("╚════════════════════════════════════════════════════════════════════╝")
+    print("+--------------------------------------------------------------------+")
     
     try:
         # Setup
@@ -325,23 +325,23 @@ def main():
         test_client_confirmation_with_pin()
         
         # Résumé final
-        print_section("✅ RÉSUMÉ FINAL")
-        print("✓ PIN généré en 6 chiffres lors de la création de livraison")
-        print("✓ PIN enregistré dans Delivery.delivery_code")
-        print("✓ PIN peut être vérifié par le client lors du upload de preuve")
-        print("✓ Client peut confirmer livraison avec PIN correct")
-        print("\n🎯 Flux PIN complet et fonctionnel!")
+        print_section("? RÉSUMÉ FINAL")
+        print("? PIN généré en 6 chiffres lors de la création de livraison")
+        print("? PIN enregistré dans Delivery.delivery_code")
+        print("? PIN peut être vérifié par le client lors du upload de preuve")
+        print("? Client peut confirmer livraison avec PIN correct")
+        print("\n?? Flux PIN complet et fonctionnel!")
         
     except Exception as e:
-        print(f"\n❌ Erreur lors du test: {str(e)}")
+        print(f"\n? Erreur lors du test: {str(e)}")
         import traceback
         traceback.print_exc()
     finally:
         # Cleanup
-        print_section("🧹 Nettoyage final")
+        print_section("?? Nettoyage final")
         # Décommenter pour nettoyer après les tests
         # cleanup_test_data()
-        print("✓ Données de test conservées pour inspection")
+        print("? Données de test conservées pour inspection")
 
 if __name__ == '__main__':
     main()

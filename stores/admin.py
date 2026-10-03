@@ -41,8 +41,7 @@ class StoreAdmin(admin.ModelAdmin):
         }),
         ('Configuration Business', {
             'fields': (
-                'service_fee',
-                'min_order_amount'
+                'min_order_amount',
             )
         }),
         ('Configuration B2B/B2C', {

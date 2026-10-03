@@ -73,7 +73,7 @@ def auto_track_b2b_order_as_expense(sender, instance, created, **kwargs):
                 created_by=instance.source_store.manager if instance.source_store.manager else None,
             )
             
-            logger.info(f"✅ Dépense auto-créée pour la commande B2B {instance.order_number}: {expense.amount} FCFA")
+            logger.info(f"? Dépense auto-créée pour la commande B2B {instance.order_number}: {expense.amount} FCFA")
     
     except Exception as e:
-        logger.error(f"❌ Erreur lors de la création automatique de la dépense pour la commande B2B {instance.order_number}: {str(e)}", exc_info=True)
+        logger.error(f"? Erreur lors de la création automatique de la dépense pour la commande B2B {instance.order_number}: {str(e)}", exc_info=True)

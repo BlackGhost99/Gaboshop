@@ -163,7 +163,6 @@ def calculate_b2b_order_totals(order_items, wholesaler, buyer_store):
 		dict - {
 			'items_total': Decimal,
 			'delivery_fee': Decimal,
-			'service_fee': Decimal,
 			'total_amount': Decimal,
 			'items': list - Liste des items avec prix B2B
 		}
@@ -201,15 +200,12 @@ def calculate_b2b_order_totals(order_items, wholesaler, buyer_store):
 	
 	# Calculer les frais
 	delivery_fee = wholesaler.delivery_fee or Decimal('0.00')
-	service_fee = wholesaler.service_fee or Decimal('0.00')
-	
 	# Total
-	total_amount = items_total + delivery_fee + service_fee
+	total_amount = items_total + delivery_fee
 	
 	return {
 		'items_total': items_total,
 		'delivery_fee': delivery_fee,
-		'service_fee': service_fee,
 		'total_amount': total_amount,
 		'items': items
 	}

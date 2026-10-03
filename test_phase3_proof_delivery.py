@@ -517,10 +517,10 @@ def run_all_tests():
     customer.delete()
     
     if failed == 0:
-        print_test("\n✓ All proof of delivery tests passed!", "PASS")
+        print_test("\n? All proof of delivery tests passed!", "PASS")
         return True
     else:
-        print_test(f"\n✗ {failed} test(s) failed", "FAIL")
+        print_test(f"\n? {failed} test(s) failed", "FAIL")
         return False
 
 if __name__ == '__main__':

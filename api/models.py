@@ -48,6 +48,7 @@ class SystemSettings(models.Model):
         validators=[MinValueValidator(1)],
         help_text="Délai max avant expiration d'une commande impayée (minutes)"
     )
+    payment_policy = models.JSONField(default=dict, blank=True, help_text="Circuits et plafonds de paiement actifs")
     
     # === 3. VILLES & GÉOLOCALISATION ===
     auto_detect_cities = models.BooleanField(

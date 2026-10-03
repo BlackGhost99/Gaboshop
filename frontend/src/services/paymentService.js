@@ -1,5 +1,20 @@
 import api from './api';
 
+export const getPaymentOptions = async (storeId, deliveryRequested = true) => {
+  const response = await api.get('/payments/options/', { params: { store_id: storeId, delivery_requested: deliveryRequested } });
+  return response.data;
+};
+
+export const getPaymentArrangement = async (orderId) => {
+  const response = await api.get(`/payments/arrangements/order/${orderId}/`);
+  return response.data;
+};
+
+export const recordPaymentReceipt = async (payload) => {
+  const response = await api.post('/payments/receipts/', payload);
+  return response.data;
+};
+
 // Initialise un paiement pour une commande donnée
 export const initPayment = async (orderId, payload) => {
   try {

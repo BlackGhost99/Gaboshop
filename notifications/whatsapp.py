@@ -28,7 +28,7 @@ class WhatsAppService:
             
             # Vérifier la configuration
             if not settings.WHATSAPP_ACCESS_TOKEN or not settings.WHATSAPP_PHONE_ID:
-                logger.warning("⚠️ WhatsApp non configuré - Simulation d'envoi")
+                logger.warning("?? WhatsApp non configuré - Simulation d'envoi")
                 return WhatsAppService._simulate_send(phone, template_name, parameters)
             
             payload = {
@@ -53,17 +53,17 @@ class WhatsAppService:
             )
             
             if response.status_code == 200:
-                logger.info(f"✅ WhatsApp envoyé à {formatted_phone}: {template_name}")
+                logger.info(f"? WhatsApp envoyé à {formatted_phone}: {template_name}")
                 return True
             else:
-                logger.error(f"❌ Erreur WhatsApp {response.status_code}: {response.text}")
+                logger.error(f"? Erreur WhatsApp {response.status_code}: {response.text}")
                 return False
                 
         except requests.exceptions.Timeout:
-            logger.error("❌ Timeout WhatsApp API")
+            logger.error("? Timeout WhatsApp API")
             return False
         except Exception as e:
-            logger.error(f"❌ Erreur WhatsApp: {e}")
+            logger.error(f"? Erreur WhatsApp: {e}")
             return False
     
     @staticmethod
@@ -75,7 +75,7 @@ class WhatsAppService:
             formatted_phone = WhatsAppService._format_phone(phone)
             
             if not settings.WHATSAPP_ACCESS_TOKEN:
-                logger.info(f"📱 WhatsApp simulé à {formatted_phone}: {message}")
+                logger.info(f"?? WhatsApp simulé à {formatted_phone}: {message}")
                 return True
             
             payload = {
@@ -98,7 +98,7 @@ class WhatsAppService:
             return response.status_code == 200
             
         except Exception as e:
-            logger.error(f"❌ Erreur WhatsApp texte: {e}")
+            logger.error(f"? Erreur WhatsApp texte: {e}")
             return False
     
     @staticmethod
@@ -126,7 +126,7 @@ class WhatsAppService:
         Simuler l'envoi pendant le développement
         """
         logger.info(
-            f"🎯 WhatsApp simulé - À: {phone} | "
+            f"?? WhatsApp simulé - À: {phone} | "
             f"Template: {template_name} | "
             f"Params: {parameters}"
         )
@@ -170,7 +170,7 @@ class WhatsAppService:
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erreur traitement webhook WhatsApp: {e}")
+            logger.error(f"? Erreur traitement webhook WhatsApp: {e}")
             return False
     
     @staticmethod
@@ -179,7 +179,7 @@ class WhatsAppService:
         Traiter les réponses texte des utilisateurs
         """
         # Exemple: confirmation de livraison, statut commande, etc.
-        logger.info(f"📨 Réponse WhatsApp de {phone}: {text}")
+        logger.info(f"?? Réponse WhatsApp de {phone}: {text}")
         
         # Ici on peut intégrer avec le chatbot GABOSHOP
         # Pour le MVP, on log simplement
@@ -189,7 +189,7 @@ class WhatsAppService:
         """
         Traiter les réponses aux boutons interactifs
         """
-        logger.info(f"🔘 Bouton WhatsApp de {phone}: {button_text}")
+        logger.info(f"?? Bouton WhatsApp de {phone}: {button_text}")
         
         # Actions possibles:
         # - "Confirmer livraison"

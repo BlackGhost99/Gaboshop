@@ -23,7 +23,7 @@ class NotificationTemplates:
                 }]
             },
             'sms': _(
-                "🛍️ NOUVELLE COMMANDE #{order_number} - {total_amount} FCFA\n"
+                "??? NOUVELLE COMMANDE #{order_number} - {total_amount} FCFA\n"
                 "Client: {client_phone} - Zone: {delivery_zone}\n"
                 "GABOSHOP"
             ).format(
@@ -53,7 +53,7 @@ class NotificationTemplates:
                 }]
             },
             'sms': _(
-                "📦 COMMANDE #{order_number}\n"
+                "?? COMMANDE #{order_number}\n"
                 "Statut: {status}\n"
                 "Magasin: {store_name}\n"
                 "GABOSHOP"
@@ -82,7 +82,7 @@ class NotificationTemplates:
                 }]
             },
             'sms': _(
-                "🚗 LIVRAISON #{tracking_number}\n"
+                "?? LIVRAISON #{tracking_number}\n"
                 "Commission: {delivery_fee} FCFA\n"
                 "Magasin: {pickup_address}\n" 
                 "Client: {delivery_address}\n"
@@ -112,7 +112,7 @@ class NotificationTemplates:
                 }]
             },
             'sms': _(
-                "✅ PAIEMENT CONFIRMÉ\n"
+                "? PAIEMENT CONFIRMÉ\n"
                 "Commande: #{order_number}\n"
                 "Montant: {amount} FCFA\n"
                 "Merci pour votre achat !\n"
@@ -140,7 +140,7 @@ class NotificationTemplates:
                 }]
             },
             'sms': _(
-                "❌ PAIEMENT ÉCHOUÉ\n"
+                "? PAIEMENT ÉCHOUÉ\n"
                 "Commande: #{order_number}\n"
                 "Veuillez réessayer ou contacter le support\n"
                 "GABOSHOP - 07 XX XX XX XX"
@@ -164,7 +164,7 @@ class NotificationTemplates:
                 }]
             },
             'sms': _(
-                "🚗 VOTRE COMMANDE ARRIVE !\n"
+                "?? VOTRE COMMANDE ARRIVE !\n"
                 "Livreur: {agent_phone}\n"
                 "Tracking: #{tracking_number}\n"
                 "Préparez {amount} FCFA\n"

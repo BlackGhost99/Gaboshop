@@ -279,6 +279,10 @@ class StoreDashboardView(APIView):
 
         # Calculer les limites du plan pour les produits
         plan = store.get_current_plan()
+        can_view_detailed = getattr(plan, 'can_view_detailed_reports', False) or getattr(plan, 'has_statistics', False)
+        if not can_view_detailed:
+            category_breakdown_daily = []
+            category_breakdown_monthly = []
         current_products = store.products.count()
         
         # Gérer les deux types de plans : B2B (max_b2b_products) et B2C (max_products)
@@ -295,7 +299,7 @@ class StoreDashboardView(APIView):
                     'current': current_products,
                     'max': max_products,
                     'can_add_more': max_products is None or current_products < max_products,
-                    'message': f"Vous avez {current_products}/{max_products if max_products else '∞'} produits" if max_products else "Produits illimités",
+                    'message': f"Vous avez {current_products}/{max_products if max_products else '8'} produits" if max_products else "Produits illimités",
                 }
             }
             subscription_payload['features'] = {
@@ -380,9 +384,14 @@ class DeliveryDashboardView(APIView):
                 'pickup_address': active_delivery.pickup_address,
                 'delivery_address': active_delivery.delivery_address,
                 'client_phone': active_delivery.order.client.phone,
+                'client_name': active_delivery.order.client.get_display_name(),
                 'status': active_delivery.status,
                 'status_display': active_delivery.get_status_display(),
                 'fee': active_delivery.agent_commission,
+                'delivery_fee': active_delivery.delivery_fee,
+                'agent_commission': active_delivery.agent_commission,
+                'assigned_at': active_delivery.assigned_at,
+                'assignment_timeout_minutes': active_delivery.assignment_timeout_minutes,
                 'proof_status': getattr(proof, 'status', None),
                 'proof_is_valid': proof.is_valid if proof else False,
                 'proof_is_fully_confirmed': proof.is_fully_confirmed if proof else False,
@@ -462,9 +471,12 @@ class DeliveryAssignedOrdersView(APIView):
                     'status': delivery.status,
                     'status_display': delivery.get_status_display(),
                     'fee': float(delivery.agent_commission) if delivery.agent_commission else 0,
+                    'delivery_fee': float(delivery.delivery_fee) if delivery.delivery_fee else 0,
                     'items_count': delivery.order.items.count(),
                     'total_amount': float(delivery.order.total_amount),
                     'created_at': delivery.created_at,
+                    'assigned_at': delivery.assigned_at,
+                    'assignment_timeout_minutes': delivery.assignment_timeout_minutes,
                     'proof_status': getattr(proof, 'status', None),
                     'proof_is_valid': proof.is_valid if proof else False,
                     'proof_is_fully_confirmed': proof.is_fully_confirmed if proof else False,
@@ -473,7 +485,7 @@ class DeliveryAssignedOrdersView(APIView):
                     'can_complete_delivery': bool(proof and proof.is_valid)
                 })
             except Exception as e:
-                print(f"❌ Erreur lors du traitement de la livraison {delivery.id}: {str(e)}")
+                print(f"? Erreur lors du traitement de la livraison {delivery.id}: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 continue

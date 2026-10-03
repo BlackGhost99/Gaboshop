@@ -25,7 +25,7 @@ class WhatsAppWebhookView(APIView):
     def post(self, request):
         try:
             data = json.loads(request.body)
-            logger.info(f"📨 Webhook WhatsApp reçu: {data}")
+            logger.info(f"?? Webhook WhatsApp reçu: {data}")
             
             # Traiter le webhook
             WhatsAppService.process_webhook(data)
@@ -33,5 +33,5 @@ class WhatsAppWebhookView(APIView):
             return HttpResponse('OK')
             
         except Exception as e:
-            logger.error(f"❌ Erreur webhook WhatsApp: {e}")
+            logger.error(f"? Erreur webhook WhatsApp: {e}")
             return HttpResponse('Error', status=500)

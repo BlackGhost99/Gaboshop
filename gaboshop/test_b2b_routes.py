@@ -22,11 +22,11 @@ print("=" * 50)
 for route_name, kwargs in routes_to_test:
     try:
         url = reverse(route_name, kwargs=kwargs)
-        print(f"✓ {route_name:30} -> {url}")
+        print(f"? {route_name:30} -> {url}")
     except NoReverseMatch as e:
-        print(f"✗ {route_name:30} -> ERREUR: {e}")
+        print(f"? {route_name:30} -> ERREUR: {e}")
     except Exception as e:
-        print(f"✗ {route_name:30} -> ERREUR: {e}")
+        print(f"? {route_name:30} -> ERREUR: {e}")
 
 print("=" * 50)
 

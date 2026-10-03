@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('order_number', models.CharField(editable=False, max_length=20, unique=True)),
-                ('status', models.CharField(choices=[('pending', '🟡 En attente de paiement'), ('confirmed', '🔵 Confirmée'), ('preparing', '👨\u200d🍳 En préparation'), ('ready', '✅ Prête pour livraison'), ('assigned', '🚗 Livreur assigné'), ('in_transit', '📦 En cours de livraison'), ('delivered', '🎉 Livrée'), ('cancelled', '❌ Annulée'), ('refunded', '💸 Remboursée')], default='pending', max_length=20)),
+                ('status', models.CharField(choices=[('pending', '?? En attente de paiement'), ('confirmed', '?? Confirmée'), ('preparing', '??\u200d?? En préparation'), ('ready', '? Prête pour livraison'), ('assigned', '?? Livreur assigné'), ('in_transit', '?? En cours de livraison'), ('delivered', '?? Livrée'), ('cancelled', '? Annulée'), ('refunded', '?? Remboursée')], default='pending', max_length=20)),
                 ('notes', models.TextField(blank=True, help_text='Instructions spéciales du client')),
                 ('items_total', models.DecimalField(decimal_places=2, default=0.0, max_digits=10)),
                 ('delivery_fee', models.DecimalField(decimal_places=2, default=0.0, max_digits=8)),

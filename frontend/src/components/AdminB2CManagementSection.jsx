@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import B2CCategoryModal from './B2CCategoryModal';
 import B2CProductPricingModal from './B2CProductPricingModal';
-import StoreB2CModal from './StoreB2CModal';
+import StoreMarketModeModal from './StoreMarketModeModal';
 import ConfirmModal from './ConfirmModal';
 import Modal from './Modal';
 import {
@@ -144,20 +144,20 @@ const AdminB2CManagementSection = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Gestion B2C</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Mode B2B/B2C</h2>
       </div>
 
       {/* Messages */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">✕</button>
+          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">?</button>
         </div>
       )}
       {success && (
         <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded text-sm flex justify-between items-center">
           <span>{success}</span>
-          <button onClick={() => setSuccess(null)} className="text-green-600 hover:text-green-800">✕</button>
+          <button onClick={() => setSuccess(null)} className="text-green-600 hover:text-green-800">?</button>
         </div>
       )}
 
@@ -249,7 +249,7 @@ const AdminB2CManagementSection = () => {
                           onClick={() => setSelectedStoreForB2C(store)}
                           className="text-indigo-600 hover:text-indigo-900"
                         >
-                          Gérer B2C
+                          Mode B2B/B2C
                         </button>
                       </td>
                     </tr>
@@ -261,7 +261,7 @@ const AdminB2CManagementSection = () => {
         </div>
       )}
 
-      {/* Catégories B2C */}
+      {/* Categories B2C */}
       {!loading && activeSubTab === 'categories' && (
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -535,7 +535,7 @@ const AdminB2CManagementSection = () => {
       )}
 
       {/* Modals */}
-      <StoreB2CModal
+      <StoreMarketModeModal
         isOpen={selectedStoreForB2C !== null}
         onClose={() => setSelectedStoreForB2C(null)}
         store={selectedStoreForB2C}

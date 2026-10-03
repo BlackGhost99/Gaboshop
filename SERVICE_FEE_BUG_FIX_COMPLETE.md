@@ -59,19 +59,19 @@ Three test scenarios ensure the fix is correct:
 - Order is B2C (`is_b2b=False`, `source_store=None`)
 - Client pays: Items + Delivery + Service Fee
 - Store pays: Commission only (NOT service fee)
-- ✓ Service fee = 500 FCFA (from plan)
+- ? Service fee = 500 FCFA (from plan)
 
 #### Test 2: B2B Order - Buyer Pays Only
 - Order is B2B (`is_b2b=True`, `source_store=buyer_store`)
 - Buyer store pays: Items + Delivery + Service Fee (B2B amount)
 - Seller (wholesaler) pays: Commission only (NOT service fee)
-- ✓ Service fee = 1000 FCFA (from SubscriptionChecker.get_service_fee_b2b())
+- ? Service fee = 1000 FCFA (from SubscriptionChecker.get_service_fee_b2b())
 
 #### Test 3: Reversement Calculation
 - Service fee (paid by client/buyer) is NOT deducted from store's payout
 - Store receives: Items Total - Commission + Delivery Share
 - Service Fee belongs to GABOSHOP (platform)
-- ✓ Double-deduction bug prevented
+- ? Double-deduction bug prevented
 
 ---
 
@@ -96,15 +96,15 @@ Ran 3 tests in 13.287s - OK (all passed)
 
 ### Before Fix (WRONG)
 **B2C Order Example**: Items 15,000 + Delivery 2,000
-- Client was charged: 15,000 + 2,000 + **500** = 17,500 ❌
-- Store was also charged: **500** (service fee) ❌❌ **DOUBLE CHARGE!**
-- GABOSHOP received: 500 (from client) + 500 (from store) = **1,000 FCFA** ❌ **FRAUD**
+- Client was charged: 15,000 + 2,000 + **500** = 17,500 ?
+- Store was also charged: **500** (service fee) ?? **DOUBLE CHARGE!**
+- GABOSHOP received: 500 (from client) + 500 (from store) = **1,000 FCFA** ? **FRAUD**
 
 ### After Fix (CORRECT)
 **B2C Order Example**: Items 15,000 + Delivery 2,000
-- Client pays: 15,000 + 2,000 + **500** = 17,500 ✓
-- Store pays: Commission only (8% of 15,000 = 1,200) ✓
-- GABOSHOP receives: 500 (service fee) + 1,200 (commission) + 800 (delivery share) = **2,500 FCFA** ✓
+- Client pays: 15,000 + 2,000 + **500** = 17,500 ?
+- Store pays: Commission only (8% of 15,000 = 1,200) ?
+- GABOSHOP receives: 500 (service fee) + 1,200 (commission) + 800 (delivery share) = **2,500 FCFA** ?
 
 ---
 
@@ -142,4 +142,4 @@ Ran 3 tests in 13.287s - OK (all passed)
 **January 13, 2026**
 
 ## Status
-✅ **FIXED AND TESTED**
+? **FIXED AND TESTED**

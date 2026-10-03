@@ -139,7 +139,7 @@ class ErrorAnalyzer:
             if 'subscription' in endpoint or 'permission' in endpoint:
                 return f"{base_explanation} Votre forfait actuel ne permet pas cette action. Considérez une mise à niveau."
             elif 'b2b' in endpoint:
-                return f"{base_explanation} L'accès B2B nécessite un forfait Business."
+                return f"{base_explanation} L'accès B2B nécessite un forfait Pro ou Business."
         
         if status_code == 404:
             if 'product' in endpoint:

@@ -77,7 +77,7 @@ const StoreB2BModal = ({ isOpen, onClose, store, onSuccess }) => {
 
 				{success && (
 					<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded text-sm">
-						<div className="font-semibold mb-1">✓ Paramètres B2B mis à jour avec succès</div>
+						<div className="font-semibold mb-1">? Paramètres B2B mis à jour avec succès</div>
 						{isB2B && (
 							<div className="text-xs mt-1 text-green-600">
 								Le profil B2B a été créé/activé automatiquement. Le magasin est maintenant visible comme grossiste.
@@ -162,7 +162,7 @@ const StoreB2BModal = ({ isOpen, onClose, store, onSuccess }) => {
 						disabled={loading || success}
 						className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
 					>
-						{loading ? 'Enregistrement...' : success ? '✓ Enregistré' : 'Enregistrer'}
+						{loading ? 'Enregistrement...' : success ? '? Enregistré' : 'Enregistrer'}
 					</button>
 					<button
 						type="button"

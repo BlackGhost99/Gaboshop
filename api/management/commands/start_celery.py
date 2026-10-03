@@ -5,12 +5,12 @@ class Command(BaseCommand):
     help = 'Start Celery worker and beat together'
     
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS('🚀 Starting Celery services...'))
+        self.stdout.write(self.style.SUCCESS('?? Starting Celery services...'))
         
         # Démarrer le worker
-        self.stdout.write('🤖 Starting Celery worker...')
+        self.stdout.write('?? Starting Celery worker...')
         call_command('celery', 'worker', '--loglevel=info')
         
         # Démarrer beat (dans un terminal séparé en production)
-        self.stdout.write('⏰ Starting Celery beat...')
+        self.stdout.write('? Starting Celery beat...')
         call_command('celery', 'beat', '--loglevel=info')

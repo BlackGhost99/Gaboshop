@@ -338,18 +338,11 @@ class RevenueBreakdownView(APIView):
 			start_date__gte=timezone.now() - timedelta(days=30)
 		).aggregate(total=Sum('price_paid'))['total'] or 0
 
-		# Frais de service
-		service_fees = Payment.objects.filter(
-			status='success',
-			created_at__date__gte=month_start
-		).aggregate(total=Sum('fees_amount'))['total'] or 0
-
 		total_revenue = (
 			float(commissions_revenue) +
 			float(delivery_revenue) +
 			float(subscriptions_revenue) +
-			float(sponsoring_revenue) +
-			float(service_fees)
+			float(sponsoring_revenue)
 		)
 
 		data = {
@@ -368,10 +361,6 @@ class RevenueBreakdownView(APIView):
 			"sponsoring": {
 				"amount": float(sponsoring_revenue),
 				"percentage": (float(sponsoring_revenue) / max(total_revenue, 1)) * 100,
-			},
-			"service_fees": {
-				"amount": float(service_fees),
-				"percentage": (float(service_fees) / max(total_revenue, 1)) * 100,
 			},
 			"total_revenue": total_revenue,
 		}

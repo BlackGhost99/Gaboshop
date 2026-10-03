@@ -5,12 +5,70 @@ from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
 from django.conf import settings
-from payments.models import Payment, Commission, Reversement
+from payments.models import Payment, Commission, Reversement, DeliveryPayout
 from orders.models import Order
 # Persisted notifications service (DB + multi-canal)
 from notifications.service import NotificationService
+from payments.utils import call_singpay_payment, call_singpay_transfer
 
 logger = logging.getLogger(__name__)
+
+
+def _build_singpay_error_message(response):
+    """Build a user-facing SingPay error with actionable context."""
+    if not isinstance(response, dict):
+        return "Erreur SingPay"
+
+    details = response.get("response") if isinstance(response.get("response"), dict) else {}
+    status_payload = response.get("status") if isinstance(response.get("status"), dict) else {}
+    transaction_payload = response.get("transaction") if isinstance(response.get("transaction"), dict) else {}
+    payment_result = response.get("paymentResult") or response.get("paiementResult")
+    if isinstance(payment_result, dict):
+        status_payload = status_payload or (
+            payment_result.get("status") if isinstance(payment_result.get("status"), dict) else {}
+        )
+        transaction_payload = transaction_payload or (
+            payment_result.get("transaction") if isinstance(payment_result.get("transaction"), dict) else {}
+        )
+
+    message_parts = [
+        response.get("error"),
+        response.get("result"),
+        response.get("status") if not isinstance(response.get("status"), dict) else None,
+        status_payload.get("message"),
+        status_payload.get("code"),
+        details.get("message"),
+        details.get("error"),
+        details.get("raw"),
+        transaction_payload.get("result"),
+        transaction_payload.get("status"),
+    ]
+    message = " - ".join(str(part) for part in message_parts if part not in (None, "", {}))
+    if not message:
+        message = "SingPay error"
+
+    lowered = message.lower()
+    if "timeouterror" in lowered or "timeout" in lowered:
+        return (
+            "Paiement Mobile Money expire: le client n'a pas valide le prompt a temps, "
+            "le telephone etait indisponible, ou l'operateur n'a pas confirme le debit."
+        )
+    if "insufficient" in lowered or "solde" in lowered or "fund" in lowered:
+        return "Paiement refuse: le solde du client semble insuffisant."
+    if "wallet not accepted" in lowered or "status: pending" in lowered:
+        return (
+            message
+            + " | "
+            "Action requise: activer/valider le wallet chez SingPay "
+            "(wallet en Pending) puis reutiliser le meme CLIENT_ID/SECRET/WALLET_ID."
+        )
+    if "something went wrong" in lowered:
+        return (
+            "SingPay a retourne une erreur generique. Verifiez dans le tableau SingPay "
+            "le champ result; si result=TimeOutError, le client doit relancer et valider "
+            "le prompt Mobile Money."
+        )
+    return message
 
 
 class PaymentService:
@@ -94,150 +152,140 @@ class PaymentService:
                 return PaymentService._call_moov_money_api(phone, amount, order)
                 
         except Exception as e:
-            logger.error(f"❌ Erreur API {operator}: {e}")
-            # Retourner une réponse simulée en cas d'échec
-            return PaymentService._get_fallback_response(operator, phone, amount, order)
-
+            logger.error(f"Erreur API {operator}: {e}")
+            if getattr(settings, 'PAYMENT_SIMULATION_MODE', False):
+                # Mode simulation explicite uniquement (dev/tests)
+                return PaymentService._get_fallback_response(operator, phone, amount, order)
+            raise
     @staticmethod
     def _call_airtel_money_api(phone, amount, order):
         """
-        Intégration avec Airtel Money API
+        Integration avec SingPay (Airtel Money)
         """
         try:
-            # === EN PRODUCTION: Décommenter et configurer ===
-            """
-            headers = {
-                'Authorization': f'Bearer {settings.AIRTEL_API_KEY}',
-                'Content-Type': 'application/json',
-                'X-Country': 'GA',
-                'X-Currency': 'XAF'
-            }
-            
-            payload = {
-                'reference': f"GABOSHOP_{order.order_number}",
-                'subscriber': {
-                    'msisdn': phone
-                },
-                'transaction': {
-                    'amount': str(amount),
-                    'id': f"CMD{order.id}",
-                    'description': f"Paiement GABOSHOP #{order.order_number}"
-                }
-            }
-            
-            response = requests.post(
-                'https://openapi.airtel.africa/merchant/v1/payments/',
-                headers=headers,
-                json=payload,
-                timeout=30
+            response = call_singpay_payment(
+                "airtel",
+                amount=amount,
+                reference=f"GABOSHOP_{order.order_number}",
+                phone=phone,
+                portefeuille=getattr(settings, "SINGPAY_WALLET_ID", ""),
+                disbursement=getattr(settings, "SINGPAY_DISBURSEMENT_ID", ""),
+                is_transfer=getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False),
             )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'transaction_id': data['data']['transaction']['id'],
-                    'operator_reference': data['data']['transaction']['airtel_money_id'],
-                    'status': 'pending',
-                    'next_steps': {
-                        'message': 'Un prompt de paiement apparaîtra sur votre mobile Airtel',
-                        'action': 'Vérifiez votre téléphone et entrez votre PIN'
-                    }
-                }
-            else:
-                raise Exception(f"Airtel API error: {response.status_code} - {response.text}")
-            """
-            
-            # === SIMULATION POUR MVP ===
-            transaction_id = f"AIRTEL_{order.id}_{int(timezone.now().timestamp())}"
-            
-            logger.info(
-                f"📱 Appel Airtel Money simulé: "
-                f"{phone} | {amount}F | {transaction_id}"
+
+            if response.get("error"):
+                raise Exception(_build_singpay_error_message(response))
+
+            tx = response.get("transaction") if isinstance(response.get("transaction"), dict) else {}
+            status_payload = response.get("status") if isinstance(response.get("status"), dict) else {}
+            result_payload = str(response.get("result") or tx.get("result") or "").lower()
+            if result_payload in ("timeouterror", "failed", "error", "ko"):
+                raise Exception(_build_singpay_error_message(response))
+            if status_payload.get("success") is False:
+                raise Exception(_build_singpay_error_message(response))
+            transaction_id = (
+                tx.get("airtel_money_id")
+                or tx.get("id")
+                or tx.get("_id")
+                or response.get("airtel_money_id")
+                or response.get("id")
+                or response.get("_id")
+                or response.get("transaction_id")
+                or f"AIRTEL_{order.id}_{int(timezone.now().timestamp())}"
             )
-            
+            operator_reference = (
+                tx.get("airtel_money_id")
+                or tx.get("id")
+                or tx.get("_id")
+                or response.get("airtel_money_id")
+                or response.get("id")
+                or response.get("_id")
+                or ""
+            )
+
             return {
-                'transaction_id': transaction_id,
-                'operator_reference': f"AIRTEL_REF_{order.order_number}",
-                'status': 'pending',
-                'next_steps': {
-                    'message': '✅ Simulation: Un prompt de paiement apparaîtra sur votre mobile Airtel',
-                    'action': '📱 Vérifiez votre téléphone et entrez votre PIN',
-                    'test_instruction': 'Pour tester, simulez le paiement dans l\'interface admin'
-                }
+                "transaction_id": transaction_id,
+                "operator_reference": operator_reference,
+                "status": "pending",
+                "next_steps": {
+                    "message": "Un prompt de paiement apparaitra sur votre mobile Airtel",
+                    "action": "Verifiez votre telephone et entrez votre PIN",
+                    "singpay_status": status_payload,
+                },
+                "raw": response,
             }
-            
+
         except Exception as e:
-            logger.error(f"❌ Erreur Airtel Money API: {e}")
+            logger.error(f"Erreur Airtel Money API: {e}")
             raise
+
 
     @staticmethod
     def _call_moov_money_api(phone, amount, order):
         """
-        Intégration avec Moov Money API
+        Integration avec SingPay (Moov Money)
         """
         try:
-            # === EN PRODUCTION: Décommenter et configurer ===
-            """
-            headers = {
-                'Authorization': f'Bearer {settings.MOOV_API_KEY}',
-                'Content-Type': 'application/json',
-                'X-API-Key': settings.MOOV_API_SECRET
-            }
-            
-            payload = {
-                'merchantId': settings.MOOV_MERCHANT_ID,
-                'amount': str(amount),
-                'currency': 'XAF',
-                'customerMsidn': phone,
-                'orderId': order.order_number,
-                'description': f"GABOSHOP Commande #{order.order_number}",
-                'callbackUrl': f"{settings.BASE_URL}/api/v1/payments/webhook/"
-            }
-            
-            response = requests.post(
-                'https://api.moov.africa/payments/request',
-                headers=headers,
-                json=payload,
-                timeout=30
+            response = call_singpay_payment(
+                "moov",
+                amount=amount,
+                reference=f"GABOSHOP_{order.order_number}",
+                phone=phone,
+                portefeuille=getattr(settings, "SINGPAY_WALLET_ID", ""),
+                disbursement=getattr(settings, "SINGPAY_DISBURSEMENT_ID", ""),
+                is_transfer=getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False),
             )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'transaction_id': data['transactionId'],
-                    'operator_reference': data['paymentReference'],
-                    'status': 'pending',
-                    'next_steps': {
-                        'message': 'Un prompt de paiement apparaîtra sur votre mobile Moov',
-                        'action': 'Vérifiez votre téléphone et entrez votre PIN'
-                    }
-                }
-            else:
-                raise Exception(f"Moov API error: {response.status_code} - {response.text}")
-            """
-            
-            # === SIMULATION POUR MVP ===
-            transaction_id = f"MOOV_{order.id}_{int(timezone.now().timestamp())}"
-            
-            logger.info(
-                f"📱 Appel Moov Money simulé: "
-                f"{phone} | {amount}F | {transaction_id}"
+
+            if response.get("error"):
+                raise Exception(_build_singpay_error_message(response))
+
+            tx = response.get("transaction") if isinstance(response.get("transaction"), dict) else {}
+            status_payload = response.get("status") if isinstance(response.get("status"), dict) else {}
+            result_payload = str(response.get("result") or tx.get("result") or "").lower()
+            if result_payload in ("timeouterror", "failed", "error", "ko"):
+                raise Exception(_build_singpay_error_message(response))
+            if status_payload.get("success") is False:
+                raise Exception(_build_singpay_error_message(response))
+            transaction_id = (
+                tx.get("moov_money_id")
+                or tx.get("airtel_money_id")
+                or tx.get("id")
+                or tx.get("_id")
+                or response.get("moov_money_id")
+                or response.get("airtel_money_id")
+                or response.get("id")
+                or response.get("_id")
+                or response.get("transaction_id")
+                or f"MOOV_{order.id}_{int(timezone.now().timestamp())}"
             )
-            
+            operator_reference = (
+                tx.get("moov_money_id")
+                or tx.get("airtel_money_id")
+                or tx.get("id")
+                or tx.get("_id")
+                or response.get("moov_money_id")
+                or response.get("airtel_money_id")
+                or response.get("id")
+                or response.get("_id")
+                or ""
+            )
+
             return {
-                'transaction_id': transaction_id,
-                'operator_reference': f"MOOV_REF_{order.order_number}",
-                'status': 'pending',
-                'next_steps': {
-                    'message': '✅ Simulation: Un prompt de paiement apparaîtra sur votre mobile Moov',
-                    'action': '📱 Vérifiez votre téléphone et entrez votre PIN',
-                    'test_instruction': 'Pour tester, simulez le paiement dans l\'interface admin'
-                }
+                "transaction_id": transaction_id,
+                "operator_reference": operator_reference,
+                "status": "pending",
+                "next_steps": {
+                    "message": "Un prompt de paiement apparaitra sur votre mobile Moov",
+                    "action": "Verifiez votre telephone et entrez votre PIN",
+                    "singpay_status": status_payload,
+                },
+                "raw": response,
             }
-            
+
         except Exception as e:
-            logger.error(f"❌ Erreur Moov Money API: {e}")
+            logger.error(f"Erreur Moov Money API: {e}")
             raise
+
 
     @staticmethod
     def _get_fallback_response(operator, phone, amount, order):
@@ -262,6 +310,8 @@ class PaymentService:
         """
         Formater le numéro de téléphone pour les APIs Gabon
         """
+        import re
+
         # Nettoyer le numéro
         clean_phone = phone.replace(' ', '').replace('-', '').replace('.', '')
         
@@ -276,10 +326,11 @@ class PaymentService:
         # Validation pour le Gabon
         if not clean_phone.startswith('+241'):
             raise ValueError("Numéro de téléphone Gabon invalide. Format: +241XXXXXXXX")
-        
-        if len(clean_phone) != 13:  # +241 + 8 chiffres
+
+        # Format attendu: +241 suivi de 8 chiffres (Gabon)
+        if not re.match(r'^\+241\d{8}$', clean_phone):
             raise ValueError("Numéro de téléphone Gabon invalide. Doit avoir 8 chiffres après +241")
-        
+
         return clean_phone
 
     @staticmethod
@@ -299,7 +350,7 @@ class PaymentService:
             
             if external_status.upper() in ['SUCCESS', 'COMPLETED', 'APPROVED']:
                 # Paiement réussi
-                payment.status = 'completed'
+                payment.status = 'success'
                 payment.completed_at = timezone.now()
                 
                 if operator_data:
@@ -403,132 +454,120 @@ class PaymentService:
     @transaction.atomic
     def payout_delivery_agent(delivery):
         """
-        Payer le livreur via Airtel Money après confirmation de livraison
-        
-        Args:
-            delivery: Objet Delivery avec agent_commission et delivery_agent
-            
-        Returns:
-            dict avec succès et détails du payout
+        Payer le livreur via SingPay /transfer apres confirmation de livraison.
         """
         try:
-            # Validation
+            if delivery.status != 'delivered' or delivery.order.status in ('cancelled', 'refunded'):
+                return {'success': False, 'error': 'La livraison doit être livrée et non annulée'}
+            if not hasattr(delivery, 'proof'):
+                return {'success': False, 'error': 'Preuve de livraison requise'}
             if not delivery.agent_commission or delivery.agent_commission <= 0:
-                logger.warning(f"⚠️ Pas de commission pour livraison {delivery.id}")
-                return {
-                    'success': False,
-                    'error': 'Aucune commission à payer'
-                }
-            
+                logger.warning("Pas de commission pour livraison %s", delivery.id)
+                return {'success': False, 'error': 'Aucune commission a payer'}
+
             agent = delivery.delivery_agent
-            if not agent.phone_number:
-                logger.error(f"❌ Livreur {agent.id} n'a pas de numéro de téléphone")
-                return {
-                    'success': False,
-                    'error': 'Livreur: numéro de téléphone manquant'
-                }
-            
-            # Déterminer l'opérateur (pour l'instant Airtel par défaut)
-            operator = 'airtel'
-            formatted_phone = PaymentService._format_gabon_phone(agent.phone_number, operator)
-            
-            # Créer le paiement pour le livreur
-            payment = Payment.objects.create(
-                order=delivery.order,
-                payment_method='mobile_money',
-                amount=delivery.agent_commission,
-                status='pending',
-                operator_reference=f"PAYOUT_DELIVERY_{delivery.id}",
-                transaction_id=f"PAYOUT_DLV_{delivery.id}_{int(timezone.now().timestamp())}",
-                client_phone=formatted_phone,  # Utiliser pour le numéro du livreur
-                client_name=agent.get_full_name() or agent.username  # Utiliser pour le nom du livreur
-            )
-            
-            # Appeler l'API Airtel Money pour le payout
-            try:
-                api_result = PaymentService._call_airtel_payout_api(
-                    formatted_phone,
-                    float(delivery.agent_commission),
-                    delivery,
-                    agent
-                )
-                
-                payment.transaction_id = api_result['transaction_id']
-                payment.operator_reference = api_result['operator_reference']
-                payment.status = api_result.get('status', 'pending')
-                
-                if api_result.get('completed'):
-                    payment.completed_at = timezone.now()
-                
-                payment.save()
-                
-                logger.info(
-                    f"💳 Payout Airtel initié pour livreur {agent.username}: "
-                    f"{delivery.agent_commission}F CFA | {formatted_phone} | "
-                    f"Livraison #{delivery.id}"
-                )
-                
-                # Notifier le livreur
-                NotificationService.notify_delivery_agent_payment(
-                    agent, delivery, payment, api_result.get('message', '')
-                )
-                
+            if not agent:
+                return {'success': False, 'error': 'Livreur non assigne'}
+            if not agent.phone:
+                return {'success': False, 'error': 'Livreur: numero de telephone manquant'}
+
+            disbursement_id = (agent.singpay_disbursement_id or '').strip()
+            if not disbursement_id:
+                return {'success': False, 'error': 'Livreur: disbursement SingPay manquant'}
+
+            existing = DeliveryPayout.objects.select_for_update().filter(
+                order=delivery.order, delivery_agent=agent
+            ).first()
+            if existing and existing.status in ('completed', 'processing'):
                 return {
                     'success': True,
-                    'payment': payment,
-                    'amount': delivery.agent_commission,
-                    'phone': formatted_phone,
-                    'transaction_id': payment.transaction_id,
-                    'message': api_result.get('message', 'Payout Airtel Money initié')
+                    'payment': existing,
+                    'amount': existing.calculated_payout,
+                    'phone': agent.phone,
+                    'transaction_id': None,
+                    'message': 'Paiement livreur déjà initié ou terminé',
+                    'already_processed': True,
                 }
-                
-            except Exception as api_error:
-                logger.error(f"❌ Erreur API Airtel payout: {api_error}")
-                payment.status = 'failed'
-                payment.save()
-                
-                return {
-                    'success': False,
-                    'error': f'Erreur service Airtel: {str(api_error)}',
-                    'payment': payment
+
+            payout, _ = DeliveryPayout.objects.get_or_create(
+                order=delivery.order,
+                delivery_agent=agent,
+                defaults={
+                    'delivery_fee_from_client': delivery.delivery_fee,
+                    'distance_km': Decimal('0.00'),
+                    'price_per_km': Decimal('0.00'),
+                    'calculated_payout': delivery.agent_commission,
+                    'platform_profit': Decimal('0.00'),
+                    'status': 'pending',
                 }
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur payout livreur: {e}")
+            )
+
+            api_result = PaymentService._call_airtel_payout_api(
+                amount=float(delivery.agent_commission),
+                delivery=delivery,
+                agent=agent,
+                disbursement_id=disbursement_id,
+            )
+
+            payout.status = 'completed' if api_result.get('completed') else 'processing'
+            if payout.status == 'completed':
+                payout.paid_at = timezone.now()
+            payout.save(update_fields=['status', 'paid_at'])
+            # Expose transaction id to notification layer (non persisted here).
+            payout.transaction_id = api_result.get('transaction_id')
+
+            NotificationService.notify_delivery_agent_payment(
+                agent, delivery, payout, api_result.get('message', '')
+            )
+
             return {
-                'success': False,
-                'error': f'Erreur payout: {str(e)}'
+                'success': True,
+                'payment': payout,
+                'amount': delivery.agent_commission,
+                'phone': agent.phone,
+                'transaction_id': api_result.get('transaction_id'),
+                'message': api_result.get('message', 'Payout SingPay initie')
             }
+        except Exception as e:
+            logger.error("Erreur payout livreur: %s", e)
+            return {'success': False, 'error': f'Erreur payout: {str(e)}'}
 
     @staticmethod
-    def _call_airtel_payout_api(phone, amount, delivery, agent):
+    def _call_airtel_payout_api(amount, delivery, agent, disbursement_id):
         """
-        Appeler l'API Airtel Money pour un payout (paiement au livreur)
+        Appeler l'API SingPay pour un payout (paiement au livreur)
         """
         try:
-            # En production: appeler l'API réelle d'Airtel
-            # Pour le MVP: simulation
-            
-            logger.info(
-                f"📱 Payout Airtel simulé: {phone} | {amount}F CFA | "
-                f"Livreur: {agent.username} | Livraison: {delivery.id}"
+            reference = None
+            if delivery and getattr(delivery, 'order', None) and getattr(delivery.order, 'payment', None):
+                reference = delivery.order.payment.transaction_id or None
+            if not reference:
+                reference = f"PAYOUT_DLV_{delivery.id}_{int(timezone.now().timestamp())}"
+
+            response = call_singpay_transfer(
+                reference=reference,
+                disbursement=disbursement_id,
+                amount=amount,
+                portefeuille=getattr(settings, "SINGPAY_WALLET_ID", ""),
             )
-            
-            transaction_id = f"AIRTEL_PAYOUT_{delivery.id}_{int(timezone.now().timestamp())}"
-            
+
+            if response.get("error"):
+                raise Exception(response["error"])
+
             return {
-                'transaction_id': transaction_id,
-                'operator_reference': f"AIRTEL_PAYOUT_{delivery.order.order_number}",
-                'status': 'completed',  # En simulation, considérer comme réussi immédiatement
+                'transaction_id': response.get('transaction_id') or reference,
+                'operator_reference': reference,
+                'status': 'success',
                 'completed': True,
-                'message': f'✅ Payout {amount}F CFA envoyé à {phone}',
+                'message': f'Payout {amount}F CFA envoye au livreur',
                 'amount': amount,
                 'recipient': agent.get_full_name() or agent.username
             }
-            
+
         except Exception as e:
-            logger.error(f"❌ Erreur API Airtel payout: {e}")
+            logger.error(f"Erreur API SingPay payout: {e}")
             raise
+
 
     @staticmethod
     def process_store_payout(store_id, period_start, period_end):
@@ -601,3 +640,4 @@ class PaymentService:
                 'success': False,
                 'error': str(e)
             }
+

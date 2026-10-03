@@ -1,4 +1,4 @@
-# 📋 GABOSHOP - PLAN D'IMPLÉMENTATION COMPLET
+# ?? GABOSHOP - PLAN D'IMPLÉMENTATION COMPLET
 
 **Date de création:** 4 décembre 2025  
 **Version:** 1.0  
@@ -6,19 +6,19 @@
 
 ---
 
-## 🌍 1. VISION DU PROJET
+## ?? 1. VISION DU PROJET
 
 GABOSHOP est une plateforme d'achat en ligne qui connecte clients, magasins et agents de livraison (motos/scooters). Elle permet à la population de Libreville et du Gabon de commander facilement des produits de première nécessité (nourriture, vêtements, produits divers) depuis leur mobile, avec paiement sécurisé via Mobile Money (Airtel Money / Moov Money), et de se faire livrer à domicile rapidement.
 
 ### Objectifs principaux
-- ✅ Faciliter l'achat en ligne pour une population à faible accessibilité aux commerces physiques
-- ✅ Réduire les frictions pour les magasins : paiement garanti, gestion simple des commandes, aucun marchandage ni crédit
-- ✅ Offrir aux livreurs indépendants une opportunité de revenus via une plateforme structurée
-- ✅ Créer un système gagnant-gagnant pour tous les acteurs : client, magasin, livreur et plateforme
+- ? Faciliter l'achat en ligne pour une population à faible accessibilité aux commerces physiques
+- ? Réduire les frictions pour les magasins : paiement garanti, gestion simple des commandes, aucun marchandage ni crédit
+- ? Offrir aux livreurs indépendants une opportunité de revenus via une plateforme structurée
+- ? Créer un système gagnant-gagnant pour tous les acteurs : client, magasin, livreur et plateforme
 
 ---
 
-## 🔄 2. FONCTIONNEMENT DU SERVICE
+## ?? 2. FONCTIONNEMENT DU SERVICE
 
 1. Le client choisit un magasin et sélectionne des produits
 2. Le client paye à l'avance via Mobile Money 
@@ -29,7 +29,7 @@ GABOSHOP est une plateforme d'achat en ligne qui connecte clients, magasins et a
 
 ---
 
-## 👥 3. ACTEURS ET RÔLES
+## ?? 3. ACTEURS ET RÔLES
 
 | Acteur | Rôle clé |
 |--------|----------|
@@ -40,11 +40,11 @@ GABOSHOP est une plateforme d'achat en ligne qui connecte clients, magasins et a
 
 ---
 
-## 🏗️ 4. ARCHITECTURE BACKEND (Django + DRF)
+## ??? 4. ARCHITECTURE BACKEND (Django + DRF)
 
-### 📦 Modules / Apps Django
+### ?? Modules / Apps Django
 
-#### 1️⃣ **users**
+#### 1?? **users**
 Gère tous les types d'utilisateurs + authentification.
 
 **Modèles:**
@@ -79,7 +79,7 @@ Gère tous les types d'utilisateurs + authentification.
 
 ---
 
-#### 2️⃣ **shops**
+#### 2?? **shops**
 Tout ce qui concerne les magasins, catégories, produits.
 
 **Modèles:**
@@ -116,7 +116,7 @@ Tout ce qui concerne les magasins, catégories, produits.
 
 ---
 
-#### 3️⃣ **orders**
+#### 3?? **orders**
 Commandes clients + panier + livraison.
 
 **Modèles:**
@@ -151,7 +151,7 @@ Commandes clients + panier + livraison.
 
 ---
 
-#### 4️⃣ **payments**
+#### 4?? **payments**
 Paiements Mobile Money + carte bancaire.
 
 **Modèles:**
@@ -178,7 +178,7 @@ Paiements Mobile Money + carte bancaire.
 
 ---
 
-#### 5️⃣ **delivery**
+#### 5?? **delivery**
 Gestion des livreurs et assignation automatique.
 
 **Modèles:**
@@ -205,7 +205,7 @@ Gestion des livreurs et assignation automatique.
 
 ---
 
-#### 6️⃣ **revenue** (nouveau module à créer)
+#### 6?? **revenue** (nouveau module à créer)
 Gestion des revenus et commissions.
 
 **Modèles:**
@@ -247,13 +247,13 @@ Gestion des revenus et commissions.
 
 ---
 
-## 🚨 4.5. PROBLÉMATIQUES CRITIQUES & SOLUTIONS
+## ?? 4.5. PROBLÉMATIQUES CRITIQUES & SOLUTIONS
 
-### 📌 PROBLÈME 1 : Identifier la ville du client automatiquement
+### ?? PROBLÈME 1 : Identifier la ville du client automatiquement
 **Pourquoi c’est un problème ?**
 GABOSHOP doit afficher uniquement les magasins de la ville du client. Un client à Libreville ne doit pas voir les magasins de Port-Gentil. Le numéro de téléphone seul ne suffit pas (+241 = Gabon entier).
 
-**⭐ SOLUTION ADOPTÉE : Détection + Sélection de la ville**
+**? SOLUTION ADOPTÉE : Détection + Sélection de la ville**
 1. **Détection automatique:** GPS (Mobile) ou IP (Web)
 2. **Confirmation manuelle:** L'utilisateur confirme ou change sa ville (Libreville, Port-Gentil, Franceville, etc.)
 3. **Filtrage:** Chaque produit, magasin et livreur est tagué avec une `VILLE`.
@@ -262,11 +262,11 @@ GABOSHOP doit afficher uniquement les magasins de la ville du client. Un client 
 
 ---
 
-### 📌 PROBLÈME 2 : Les frais Mobile Money (Airtel / Moov)
+### ?? PROBLÈME 2 : Les frais Mobile Money (Airtel / Moov)
 **Pourquoi c’est un problème ?**
 Les paiements Mobile Money ne sont pas gratuits. Si GABOSHOP paie ces frais (ex: 1500 FCFA sur 50.000 FCFA), la marge devient nulle ou négative.
 
-**⭐ SOLUTION ADOPTÉE : Le client paie les frais MoMo**
+**? SOLUTION ADOPTÉE : Le client paie les frais MoMo**
 Le calcul final est transparent :
 `Total commande + Livraison + Frais MoMo + Frais service`
 
@@ -277,24 +277,24 @@ Le calcul final est transparent :
 
 ---
 
-## 🔗 5. RELATIONS ENTRE MODULES
+## ?? 5. RELATIONS ENTRE MODULES
 
 ```
-GerantProfile (OneToOne) ↔ Shop (OneToOne)
-Shop (OneToMany) → Category
-Shop (OneToMany) → Product
-Client (FK) → Order
-Shop (FK) → Order
-Order (OneToOne) ↔ Payment
-Order (OneToOne) ↔ DeliveryAssignment
-Order (OneToOne) ↔ Commission
+GerantProfile (OneToOne) ? Shop (OneToOne)
+Shop (OneToMany) ? Category
+Shop (OneToMany) ? Product
+Client (FK) ? Order
+Shop (FK) ? Order
+Order (OneToOne) ? Payment
+Order (OneToOne) ? DeliveryAssignment
+Order (OneToOne) ? Commission
 ```
 
 ---
 
-## ⚙️ 6. WORKFLOW AUTOMATIQUE
+## ?? 6. WORKFLOW AUTOMATIQUE
 
-### 🟩 Étape 1: Création de commande
+### ?? Étape 1: Création de commande
 **Endpoint:** `POST /api/orders/create/`
 
 **Backend fait:**
@@ -308,7 +308,7 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-### 🟨 Étape 2: Paiement Mobile Money
+### ?? Étape 2: Paiement Mobile Money
 **Endpoint:** `POST /api/payments/initiate/`
 
 **Backend fait:**
@@ -318,20 +318,20 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-### 🟧 Étape 3: Webhook Mobile Money
-**Opérateur → Backend**
+### ?? Étape 3: Webhook Mobile Money
+**Opérateur ? Backend**
 
 **Traitement:**
 1. Vérifie signature webhook
-2. Met à jour `Payment.statut` → `SUCCESS`
-3. Met à jour `Order.statut` → `PAID`
+2. Met à jour `Payment.statut` ? `SUCCESS`
+3. Met à jour `Order.statut` ? `PAID`
 4. Crée `Commission` automatiquement
 5. **Déclenche Celery Task:** assignation livreur
 6. Envoie notification magasin (WhatsApp/SMS)
 
 ---
 
-### 🟥 Étape 4: Assignation automatique livreur
+### ?? Étape 4: Assignation automatique livreur
 **Celery Task:** `assign_nearest_available_delivery`
 
 **Logique:**
@@ -340,18 +340,18 @@ Order (OneToOne) ↔ Commission
    - Distance minimale du magasin (géolocalisation)
 2. Trie par distance (algorithme haversine)
 3. Crée `DeliveryAssignment`
-4. Change `Order.statut` → `ASSIGNED`
+4. Change `Order.statut` ? `ASSIGNED`
 5. Envoie notification livreur
 6. Envoie notification client (livreur assigné)
 
 ---
 
-### 🟦 Étape 5: Livraison en temps réel
+### ?? Étape 5: Livraison en temps réel
 **Dashboard livreur:**
 - Liste livraisons assignées
 - Acceptation/refus
 - Changement statut:
-  - `ACCEPTED` → `IN_DELIVERY` → `DELIVERED`
+  - `ACCEPTED` ? `IN_DELIVERY` ? `DELIVERED`
 - Upload preuve livraison (photo)
 - Code PIN validation
 
@@ -361,9 +361,9 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-## 🖥️ 7. DASHBOARDS PAR RÔLE
+## ??? 7. DASHBOARDS PAR RÔLE
 
-### 👤 Dashboard Client
+### ?? Dashboard Client
 - Historique commandes
 - Statut en temps réel
 - Suivi livreur (GPS optionnel)
@@ -371,7 +371,7 @@ Order (OneToOne) ↔ Commission
 - Adresses enregistrées
 - Cashback disponible
 
-### 🏪 Dashboard Magasin/Gérant
+### ?? Dashboard Magasin/Gérant
 - Liste produits + gestion stocks
 - Commandes en attente/en cours
 - Stats journalières ventes
@@ -379,7 +379,7 @@ Order (OneToOne) ↔ Commission
 - Modifier statut ouvert/fermé
 - Rapport financier (commissions déduites)
 
-### 🛵 Dashboard Livreur
+### ?? Dashboard Livreur
 - Commandes assignées
 - Accepter/refuser livraison
 - Changer statut livraison
@@ -387,7 +387,7 @@ Order (OneToOne) ↔ Commission
 - Historique livraisons
 - Revenus du jour/semaine
 
-### 🛠️ Dashboard Admin
+### ??? Dashboard Admin
 - Gestion utilisateurs (tous rôles)
 - Gestion magasins (validation/suspension)
 - Suivi transactions (paiements/commissions)
@@ -398,9 +398,9 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-## 💰 8. MODÈLE DE REVENUS
+## ?? 8. MODÈLE DE REVENUS
 
-### ✅ À IMPLÉMENTER MAINTENANT (priorité 1)
+### ? À IMPLÉMENTER MAINTENANT (priorité 1)
 
 #### 1. Commission par vente
 - **Taux:** 8% par défaut (configurable par magasin)
@@ -420,7 +420,7 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-### 🟨 À PRÉPARER MAINTENANT (structure seulement)
+### ?? À PRÉPARER MAINTENANT (structure seulement)
 
 #### 4. Abonnements magasins
 
@@ -450,7 +450,7 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-### 🟥 À AJOUTER PLUS TARD (phase 2)
+### ?? À AJOUTER PLUS TARD (phase 2)
 
 9. **Statistiques anonymisées** (vente aux grands distributeurs)
 10. **Partenariats Mobile Money** (cashback opérateur)
@@ -458,7 +458,7 @@ Order (OneToOne) ↔ Commission
 
 ---
 
-## 🤖 9. AUTOMATISATIONS BACKEND (Celery)
+## ?? 9. AUTOMATISATIONS BACKEND (Celery)
 
 ### Tasks prioritaires
 
@@ -497,103 +497,103 @@ def expire_sponsored_products():
 
 ---
 
-## 🧱 10. STRUCTURE FINALE DU BACKEND
+## ?? 10. STRUCTURE FINALE DU BACKEND
 
 ```
 gaboshop/
-├── users/
-│   ├── models.py (User, ClientProfile, GerantProfile, LivreurProfile)
-│   ├── serializers.py
-│   ├── views.py
-│   ├── permissions.py
-│   └── urls.py
++-- users/
+│   +-- models.py (User, ClientProfile, GerantProfile, LivreurProfile)
+│   +-- serializers.py
+│   +-- views.py
+│   +-- permissions.py
+│   +-- urls.py
 │
-├── shops/
-│   ├── models.py (Shop, Category, Product)
-│   ├── serializers.py
-│   ├── views.py
-│   └── urls.py
++-- shops/
+│   +-- models.py (Shop, Category, Product)
+│   +-- serializers.py
+│   +-- views.py
+│   +-- urls.py
 │
-├── orders/
-│   ├── models.py (Order, OrderItem)
-│   ├── serializers.py
-│   ├── views.py
-│   ├── signals.py (post_save triggers)
-│   └── urls.py
++-- orders/
+│   +-- models.py (Order, OrderItem)
+│   +-- serializers.py
+│   +-- views.py
+│   +-- signals.py (post_save triggers)
+│   +-- urls.py
 │
-├── payments/
-│   ├── models.py (Payment)
-│   ├── services/
-│   │   ├── airtel_money.py
-│   │   └── moov_money.py
-│   ├── webhooks.py
-│   └── urls.py
++-- payments/
+│   +-- models.py (Payment)
+│   +-- services/
+│   │   +-- airtel_money.py
+│   │   +-- moov_money.py
+│   +-- webhooks.py
+│   +-- urls.py
 │
-├── delivery/
-│   ├── models.py (DeliveryAssignment, DeliveryFee)
-│   ├── tasks.py (Celery assignment logic)
-│   ├── utils.py (géolocalisation distance)
-│   └── urls.py
++-- delivery/
+│   +-- models.py (DeliveryAssignment, DeliveryFee)
+│   +-- tasks.py (Celery assignment logic)
+│   +-- utils.py (géolocalisation distance)
+│   +-- urls.py
 │
-├── revenue/ (nouveau module)
-│   ├── models.py (Commission, StoreSubscription, BannerAd, Cashback)
-│   ├── serializers.py
-│   ├── views.py
-│   └── admin.py
++-- revenue/ (nouveau module)
+│   +-- models.py (Commission, StoreSubscription, BannerAd, Cashback)
+│   +-- serializers.py
+│   +-- views.py
+│   +-- admin.py
 │
-├── notifications/
-│   ├── services.py (WhatsApp, SMS)
-│   └── tasks.py
++-- notifications/
+│   +-- services.py (WhatsApp, SMS)
+│   +-- tasks.py
 │
-├── core/
-│   └── utils.py (helpers communs)
++-- core/
+│   +-- utils.py (helpers communs)
 │
-├── gaboshop/
-│   ├── settings/
-│   │   ├── base.py
-│   │   ├── dev.py
-│   │   └── prod.py
-│   ├── celery.py
-│   ├── urls.py
-│   └── wsgi.py
++-- gaboshop/
+│   +-- settings/
+│   │   +-- base.py
+│   │   +-- dev.py
+│   │   +-- prod.py
+│   +-- celery.py
+│   +-- urls.py
+│   +-- wsgi.py
 │
-├── requirements.txt
-├── docker-compose.yml
-├── Dockerfile
-└── manage.py
++-- requirements.txt
++-- docker-compose.yml
++-- Dockerfile
++-- manage.py
 ```
 
 ---
 
-## 📊 11. PRIORITÉS D'IMPLÉMENTATION
+## ?? 11. PRIORITÉS D'IMPLÉMENTATION
 
-### ✅ PHASE 1 - MVP FONCTIONNEL (À FAIRE MAINTENANT)
+### ? PHASE 1 - MVP FONCTIONNEL (À FAIRE MAINTENANT)
 
 **Backend:**
-1. ✅ Modèles utilisateurs (User, profiles)
-2. ✅ Modèles magasins (Shop, Category, Product)
-3. ✅ Modèles commandes (Order, OrderItem)
-4. ✅ Modèles paiements (Payment)
-5. ✅ Modèles livraison (DeliveryAssignment, DeliveryFee)
-6. ⚠️ Modèle revenue (Commission - à créer)
-7. ⚠️ Logique calcul commissions (Order.calculate_commission)
-8. ⚠️ Logique frais livraison (Order.calculate_delivery_fee)
-9. ⚠️ Logique frais service (Order.calculate_service_fee)
-10. ⚠️ Webhook handlers (Airtel Money, Moov Money)
-11. ⚠️ Celery task assignation livreur
-12. ⚠️ Notifications WhatsApp/SMS
-13. ✅ Dashboards API (endpoints par rôle)
-14. ⚠️ Permissions DRF strictes par rôle
+1. ? Modèles utilisateurs (User, profiles)
+2. ? Modèles magasins (Shop, Category, Product)
+3. ? Modèles commandes (Order, OrderItem)
+4. ? Modèles paiements (Payment)
+5. ? Modèles livraison (DeliveryAssignment, DeliveryFee)
+6. ?? Modèle revenue (Commission - à créer)
+7. ?? Logique calcul commissions (Order.calculate_commission)
+8. ?? Logique frais livraison (Order.calculate_delivery_fee)
+9. ?? Logique frais service (Order.calculate_service_fee)
+10. ?? Webhook handlers (Airtel Money, Moov Money)
+11. ?? Celery task assignation livreur
+12. ?? Notifications WhatsApp/SMS
+13. ? Dashboards API (endpoints par rôle)
+14. ?? Permissions DRF strictes par rôle
 
 **Frontend:**
-15. ⚠️ Intégration API backend
-16. ⚠️ Pages paiement Mobile Money
-17. ⚠️ Suivi commande temps réel
-18. ⚠️ Dashboard livreur mobile-friendly
+15. ?? Intégration API backend
+16. ?? Pages paiement Mobile Money
+17. ?? Suivi commande temps réel
+18. ?? Dashboard livreur mobile-friendly
 
 ---
 
-### 🟨 PHASE 2 - REVENUS ADDITIONNELS
+### ?? PHASE 2 - REVENUS ADDITIONNELS
 
 1. Créer modèles `StoreSubscription`, `BannerAd`, `Cashback`
 2. Implémenter logique abonnements magasins
@@ -604,7 +604,7 @@ gaboshop/
 
 ---
 
-### 🟥 PHASE 3 - SCALE & OPTIMISATION
+### ?? PHASE 3 - SCALE & OPTIMISATION
 
 1. Statistiques vendables (analytics avancés)
 2. Partenariats Mobile Money
@@ -615,19 +615,19 @@ gaboshop/
 
 ---
 
-## 🎯 12. POINTS FORTS DU SYSTÈME
+## ?? 12. POINTS FORTS DU SYSTÈME
 
-✅ **Paiement prépayé et sécurisé** → aucune commande impayée  
-✅ **Notification instantanée** → WhatsApp/SMS magasins et livreurs  
-✅ **Gestion automatisée** → dashboards simples par rôle  
-✅ **MVP lean** → pas besoin de flotte de livraison propre  
-✅ **Multi-revenue streams** → 6 à 9 sources de revenus cumulées  
-✅ **Scalable** → architecture modulaire Django  
-✅ **Production-ready** → Docker, Celery, Redis, PostgreSQL
+? **Paiement prépayé et sécurisé** ? aucune commande impayée  
+? **Notification instantanée** ? WhatsApp/SMS magasins et livreurs  
+? **Gestion automatisée** ? dashboards simples par rôle  
+? **MVP lean** ? pas besoin de flotte de livraison propre  
+? **Multi-revenue streams** ? 6 à 9 sources de revenus cumulées  
+? **Scalable** ? architecture modulaire Django  
+? **Production-ready** ? Docker, Celery, Redis, PostgreSQL
 
 ---
 
-## 📝 13. PROCHAINES ACTIONS IMMÉDIATES
+## ?? 13. PROCHAINES ACTIONS IMMÉDIATES
 
 ### Backend (priorité absolue)
 
@@ -673,7 +673,7 @@ gaboshop/
    ```
 
 7. **Tester workflow complet:**
-   - Commande → Paiement → Assignation → Livraison
+   - Commande ? Paiement ? Assignation ? Livraison
 
 ---
 
@@ -686,15 +686,15 @@ gaboshop/
 
 ---
 
-## 🚀 14. OBJECTIF FINAL
+## ?? 14. OBJECTIF FINAL
 
 **Avoir un MVP fonctionnel permettant:**
-- ✅ Parcourir magasins et produits
-- ✅ Passer commande et payer
-- ✅ Suivre les livraisons
-- ✅ Notifier magasin et livreur
-- ✅ Calculer automatiquement la commission et préparer le reversement
-- ✅ Générer des revenus via 3 sources minimum (commission + livraison + service fee)
+- ? Parcourir magasins et produits
+- ? Passer commande et payer
+- ? Suivre les livraisons
+- ? Notifier magasin et livreur
+- ? Calculer automatiquement la commission et préparer le reversement
+- ? Générer des revenus via 3 sources minimum (commission + livraison + service fee)
 
 ---
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Test de validation de la logique de rapports et exports par plan
-Vérifie que la règle "Voir ≠ Exporter" est bien respectée
+Vérifie que la règle "Voir ? Exporter" est bien respectée
 """
 
 import os
@@ -71,15 +71,15 @@ for plan_type, expected in expected_rules.items():
             actual_value = getattr(plan, field)
             
             if actual_value != expected_value:
-                errors.append(f"    ✗ {field}: attendu {expected_value}, obtenu {actual_value}")
+                errors.append(f"    ? {field}: attendu {expected_value}, obtenu {actual_value}")
                 all_passed = False
         
         if errors:
-            print("  Résultat: ✗ ECHEC")
+            print("  Résultat: ? ECHEC")
             for error in errors:
                 print(error)
         else:
-            print("  Résultat: ✓ REUSSI")
+            print("  Résultat: ? REUSSI")
             print(f"    • Voir basique: {plan.can_view_basic_reports}")
             print(f"    • Voir détails: {plan.can_view_detailed_reports}")
             print(f"    • Export Excel: {plan.can_export_excel}")
@@ -87,7 +87,7 @@ for plan_type, expected in expected_rules.items():
             print(f"    • Historique: {plan.history_limit_days or 'illimité'} jours")
     
     except SubscriptionPlan.DoesNotExist:
-        print(f"  Résultat: ✗ ERREUR - Plan {plan_type} introuvable")
+        print(f"  Résultat: ? ERREUR - Plan {plan_type} introuvable")
         all_passed = False
 
 # Tableau récapitulatif
@@ -114,9 +114,9 @@ plans = {
 }
 
 for feature_name, field_name in features:
-    free_val = "✓" if getattr(plans['free'], field_name) else "✗"
-    pro_val = "✓" if getattr(plans['pro'], field_name) else "✗"
-    business_val = "✓" if getattr(plans['business'], field_name) else "✗"
+    free_val = "?" if getattr(plans['free'], field_name) else "?"
+    pro_val = "?" if getattr(plans['pro'], field_name) else "?"
+    business_val = "?" if getattr(plans['business'], field_name) else "?"
     
     print("{:<20} {:<10} {:<10} {:<12}".format(
         feature_name, free_val, pro_val, business_val
@@ -131,8 +131,8 @@ print("{:<20} {:<10} {:<10} {:<12}".format(
 
 print("\n" + "=" * 80)
 if all_passed:
-    print("  [✓] TOUS LES TESTS PASSES - La logique est correctement implémentée")
+    print("  [?] TOUS LES TESTS PASSES - La logique est correctement implémentée")
 else:
-    print("  [✗] CERTAINS TESTS ONT ECHOUE - Vérifier la configuration")
+    print("  [?] CERTAINS TESTS ONT ECHOUE - Vérifier la configuration")
 print("=" * 80)
 

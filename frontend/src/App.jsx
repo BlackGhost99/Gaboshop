@@ -3,7 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
+import StoreCategories from './pages/StoreCategories';
+import Stores from './pages/Stores';
 import StoreDetail from './pages/StoreDetail';
+import ProductsRedirect from './pages/ProductsRedirect';
 import DashboardRedirect from './components/DashboardRedirect';
 import GaboshopAI from './components/GaboshopAI';
 import AIAlertBanner from './components/AIAlertBanner';
@@ -17,10 +20,10 @@ import StoreSettings from './pages/store/StoreSettings';
 import StoreProfile from './pages/store/StoreProfile';
 import B2BProcurement from './pages/store/B2BProcurement';
 import Finance from './pages/store/Finance';
+import StoreSubscriptionPlans from './pages/store/SubscriptionPlans';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
-import SubscriptionPlans from './pages/SubscriptionPlans';
 import PrivateRoute from './components/guards/PrivateRoute';
 import PublicRoute from './components/guards/PublicRoute';
 
@@ -69,6 +72,9 @@ function App() {
         <Routes>
         {/* Routes publiques (BLOQUEES pour store_managers) */}
         <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
+        <Route path="/products" element={<PublicRoute><ProductsRedirect /></PublicRoute>} />
+        <Route path="/categories" element={<PublicRoute><StoreCategories /></PublicRoute>} />
+        <Route path="/boutiques" element={<PublicRoute><Stores /></PublicRoute>} />
         <Route path="/stores/:id" element={<PublicRoute><StoreDetail /></PublicRoute>} />
         
         {/* Auth (accessible à tous) */}
@@ -124,6 +130,11 @@ function App() {
             <StoreProfile />
           </PrivateRoute>
         } />
+        <Route path="/store/subscription" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreSubscriptionPlans />
+          </PrivateRoute>
+        } />
 
         {/* Delivery routes (PROTEGEES) */}
         <Route path="/delivery/dashboard" element={
@@ -141,8 +152,12 @@ function App() {
           </PrivateRoute>
         } />
         
-        {/* Plans (accessible à tous) */}
-        <Route path="/plans" element={<SubscriptionPlans />} />
+        {/* Plans (store managers only) */}
+        <Route path="/plans" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreSubscriptionPlans />
+          </PrivateRoute>
+        } />
         </Routes>
         <AIAlertBanner />
         <GaboshopAI />

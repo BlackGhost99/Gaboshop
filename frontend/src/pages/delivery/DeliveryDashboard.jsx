@@ -8,7 +8,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import AssignedOrdersList from '../../components/AssignedOrdersList';
 import ProofUploadModal from '../../components/ProofUploadModal';
 import { getDeliveryDashboard, updateDeliveryProfile } from '../../services/dashboardService';
-import { startDelivery, acceptDelivery } from '../../services/deliveryService';
+import { startDelivery, acceptDelivery, rejectDelivery, getAvailableDeliveries, claimDelivery, updateAvailability } from '../../services/deliveryService';
 import { formatCurrency, getDeliveryStatusBadge } from '../../utils/helpers';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from '../../services/notificationService';
 
@@ -50,6 +50,10 @@ const DeliveryDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
+  const [availableDeliveries, setAvailableDeliveries] = useState([]);
+  const [availableLoading, setAvailableLoading] = useState(false);
+  const [availableError, setAvailableError] = useState(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     fetchDashboard();
@@ -77,6 +81,11 @@ const DeliveryDashboard = () => {
       clearInterval(id);
     };
   }, [loadNotifications]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const fetchDashboard = async () => {
     try {
@@ -107,9 +116,72 @@ const DeliveryDashboard = () => {
     }
   };
 
+  const fetchAvailableDeliveries = async (isBackground = false) => {
+    if (!isBackground) {
+      setAvailableLoading(true);
+      setAvailableError(null);
+    }
+    try {
+      const response = await getAvailableDeliveries();
+      const payload = response?.data ?? response;
+      let items = [];
+
+      if (payload?.success === false) {
+        throw new Error(payload.error || 'Erreur chargement missions');
+      }
+
+      if (Array.isArray(payload)) {
+        items = payload;
+      } else if (Array.isArray(payload?.results)) {
+        items = payload.results;
+      } else if (Array.isArray(payload?.data)) {
+        items = payload.data;
+      }
+
+      setAvailableDeliveries(items);
+    } catch (err) {
+      if (!isBackground) {
+        setAvailableError('Erreur lors du chargement des missions disponibles');
+      }
+      console.error(err);
+    } finally {
+      if (!isBackground) setAvailableLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    fetchAvailableDeliveries();
+    const id = setInterval(() => mounted && fetchAvailableDeliveries(true), NOTIF_POLL_MS);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  const getAssignmentCountdown = (delivery) => {
+    if (!delivery?.assigned_at || !delivery?.assignment_timeout_minutes) return null;
+    const assignedMs = new Date(delivery.assigned_at).getTime();
+    if (Number.isNaN(assignedMs)) return null;
+    const deadlineMs = assignedMs + delivery.assignment_timeout_minutes * 60 * 1000;
+    const diffMs = deadlineMs - now;
+    const clampedMs = Math.max(0, diffMs);
+    const minutes = Math.floor(clampedMs / 60000);
+    const seconds = Math.floor((clampedMs % 60000) / 1000);
+    return {
+      label: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+      expired: diffMs <= 0
+    };
+  };
+
   const toggleAvailability = async () => {
-    // TODO: Appeler l'API pour changer la disponibilité
-    setIsAvailable(!isAvailable);
+    const nextValue = !isAvailable;
+    setIsAvailable(nextValue);
+    const response = await updateAvailability(nextValue);
+    if (!response?.success) {
+      setIsAvailable(!nextValue);
+      alert(response?.error || 'Erreur mise a jour disponibilite');
+    }
   };
 
   const handleStartDelivery = async (deliveryId) => {
@@ -134,10 +206,10 @@ const DeliveryDashboard = () => {
       setActionLoading(prev => ({ ...prev, [deliveryId]: true }));
       const res = await acceptDelivery(deliveryId);
       if (res.success) {
-        alert('✓ Livraison acceptée avec succès !');
+        alert('? Livraison acceptée avec succès !');
         fetchDashboard();
       } else {
-        alert(`❌ ${res.error?.message || res.error || 'Erreur lors de l\'acceptation'}`);
+        alert(`? ${res.error?.message || res.error || 'Erreur lors de l\'acceptation'}`);
       }
     } catch (err) {
       alert('Erreur: ' + err.message);
@@ -147,16 +219,41 @@ const DeliveryDashboard = () => {
   };
 
   const handleRejectDelivery = async (deliveryId) => {
-    if (!window.confirm('Confirmer le refus de cette livraison ?')) return;
+    if (!window.confirm('Confirmer l\'annulation de cette livraison ?')) return;
     try {
       setActionLoading(prev => ({ ...prev, [deliveryId]: true }));
-      // TODO: Appeler endpoint de refus
-      console.log('Refuser livraison', deliveryId);
-      fetchDashboard();
+      const res = await rejectDelivery(deliveryId);
+      if (res.success) {
+        fetchDashboard();
+        fetchAvailableDeliveries(true);
+      } else {
+        alert(res.error || 'Erreur lors du refus');
+      }
     } catch (err) {
       alert('Erreur: ' + err.message);
     } finally {
       setActionLoading(prev => ({ ...prev, [deliveryId]: false }));
+    }
+  };
+
+  const handleClaimDelivery = async (deliveryId) => {
+    if (!isAvailable) {
+      alert("Vous n'etes pas disponible");
+      return;
+    }
+    try {
+      setActionLoading(prev => ({ ...prev, [`claim-${deliveryId}`]: true }));
+      const res = await claimDelivery(deliveryId);
+      if (res.success) {
+        fetchDashboard();
+        fetchAvailableDeliveries(true);
+      } else {
+        alert(res.error || 'Erreur lors de la reclamation');
+      }
+    } catch (err) {
+      alert('Erreur: ' + err.message);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`claim-${deliveryId}`]: false }));
     }
   };
 
@@ -454,7 +551,7 @@ const DeliveryDashboard = () => {
                         <p className="text-sm text-gray-700 mt-1 line-clamp-2">{n.body}</p>
                         <div className="flex items-center gap-3 mt-2">
                           {n.metadata?.from && n.metadata?.to && (
-                            <p className="text-xs text-gray-500">{n.metadata.from} → {n.metadata.to}</p>
+                            <p className="text-xs text-gray-500">{n.metadata.from} ? {n.metadata.to}</p>
                           )}
                           {n.order && (
                             <p className="text-xs text-gray-500">Commande #{n.order}</p>
@@ -483,6 +580,70 @@ const DeliveryDashboard = () => {
               </div>
               {unreadCount > 0 && (
                 <p className="text-xs text-slate-900 mt-3">{unreadCount} mission(s) non lue(s)</p>
+              )}
+            </div>
+
+            {/* Missions disponibles */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Missions disponibles</h3>
+                  <p className="text-sm text-gray-500">Visibles pour tous les livreurs</p>
+                </div>
+                <button
+                  onClick={() => fetchAvailableDeliveries()}
+                  className="text-xs font-semibold text-slate-900 hover:text-slate-700"
+                >
+                  Actualiser
+                </button>
+              </div>
+
+              {availableLoading && <p className="text-sm text-gray-500">Chargement...</p>}
+              {availableError && (
+                <div className="text-sm text-red-600 mb-3">{availableError}</div>
+              )}
+              {!availableLoading && availableDeliveries.length === 0 && (
+                <p className="text-sm text-gray-500">Aucune mission ouverte pour le moment.</p>
+              )}
+
+              <div className="space-y-3">
+                {availableDeliveries.map((delivery) => {
+                  const claimKey = `claim-${delivery.id}`;
+                  const claimDisabled = !isAvailable || dashboardData?.active_delivery;
+                  return (
+                    <div
+                      key={delivery.id}
+                      className="border rounded-lg p-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-gray-900">Commande #{delivery.order_number}</p>
+                            <span className="text-xs text-gray-500">{delivery.store_name}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{delivery.delivery_address}</p>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                            <span>Distance: {delivery.distance_km ? `${delivery.distance_km} km` : 'N/A'}</span>
+                            <span>Frais: {formatCurrency(delivery.delivery_fee || 0)}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleClaimDelivery(delivery.id)}
+                          disabled={actionLoading[claimKey] || claimDisabled}
+                          className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                        >
+                          {actionLoading[claimKey] ? 'Traitement...' : 'Prendre'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {!isAvailable && availableDeliveries.length > 0 && (
+                <p className="text-xs text-amber-600 mt-3">Passez disponible pour prendre une mission.</p>
+              )}
+              {dashboardData?.active_delivery && availableDeliveries.length > 0 && (
+                <p className="text-xs text-amber-600 mt-1">Terminez la livraison en cours pour prendre une nouvelle mission.</p>
               )}
             </div>
 
@@ -525,6 +686,7 @@ const DeliveryDashboard = () => {
                   {(() => {
                     const delivery = dashboardData.active_delivery;
                     const statusBadge = getDeliveryStatusBadge(delivery.status);
+                    const countdown = getAssignmentCountdown(delivery);
                     return (
                       <div key={delivery.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-4">
@@ -548,20 +710,23 @@ const DeliveryDashboard = () => {
                           </div>
                           <div>
                             <p className="text-sm text-gray-600">Client:</p>
-                            <p className="text-sm font-medium text-gray-900">{delivery.client_name}</p>
+                            <p className="text-sm font-medium text-gray-900">{delivery.client_name || delivery.client_phone}</p>
                             <p className="text-sm text-gray-600">{delivery.client_phone}</p>
                           </div>
                         </div>
 
+                        {countdown && ['assigned', 'pending'].includes(delivery.status) && (
+                          <p className={`text-xs ${countdown.expired ? 'text-red-600' : 'text-amber-600'} mb-3`}>Temps restant pour accepter: {countdown.label}</p>
+                        )}
                         <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                           <div>
-                            <span className="text-sm text-gray-600">Rémunération: </span>
+                            <span className="text-sm text-gray-600">Frais livraison (client): </span>
                             <span className="text-lg font-bold text-green-600">
-                              {formatCurrency(delivery.fee || 1200)}
+                              {formatCurrency(delivery.delivery_fee || delivery.fee || 0)}
                             </span>
                           </div>
                           <div className="space-x-2">
-                            {delivery.status === 'assigned' && (
+                            {['assigned', 'pending'].includes(delivery.status) && (
                               <>
                                 <button
                                   onClick={() => handleAcceptDelivery(delivery.id)}
@@ -580,13 +745,22 @@ const DeliveryDashboard = () => {
                               </>
                             )}
                             {delivery.status === 'accepted' && (
-                              <button
-                                onClick={() => handleStartDelivery(delivery.id)}
-                                disabled={actionLoading[delivery.id]}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
-                              >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '📦 Récupérer le colis'}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleRejectDelivery(delivery.id)}
+                                  disabled={actionLoading[delivery.id]}
+                                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                >
+                                  {actionLoading[delivery.id] ? 'Traitement...' : 'Annuler'}
+                                </button>
+                                <button
+                                  onClick={() => handleStartDelivery(delivery.id)}
+                                  disabled={actionLoading[delivery.id]}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                >
+                                  {actionLoading[delivery.id] ? 'Traitement...' : '?? Récupérer le colis'}
+                                </button>
+                              </>
                             )}
                             {delivery.status === 'picked_up' && (
                               <button
@@ -594,7 +768,7 @@ const DeliveryDashboard = () => {
                                 disabled={actionLoading[delivery.id]}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                               >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '🚗 Démarrer la livraison'}
+                                {actionLoading[delivery.id] ? 'Traitement...' : '?? Démarrer la livraison'}
                               </button>
                             )}
                             {delivery.status === 'in_transit' && (
@@ -603,7 +777,7 @@ const DeliveryDashboard = () => {
                                 disabled={actionLoading[delivery.id]}
                                 className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                               >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '✓ Confirmer livraison'}
+                                {actionLoading[delivery.id] ? 'Traitement...' : '? Confirmer livraison'}
                               </button>
                             )}
                             {delivery.can_complete_delivery && delivery.status !== 'in_transit' && (
@@ -613,7 +787,7 @@ const DeliveryDashboard = () => {
                                 className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 title={`Statut: ${delivery.status}`}
                               >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '✓ Confirmer livraison (preuve prête)'}
+                                {actionLoading[delivery.id] ? 'Traitement...' : '? Confirmer livraison (preuve prête)'}
                               </button>
                             )}
                           </div>
@@ -630,7 +804,7 @@ const DeliveryDashboard = () => {
                   </svg>
                   <p className="mt-4 text-gray-500">Aucune livraison en cours</p>
                   <p className="text-sm text-gray-400 mt-2">
-                    {isAvailable ? 'Activez votre disponibilité pour recevoir des livraisons' : 'Vous êtes disponible, les livraisons arrivent bientôt'}
+                    {isAvailable ? 'Vous êtes disponible, les livraisons arrivent bientôt' : 'Activez votre disponibilité pour recevoir des livraisons'}
                   </p>
                 </div>
               )}
@@ -774,14 +948,14 @@ const DeliveryDashboard = () => {
                           selectedNotification.notif_type === 'warning' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-gray-100 text-gray-700'
                     }`}>
-                    {selectedNotification.notif_type === 'delivery' && '🚚 Livraison'}
-                    {selectedNotification.notif_type === 'order' && '📦 Commande'}
-                    {selectedNotification.notif_type === 'payment' && '💰 Paiement'}
-                    {selectedNotification.notif_type === 'warning' && '⚠️ Alerte'}
-                    {selectedNotification.notif_type === 'info' && 'ℹ️ Info'}
+                    {selectedNotification.notif_type === 'delivery' && '?? Livraison'}
+                    {selectedNotification.notif_type === 'order' && '?? Commande'}
+                    {selectedNotification.notif_type === 'payment' && '?? Paiement'}
+                    {selectedNotification.notif_type === 'warning' && '?? Alerte'}
+                    {selectedNotification.notif_type === 'info' && '?? Info'}
                   </span>
                   {selectedNotification.is_read && (
-                    <span className="text-xs text-gray-500">✓ Lu</span>
+                    <span className="text-xs text-gray-500">? Lu</span>
                   )}
                 </div>
 

@@ -10,8 +10,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
+from django.views.generic.base import RedirectView
 
 urlpatterns = [
+    path("favicon.ico", RedirectView.as_view(url="/static/favicon.ico", permanent=True)),
     path('', lambda request: HttpResponse(
         "<h1>Gaboshop</h1><p>API running — available endpoints: <a href='/admin/'>admin</a>, "
         "<a href='/api/v1/'>/api/v1/</a></p>",

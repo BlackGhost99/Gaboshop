@@ -1,4 +1,4 @@
-# 🎨 Comment Intégrer le TestPanel dans votre Frontend
+# ?? Comment Intégrer le TestPanel dans votre Frontend
 
 ## Option 1: Ajouter au Layout Principal (Recommandé)
 
@@ -113,7 +113,7 @@ export function MainLayout({ children }) {
 
 ## Après l'Intégration
 
-### 1. Voir le Bouton 🧪
+### 1. Voir le Bouton ??
 Une fois intégré, un bouton violet apparaît en bas à droite de votre écran.
 
 ### 2. Cliquer pour Ouvrir le Panel
@@ -123,23 +123,23 @@ Le panel s'ouvre avec:
 - Résumé des résultats
 
 ### 3. Exécuter les Tests
-Cliquez "▶️ Exécuter les tests" et observez les résultats en temps réel.
+Cliquez "?? Exécuter les tests" et observez les résultats en temps réel.
 
 ---
 
 ## Vérifier l'Intégration
 
-### ✓ Le bouton 🧪 apparaît?
-- Oui → TestPanel correctement intégré!
-- Non → Vérifiez l'import
+### ? Le bouton ?? apparaît?
+- Oui ? TestPanel correctement intégré!
+- Non ? Vérifiez l'import
 
-### ✓ Pouvez-vous ouvrir le panel?
-- Oui → Fonctionne!
-- Non → Vérifiez le JSX
+### ? Pouvez-vous ouvrir le panel?
+- Oui ? Fonctionne!
+- Non ? Vérifiez le JSX
 
-### ✓ Les tests s'exécutent?
-- Oui → Tout fonctionne!
-- Non → Vérifiez les fichiers de test
+### ? Les tests s'exécutent?
+- Oui ? Tout fonctionne!
+- Non ? Vérifiez les fichiers de test
 
 ---
 
@@ -149,20 +149,20 @@ Cliquez "▶️ Exécuter les tests" et observez les résultats en temps réel.
 ```jsx
 // Vérifier l'import
 import { TestPanel } from '../components/TestPanel';
-//                         ← Chemin correct?
+//                         ? Chemin correct?
 ```
 
 ### Erreur: "Default export not found"
 ```jsx
 // Fichier: TestPanel.jsx
-export function TestPanel() { ... }  // ✓ Nommé export
+export function TestPanel() { ... }  // ? Nommé export
 
 // Import:
-import { TestPanel } from './TestPanel';  // ✓ Avec accolades
+import { TestPanel } from './TestPanel';  // ? Avec accolades
 
 // OU
 
-export default TestPanel;  // ✗ Default export
+export default TestPanel;  // ? Default export
 // Import:
 import TestPanel from './TestPanel';  // Import sans accolades
 ```
@@ -184,7 +184,7 @@ import TestPanel from './TestPanel';  // Import sans accolades
 Le TestPanel utilise ces classes CSS (définis dans TestPanel.css):
 
 ```css
-.test-panel-button        /* Bouton 🧪 */
+.test-panel-button        /* Bouton ?? */
 .test-toggle-btn          /* Styling du bouton */
 .test-panel               /* Panel principal */
 .test-panel-header        /* En-tête */
@@ -253,7 +253,7 @@ Modifiez `TestPanel.css`:
 ### Checklist d'Intégration
 - [ ] TestPanel importé
 - [ ] TestPanel rendu dans JSX
-- [ ] Bouton 🧪 visible
+- [ ] Bouton ?? visible
 - [ ] Panel s'ouvre
 - [ ] Tests s'exécutent
 - [ ] Résultats affichés
@@ -309,14 +309,14 @@ export default App;
 
 ---
 
-## C'est Tout! 🎉
+## C'est Tout! ??
 
 Une fois intégré, le TestPanel est prêt à l'emploi!
 
 **Prochaines étapes:**
-1. Cliquez sur 🧪
+1. Cliquez sur ??
 2. Exécutez les tests
 3. Vérifiez les résultats
 4. Consultez les logs d'audit
 
-Besoin d'aide? → Consultez `HOW_TO_TEST_PHASE1_FR.md`
+Besoin d'aide? ? Consultez `HOW_TO_TEST_PHASE1_FR.md`

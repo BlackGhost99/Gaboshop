@@ -1,6 +1,6 @@
-# 🎯 PROMPT CURSOR — ABONNEMENTS B2B & B2C (CONFIGURABLE BACKEND)
+# ?? PROMPT CURSOR — ABONNEMENTS B2B & B2C (CONFIGURABLE BACKEND)
 
-## 📋 Contexte projet
+## ?? Contexte projet
 
 Nous développons **GABOSHOP**, une marketplace B2B/B2C.
 
@@ -10,20 +10,20 @@ Les valeurs (prix, pourcentages, frais, limites) doivent pouvoir **évoluer sans
 
 ---
 
-## 🔵 1. ABONNEMENTS B2B — BOUTIQUES CLIENTES (ACHETEUSES)
+## ?? 1. ABONNEMENTS B2B — BOUTIQUES CLIENTES (ACHETEUSES)
 
-### 🎯 Finalité
+### ?? Finalité
 Réduire les coûts variables des commandes B2B et générer un revenu fixe pour la plateforme.
 
-### 📌 Plans (exemple — valeurs modifiables)
+### ?? Plans (exemple — valeurs modifiables)
 
 | Plan | Prix/mois | Commission B2B | Service Fee | Operator Fee | Livraison | Priorité |
 |------|-----------|----------------|-------------|--------------|-----------|----------|
-| **Free** | 0 FCFA | 10% | 1,000 FCFA | 3% | ✗ | Normale |
-| **Pro** | 30,000 FCFA | 5% | 0 FCFA | 3% | ✓ | Haute |
-| **Business** | 100,000 FCFA | 0% | 0 FCFA | 0% | ✓ | Maximale |
+| **Free** | 0 FCFA | 10% | 1,000 FCFA | 3% | ? | Normale |
+| **Pro** | 30,000 FCFA | 5% | 0 FCFA | 3% | ? | Haute |
+| **Business** | 100,000 FCFA | 0% | 0 FCFA | 0% | ? | Maximale |
 
-### ⚙️ Avantages à implémenter (tous configurables)
+### ?? Avantages à implémenter (tous configurables)
 
 Pour chaque plan B2B Buyer, prévoir les **champs suivants** :
 
@@ -48,7 +48,7 @@ monthly_price              # Decimal(10,2) - Prix mensuel
 visible_benefits_label     # TextField - Texte affiché au frontend (JSON ou texte)
 ```
 
-### 📌 Règles métier
+### ?? Règles métier
 
 1. **La boutique cliente paie le montant brut** (prix produits + frais)
 2. **La commission est déduite avant payout du grossiste**
@@ -70,20 +70,20 @@ revenue_plateforme = commission + service_fee + operator_fee     # 14,000 FCFA
 
 ---
 
-## 🔵 2. ABONNEMENTS B2B — GROSSISTES (VENDEURS)
+## ?? 2. ABONNEMENTS B2B — GROSSISTES (VENDEURS)
 
-### 🎯 Finalité
+### ?? Finalité
 Inciter les grossistes à utiliser la plateforme comme canal principal.
 
-### 📌 Plans (exemple — valeurs modifiables)
+### ?? Plans (exemple — valeurs modifiables)
 
 | Plan | Prix/mois | Produits | Payout Delay | Badge | Analytics | Support |
 |------|-----------|----------|--------------|-------|-----------|---------|
-| **Free** | 0 FCFA | 50 | 30 jours | ✗ | ✗ | Basic |
-| **Pro** | 25,000 FCFA | 500 | 7 jours | ✓ | ✓ | Priority |
-| **Business** | 50,000 FCFA | Illimité | 2 jours | ✓ | ✓ | VIP 24/7 |
+| **Free** | 0 FCFA | 50 | 30 jours | ? | ? | Basic |
+| **Pro** | 25,000 FCFA | 500 | 7 jours | ? | ? | Priority |
+| **Business** | 50,000 FCFA | Illimité | 2 jours | ? | ? | VIP 24/7 |
 
-### ⚙️ Avantages configurables par plan grossiste
+### ?? Avantages configurables par plan grossiste
 
 ```python
 # Visibilité et marketing
@@ -117,7 +117,7 @@ monthly_price              # Decimal(10,2)
 visible_benefits_label     # TextField - Avantages affichés
 ```
 
-### 📌 Règles métier
+### ?? Règles métier
 
 1. **Le grossiste ne paie JAMAIS de commission par commande**
 2. **L'abonnement agit uniquement sur** :
@@ -130,20 +130,20 @@ visible_benefits_label     # TextField - Avantages affichés
 
 ---
 
-## 🟢 3. ABONNEMENTS B2C — BOUTIQUES (VENTE AU CLIENT FINAL)
+## ?? 3. ABONNEMENTS B2C — BOUTIQUES (VENTE AU CLIENT FINAL)
 
-### 🎯 Finalité
+### ?? Finalité
 Monétiser la visibilité et les outils, **sans impacter le client final**.
 
-### 📌 Plans (exemple — valeurs modifiables)
+### ?? Plans (exemple — valeurs modifiables)
 
 | Plan | Prix/mois | Produits | Visibilité | Promo | Stats | Commission |
 |------|-----------|----------|------------|-------|-------|------------|
-| **Free** | 0 FCFA | 100 | Normale | ✗ | ✗ | 100% |
-| **Pro** | 15,000 FCFA | 1,000 | Haute | ✓ | ✓ | 50% |
-| **Business** | 40,000 FCFA | Illimité | Maximale | ✓ | ✓ | 0% |
+| **Free** | 0 FCFA | 100 | Normale | ? | ? | 100% |
+| **Pro** | 15,000 FCFA | 1,000 | Haute | ? | ? | 50% |
+| **Business** | 40,000 FCFA | Illimité | Maximale | ? | ? | 0% |
 
-### ⚙️ Avantages configurables par plan B2C
+### ?? Avantages configurables par plan B2C
 
 ```python
 # Visibilité et ranking
@@ -182,7 +182,7 @@ monthly_price              # Decimal(10,2)
 visible_benefits_label     # TextField
 ```
 
-### 📌 Règles métier
+### ?? Règles métier
 
 1. **Les clients finaux ne souscrivent jamais** (abonnements réservés aux boutiques)
 2. **Les frais de service client (500 FCFA) sont indépendants du plan**
@@ -204,7 +204,7 @@ commission_finale = 20_000 * base_rate * multiplier
 
 ---
 
-## 🧱 4. MODÉLISATION ATTENDUE (SANS CODE MÉTIER DUR)
+## ?? 4. MODÉLISATION ATTENDUE (SANS CODE MÉTIER DUR)
 
 ### Proposer une structure backend permettant :
 
@@ -313,7 +313,7 @@ class StoreSubscription(models.Model):
 
 ---
 
-## 🧠 5. SERVICES DE LECTURE (PAS DE LOGIQUE DUR)
+## ?? 5. SERVICES DE LECTURE (PAS DE LOGIQUE DUR)
 
 ### Service de calcul de commission B2B
 
@@ -432,9 +432,9 @@ def calculate_b2c_commission(store, product, sale_amount):
 
 ---
 
-## 🧠 6. OBJECTIF FINAL
+## ?? 6. OBJECTIF FINAL
 
-### ✅ Ce qui DOIT être possible :
+### ? Ce qui DOIT être possible :
 
 1. **Activer / désactiver un avantage sans recoder**
    ```python
@@ -482,31 +482,31 @@ def calculate_b2c_commission(store, product, sale_amount):
 
 ---
 
-## ✅ LIVRABLE ATTENDU DE CURSOR
+## ? LIVRABLE ATTENDU DE CURSOR
 
 ### 1. Proposition de structure de données (models / config)
-- ✅ Table `SubscriptionPlan` avec `features_config` JSON
-- ✅ Table `StoreSubscription` avec `plan_snapshot`
-- ✅ Distinction par `scope` (b2b_buyer / b2b_wholesaler / b2c_store)
+- ? Table `SubscriptionPlan` avec `features_config` JSON
+- ? Table `StoreSubscription` avec `plan_snapshot`
+- ? Distinction par `scope` (b2b_buyer / b2b_wholesaler / b2c_store)
 
 ### 2. Liste exhaustive des champs configurables par plan
-- ✅ **B2B Buyer** : 8 champs financiers/fonctionnels
-- ✅ **B2B Wholesaler** : 15 champs visibilité/outils/limites
-- ✅ **B2C Store** : 17 champs visibilité/marketing/commissions
+- ? **B2B Buyer** : 8 champs financiers/fonctionnels
+- ? **B2B Wholesaler** : 15 champs visibilité/outils/limites
+- ? **B2C Store** : 17 champs visibilité/marketing/commissions
 
 ### 3. Exemple de lecture de configuration dans les services
-- ✅ `calculate_b2b_order_costs()` - Sans constantes
-- ✅ `can_perform_action()` - Lecture dynamique des limites
-- ✅ `calculate_b2c_commission()` - Multiplicateur depuis config
+- ? `calculate_b2b_order_costs()` - Sans constantes
+- ? `can_perform_action()` - Lecture dynamique des limites
+- ? `calculate_b2c_commission()` - Multiplicateur depuis config
 
 ### 4. Aucun calcul financier codé en dur
-- ✅ Tous les taux lus depuis `features_config`
-- ✅ Tous les prix/limites configurables
-- ✅ Plans Free créés en DB, pas en code
+- ? Tous les taux lus depuis `features_config`
+- ? Tous les prix/limites configurables
+- ? Plans Free créés en DB, pas en code
 
 ---
 
-## 🎨 EXEMPLE DE CONFIGURATION COMPLÈTE
+## ?? EXEMPLE DE CONFIGURATION COMPLÈTE
 
 ### Plan B2B Buyer "Free"
 
@@ -545,5 +545,5 @@ def calculate_b2c_commission(store, product, sale_amount):
 
 ---
 
-👉 **Fin du prompt**
+?? **Fin du prompt**
 

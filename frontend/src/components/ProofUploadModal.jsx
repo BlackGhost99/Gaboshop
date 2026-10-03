@@ -98,7 +98,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
       setErrors(prev => ({ ...prev, pin: null }));
       
       // Afficher un message de succès avec feedback visuel
-      console.log('✓ Code PIN accepté - Vous pouvez maintenant soumettre la preuve');
+      console.log('? Code PIN accepté - Vous pouvez maintenant soumettre la preuve');
     } else {
       console.log('PIN incorrect:', response.error);
       setErrors(prev => ({ ...prev, pin: response.error || 'PIN incorrect' }));
@@ -167,7 +167,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
       if (!proofResponse.success) {
         setLoading(false);
         const errorMsg = proofResponse.error?.message || proofResponse.error || 'Erreur lors de l\'upload de la preuve';
-        setErrors(proofResponse.validation_errors || { general: `❌ Upload échoué: ${errorMsg}` });
+        setErrors(proofResponse.validation_errors || { general: `? Upload échoué: ${errorMsg}` });
         return;
       }
 
@@ -181,12 +181,12 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
         const errorMsg = completeResponse.error?.message || completeResponse.error || 'Erreur lors de la confirmation';
         const detailMsg = completeResponse.error?.details ? 
           ` (${Object.values(completeResponse.error.details).join(', ')})` : '';
-        setErrors({ general: `❌ Confirmation échouée: ${errorMsg}${detailMsg}` });
+        setErrors({ general: `? Confirmation échouée: ${errorMsg}${detailMsg}` });
       }
     } catch (error) {
       setLoading(false);
       console.error('Erreur lors du traitement de la preuve:', error);
-      setErrors({ general: `❌ Erreur système: ${error.message || 'Une erreur inattendue s\'est produite'}` });
+      setErrors({ general: `? Erreur système: ${error.message || 'Une erreur inattendue s\'est produite'}` });
     }
   };
 
@@ -235,7 +235,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
             {/* ID Card Photo - OBLIGATOIRE */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📸 Photo de la pièce d'identité du client <span className="text-red-600">*</span>
+                ?? Photo de la pièce d'identité du client <span className="text-red-600">*</span>
               </label>
               <p className="text-xs text-gray-500 mb-3">
                 Obligatoire: Certaines routes ne sont pas accessibles, le client peut venir chercher le colis.
@@ -259,7 +259,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
             {/* Package Photo - OPTIONNELLE */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📦 Photo du colis (optionnelle)
+                ?? Photo du colis (optionnelle)
               </label>
               <p className="text-xs text-gray-500 mb-3">
                 Si la livraison se fait au domicile du client, vous pouvez ajouter une photo du colis.
@@ -279,7 +279,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
             {/* GPS Location */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📍 Position GPS <span className="text-red-600">*</span>
+                ?? Position GPS <span className="text-red-600">*</span>
               </label>
               {gpsLoading ? (
                 <div className="flex items-center text-sm text-gray-600">
@@ -291,7 +291,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                 </div>
               ) : gpsLocation ? (
                 <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-sm text-green-700">✓ Position GPS obtenue</p>
+                  <p className="text-sm text-green-700">? Position GPS obtenue</p>
                   <p className="text-xs text-gray-600 mt-1">
                     Lat: {gpsLocation.latitude.toFixed(6)}, Long: {gpsLocation.longitude.toFixed(6)}
                   </p>
@@ -299,7 +299,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                 </div>
               ) : (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <p className="text-sm text-yellow-700">⚠ GPS non disponible</p>
+                  <p className="text-sm text-yellow-700">? GPS non disponible</p>
                 </div>
               )}
               {errors.gps && (
@@ -319,7 +319,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                 disabled={!idCardPhoto || !gpsLocation}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Suivant →
+                Suivant ?
               </button>
             </div>
           </div>
@@ -342,7 +342,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-2xl mb-2">✍️</div>
+                  <div className="text-2xl mb-2">??</div>
                   <div className="font-semibold text-gray-900">Signature</div>
                   <div className="text-xs text-gray-600 mt-1">Le client signe pour confirmer</div>
                 </button>
@@ -354,7 +354,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-2xl mb-2">🔢</div>
+                  <div className="text-2xl mb-2">??</div>
                   <div className="font-semibold text-gray-900">Code PIN</div>
                   <div className="text-xs text-gray-600 mt-1">Le client fournit son code PIN</div>
                 </button>
@@ -365,7 +365,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
             {verificationMethod === 'signature' && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  ✍️ Signature du client <span className="text-red-600">*</span>
+                  ?? Signature du client <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="file"
@@ -387,7 +387,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
             {verificationMethod === 'pin' && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  🔢 Code PIN du client (4-6 chiffres) <span className="text-red-600">*</span>
+                  ?? Code PIN du client (4-6 chiffres) <span className="text-red-600">*</span>
                 </label>
                 <div className={`p-4 rounded-lg border-2 transition ${
                   pinVerified 
@@ -416,7 +416,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                       </button>
                     ) : (
                       <div className="px-4 py-2 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center min-w-max">
-                        ✓ Vérifié
+                        ? Vérifié
                       </div>
                     )}
                   </div>
@@ -430,7 +430,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                   
                   {pinVerified && (
                     <div className="p-3 bg-green-100 border border-green-300 rounded-md">
-                      <p className="text-sm text-green-700 font-semibold">✓ Code PIN vérifié avec succès</p>
+                      <p className="text-sm text-green-700 font-semibold">? Code PIN vérifié avec succès</p>
                       <p className="text-xs text-green-600 mt-1">Vous pouvez maintenant confirmer la livraison</p>
                     </div>
                   )}
@@ -443,7 +443,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                 onClick={() => setStep(1)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium transition"
               >
-                ← Retour
+                ? Retour
               </button>
               <button
                 onClick={handleSubmit}
@@ -454,7 +454,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                     : 'bg-green-600 text-white hover:bg-green-700 active:scale-95 shadow-lg hover:shadow-xl'
                 }`}
               >
-                {loading ? '⏳ Upload en cours...' : '✓ Confirmer la livraison'}
+                {loading ? '? Upload en cours...' : '? Confirmer la livraison'}
               </button>
             </div>
           </div>

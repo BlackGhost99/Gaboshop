@@ -33,7 +33,7 @@ def migrate_b2b_products():
             product.market_type = 'both'
             product.save(update_fields=['market_type'])
             count += 1
-            print(f"✓ {product.name} (ID: {product.id}) → market_type='both'")
+            print(f"? {product.name} (ID: {product.id}) ? market_type='both'")
     
     print(f"\n=== Migration terminée ===")
     print(f"Produits mis à jour: {count}")

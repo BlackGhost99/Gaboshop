@@ -24,20 +24,20 @@ print("=" * 70)
 # Vérifier le plan Business
 try:
     plan_business = SubscriptionPlan.objects.get(plan_type='business')
-    print(f"\n✓ Plan Business trouvé: {plan_business.name}")
+    print(f"\n? Plan Business trouvé: {plan_business.name}")
     print(f"  - can_access_b2b: {plan_business.can_access_b2b}")
     
     if not plan_business.can_access_b2b:
-        print("\n⚠️  ATTENTION: Le plan Business n'a pas can_access_b2b=True")
+        print("\n??  ATTENTION: Le plan Business n'a pas can_access_b2b=True")
         print("   Correction en cours...")
         plan_business.can_access_b2b = True
         plan_business.save()
-        print("   ✓ Plan Business corrigé: can_access_b2b=True")
+        print("   ? Plan Business corrigé: can_access_b2b=True")
     else:
-        print("   ✓ Configuration correcte")
+        print("   ? Configuration correcte")
         
 except SubscriptionPlan.DoesNotExist:
-    print("\n⚠️  Le plan Business n'existe pas!")
+    print("\n??  Le plan Business n'existe pas!")
     print("   Création du plan Business...")
     plan_business = SubscriptionPlan.objects.create(
         plan_type='business',
@@ -51,7 +51,7 @@ except SubscriptionPlan.DoesNotExist:
         has_custom_page=True,
         can_sponsor_products=True,
     )
-    print("   ✓ Plan Business créé avec can_access_b2b=True")
+    print("   ? Plan Business créé avec can_access_b2b=True")
 
 # Vérifier les autres plans
 print("\n" + "=" * 70)
@@ -64,11 +64,11 @@ for plan_type in ['free', 'pro', 'business']:
         print(f"\n{plan.name} ({plan_type}):")
         print(f"  - can_access_b2b: {plan.can_access_b2b}")
         if plan_type == 'business' and not plan.can_access_b2b:
-            print("  ⚠️  DOIT ÊTRE True!")
+            print("  ??  DOIT ÊTRE True!")
         elif plan_type != 'business' and plan.can_access_b2b:
-            print("  ⚠️  Normalement False pour ce plan")
+            print("  ??  Normalement False pour ce plan")
     except SubscriptionPlan.DoesNotExist:
-        print(f"\n⚠️  Plan {plan_type} n'existe pas")
+        print(f"\n??  Plan {plan_type} n'existe pas")
 
 print("\n" + "=" * 70)
 print("  VÉRIFICATION TERMINÉE")

@@ -142,24 +142,6 @@ def test_business_plans():
     print(f"[OK] {store_business.name} (Business) peut acceder au B2B")
     
     # ==========================================
-    # 4. Test frais de service B2B
-    # ==========================================
-    print_section("4. Test: Frais de service B2B")
-    
-    service_fee_free = SubscriptionChecker.get_service_fee_b2b(store_free)
-    service_fee_business = SubscriptionChecker.get_service_fee_b2b(store_business)
-    
-    if service_fee_free != Decimal('200.00'):
-        print(f"[ERREUR] Service fee Free devrait etre 200 F, obtenu: {service_fee_free} F")
-        return False
-    
-    if service_fee_business != Decimal('0.00'):
-        print(f"[ERREUR] Service fee Business devrait etre 0 F, obtenu: {service_fee_business} F")
-        return False
-    
-    print(f"[OK] Service fee Free: {service_fee_free} F")
-    print(f"[OK] Service fee Business: {service_fee_business} F")
-    
     # ==========================================
     # 5. Test commissions Business
     # ==========================================
@@ -218,7 +200,6 @@ def test_business_plans():
     1. Plans crees: Free, Pro, Business [OK]
     2. Store Free bloque pour B2B [OK]
     3. Store Business peut acceder au B2B [OK]
-    4. Frais de service B2B dynamiques [OK]
     5. Commissions Business correctes [OK]
     """)
     

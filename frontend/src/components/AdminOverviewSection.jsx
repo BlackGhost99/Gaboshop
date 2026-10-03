@@ -36,8 +36,8 @@ const AdminOverviewSection = ({ summary, loading }) => {
             </span>
           </div>
           <div className="mt-4 flex justify-between text-xs text-gray-500">
-            <span>⏳ {kpis?.orders?.pending || 0} en attente</span>
-            <span>✅ {kpis?.orders?.delivered || 0} livrées</span>
+            <span>? {kpis?.orders?.pending || 0} en attente</span>
+            <span>? {kpis?.orders?.delivered || 0} livrées</span>
           </div>
         </div>
 
@@ -53,8 +53,8 @@ const AdminOverviewSection = ({ summary, loading }) => {
             </span>
           </div>
           <div className="mt-4 flex justify-between text-xs text-gray-500">
-            <span>📅 {formatMoney(kpis?.finance?.sales_month)} (Mois)</span>
-            <span>💰 {formatMoney(kpis?.finance?.commissions_total)} (Com)</span>
+            <span>?? {formatMoney(kpis?.finance?.sales_month)} (Mois)</span>
+            <span>?? {formatMoney(kpis?.finance?.commissions_total)} (Com)</span>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
             </span>
           </div>
           <div className="mt-4 text-xs text-gray-500">
-            🛵 {kpis?.users?.agents_active_today || 0} livreurs actifs aujourd'hui
+            ?? {kpis?.users?.agents_active_today || 0} livreurs actifs aujourd'hui
           </div>
         </div>
       </div>
@@ -95,7 +95,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sales Curve */}
         <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 Courbe des ventes (30 jours)</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">?? Courbe des ventes (30 jours)</h3>
           <div className="h-64 flex items-end space-x-1">
             {charts?.sales_curve?.map((day, index) => {
                const maxSales = Math.max(...(charts.sales_curve.map(d => d.sales) || [0]), 1);
@@ -124,7 +124,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
 
         {/* Category Distribution (Pie Chart Simulation) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">🟦 Répartition (Top 5)</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">?? Répartition (Top 5)</h3>
           <div className="space-y-4">
             {charts?.categories?.map((cat, index) => {
               const total = charts.categories.reduce((acc, curr) => acc + curr.value, 0) || 1;
@@ -156,7 +156,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
         {/* Low Stock */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-yellow-500">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-            ⚠️ Stock Faible
+            ?? Stock Faible
           </h3>
           <div className="space-y-3">
             {alerts?.low_stock?.map((p) => (
@@ -179,7 +179,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
         {/* Deactivated Stores */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-red-500">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-            🛑 Magasins Désactivés
+            ?? Magasins Désactivés
           </h3>
           <div className="space-y-3">
             {alerts?.deactivated_stores?.map((s) => (
@@ -197,7 +197,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
         {/* Unvalidated Agents */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-            👤 Livreurs à valider
+            ?? Livreurs à valider
           </h3>
           <div className="space-y-3">
             {alerts?.unvalidated_agents?.map((u) => (
@@ -221,7 +221,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
       {/* 4. Recent Orders Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-semibold text-gray-800">🧾 Commandes Récentes</h3>
+          <h3 className="font-semibold text-gray-800">?? Commandes Récentes</h3>
           <button className="text-sm text-blue-600 hover:text-blue-800">Voir tout</button>
         </div>
         <div className="overflow-x-auto">
@@ -271,7 +271,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Top Products */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="font-semibold text-gray-800 mb-4">🥇 Top Produits Vendus</h3>
+          <h3 className="font-semibold text-gray-800 mb-4">?? Top Produits Vendus</h3>
           <div className="space-y-3">
             {top_lists?.products?.map((p, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm">
@@ -295,7 +295,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
 
         {/* Top Stores */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="font-semibold text-gray-800 mb-4">🏆 Top Magasins Performants</h3>
+          <h3 className="font-semibold text-gray-800 mb-4">?? Top Magasins Performants</h3>
           <div className="space-y-3">
             {top_lists?.stores?.map((s, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm">
@@ -323,7 +323,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
         {/* System Status */}
         <div className="bg-gray-900 text-white p-6 rounded-lg shadow-sm">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
-            ⚙️ État du Système
+            ?? État du Système
           </h3>
           <div className="space-y-4 text-sm">
             <div className="flex justify-between items-center">
@@ -343,22 +343,22 @@ const AdminOverviewSection = ({ summary, loading }) => {
 
         {/* Quick Actions */}
         <div className="md:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="font-semibold text-gray-800 mb-4">🚀 Actions Rapides</h3>
+          <h3 className="font-semibold text-gray-800 mb-4">?? Actions Rapides</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button className="p-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors flex flex-col items-center gap-2 text-sm font-medium">
-              <span className="text-xl">➕</span>
+              <span className="text-xl">?</span>
               Ajouter Magasin
             </button>
             <button className="p-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex flex-col items-center gap-2 text-sm font-medium">
-              <span className="text-xl">📦</span>
+              <span className="text-xl">??</span>
               Ajouter Produit
             </button>
             <button className="p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors flex flex-col items-center gap-2 text-sm font-medium">
-              <span className="text-xl">🛵</span>
+              <span className="text-xl">??</span>
               Gérer Livreurs
             </button>
             <button className="p-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors flex flex-col items-center gap-2 text-sm font-medium">
-              <span className="text-xl">⚙️</span>
+              <span className="text-xl">??</span>
               Paramètres
             </button>
           </div>

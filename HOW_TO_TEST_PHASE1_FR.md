@@ -1,21 +1,21 @@
-# 🧪 TESTING GUIDE - Comment Tester Phase 1 en Frontend
+# ?? TESTING GUIDE - Comment Tester Phase 1 en Frontend
 
 Il existe **3 méthodes simples** pour tester l'implémentation Phase 1 (Status Validation & Audit Logging):
 
 ---
 
-## ✅ Méthode 1: Console Browser (Recommandée - 2 minutes)
+## ? Méthode 1: Console Browser (Recommandée - 2 minutes)
 
-### 🎯 Objectif
+### ?? Objectif
 Tester les validations directement depuis la console du navigateur.
 
-### 📋 Étapes
+### ?? Étapes
 
 **1. Ouvrir la Console**
 ```
-Chrome/Edge:  Ctrl+Shift+I  →  Onglet "Console"
-Firefox:      Ctrl+Shift+K  →  Console
-Safari:       Cmd+Option+I  →  Console
+Chrome/Edge:  Ctrl+Shift+I  ?  Onglet "Console"
+Firefox:      Ctrl+Shift+K  ?  Console
+Safari:       Cmd+Option+I  ?  Console
 ```
 
 **2. Copier-Coller le Code de Test**
@@ -36,28 +36,28 @@ setTimeout(() => {
 
 **3. Résultats Visibles en Direct**
 ```
-✓ Login delivery agent - Token: abc123xyz...
-✓ Get assigned deliveries - Found 1 deliveries
-✓ Accept delivery (valid) - Status: accepted
-✓ Reject invalid transition - Correctly rejected with status 400
-✓ Start delivery (in_transit) - Status: in_transit
-✓ Complete delivery (delivered) - Status: delivered
+? Login delivery agent - Token: abc123xyz...
+? Get assigned deliveries - Found 1 deliveries
+? Accept delivery (valid) - Status: accepted
+? Reject invalid transition - Correctly rejected with status 400
+? Start delivery (in_transit) - Status: in_transit
+? Complete delivery (delivered) - Status: delivered
 
-╔════════════════════════════════════════════════════╗
++----------------------------------------------------+
 ║                   TEST SUMMARY                     ║
-║ ✓ Passed: 6                                         ║
-║ ✗ Failed: 0                                         ║
-╚════════════════════════════════════════════════════╝
+║ ? Passed: 6                                         ║
+║ ? Failed: 0                                         ║
++----------------------------------------------------+
 ```
 
 ---
 
-## 🎨 Méthode 2: Interface UI (Plus Facile - 1 minute)
+## ?? Méthode 2: Interface UI (Plus Facile - 1 minute)
 
-### 🎯 Objectif  
+### ?? Objectif  
 Tester avec un panel graphique dans votre interface.
 
-### 📋 Étapes
+### ?? Étapes
 
 **1. Ajouter le TestPanel au Composant Principal**
 
@@ -81,45 +81,45 @@ export function DeliveryDashboard() {
 ```
 
 **2. Interface Apparaît**
-- Un bouton violet 🧪 apparaît en bas à droite
+- Un bouton violet ?? apparaît en bas à droite
 - Cliquez dessus pour ouvrir le panel
 
 **3. Exécuter les Tests**
-- Cliquez "▶️ Exécuter les tests"
+- Cliquez "?? Exécuter les tests"
 - Observez les résultats en temps réel
 - Chaque action est loggée
 
-### 📊 Vous Verrez
+### ?? Vous Verrez
 ```
-╔════════════════════════════════════════════════════╗
-║   🧪 Test Phase 1 - Status Validation            ║
-╚════════════════════════════════════════════════════╝
++----------------------------------------------------+
+║   ?? Test Phase 1 - Status Validation            ║
++----------------------------------------------------+
 
-[14:30:12] 🔍 Démarrage des tests Phase 1...
-[14:30:13] 📝 Exécution de la suite de tests...
-[14:30:14] ✓ Tests terminés: 6 réussis, 0 échoués
+[14:30:12] ?? Démarrage des tests Phase 1...
+[14:30:13] ?? Exécution de la suite de tests...
+[14:30:14] ? Tests terminés: 6 réussis, 0 échoués
 
-📊 Résumé des tests:
-  ✓ Réussis: 6
-  ✗ Échoués: 0
+?? Résumé des tests:
+  ? Réussis: 6
+  ? Échoués: 0
   Total: 6
 
-✓ Login delivery agent - Token: abc123...
-✓ Get assigned deliveries - Found 1 deliveries
-✓ Accept delivery (valid) - Status: accepted
-✓ Reject invalid transition - Correctly rejected
-✓ Start delivery (in_transit) - Status: in_transit
-✓ Complete delivery (delivered) - Status: delivered
+? Login delivery agent - Token: abc123...
+? Get assigned deliveries - Found 1 deliveries
+? Accept delivery (valid) - Status: accepted
+? Reject invalid transition - Correctly rejected
+? Start delivery (in_transit) - Status: in_transit
+? Complete delivery (delivered) - Status: delivered
 ```
 
 ---
 
-## 🔌 Méthode 3: API Direct avec Curl (Pour Admins - 5 minutes)
+## ?? Méthode 3: API Direct avec Curl (Pour Admins - 5 minutes)
 
-### 🎯 Objectif
+### ?? Objectif
 Tester les endpoints REST directement.
 
-### 📋 Étapes Préalables
+### ?? Étapes Préalables
 
 **1. S'Authentifier**
 ```bash
@@ -169,7 +169,7 @@ curl http://localhost:8000/api/v1/dashboard/delivery/assigned-orders/ \
 
 Notez l'ID de livraison (ici: `1`)
 
-### ✅ Test 1: Accepter une Livraison (Transition Valide)
+### ? Test 1: Accepter une Livraison (Transition Valide)
 
 ```bash
 DELIVERY_ID=1
@@ -193,9 +193,9 @@ curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/accept
 }
 ```
 
-✅ **Status: 200** = Test réussi!
+? **Status: 200** = Test réussi!
 
-### ❌ Test 2: Essayer d'Accepter à Nouveau (Transition Invalide)
+### ? Test 2: Essayer d'Accepter à Nouveau (Transition Invalide)
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/accept/ \
@@ -212,9 +212,9 @@ curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/accept
 }
 ```
 
-❌ **Status: 400** = Validation fonctionne!
+? **Status: 400** = Validation fonctionne!
 
-### ✅ Test 3: Démarrer la Livraison (Transition Valide)
+### ? Test 3: Démarrer la Livraison (Transition Valide)
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/start/ \
@@ -235,7 +235,7 @@ curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/start/
 }
 ```
 
-### ✅ Test 4: Compléter la Livraison (Transition Valide)
+### ? Test 4: Compléter la Livraison (Transition Valide)
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/complete/ \
@@ -258,12 +258,12 @@ curl -X POST http://localhost:8000/api/v1/dashboard/delivery/$DELIVERY_ID/comple
 
 ---
 
-## 🛡️ Méthode 4: Vérifier les Logs d'Audit (Admin)
+## ??? Méthode 4: Vérifier les Logs d'Audit (Admin)
 
-### 🎯 Objectif
+### ?? Objectif
 Visualiser les changements enregistrés dans la base de données.
 
-### 📋 Étapes
+### ?? Étapes
 
 **1. Aller à Django Admin**
 ```
@@ -280,10 +280,10 @@ http://localhost:8000/admin/
 
 **4. Vous Verrez le Tableau:**
 
-| Timestamp | Action | User | Object | Old → New | IP | Suspicious |
+| Timestamp | Action | User | Object | Old ? New | IP | Suspicious |
 |-----------|--------|------|--------|-----------|----|-----------:|
-| 2025-12-08 14:30 | delivery_status_change | driver@test.com | delivery#1 | pending → accepted | 127.0.0.1 | No |
-| 2025-12-08 14:30 | order_status_change | driver@test.com | order#5 | assigned → in_transit | 127.0.0.1 | No |
+| 2025-12-08 14:30 | delivery_status_change | driver@test.com | delivery#1 | pending ? accepted | 127.0.0.1 | No |
+| 2025-12-08 14:30 | order_status_change | driver@test.com | order#5 | assigned ? in_transit | 127.0.0.1 | No |
 
 **5. Filtrer par:**
 - Action type
@@ -293,12 +293,12 @@ http://localhost:8000/admin/
 
 ---
 
-## 🐍 Méthode 5: Script Python (Automatisé)
+## ?? Méthode 5: Script Python (Automatisé)
 
-### 🎯 Objectif
+### ?? Objectif
 Exécuter une suite complète de tests en Python.
 
-### 📋 Étapes
+### ?? Étapes
 
 **1. Exécuter le Script**
 ```bash
@@ -316,54 +316,54 @@ python test_phase1.py
                       TEST 1: Valid Status Transitions
 ======================================================================
 
-1.1 Testing: Accept Delivery (pending → accepted)
-✓ Accept delivery endpoint                          PASS - Status: 200
-✓ Status updated to 'accepted'                      PASS - Status: accepted
+1.1 Testing: Accept Delivery (pending ? accepted)
+? Accept delivery endpoint                          PASS - Status: 200
+? Status updated to 'accepted'                      PASS - Status: accepted
 
-1.2 Testing: Start Delivery (accepted → in_transit)
-✓ Start delivery endpoint                           PASS - Status: 200
-✓ Status updated to 'in_transit'                    PASS - Status: in_transit
+1.2 Testing: Start Delivery (accepted ? in_transit)
+? Start delivery endpoint                           PASS - Status: 200
+? Status updated to 'in_transit'                    PASS - Status: in_transit
 
-1.3 Testing: Complete Delivery (in_transit → delivered)
-✓ Complete delivery endpoint                        PASS - Status: 200
-✓ Status updated to 'delivered'                     PASS - Status: delivered
+1.3 Testing: Complete Delivery (in_transit ? delivered)
+? Complete delivery endpoint                        PASS - Status: 200
+? Status updated to 'delivered'                     PASS - Status: delivered
 
 ======================================================================
                     TEST 2: Invalid Status Transitions
 ======================================================================
 
 2.1 Testing: Invalid - Accept Already Accepted Delivery
-✓ Reject double acceptance                          PASS - Status: 400
+? Reject double acceptance                          PASS - Status: 400
 
 2.2 Testing: Suspicious Activity Logging
-✓ Suspicious activity marked in audit log           PASS - Found 1 suspicious logs
+? Suspicious activity marked in audit log           PASS - Found 1 suspicious logs
 
 ======================================================================
                     TEST 3: Unauthorized Access Prevention
 ======================================================================
 
 3.1 Testing: Unauthorized Driver Cannot Accept Others' Deliveries
-✓ Reject unauthorized access                        PASS - Status: 403
+? Reject unauthorized access                        PASS - Status: 403
 
 3.2 Testing: Unauthorized Access Logged as Suspicious
-✓ Unauthorized attempt flagged as suspicious        PASS - Found 1 suspicious logs
+? Unauthorized attempt flagged as suspicious        PASS - Found 1 suspicious logs
 
 3.3 Testing: Security Details Captured
-✓ IP address captured                               PASS - IP: 127.0.0.1
-✓ Reason recorded                                   PASS - Reason: Unauthorized user attempted
+? IP address captured                               PASS - IP: 127.0.0.1
+? Reason recorded                                   PASS - Reason: Unauthorized user attempted
 
 ======================================================================
                         TEST 4: Audit Trail Logging
 ======================================================================
 
 4.1 Testing: Audit Log Creation on Status Change
-✓ Audit log created on status change                PASS - Logs: 0 → 5
+? Audit log created on status change                PASS - Logs: 0 ? 5
 
 4.2 Testing: Audit Log Details
-✓ Old status recorded                               PASS - Old: pending
-✓ New status recorded                               PASS - New: accepted
-✓ User recorded                                     PASS - User: driver@test.com
-✓ IP address recorded                               PASS - IP: 127.0.0.1
+? Old status recorded                               PASS - Old: pending
+? New status recorded                               PASS - New: accepted
+? User recorded                                     PASS - User: driver@test.com
+? IP address recorded                               PASS - IP: 127.0.0.1
 
 ======================================================================
                           TEST SUMMARY
@@ -374,18 +374,18 @@ Passed: 24
 Failed: 0
 Success Rate: 100.0%
 
-✓ ALL TESTS PASSED - Phase 1 is working correctly!
+? ALL TESTS PASSED - Phase 1 is working correctly!
 ```
 
 ---
 
-## 📋 Checklist Complète
+## ?? Checklist Complète
 
 ### Phase 1 Validation
 - [ ] **Transitions Valides** fonctionnent (200 OK)
-  - [ ] pending → accepted
-  - [ ] accepted → in_transit
-  - [ ] in_transit → delivered
+  - [ ] pending ? accepted
+  - [ ] accepted ? in_transit
+  - [ ] in_transit ? delivered
 
 - [ ] **Transitions Invalides** sont rejetées (400 Bad Request)
   - [ ] Double acceptation
@@ -414,7 +414,7 @@ Success Rate: 100.0%
 
 ---
 
-## 🐛 Dépannage
+## ?? Dépannage
 
 ### Erreur: "Token Invalide"
 ```bash
@@ -455,25 +455,25 @@ python manage.py migrate core
 
 ---
 
-## 📊 Interprétation
+## ?? Interprétation
 
-### ✅ Tous les Tests Passent
+### ? Tous les Tests Passent
 **Phase 1 est prêt pour la production!**
-- Validations fonctionnent ✓
-- Audit trail enregistre ✓
-- Fraude détectée ✓
-- Performance OK ✓
+- Validations fonctionnent ?
+- Audit trail enregistre ?
+- Fraude détectée ?
+- Performance OK ?
 
-### ⚠️ Quelques Tests Échouent
+### ?? Quelques Tests Échouent
 1. Vérifiez les messages d'erreur
 2. Consultez `python manage.py runserver` output
 3. Vérifiez les migrations
 
-### ❌ Tous les Tests Échouent
+### ? Tous les Tests Échouent
 1. Serveur Django tourne? `http://localhost:8000/api/v1/`
 2. Core app enregistrée? `INSTALLED_APPS`
 3. Migrations appliquées? `python manage.py migrate core`
 
 ---
 
-**Choisissez la méthode qui vous convient le mieux! 🚀**
+**Choisissez la méthode qui vous convient le mieux! ??**

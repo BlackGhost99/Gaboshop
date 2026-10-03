@@ -34,11 +34,11 @@ class StoreService:
                     **store_data
                 )
                 
-                logger.info(f"🏪 Magasin créé: {store.name} par {manager.phone}")
+                logger.info(f"?? Magasin créé: {store.name} par {manager.phone}")
                 return store
                 
         except Exception as e:
-            logger.error(f"❌ Erreur création magasin: {e}")
+            logger.error(f"? Erreur création magasin: {e}")
             raise
     
     @staticmethod
@@ -69,7 +69,7 @@ class StoreService:
             return store._metrics_cache
             
         except Store.DoesNotExist:
-            logger.error(f"❌ Magasin {store_id} non trouvé")
+            logger.error(f"? Magasin {store_id} non trouvé")
             return None
     
     @staticmethod
@@ -117,5 +117,5 @@ class StoreService:
             }
             
         except Store.DoesNotExist:
-            logger.error(f"❌ Magasin {store_id} non trouvé")
+            logger.error(f"? Magasin {store_id} non trouvé")
             return None

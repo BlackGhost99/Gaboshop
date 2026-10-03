@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Set workdir
 WORKDIR /app
@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Install system deps
 RUN apt-get update \
-    && apt-get install -y build-essential gcc libpq-dev --no-install-recommends \
+    && apt-get install -y build-essential gcc libpq-dev pkg-config libcairo2-dev --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
 
 # Create static/media dirs if needed
-RUN mkdir -p /app/static /app/media
+RUN mkdir -p /app/staticfiles /app/media
 
 EXPOSE 8000
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"]

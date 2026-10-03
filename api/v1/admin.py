@@ -163,8 +163,16 @@ class AdminUsersView(APIView):
             # Add delivery profile for delivery agents
             if u.user_type == 'delivery_agent' and hasattr(u, 'delivery_profile'):
                 profile = u.delivery_profile
+                vehicle_label = ''
+                vehicle_id = None
+                if profile.vehicle_type:
+                    vehicle_label = str(profile.vehicle_type)
+                    vehicle_id = profile.vehicle_type_id
+                elif profile.vehicle_type_old:
+                    vehicle_label = profile.vehicle_type_old
                 user_data['profile'] = {
-                    'vehicle_type': profile.vehicle_type,
+                    'vehicle_type': vehicle_label,
+                    'vehicle_type_id': vehicle_id,
                     'vehicle_plate': profile.vehicle_plate,
                     'cin_number': profile.cin_number,
                     'status': profile.status,
@@ -765,6 +773,8 @@ class AdminProductsView(APIView):
                 "price": p.price,
                 "stock": p.stock,
                 "is_available": p.is_available,
+                "weight_kg": p.weight_kg,
+                "length_m": p.length_m,
                 "store_id": p.store.id,
                 "store_name": p.store.name,
                 "category_id": p.category.id if p.category else None,
@@ -795,7 +805,9 @@ class AdminProductsView(APIView):
                 description=request.data.get('description', ''),
                 price=request.data.get('price', 0),
                 stock=request.data.get('stock', 0),
-                is_available=request.data.get('is_available', True)
+                is_available=request.data.get('is_available', True),
+                weight_kg=request.data.get('weight_kg'),
+                length_m=request.data.get('length_m')
             )
         except Exception as e:
             return Response({"success": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -817,6 +829,8 @@ class AdminProductsView(APIView):
         if 'price' in request.data: product.price = request.data['price']
         if 'stock' in request.data: product.stock = request.data['stock']
         if 'is_available' in request.data: product.is_available = bool(request.data['is_available'])
+        if 'weight_kg' in request.data: product.weight_kg = request.data['weight_kg']
+        if 'length_m' in request.data: product.length_m = request.data['length_m']
         
         if 'category_id' in request.data:
             if request.data['category_id']:
@@ -898,6 +912,7 @@ class SystemSettingsView(APIView):
     
     def get(self, request):
         settings = SystemSettings.get_settings()
+        from payments.configuration import get_payment_policy
         
         data = {
             # Commissions
@@ -909,6 +924,7 @@ class SystemSettingsView(APIView):
             "airtel_money_fee": float(settings.airtel_money_fee),
             "payment_before_order": settings.payment_before_order,
             "unpaid_order_expiry_minutes": settings.unpaid_order_expiry_minutes,
+            "payment_policy": get_payment_policy(),
             
             # Villes & Géolocalisation
             "auto_detect_cities": settings.auto_detect_cities,
@@ -942,6 +958,7 @@ class SystemSettingsView(APIView):
     def patch(self, request):
         """Mettre à jour les paramètres système"""
         settings = SystemSettings.get_settings()
+        from payments.configuration import validate_payment_policy
         
         # Mise à jour des champs fournis
         if 'commission_global' in request.data:
@@ -957,6 +974,8 @@ class SystemSettingsView(APIView):
             settings.payment_before_order = request.data['payment_before_order']
         if 'unpaid_order_expiry_minutes' in request.data:
             settings.unpaid_order_expiry_minutes = request.data['unpaid_order_expiry_minutes']
+        if 'payment_policy' in request.data:
+            settings.payment_policy = validate_payment_policy(request.data['payment_policy'])
         
         if 'auto_detect_cities' in request.data:
             settings.auto_detect_cities = request.data['auto_detect_cities']

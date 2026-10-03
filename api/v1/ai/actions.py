@@ -262,8 +262,8 @@ Si plusieurs magasins, choisis le premier disponible."""
         # Calculer frais
         from decimal import Decimal
         delivery_fee = float(store.delivery_fee) if store.delivery_fee else 0.0
-        service_fee = float(store.service_fee) if store.service_fee else 0.0
-        total = items_total + delivery_fee + service_fee
+        service_fee = 0.0
+        total = items_total + delivery_fee
         
         # Créer un résumé
         summary_items = ", ".join([f"{item['quantity']}x {item['product']['name']}" for item in order_items[:3]])
@@ -398,7 +398,6 @@ def confirm_action(request):
             store=store,
             items_total=Decimal(str(totals.get('items_total', 0))),
             delivery_fee=Decimal(str(totals.get('delivery_fee', 0))),
-            service_fee=Decimal(str(totals.get('service_fee', 0))),
             total_amount=Decimal(str(totals.get('total', 0))),
             status='created',
             delivery_address=request.data.get('delivery_address', ''),
@@ -471,4 +470,3 @@ def confirm_action(request):
                 "message": f"Type d'action non supporté: {action_type}"
             }
         }, status=status.HTTP_400_BAD_REQUEST)
-

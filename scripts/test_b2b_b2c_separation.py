@@ -40,9 +40,9 @@ def test_public_products_endpoint():
 	print(f"Produits B2B purs (devraient être cachés): {b2b_only_products}")
 	
 	if b2b_only_products > 0:
-		print(f"✓ {b2b_only_products} produits B2B purs seront filtrés des endpoints publics")
+		print(f"? {b2b_only_products} produits B2B purs seront filtrés des endpoints publics")
 	else:
-		print("✓ Aucun produit B2B pur trouvé")
+		print("? Aucun produit B2B pur trouvé")
 	
 	return True
 
@@ -58,7 +58,7 @@ def test_store_manager_access():
 		stores = Store.objects.filter(manager=manager, is_active=True)
 		print(f"  - {manager.username}: {stores.count()} store(s)")
 	
-	print("✓ Les store_managers seront redirigés vers /store/dashboard par PublicRoute")
+	print("? Les store_managers seront redirigés vers /store/dashboard par PublicRoute")
 	return True
 
 
@@ -70,9 +70,9 @@ def test_client_access():
 	print(f"Clients trouvés: {clients.count()}")
 	
 	if clients.exists():
-		print(f"✓ Les clients seront redirigés vers /client/dashboard par PrivateRoute")
+		print(f"? Les clients seront redirigés vers /client/dashboard par PrivateRoute")
 	else:
-		print("⚠ Aucun client trouvé dans la base")
+		print("? Aucun client trouvé dans la base")
 	
 	return True
 
@@ -95,9 +95,9 @@ def test_b2b_products_filtering():
 	print(f"Produits B2C et B2B: {both}")
 	
 	if b2b_only > 0:
-		print(f"✓ {b2b_only} produits B2B purs seront exclus des endpoints publics")
+		print(f"? {b2b_only} produits B2B purs seront exclus des endpoints publics")
 	
-	print("✓ Les endpoints publics filtrent market_type__in=['b2c', 'both']")
+	print("? Les endpoints publics filtrent market_type__in=['b2c', 'both']")
 	return True
 
 
@@ -118,9 +118,9 @@ def test_b2b_orders():
 	
 	if b2b_orders.exists():
 		orders_with_source = b2b_orders.exclude(source_store__isnull=True).count()
-		print(f"✓ {orders_with_source}/{b2b_orders.count()} commandes B2B ont un source_store")
+		print(f"? {orders_with_source}/{b2b_orders.count()} commandes B2B ont un source_store")
 	else:
-		print("⚠ Aucune commande B2B trouvée")
+		print("? Aucune commande B2B trouvée")
 	
 	return True
 
@@ -163,7 +163,7 @@ def main():
 			result = test()
 			results.append((test.__name__, result))
 		except Exception as e:
-			print(f"❌ Erreur dans {test.__name__}: {str(e)}")
+			print(f"? Erreur dans {test.__name__}: {str(e)}")
 			results.append((test.__name__, False))
 	
 	# Résumé
@@ -172,15 +172,15 @@ def main():
 	print("=" * 60)
 	
 	for test_name, result in results:
-		status = "✓ PASS" if result else "❌ FAIL"
+		status = "? PASS" if result else "? FAIL"
 		print(f"{status}: {test_name}")
 	
 	all_passed = all(result for _, result in results)
 	
 	if all_passed:
-		print("\n✅ Tous les tests sont passés !")
+		print("\n? Tous les tests sont passés !")
 	else:
-		print("\n⚠️ Certains tests ont échoué")
+		print("\n?? Certains tests ont échoué")
 	
 	return all_passed
 

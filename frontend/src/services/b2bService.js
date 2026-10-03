@@ -148,28 +148,16 @@ export const getMyB2BOrders = async () => {
  */
 export const getStoreB2BProfile = async (storeId) => {
 	try {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'A', location: 'b2bService.js:getStoreB2BProfile', message: 'call getStoreB2BProfile', data: { storeId, baseURL: api?.defaults?.baseURL, path: `/b2b/profiles/${storeId}/` }, timestamp: Date.now() }) }).catch(() => {});
-		// #endregion
 		const response = await api.get(`/b2b/profiles/${storeId}/`);
 		return response.data;
 	} catch (error) {
 		// Si 404, c'est normal (profil n'existe pas encore) - ne pas logger comme erreur
 		if (error.response?.status === 404) {
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'D', location: 'b2bService.js:getStoreB2BProfile', message: 'profile missing 404', data: { storeId, status: error.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-			// #endregion
 			// Tentative sans trailing slash pour détecter un souci de configuration APPEND_SLASH
 			try {
 				const altResponse = await api.get(`/b2b/profiles/${storeId}`);
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'E', location: 'b2bService.js:getStoreB2BProfile', message: 'alt path success', data: { storeId, path: `/b2b/profiles/${storeId}`, status: altResponse?.status }, timestamp: Date.now() }) }).catch(() => {});
-				// #endregion
 				return altResponse.data;
 			} catch (altErr) {
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'E', location: 'b2bService.js:getStoreB2BProfile', message: 'alt path failed', data: { storeId, status: altErr?.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-				// #endregion
 			}
 			// Retourner une réponse structurée pour indiquer que le profil n'existe pas
 			return {
@@ -181,9 +169,6 @@ export const getStoreB2BProfile = async (storeId) => {
 			};
 		}
 		// Pour les autres erreurs, logger et throw
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'A', location: 'b2bService.js:getStoreB2BProfile', message: 'profile fetch error', data: { storeId, status: error.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-		// #endregion
 		throw error;
 	}
 };
@@ -199,32 +184,20 @@ export const getStoreB2BProfile = async (storeId) => {
  */
 export const createStoreB2BProfile = async (storeId, data) => {
 	try {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'B', location: 'b2bService.js:createStoreB2BProfile', message: 'call create profile', data: { storeId, body: { ...data }, baseURL: api?.defaults?.baseURL, path: '/b2b/profiles/' }, timestamp: Date.now() }) }).catch(() => {});
-		// #endregion
 		const response = await api.post('/b2b/profiles/', {
 			store_id: storeId,
 			...data,
 		});
 		return response.data;
 	} catch (error) {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'B', location: 'b2bService.js:createStoreB2BProfile', message: 'create profile error', data: { storeId, status: error.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-		// #endregion
 		// Tentative sans trailing slash
 		try {
 			const altResponse = await api.post('/b2b/profiles', {
 				store_id: storeId,
 				...data,
 			});
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'E', location: 'b2bService.js:createStoreB2BProfile', message: 'alt create success', data: { storeId, path: '/b2b/profiles', status: altResponse?.status }, timestamp: Date.now() }) }).catch(() => {});
-			// #endregion
 			return altResponse.data;
 		} catch (altErr) {
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'E', location: 'b2bService.js:createStoreB2BProfile', message: 'alt create failed', data: { storeId, status: altErr?.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-			// #endregion
 		}
 		throw error;
 	}
@@ -254,26 +227,14 @@ export const updateStoreB2BProfile = async (storeId, data) => {
  */
 export const activateStoreB2B = async (storeId, data = {}) => {
 	try {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'C', location: 'b2bService.js:activateStoreB2B', message: 'call activate', data: { storeId, body: { ...data }, baseURL: api?.defaults?.baseURL, path: `/b2b/profiles/${storeId}/activate/` }, timestamp: Date.now() }) }).catch(() => {});
-		// #endregion
 		const response = await api.patch(`/b2b/profiles/${storeId}/activate/`, data);
 		return response.data;
 	} catch (error) {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'C', location: 'b2bService.js:activateStoreB2B', message: 'activate error', data: { storeId, status: error.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-		// #endregion
 		// Tentative sans trailing slash
 		try {
 			const altResponse = await api.patch(`/b2b/profiles/${storeId}/activate`, data);
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'E', location: 'b2bService.js:activateStoreB2B', message: 'alt activate success', data: { storeId, path: `/b2b/profiles/${storeId}/activate`, status: altResponse?.status }, timestamp: Date.now() }) }).catch(() => {});
-			// #endregion
 			return altResponse.data;
 		} catch (altErr) {
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/fced817a-6879-4b38-979a-ae3f1398a171', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'prefix', hypothesisId: 'E', location: 'b2bService.js:activateStoreB2B', message: 'alt activate failed', data: { storeId, status: altErr?.response?.status }, timestamp: Date.now() }) }).catch(() => {});
-			// #endregion
 		}
 		throw error;
 	}

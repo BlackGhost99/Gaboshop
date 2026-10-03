@@ -34,9 +34,6 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     max_b2b_suppliers: null,
     max_b2b_monthly_orders: null,
     
-    // Frais de service
-    service_fee_client_amount: 500,
-    service_fee_to_wholesaler_amount: 1000,
     
     // Commissions
     commission_reduction_percent: 0,
@@ -100,8 +97,6 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         max_products_non_food: 5,
         max_b2b_suppliers: null,
         max_b2b_monthly_orders: null,
-        service_fee_client_amount: 500,
-        service_fee_to_wholesaler_amount: 1000,
         commission_reduction_percent: 0,
         commission_rate: null,
         commission_multiplier: 1.0,
@@ -177,7 +172,6 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     { id: 'general', label: 'Informations générales' },
     { id: 'limits', label: 'Limites Produits & Commandes' },
     { id: 'b2b_quotas', label: 'Quotas B2B' },
-    { id: 'fees', label: 'Frais de Service' },
     { id: 'commissions', label: 'Commissions' },
     { id: 'b2b_features', label: 'Fonctionnalités B2B' },
     { id: 'b2b_visibility', label: 'Visibilité B2B' },
@@ -386,32 +380,6 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                   placeholder="Illimité"
                 />
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Fees Section */}
-        {activeSection === 'fees' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Frais de service client (FCFA)</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.service_fee_client_amount}
-                onChange={(e) => updateField('service_fee_client_amount', parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Frais vers grossiste (FCFA)</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.service_fee_to_wholesaler_amount}
-                onChange={(e) => updateField('service_fee_to_wholesaler_amount', parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
             </div>
           </div>
         )}

@@ -42,7 +42,7 @@ def create_subscription_plans():
         }
     )
     if created:
-        print(f"✓ Plan Starter créé: {starter}")
+        print(f"? Plan Starter créé: {starter}")
     else:
         print(f"- Plan Starter existe déjà: {starter}")
     
@@ -71,7 +71,7 @@ def create_subscription_plans():
         }
     )
     if created:
-        print(f"✓ Plan Pro créé: {pro}")
+        print(f"? Plan Pro créé: {pro}")
     else:
         print(f"- Plan Pro existe déjà: {pro}")
     
@@ -102,11 +102,11 @@ def create_subscription_plans():
         }
     )
     if created:
-        print(f"✓ Plan Business créé: {business}")
+        print(f"? Plan Business créé: {business}")
     else:
         print(f"- Plan Business existe déjà: {business}")
     
-    print("\n✅ Plans d'abonnement configurés avec succès!")
+    print("\n? Plans d'abonnement configurés avec succès!")
     print(f"\nRécapitulatif:")
     print(f"- Starter: Gratuit (max 20 produits)")
     print(f"- Pro: 15 000 FCFA/mois (produits illimités, stats)")

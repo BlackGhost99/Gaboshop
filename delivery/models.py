@@ -52,6 +52,7 @@ class VehicleType(models.Model):
 	
 	name = models.CharField(max_length=20, choices=VEHICLE_NAME_CHOICES, unique=True, help_text="Type de véhicule")
 	max_weight_kg = models.DecimalField(max_digits=8, decimal_places=2, help_text="Poids maximum en kg")
+	max_length_m = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'), help_text="Longueur maximum en mètres")
 	max_items = models.PositiveIntegerField(help_text="Nombre maximum d'articles (0 = illimité)")
 	max_distance_km = models.DecimalField(max_digits=8, decimal_places=2, help_text="Distance maximum en km")
 	allow_intercity = models.BooleanField(default=False, help_text="Autorisé pour livraison inter-ville")
@@ -144,7 +145,7 @@ class CityDistance(models.Model):
 		]
 	
 	def __str__(self):
-		return f"{self.from_city} → {self.to_city}: {self.distance_km} km"
+		return f"{self.from_city} ? {self.to_city}: {self.distance_km} km"
 
 
 class Delivery(models.Model):
@@ -217,11 +218,17 @@ class Delivery(models.Model):
 	
 	# Assignation automatique
 	is_auto_assigned = models.BooleanField(default=False, help_text="Assigné automatiquement")
+	auto_assignment_enabled = models.BooleanField(default=True, help_text="Auto-assignation active pour cette livraison")
 	distance_to_store = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Distance en km")
-	distance_km = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Distance totale en km (store → client)")
+	distance_km = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Distance totale en km (store ? client)")
 	estimated_duration = models.PositiveIntegerField(null=True, blank=True, help_text="Durée estimée en minutes")
 	is_intra_city = models.BooleanField(default=True, help_text="Livraison intra-ville (même ville)")
-	assignment_timeout_minutes = models.PositiveIntegerField(default=2, help_text="Timeout pour acceptation livreur (minutes)")
+	assignment_timeout_minutes = models.PositiveIntegerField(default=10, help_text="Timeout pour acceptation livreur (minutes)")
+	assignment_started_at = models.DateTimeField(null=True, blank=True, help_text="Debut assignation automatique")
+	assignment_round = models.PositiveIntegerField(default=0, help_text="Nombre d'assignations successives")
+	assignment_attempts = models.JSONField(default=list, blank=True, help_text="IDs livreurs deja sollicites")
+	is_open_to_all = models.BooleanField(default=False, help_text="Visible a tous les livreurs")
+	opened_at = models.DateTimeField(null=True, blank=True, help_text="Date ouverture globale")
     
 	# Adresses
 	city = models.CharField(max_length=100, default='Libreville', help_text="Ville de livraison")
@@ -546,4 +553,3 @@ class DeliveryProof(models.Model):
 		
 		# Tolérance: 100 mètres
 		return self.distance_from_address <= 100
-

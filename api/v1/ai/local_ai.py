@@ -70,7 +70,7 @@ class LocalAI:
             if role == 'store_manager':
                 alerts = context.get("alerts", [])
                 if "LOW_STOCK_PRODUCTS" in alerts or "OUT_OF_STOCK" in alerts:
-                    return "⚠️ Vous avez des produits avec stock faible ou en rupture. Consultez la section 'Produits' pour gérer votre inventaire."
+                    return "?? Vous avez des produits avec stock faible ou en rupture. Consultez la section 'Produits' pour gérer votre inventaire."
                 return "Votre stock semble correct. Consultez la section 'Produits' pour voir tous vos articles."
         
         # Questions sur la livraison
@@ -86,7 +86,7 @@ class LocalAI:
                 subscription = context.get("subscription", {})
                 b2b_plan = subscription.get("b2b", "free")
                 if b2b_plan == "free":
-                    return "L'accès B2B nécessite un forfait Business. Consultez vos forfaits dans la section Abonnements pour mettre à niveau."
+                    return "L'accès B2B nécessite un forfait Pro ou Business. Consultez vos forfaits dans la section Abonnements pour mettre à niveau."
                 return "Pour vous réapprovisionner, rendez-vous dans l'onglet 'Approvisionnement B2B' de votre tableau de bord. Vous y trouverez nos partenaires grossistes."
         
         # Questions sur les erreurs

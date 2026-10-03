@@ -1,4 +1,6 @@
 from django.db import models
+import re
+import unicodedata
 from orders.models import Order
 from stores.models import Store
 from products.models import Product
@@ -251,14 +253,14 @@ class SubscriptionPlan(models.Model):
 	has_priority_support = models.BooleanField(default=False, help_text="Support VIP")
 	priority_listing = models.IntegerField(default=0, help_text="Ordre de priorité dans les listings (plus élevé = plus visible)")
 	
-	# FRAIS DE SERVICE
+	# CHAMP DESACTIVE
 	service_fee_client_amount = models.IntegerField(
-		default=500,
-		help_text="Montant des frais de service payés par le client final par commande B2C (FCFA)"
+		default=0,
+		help_text="Montant desactive (laisser a 0)"
 	)
 	service_fee_to_wholesaler_amount = models.IntegerField(
-		default=1000,
-		help_text="Frais facturés au commerce B2C pour chaque commande B2B vers un grossiste (FCFA)"
+		default=0,
+		help_text="Montant desactive (laisser a 0)"
 	)
 	
 	# COMMISSIONS
@@ -403,6 +405,37 @@ class SubscriptionPlan(models.Model):
 	
 	def get_features_list(self):
 		"""Retourne la liste des fonctionnalités"""
+		def normalize_text(value):
+			text = (value or '').strip().lower()
+			text = unicodedata.normalize('NFD', text)
+			text = re.sub(r'[\u0300-\u036f]', '', text)
+			text = re.sub(r'[^a-z0-9]+', ' ', text)
+			return ' '.join(text.split())
+
+		def feature_key(value):
+			normalized = normalize_text(value)
+			if not normalized:
+				return ''
+			match = re.search(r'\d+', normalized)
+			if 'produit' in normalized:
+				key = 'produits'
+				if 'non' in normalized and 'aliment' in normalized:
+					key = 'produits_non_food'
+				if match:
+					return f"{key}:{match.group(0)}"
+			if 'commande' in normalized and match:
+				return f"commandes:{match.group(0)}"
+			return normalized
+
+		def is_service_fee(value):
+			normalized = normalize_text(value)
+			return (
+				'frais de service' in normalized
+				or 'frais b2b' in normalized
+				or 'service fee' in normalized
+				or 'servicefee' in normalized
+			)
+
 		features = []
 		if self.max_products:
 			features.append(f"Jusqu'à {self.max_products} produits")
@@ -427,7 +460,20 @@ class SubscriptionPlan(models.Model):
 			features.append("Produits sponsorisés")
 		if self.priority_listing > 0:
 			features.append("Meilleure visibilité sur la plateforme")
-		return features + self.features_json
+		raw_features = features + (self.features_json or [])
+		unique = []
+		seen = set()
+		for item in raw_features:
+			if not isinstance(item, str):
+				continue
+			if is_service_fee(item):
+				continue
+			key = feature_key(item)
+			if not key or key in seen:
+				continue
+			seen.add(key)
+			unique.append(item)
+		return unique
 
 
 class CategoryCommission(models.Model):
@@ -468,7 +514,7 @@ class CategoryCommissionChangeLog(models.Model):
 
 	def __str__(self):
 		who = self.changed_by.get_full_name() if self.changed_by else 'Système'
-		return f"{self.category_commission.store_category.name}: {self.old_rate} → {self.new_rate} par {who} @ {self.created_at}"
+		return f"{self.category_commission.store_category.name}: {self.old_rate} ? {self.new_rate} par {who} @ {self.created_at}"
 
 
 class StoreSubscription(models.Model):
@@ -647,7 +693,7 @@ class Forfait(models.Model):
 
 class ClientForfait(models.Model):
 	"""
-	Tableau de correspondance User (Client) → Forfait
+	Tableau de correspondance User (Client) ? Forfait
 	Permet de savoir en temps réel quel forfait est appliqué au client.
 	"""
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_forfait')
@@ -762,4 +808,11 @@ class Payout(models.Model):
 	def __str__(self):
 		payout_type_display = dict(self.TYPES).get(self.payout_type, self.payout_type)
 		return f"{payout_type_display} - {self.user.phone} - {self.amount} FCFA ({self.status})"
+
+
+# Registered with the payments app; kept separate from provider transactions.
+from .direct_models import (  # noqa: E402,F401
+	PaymentArrangement, PaymentObligation, PaymentReceipt, PaymentAdjustment,
+	CommissionSettlement, SettlementAllocation,
+)
 

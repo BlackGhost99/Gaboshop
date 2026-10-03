@@ -346,13 +346,13 @@ python manage.py migrate orders
 
 ## Key Features
 
-✅ **Decimal Precision**: Uses Python's `Decimal` type for accurate financial calculations
-✅ **Automatic Calculation**: Operator fee is calculated automatically in `calculate_totals()`
-✅ **Client Transparency**: Fee is clearly displayed in invoice breakdown
-✅ **Scalable Configuration**: Easy to modify rates without code changes
-✅ **Multiple Operators**: Supports different payment methods with different fee rates
-✅ **Zero-Fee Option**: Supports operators with 0% fees (like cash)
-✅ **API Integrated**: Fully exposed in REST API responses
+? **Decimal Precision**: Uses Python's `Decimal` type for accurate financial calculations
+? **Automatic Calculation**: Operator fee is calculated automatically in `calculate_totals()`
+? **Client Transparency**: Fee is clearly displayed in invoice breakdown
+? **Scalable Configuration**: Easy to modify rates without code changes
+? **Multiple Operators**: Supports different payment methods with different fee rates
+? **Zero-Fee Option**: Supports operators with 0% fees (like cash)
+? **API Integrated**: Fully exposed in REST API responses
 
 ## Summary
 

@@ -2,6 +2,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 import logging
+from django.db.utils import OperationalError
 
 from notifications.models import Notification
 from notifications.serializers import NotificationSerializer
@@ -14,11 +15,27 @@ class NotificationListView(APIView):
 
     def get(self, request):
         try:
-            qs = Notification.objects.filter(user=request.user).order_by('-created_at')
+            qs = (
+                Notification.objects
+                .filter(user=request.user)
+                .select_related("user")
+                .order_by('-created_at')
+            )
             serializer = NotificationSerializer(qs, many=True)
             return Response({
                 'success': True,
                 'data': serializer.data
+            })
+        except OperationalError as e:
+            logger.warning(
+                "Notification query temporarily unavailable for user %s: %s",
+                request.user.id,
+                str(e),
+            )
+            return Response({
+                'success': True,
+                'data': [],
+                'message': 'Notifications temporairement indisponibles, reessayez.'
             })
         except Exception as e:
             logger.error(f"Error fetching notifications for user {request.user.id}: {str(e)}", exc_info=True)

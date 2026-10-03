@@ -43,9 +43,9 @@ def test_operator_fee_system():
     print("-" * 80)
     try:
         fee_value = order.operator_fee
-        print(f"✓ operator_fee field accessible: {fee_value} FCFA")
+        print(f"? operator_fee field accessible: {fee_value} FCFA")
     except AttributeError as e:
-        print(f"✗ ERROR: operator_fee field not found: {e}")
+        print(f"? ERROR: operator_fee field not found: {e}")
         success = False
     
     # Test 2: Calculate method exists
@@ -54,12 +54,12 @@ def test_operator_fee_system():
     try:
         method = getattr(order, 'calculate_operator_fee', None)
         if callable(method):
-            print("✓ calculate_operator_fee() method exists and is callable")
+            print("? calculate_operator_fee() method exists and is callable")
         else:
-            print("✗ ERROR: calculate_operator_fee() is not callable")
+            print("? ERROR: calculate_operator_fee() is not callable")
             success = False
     except AttributeError as e:
-        print(f"✗ ERROR: Method not found: {e}")
+        print(f"? ERROR: Method not found: {e}")
         success = False
     
     # Test 3: Test all operator rates
@@ -82,7 +82,7 @@ def test_operator_fee_system():
         expected_fee = expected_fee.quantize(Decimal('0.01'))
         
         matches = calculated_fee == expected_fee
-        status = "✓" if matches else "✗"
+        status = "?" if matches else "?"
         
         print(f"{status} {operator_name:.<30} {calculated_fee:>12} FCFA (Expected: {expected_fee})")
         
@@ -99,9 +99,9 @@ def test_operator_fee_system():
         
         # Check main field
         if 'operator_fee' in data:
-            print(f"✓ operator_fee field in main response: {data['operator_fee']} FCFA")
+            print(f"? operator_fee field in main response: {data['operator_fee']} FCFA")
         else:
-            print("✗ ERROR: operator_fee not in main response fields")
+            print("? ERROR: operator_fee not in main response fields")
             success = False
         
         # Check invoice breakdown
@@ -110,9 +110,9 @@ def test_operator_fee_system():
             
             # Check summary
             if 'summary' in breakdown and 'operator_fee' in breakdown['summary']:
-                print(f"✓ operator_fee in invoice breakdown summary: {breakdown['summary']['operator_fee']} FCFA")
+                print(f"? operator_fee in invoice breakdown summary: {breakdown['summary']['operator_fee']} FCFA")
             else:
-                print("✗ ERROR: operator_fee not in invoice breakdown summary")
+                print("? ERROR: operator_fee not in invoice breakdown summary")
                 success = False
             
             # Check payment breakdown lines
@@ -122,21 +122,21 @@ def test_operator_fee_system():
                 
                 for line in lines:
                     if 'Frais opérateur' in line.get('description', ''):
-                        print(f"✓ operator_fee in payment breakdown lines: {line['amount']} FCFA")
+                        print(f"? operator_fee in payment breakdown lines: {line['amount']} FCFA")
                         operator_line_found = True
                         break
                 
                 if not operator_line_found and order.operator_fee > 0:
-                    print("✗ ERROR: operator_fee line not found in payment breakdown (fee > 0)")
+                    print("? ERROR: operator_fee line not found in payment breakdown (fee > 0)")
                     success = False
                 elif not operator_line_found and order.operator_fee == 0:
-                    print("✓ operator_fee line correctly omitted (fee = 0)")
+                    print("? operator_fee line correctly omitted (fee = 0)")
         else:
-            print("✗ ERROR: invoice_breakdown not in response")
+            print("? ERROR: invoice_breakdown not in response")
             success = False
             
     except Exception as e:
-        print(f"✗ ERROR during serialization: {e}")
+        print(f"? ERROR during serialization: {e}")
         success = False
     
     # Test 5: Totals include operator fee
@@ -152,7 +152,6 @@ def test_operator_fee_system():
         expected_total = (
             fresh_order.items_total +
             fresh_order.delivery_fee +
-            fresh_order.service_fee +
             fresh_order.operator_fee +
             fresh_order.tax_amount +
             fresh_order.payment_fees
@@ -160,12 +159,11 @@ def test_operator_fee_system():
         
         actual_total = fresh_order.total_amount
         matches = actual_total == expected_total
-        status = "✓" if matches else "✗"
+        status = "?" if matches else "?"
         
         print(f"{status} Total calculation:")
         print(f"   Items:       {fresh_order.items_total} FCFA")
         print(f"   Delivery:    {fresh_order.delivery_fee} FCFA")
-        print(f"   Service:     {fresh_order.service_fee} FCFA")
         print(f"   Operator:    {fresh_order.operator_fee} FCFA")
         print(f"   Tax:         {fresh_order.tax_amount} FCFA")
         print(f"   Payment:     {fresh_order.payment_fees} FCFA")
@@ -177,18 +175,18 @@ def test_operator_fee_system():
             success = False
             
     except Exception as e:
-        print(f"✗ ERROR during total calculation: {e}")
+        print(f"? ERROR during total calculation: {e}")
         success = False
     
     # Final result
     print_section("TEST RESULTS")
     
     if success:
-        print("\n✓ ALL TESTS PASSED\n")
+        print("\n? ALL TESTS PASSED\n")
         print("The operator fee system is fully functional and ready for production!")
         return True
     else:
-        print("\n✗ SOME TESTS FAILED\n")
+        print("\n? SOME TESTS FAILED\n")
         print("Please review the errors above.")
         return False
 
@@ -213,7 +211,6 @@ def display_sample_api_response():
         'financial_summary': {
             'items_total': data.get('items_total'),
             'delivery_fee': data.get('delivery_fee'),
-            'service_fee': data.get('service_fee'),
             'operator_fee': data.get('operator_fee'),
             'total_amount': data.get('total_amount'),
         },

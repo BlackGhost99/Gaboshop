@@ -28,7 +28,7 @@ def airtel_money_webhook(request):
         #     return HttpResponseForbidden("Invalid signature")
 
         data = json.loads(payload)
-        logger.info(f"📩 Webhook Airtel reçu: {data}")
+        logger.info(f"?? Webhook Airtel reçu: {data}")
 
         # 2. Extraction des données
         transaction_id = data.get('transaction_id')
@@ -39,7 +39,7 @@ def airtel_money_webhook(request):
             try:
                 payment = Payment.objects.get(transaction_id=transaction_id)
             except Payment.DoesNotExist:
-                logger.error(f"❌ Paiement non trouvé pour transaction {transaction_id}")
+                logger.error(f"? Paiement non trouvé pour transaction {transaction_id}")
                 return JsonResponse({'status': 'error', 'message': 'Payment not found'}, status=404)
 
             # Mise à jour du paiement
@@ -65,14 +65,14 @@ def airtel_money_webhook(request):
                 NotificationService.notify_payment_failed(payment.order)
                 
             else:
-                logger.warning(f"⚠️ Statut Airtel inconnu: {status}")
+                logger.warning(f"?? Statut Airtel inconnu: {status}")
 
         return JsonResponse({'status': 'received'})
 
     except json.JSONDecodeError:
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
     except Exception as e:
-        logger.error(f"❌ Erreur Webhook Airtel: {e}")
+        logger.error(f"? Erreur Webhook Airtel: {e}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
@@ -85,7 +85,7 @@ def moov_money_webhook(request):
     try:
         payload = request.body
         data = json.loads(payload)
-        logger.info(f"📩 Webhook Moov reçu: {data}")
+        logger.info(f"?? Webhook Moov reçu: {data}")
 
         # Structure typique Moov (à adapter selon la doc officielle Gabon)
         ref_commande = data.get('reference')
@@ -119,5 +119,5 @@ def moov_money_webhook(request):
         return JsonResponse({'status': 'received'})
 
     except Exception as e:
-        logger.error(f"❌ Erreur Webhook Moov: {e}")
+        logger.error(f"? Erreur Webhook Moov: {e}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class SMSService:
     """
     Service d'envoi de SMS avec support multiple providers
-    Priorité: Hub2SMS (Gabon) → Twilio → Fallback
+    Priorité: Hub2SMS (Gabon) ? Twilio ? Fallback
     """
     
     @staticmethod
@@ -46,11 +46,11 @@ class SMSService:
                     return True
                     
             except Exception as e:
-                logger.error(f"❌ Erreur SMS {provider}: {e}")
+                logger.error(f"? Erreur SMS {provider}: {e}")
                 continue
         
         # Fallback: log et retour échec
-        logger.error(f"❌ Tous les providers SMS ont échoué pour {phone}")
+        logger.error(f"? Tous les providers SMS ont échoué pour {phone}")
         return False
     
     @staticmethod
@@ -82,7 +82,7 @@ class Hub2SMSService:
         """
         try:
             if not settings.HUB2SMS_API_KEY:
-                logger.warning("⚠️ Hub2SMS non configuré - Simulation")
+                logger.warning("?? Hub2SMS non configuré - Simulation")
                 return Hub2SMSService._simulate_send(phone, message)
             
             formatted_phone = SMSService._format_phone(phone)
@@ -105,22 +105,22 @@ class Hub2SMSService:
             if response.status_code == 200:
                 result = response.json()
                 if result.get('status') == 'success':
-                    logger.info(f"✅ SMS Hub2 envoyé à {formatted_phone}")
+                    logger.info(f"? SMS Hub2 envoyé à {formatted_phone}")
                     return True
                 else:
-                    logger.error(f"❌ Hub2SMS error: {result.get('message')}")
+                    logger.error(f"? Hub2SMS error: {result.get('message')}")
                     return False
             else:
-                logger.error(f"❌ Hub2SMS HTTP error: {response.status_code}")
+                logger.error(f"? Hub2SMS HTTP error: {response.status_code}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Erreur Hub2SMS: {e}")
+            logger.error(f"? Erreur Hub2SMS: {e}")
             return False
     
     @staticmethod
     def _simulate_send(phone, message):
-        logger.info(f"🎯 SMS Hub2 simulé à {phone}: {message}")
+        logger.info(f"?? SMS Hub2 simulé à {phone}: {message}")
         return True
 
 class TwilioService:
@@ -132,7 +132,7 @@ class TwilioService:
     def send_sms(phone, message):
         try:
             if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
-                logger.warning("⚠️ Twilio non configuré - Simulation")
+                logger.warning("?? Twilio non configuré - Simulation")
                 return TwilioService._simulate_send(phone, message)
             
             from twilio.rest import Client
@@ -147,16 +147,16 @@ class TwilioService:
                 to=formatted_phone
             )
             
-            logger.info(f"✅ SMS Twilio envoyé à {formatted_phone} - SID: {message.sid}")
+            logger.info(f"? SMS Twilio envoyé à {formatted_phone} - SID: {message.sid}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erreur Twilio: {e}")
+            logger.error(f"? Erreur Twilio: {e}")
             return False
     
     @staticmethod
     def _simulate_send(phone, message):
-        logger.info(f"🎯 SMS Twilio simulé à {phone}: {message}")
+        logger.info(f"?? SMS Twilio simulé à {phone}: {message}")
         return True
 
 class InfobipService:
@@ -167,5 +167,5 @@ class InfobipService:
     @staticmethod
     def send_sms(phone, message):
         # Implémentation similaire à Twilio
-        logger.info(f"🎯 SMS Infobip simulé à {phone}: {message}")
+        logger.info(f"?? SMS Infobip simulé à {phone}: {message}")
         return True

@@ -1,4 +1,4 @@
-# 🚀 ProofUploadModal UX Improvements - Summary
+# ?? ProofUploadModal UX Improvements - Summary
 
 ## Changes Made (December 9, 2024)
 
@@ -17,7 +17,7 @@
   
 - **Success Message with Hint:**
   ```
-  ✓ Code PIN vérifié avec succès
+  ? Code PIN vérifié avec succès
   Vous pouvez maintenant confirmer la livraison
   ```
   - Primary message in bold
@@ -58,7 +58,7 @@ className={`px-8 py-3 rounded-md font-bold text-base transition transform ${
 - **Shadow effects:**
   - Default: shadow-lg
   - Hover: hover:shadow-xl
-- **Icon:** ⏳ for loading state (more visual)
+- **Icon:** ? for loading state (more visual)
 - **Disabled state:** bg-gray-300 (lighter) and opacity-60 (better distinction)
 
 ### 3. PIN Input Container
@@ -81,7 +81,7 @@ className={`px-8 py-3 rounded-md font-bold text-base transition transform ${
 2. Clicks "Vérifier" button
 3. System shows:
    - Loading state: "Vérification..."
-   - Success: Container turns green, shows success message, button changes to "✓ Vérifié"
+   - Success: Container turns green, shows success message, button changes to "? Vérifié"
    - Error: Red container, clear error message with retry hint
 4. On success:
    - Input field becomes disabled (grayed out)
@@ -147,10 +147,10 @@ className={`px-8 py-3 rounded-md font-bold text-base transition transform ${
 
 ## Testing Checklist
 
-- [ ] Enter correct PIN → Shows success, input disabled, button enabled
-- [ ] Enter incorrect PIN → Shows error in red, input still enabled
-- [ ] Click "Vérifier" again with wrong PIN → Same error handling
-- [ ] After correct PIN, click "✓ Confirmer la livraison" → Proof uploads
+- [ ] Enter correct PIN ? Shows success, input disabled, button enabled
+- [ ] Enter incorrect PIN ? Shows error in red, input still enabled
+- [ ] Click "Vérifier" again with wrong PIN ? Same error handling
+- [ ] After correct PIN, click "? Confirmer la livraison" ? Proof uploads
 - [ ] Button transitions smoothly between enabled/disabled states
 - [ ] Colors are visible on both light and dark screens
 - [ ] Touch targets are large enough on mobile (44x44px minimum)

@@ -79,7 +79,7 @@ def test_stock_update():
             city=buyer_store.city,
             items_total=b2b_pricing.b2b_price * quantity,
             delivery_fee=wholesaler.delivery_fee,
-            service_fee=200,
+            service_fee=0,
             total_amount=(b2b_pricing.b2b_price * quantity) + wholesaler.delivery_fee + 200,
             status='confirmed',
             confirmed_at=timezone.now()

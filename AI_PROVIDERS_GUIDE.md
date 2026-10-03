@@ -12,7 +12,7 @@
   - Guidance basique
 - **Limitations** : Pas de compréhension avancée du langage naturel
 
-### 2. DeepSeek (GRATUIT avec limites généreuses) ⭐ RECOMMANDÉ
+### 2. DeepSeek (GRATUIT avec limites généreuses) ? RECOMMANDÉ
 - **Coût** : 1 million de tokens/mois GRATUIT
 - **Obtenir une clé** : https://platform.deepseek.com/
 - **Configuration** :

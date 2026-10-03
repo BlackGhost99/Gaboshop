@@ -70,7 +70,7 @@ ROLE_PERMISSIONS = {
     },
     'delivery_agent': {
         'order': [],  # Pas d'accès direct
-        'delivery': ['accepted', 'picked_up', 'in_transit', 'delivered'],  # Peut accepter et livrer
+        'delivery': ['accepted', 'picked_up', 'in_transit', 'delivered', 'rejected'],  # Peut accepter, livrer ou refuser
     },
 }
 
@@ -126,7 +126,7 @@ def can_user_change_order_status(user, current_status, new_status):
         if is_valid_order_transition(current_status, new_status):
             return True, None
         else:
-            return False, f"Transition invalide: {current_status} → {new_status}"
+            return False, f"Transition invalide: {current_status} ? {new_status}"
     
     # Récupérer le rôle de l'utilisateur
     user_role = user.user_type
@@ -142,7 +142,7 @@ def can_user_change_order_status(user, current_status, new_status):
     
     # Vérifier que la transition est valide
     if not is_valid_order_transition(current_status, new_status):
-        return False, f"Transition invalide: {current_status} → {new_status}"
+        return False, f"Transition invalide: {current_status} ? {new_status}"
     
     return True, None
 
@@ -164,7 +164,7 @@ def can_user_change_delivery_status(user, current_status, new_status):
         if is_valid_delivery_transition(current_status, new_status):
             return True, None
         else:
-            return False, f"Transition invalide: {current_status} → {new_status}"
+            return False, f"Transition invalide: {current_status} ? {new_status}"
     
     # Récupérer le rôle de l'utilisateur
     user_role = user.user_type
@@ -180,7 +180,7 @@ def can_user_change_delivery_status(user, current_status, new_status):
     
     # Vérifier que la transition est valide
     if not is_valid_delivery_transition(current_status, new_status):
-        return False, f"Transition invalide: {current_status} → {new_status}"
+        return False, f"Transition invalide: {current_status} ? {new_status}"
     
     return True, None
 

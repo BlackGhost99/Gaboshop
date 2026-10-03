@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
+import PaymentPolicySettings from '../../components/PaymentPolicySettings';
 import { 
 	activateStoreB2B, 
 	deactivateStoreB2B, 
@@ -132,7 +133,7 @@ const AdminDashboard = () => {
   // Product CRUD
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [newProduct, setNewProduct] = useState({ name: '', description: '', price: 0, promo_price: null, stock: 0, is_available: true, store_id: '', category_id: '', sku: '' });
+  const [newProduct, setNewProduct] = useState({ name: '', description: '', price: 0, promo_price: null, stock: 0, weight_kg: '', length_m: '', is_available: true, store_id: '', category_id: '', sku: '' });
   const [viewingProduct, setViewingProduct] = useState(null);
   const [productsListAdmin, setProductsListAdmin] = useState([]);
   const [productStats, setProductStats] = useState(null);
@@ -790,7 +791,7 @@ const AdminDashboard = () => {
       const res = await createProductAdmin(newProduct);  // Using adminService.createProductAdmin
       if (res?.success) {
         setShowAddProduct(false);
-        setNewProduct({ name: '', description: '', price: 0, promo_price: null, stock: 0, is_available: true, store_id: '', category_id: '', sku: '' });
+        setNewProduct({ name: '', description: '', price: 0, promo_price: null, stock: 0, weight_kg: '', length_m: '', is_available: true, store_id: '', category_id: '', sku: '' });
         loadProductsData();
         loadData(false);
       }
@@ -939,42 +940,42 @@ const AdminDashboard = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         <StatCard 
-          title="📦 Total" 
+          title="?? Total" 
           value={orderStats?.today?.total_orders || 0}
           hint="Aujourd'hui"
         />
         <StatCard 
-          title="💳 En Attente" 
+          title="?? En Attente" 
           value={orderStats?.today?.pending_payment || 0}
           hint="Paiement"
         />
         <StatCard 
-          title="✅ Confirmées" 
+          title="? Confirmées" 
           value={orderStats?.today?.confirmed || 0}
           hint="Prêtes"
         />
         <StatCard 
-          title="👨‍🍳 En Préparation" 
+          title="????? En Préparation" 
           value={orderStats?.today?.in_preparation || 0}
           hint="Cuisine"
         />
         <StatCard 
-          title="🚚 En Livraison" 
+          title="?? En Livraison" 
           value={orderStats?.today?.in_delivery || 0}
           hint="Route"
         />
         <StatCard 
-          title="✔️ Livrées" 
+          title="?? Livrées" 
           value={orderStats?.today?.delivered || 0}
           hint="Complétées"
         />
         <StatCard 
-          title="❌ Annulées" 
+          title="? Annulées" 
           value={orderStats?.today?.cancelled || 0}
           hint="Échouées"
         />
         <StatCard 
-          title="💰 Revenus" 
+          title="?? Revenus" 
           value={`${(orderStats?.today?.total_revenue || 0).toLocaleString('fr-FR')} FCFA`}
           hint="Dont frais livraison"
         />
@@ -1098,7 +1099,7 @@ const AdminDashboard = () => {
                     </div>
 
                     <p className="text-xs text-gray-600">
-                      📍 {o.delivery_address || 'Adresse non spécifiée'}
+                      ?? {o.delivery_address || 'Adresse non spécifiée'}
                     </p>
                   </div>
 
@@ -1108,7 +1109,7 @@ const AdminDashboard = () => {
                       onClick={() => viewOrderDetail(o.id)}
                       className="px-3 py-2 bg-blue-50 text-blue-600 rounded text-sm hover:bg-blue-100 font-medium whitespace-nowrap"
                     >
-                      👁️ Détails
+                      ??? Détails
                     </button>
 
                     {o.status === 'pending' && (
@@ -1117,13 +1118,13 @@ const AdminDashboard = () => {
                           onClick={() => handleOrderStatusChange(o.id, 'confirmed')}
                           className="px-3 py-2 bg-emerald-50 text-emerald-600 rounded text-sm hover:bg-emerald-100 font-medium whitespace-nowrap"
                         >
-                          ✅ Confirmer
+                          ? Confirmer
                         </button>
                         <button
                           onClick={() => handleCancelOrder(o.id)}
                           className="px-3 py-2 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 font-medium whitespace-nowrap"
                         >
-                          ❌ Annuler
+                          ? Annuler
                         </button>
                       </>
                     )}
@@ -1134,7 +1135,7 @@ const AdminDashboard = () => {
                           onClick={() => handleOrderStatusChange(o.id, 'preparing')}
                           className="px-3 py-2 bg-orange-50 text-orange-600 rounded text-sm hover:bg-orange-100 font-medium whitespace-nowrap"
                         >
-                          👨‍🍳 Préparation
+                          ????? Préparation
                         </button>
                         <button 
                           onClick={() => {
@@ -1143,13 +1144,13 @@ const AdminDashboard = () => {
                           }}
                           className="px-3 py-2 bg-purple-50 text-purple-600 rounded text-sm hover:bg-purple-100 font-medium whitespace-nowrap"
                         >
-                          🚚 Assigner
+                          ?? Assigner
                         </button>
                         <button
                           onClick={() => handleCancelOrder(o.id)}
                           className="px-3 py-2 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 font-medium whitespace-nowrap"
                         >
-                          ❌ Annuler
+                          ? Annuler
                         </button>
                       </>
                     )}
@@ -1163,13 +1164,13 @@ const AdminDashboard = () => {
                           }}
                           className="px-3 py-2 bg-purple-50 text-purple-600 rounded text-sm hover:bg-purple-100 font-medium whitespace-nowrap"
                         >
-                          🚚 Assigner
+                          ?? Assigner
                         </button>
                         <button
                           onClick={() => handleCancelOrder(o.id)}
                           className="px-3 py-2 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 font-medium whitespace-nowrap"
                         >
-                          ❌ Annuler
+                          ? Annuler
                         </button>
                       </>
                     )}
@@ -1180,13 +1181,13 @@ const AdminDashboard = () => {
                           onClick={() => handleOrderStatusChange(o.id, 'in_delivery')}
                           className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded text-sm hover:bg-indigo-100 font-medium whitespace-nowrap"
                         >
-                          🚗 En livraison
+                          ?? En livraison
                         </button>
                         <button
                           onClick={() => handleCancelOrder(o.id)}
                           className="px-3 py-2 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 font-medium whitespace-nowrap"
                         >
-                          ❌ Annuler
+                          ? Annuler
                         </button>
                       </>
                     )}
@@ -1197,13 +1198,13 @@ const AdminDashboard = () => {
                           onClick={() => handleOrderStatusChange(o.id, 'delivered')}
                           className="px-3 py-2 bg-green-50 text-green-600 rounded text-sm hover:bg-green-100 font-medium whitespace-nowrap"
                         >
-                          🎯 Livrée
+                          ?? Livrée
                         </button>
                         <button
                           onClick={() => handleCancelOrder(o.id)}
                           className="px-3 py-2 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 font-medium whitespace-nowrap"
                         >
-                          ❌ Annuler
+                          ? Annuler
                         </button>
                       </>
                     )}
@@ -1217,18 +1218,18 @@ const AdminDashboard = () => {
 
       {/* Tableau par Magasin */}
       <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
-        <h2 className="text-lg font-semibold mb-3">📊 Commandes par Magasin</h2>
+        <h2 className="text-lg font-semibold mb-3">?? Commandes par Magasin</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
                 <th className="py-3 px-3 font-semibold">Magasin</th>
-                <th className="py-3 px-3 font-semibold">⏳ En attente</th>
-                <th className="py-3 px-3 font-semibold">👨‍🍳 Préparation</th>
-                <th className="py-3 px-3 font-semibold">🚚 Assignée</th>
-                <th className="py-3 px-3 font-semibold">📦 En cours</th>
-                <th className="py-3 px-3 font-semibold">✅ Jour</th>
-                <th className="py-3 px-3 font-semibold">📈 Mois</th>
+                <th className="py-3 px-3 font-semibold">? En attente</th>
+                <th className="py-3 px-3 font-semibold">????? Préparation</th>
+                <th className="py-3 px-3 font-semibold">?? Assignée</th>
+                <th className="py-3 px-3 font-semibold">?? En cours</th>
+                <th className="py-3 px-3 font-semibold">? Jour</th>
+                <th className="py-3 px-3 font-semibold">?? Mois</th>
               </tr>
             </thead>
             <tbody>
@@ -1254,18 +1255,18 @@ const AdminDashboard = () => {
 
       {/* Tableau Livreurs Actifs */}
       <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
-        <h2 className="text-lg font-semibold mb-3">🚚 Livreurs Actifs</h2>
+        <h2 className="text-lg font-semibold mb-3">?? Livreurs Actifs</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
                 <th className="py-3 px-3 font-semibold">Livreur</th>
-                <th className="py-3 px-3 font-semibold">👤 Nom</th>
-                <th className="py-3 px-3 font-semibold">📍 Assignées</th>
-                <th className="py-3 px-3 font-semibold">🚗 En transit</th>
-                <th className="py-3 px-3 font-semibold">✅ Livrées</th>
-                <th className="py-3 px-3 font-semibold">❌ Annulées</th>
-                <th className="py-3 px-3 font-semibold">📊 Total</th>
+                <th className="py-3 px-3 font-semibold">?? Nom</th>
+                <th className="py-3 px-3 font-semibold">?? Assignées</th>
+                <th className="py-3 px-3 font-semibold">?? En transit</th>
+                <th className="py-3 px-3 font-semibold">? Livrées</th>
+                <th className="py-3 px-3 font-semibold">? Annulées</th>
+                <th className="py-3 px-3 font-semibold">?? Total</th>
               </tr>
             </thead>
             <tbody>
@@ -1328,13 +1329,13 @@ const AdminDashboard = () => {
               {/* Customer & Store */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="border-l-4 border-blue-500 pl-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">👤 Client</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">?? Client</p>
                   <p className="font-bold text-gray-900">{selectedOrder.client?.name}</p>
                   <p className="text-sm text-gray-600">{selectedOrder.client?.phone}</p>
                   <p className="text-sm text-gray-600">{selectedOrder.client?.email}</p>
                 </div>
                 <div className="border-l-4 border-green-500 pl-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">🏪 Magasin</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">?? Magasin</p>
                   <p className="font-bold text-gray-900">{selectedOrder.store?.name}</p>
                   <p className="text-sm text-gray-600">{selectedOrder.store?.manager}</p>
                   <p className="text-sm text-gray-600">{selectedOrder.store?.phone}</p>
@@ -1343,14 +1344,14 @@ const AdminDashboard = () => {
 
               {/* Delivery Address */}
               <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
-                <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold mb-2">📍 Adresse de Livraison</p>
+                <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold mb-2">?? Adresse de Livraison</p>
                 <p className="font-semibold text-gray-900">{selectedOrder.delivery_address?.address}</p>
                 <p className="text-sm text-gray-700">{selectedOrder.delivery_address?.city}, {selectedOrder.delivery_address?.district}</p>
               </div>
 
               {/* Products */}
               <div>
-                <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wide">📦 Produits Commandés</h3>
+                <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wide">?? Produits Commandés</h3>
                 <div className="space-y-2 bg-gray-50 rounded-lg p-4">
                   {selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm py-2 border-b last:border-0">
@@ -1385,7 +1386,7 @@ const AdminDashboard = () => {
               {/* Delivery Info */}
               {selectedOrder.delivery_agent && (
                 <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
-                  <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold mb-2">🚚 Livreur Assigné</p>
+                  <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold mb-2">?? Livreur Assigné</p>
                   <p className="font-semibold text-gray-900">{selectedOrder.delivery_agent}</p>
                 </div>
               )}
@@ -1398,13 +1399,13 @@ const AdminDashboard = () => {
                       onClick={() => handleOrderStatusChange(selectedOrder.id, 'confirmed')}
                       className="flex-1 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-semibold hover:bg-emerald-100"
                     >
-                      ✅ Confirmer
+                      ? Confirmer
                     </button>
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
                       className="flex-1 px-4 py-2 bg-red-50 text-red-700 rounded-lg font-semibold hover:bg-red-100"
                     >
-                      ❌ Annuler
+                      ? Annuler
                     </button>
                   </>
                 )}
@@ -1415,7 +1416,7 @@ const AdminDashboard = () => {
                       onClick={() => handleOrderStatusChange(selectedOrder.id, 'preparing')}
                       className="flex-1 px-4 py-2 bg-orange-50 text-orange-700 rounded-lg font-semibold hover:bg-orange-100"
                     >
-                      👨‍🍳 Préparation
+                      ????? Préparation
                     </button>
                     <button 
                       onClick={() => {
@@ -1425,13 +1426,13 @@ const AdminDashboard = () => {
                       }}
                       className="flex-1 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg font-semibold hover:bg-purple-100"
                     >
-                      🚚 Assigner Livreur
+                      ?? Assigner Livreur
                     </button>
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
                       className="flex-1 px-4 py-2 bg-red-50 text-red-700 rounded-lg font-semibold hover:bg-red-100"
                     >
-                      ❌ Annuler
+                      ? Annuler
                     </button>
                   </>
                 )}
@@ -1446,13 +1447,13 @@ const AdminDashboard = () => {
                       }}
                       className="flex-1 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg font-semibold hover:bg-purple-100"
                     >
-                      🚚 Assigner Livreur
+                      ?? Assigner Livreur
                     </button>
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
                       className="flex-1 px-4 py-2 bg-red-50 text-red-700 rounded-lg font-semibold hover:bg-red-100"
                     >
-                      ❌ Annuler
+                      ? Annuler
                     </button>
                   </>
                 )}
@@ -1463,13 +1464,13 @@ const AdminDashboard = () => {
                       onClick={() => handleOrderStatusChange(selectedOrder.id, 'in_delivery')}
                       className="flex-1 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold hover:bg-indigo-100"
                     >
-                      🚗 En livraison
+                      ?? En livraison
                     </button>
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
                       className="flex-1 px-4 py-2 bg-red-50 text-red-700 rounded-lg font-semibold hover:bg-red-100"
                     >
-                      ❌ Annuler
+                      ? Annuler
                     </button>
                   </>
                 )}
@@ -1480,13 +1481,13 @@ const AdminDashboard = () => {
                       onClick={() => handleOrderStatusChange(selectedOrder.id, 'delivered')}
                       className="flex-1 px-4 py-2 bg-green-50 text-green-700 rounded-lg font-semibold hover:bg-green-100"
                     >
-                      🎯 Livrée
+                      ?? Livrée
                     </button>
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
                       className="flex-1 px-4 py-2 bg-red-50 text-red-700 rounded-lg font-semibold hover:bg-red-100"
                     >
-                      ❌ Annuler
+                      ? Annuler
                     </button>
                   </>
                 )}
@@ -1510,7 +1511,7 @@ const AdminDashboard = () => {
             <div className="sticky top-0 bg-white border-b p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">🚚 Assigner Livreur</h2>
+                  <h2 className="text-xl font-bold text-gray-900">?? Assigner Livreur</h2>
                   {assigningOrder && (
                     <p className="text-sm text-gray-500 mt-2">Commande #{ordersList.find(o => o.id === assigningOrder)?.order_number}</p>
                   )}
@@ -1543,12 +1544,12 @@ const AdminDashboard = () => {
                     }}
                     className="w-5 h-5 text-blue-600 rounded cursor-pointer"
                   />
-                  <span className="ml-3 font-semibold text-gray-700">🤖 Attribution automatique</span>
+                  <span className="ml-3 font-semibold text-gray-700">?? Attribution automatique</span>
                 </label>
 
                 {autoAssign && (
                   <p className="text-sm text-blue-600 bg-blue-50 p-3 rounded">
-                    ℹ️ Meilleur livreur disponible sera sélectionné automatiquement
+                    ?? Meilleur livreur disponible sera sélectionné automatiquement
                   </p>
                 )}
               </div>
@@ -1557,7 +1558,7 @@ const AdminDashboard = () => {
               {!autoAssign && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    👤 Sélectionner manuellement:
+                    ?? Sélectionner manuellement:
                   </label>
                   <select 
                     value={selectedDeliveryAgent}
@@ -1599,7 +1600,7 @@ const AdminDashboard = () => {
                   disabled={!autoAssign && !selectedDeliveryAgent}
                   className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  ✅ Assigner
+                  ? Assigner
                 </button>
               </div>
             </div>
@@ -1619,22 +1620,22 @@ const AdminDashboard = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
-           title="📊 Revenus (Mois)" 
+           title="?? Revenus (Mois)" 
            value={`${formatMoney(financeDashboard?.month?.revenue)} FCFA`}
            hint={`${financeDashboard?.month?.orders_count ?? 0} commandes`}
         />
         <StatCard 
-           title="💰 Commissions" 
+           title="?? Commissions" 
            value={`${formatMoney(financeDashboard?.month?.commissions)} FCFA`}
            hint="Prélevées à la plateforme"
         />
         <StatCard 
-           title="🚚 Paiements Livreurs" 
+           title="?? Paiements Livreurs" 
            value={`${formatMoney(financeDashboard?.month?.delivery_payouts)} FCFA`}
            hint="Coût total des livraisons"
         />
         <StatCard 
-           title="📈 Bénéfice Réel" 
+           title="?? Bénéfice Réel" 
            value={`${formatMoney(financeDashboard?.month?.platform_profit)} FCFA`}
            hint="Après tous les coûts"
         />
@@ -1643,17 +1644,17 @@ const AdminDashboard = () => {
       {/* Secondary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard 
-           title="✅ Commandes Payées" 
+           title="? Commandes Payées" 
            value={financeDashboard?.metrics?.paid_orders ?? 'N/A'}
            hint="Statut: success"
         />
         <StatCard 
-           title="⏳ Paiements en Attente" 
+           title="? Paiements en Attente" 
            value={financeDashboard?.metrics?.pending_payments ?? 'N/A'}
            hint="À confirmer"
         />
         <StatCard 
-           title="❌ Paiements Échoués" 
+           title="? Paiements Échoués" 
            value={financeDashboard?.metrics?.failed_payments ?? 'N/A'}
            hint="À vérifier"
         />
@@ -1662,7 +1663,7 @@ const AdminDashboard = () => {
       {/* Revenue Breakdown Pie Chart Data */}
       {revenueBreakdown && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Répartition des Revenus</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Répartition des Revenus</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="border-l-4 border-blue-500 pl-4">
               <p className="text-sm text-gray-500">Commissions</p>
@@ -1686,11 +1687,6 @@ const AdminDashboard = () => {
               <p className="text-2xl font-bold text-gray-900">{revenueBreakdown.sponsoring.percentage.toFixed(1)}%</p>
               <p className="text-xs text-gray-400">{revenueBreakdown.sponsoring.amount.toLocaleString('fr-FR')} FCFA</p>
             </div>
-            <div className="border-l-4 border-red-500 pl-4">
-              <p className="text-sm text-gray-500">Frais Service</p>
-              <p className="text-2xl font-bold text-gray-900">{revenueBreakdown.service_fees.percentage.toFixed(1)}%</p>
-              <p className="text-xs text-gray-400">{revenueBreakdown.service_fees.amount.toLocaleString('fr-FR')} FCFA</p>
-            </div>
           </div>
         </div>
       )}
@@ -1698,7 +1694,7 @@ const AdminDashboard = () => {
       {/* Transactions List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">💳 Transactions Clients</h3>
+          <h3 className="text-lg font-semibold">?? Transactions Clients</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1735,7 +1731,7 @@ const AdminDashboard = () => {
       {/* Commissions by Store */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">🏪 Commissions par Magasin</h3>
+          <h3 className="text-lg font-semibold">?? Commissions par Magasin</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1764,7 +1760,7 @@ const AdminDashboard = () => {
       {/* Delivery Payouts */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">🚚 Coûts Livraison & Salaires Livreurs</h3>
+          <h3 className="text-lg font-semibold">?? Coûts Livraison & Salaires Livreurs</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1798,7 +1794,7 @@ const AdminDashboard = () => {
       {subscriptions.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b">
-            <h3 className="text-lg font-semibold">📅 Abonnements Mode Pro</h3>
+            <h3 className="text-lg font-semibold">?? Abonnements Mode Pro</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -1881,7 +1877,7 @@ const AdminDashboard = () => {
           onClick={() => setSelectedStoreCategory(null)}
           className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300"
         >
-          ← Retour
+          ? Retour
         </button>
         <h2 className="text-lg font-semibold">Magasins - {selectedStoreCategory.name}</h2>
       </div>
@@ -2065,7 +2061,7 @@ const AdminDashboard = () => {
   const settingsSection = (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">⚙️ Configuration Globale</h2>
+        <h2 className="text-2xl font-bold text-gray-900">?? Configuration Globale</h2>
         {!editingSettings ? (
           <button
             onClick={() => setEditingSettings(true)}
@@ -2096,9 +2092,9 @@ const AdminDashboard = () => {
 
       {systemSettings && (
         <form onSubmit={handleUpdateSettings} className="space-y-6">
-          {/* 🟦 1. COMMISSIONS */}
+          {/* ?? 1. COMMISSIONS */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟦 Commissions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Commissions</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Commission globale par défaut (%)</label>
@@ -2125,9 +2121,9 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* 🟧 2. PAIEMENTS */}
+          {/* ?? 2. PAIEMENTS */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟧 Paiements</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Paiements</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Frais Moov Money (%)</label>
@@ -2176,9 +2172,15 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* 🟥 3. VILLES & GÉOLOCALISATION */}
+          <PaymentPolicySettings
+            value={editingSettings ? settingsForm.payment_policy : systemSettings.payment_policy}
+            onChange={(paymentPolicy) => setSettingsForm({...settingsForm, payment_policy: paymentPolicy})}
+            disabled={!editingSettings}
+          />
+
+          {/* ?? 3. VILLES & GÉOLOCALISATION */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟥 Villes & Géolocalisation</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Villes & Géolocalisation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="flex items-center gap-2 mb-4">
@@ -2226,9 +2228,9 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* 🟩 4. LIVRAISON */}
+          {/* ?? 4. LIVRAISON */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟩 Livraison</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Livraison</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Prix par km (FCFA)</label>
@@ -2266,9 +2268,9 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* 🟨 5. COMMANDES */}
+          {/* ?? 5. COMMANDES */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟨 Commandes</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Commandes</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Validité panier (heures)</label>
@@ -2303,9 +2305,9 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* 🟪 6. MAGASINS */}
+          {/* ?? 6. MAGASINS */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟪 Magasins</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">?? Magasins</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Heure ouverture par défaut</label>
@@ -2353,9 +2355,9 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* ⚫ 7. NOTIFICATIONS */}
+          {/* ? 7. NOTIFICATIONS */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">⚫ Notifications</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">? Notifications</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="flex items-center gap-2">
@@ -2402,13 +2404,13 @@ const AdminDashboard = () => {
         {actionSuccess && (
           <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 flex justify-between items-center">
             <span>{actionSuccess}</span>
-            <button onClick={() => setActionSuccess('')} className="text-green-600 hover:text-green-800">✕</button>
+            <button onClick={() => setActionSuccess('')} className="text-green-600 hover:text-green-800">?</button>
           </div>
         )}
         {actionError && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex justify-between items-center">
             <span>{actionError}</span>
-            <button onClick={() => setActionError('')} className="text-red-600 hover:text-red-800">✕</button>
+            <button onClick={() => setActionError('')} className="text-red-600 hover:text-red-800">?</button>
           </div>
         )}
 
@@ -2444,7 +2446,7 @@ const AdminDashboard = () => {
                 className="text-gray-400 hover:text-gray-600"
                 aria-label="Fermer"
               >
-                ✕
+                ?
               </button>
             </div>
             <form onSubmit={handleAddUser} className="space-y-3">
@@ -2566,7 +2568,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Détail utilisateur</h3>
-              <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">✕</button>
+              <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">?</button>
             </div>
             <div className="space-y-1 text-sm text-gray-700">
               <p><span className="font-semibold">Téléphone: </span>{selectedUser.phone}</p>
@@ -2598,7 +2600,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Confirmer la suppression</h3>
-              <button onClick={() => setConfirmDeleteUser(null)} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">✕</button>
+              <button onClick={() => setConfirmDeleteUser(null)} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">?</button>
             </div>
             <p className="text-sm text-gray-700">Supprimer l'utilisateur {confirmDeleteUser.phone} ? Cette action est définitive.</p>
             <div className="bg-gray-50 rounded-md p-3 text-xs text-gray-600 space-y-1">
@@ -2633,7 +2635,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Modifier utilisateur</h3>
-              <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">✕</button>
+              <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">?</button>
             </div>
             <form
               onSubmit={(e) => {
@@ -2767,7 +2769,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Ajouter une catégorie</h3>
-              <button onClick={() => setShowAddStoreCat(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setShowAddStoreCat(false)} className="text-gray-400 hover:text-gray-600">?</button>
             </div>
             <form onSubmit={handleCreateStoreCat} className="space-y-3">
               <div>
@@ -2819,7 +2821,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Modifier catégorie</h3>
-              <button onClick={() => setEditingStoreCat(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setEditingStoreCat(null)} className="text-gray-400 hover:text-gray-600">?</button>
             </div>
             <form onSubmit={handleUpdateStoreCat} className="space-y-3">
               <div>
@@ -2871,7 +2873,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Ajouter un magasin</h3>
-              <button onClick={() => setShowAddStore(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setShowAddStore(false)} className="text-gray-400 hover:text-gray-600">?</button>
             </div>
             <form onSubmit={handleCreateStore} className="space-y-3">
               <div>
@@ -2914,7 +2916,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Modifier magasin</h3>
-              <button onClick={() => setEditingStore(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setEditingStore(null)} className="text-gray-400 hover:text-gray-600">?</button>
             </div>
             <form onSubmit={handleUpdateStore} className="space-y-3">
               <div>
@@ -2959,7 +2961,7 @@ const AdminDashboard = () => {
                 className="text-gray-400 hover:text-gray-600"
                 aria-label="Fermer"
               >
-                ✕
+                ?
               </button>
             </div>
             <form onSubmit={handleCreateStore} className="space-y-4">
@@ -3123,7 +3125,7 @@ const AdminDashboard = () => {
                 className="text-gray-400 hover:text-gray-600"
                 aria-label="Fermer"
               >
-                ✕
+                ?
               </button>
             </div>
             <form onSubmit={handleUpdateStore} className="space-y-4">
@@ -3281,7 +3283,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Ajouter un produit</h3>
-              <button onClick={() => setShowAddProduct(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setShowAddProduct(false)} className="text-gray-400 hover:text-gray-600">?</button>
             </div>
             <form onSubmit={handleCreateProduct} className="space-y-3">
               <div>
@@ -3308,6 +3310,14 @@ const AdminDashboard = () => {
                 <input type="number" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
               </div>
               <div>
+                <label className="text-sm font-semibold text-gray-700">Poids (kg)</label>
+                <input type="number" step="0.01" min="0" value={newProduct.weight_kg || ''} onChange={(e) => setNewProduct({ ...newProduct, weight_kg: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Longueur (m)</label>
+                <input type="number" step="0.01" min="0" max="5" value={newProduct.length_m || ''} onChange={(e) => setNewProduct({ ...newProduct, length_m: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
+              </div>
+              <div>
                 <label className="text-sm font-semibold text-gray-700">Stock</label>
                 <input type="number" value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
               </div>
@@ -3325,7 +3335,7 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Modifier produit</h3>
-              <button onClick={() => setEditingProduct(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setEditingProduct(null)} className="text-gray-400 hover:text-gray-600">?</button>
             </div>
             <form onSubmit={handleUpdateProduct} className="space-y-3">
               <div>
@@ -3343,6 +3353,14 @@ const AdminDashboard = () => {
               <div>
                 <label className="text-sm font-semibold text-gray-700">Prix</label>
                 <input type="number" value={editingProduct.price} onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Poids (kg)</label>
+                <input type="number" step="0.01" min="0" value={editingProduct.weight_kg || ''} onChange={(e) => setEditingProduct({ ...editingProduct, weight_kg: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Longueur (m)</label>
+                <input type="number" step="0.01" min="0" max="5" value={editingProduct.length_m || ''} onChange={(e) => setEditingProduct({ ...editingProduct, length_m: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
               </div>
               <div>
                 <label className="text-sm font-semibold text-gray-700">Stock</label>

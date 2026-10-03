@@ -25,7 +25,7 @@ const StoreProducts = () => {
     
     // Form states
     const [newProduct, setNewProduct] = useState({
-        name: '', description: '', price: '', stock: '', category: '', image: null
+        name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', image: null
     });
     const [newCategory, setNewCategory] = useState({
         name: '', description: '', commission_rate: '8.00', order: 0
@@ -38,14 +38,6 @@ const StoreProducts = () => {
     useEffect(() => {
         fetchData();
     }, []);
-
-    useEffect(() => {
-        // #region agent log
-        if (toast) {
-            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:38',message:'Toast state changed',data:{toastExists:!!toast,toastMessage:toast?.message,toastType:toast?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,D'})}).catch(()=>{});
-        }
-        // #endregion
-    }, [toast]);
 
     const fetchData = async () => {
         try {
@@ -121,13 +113,7 @@ const StoreProducts = () => {
     // };
 
     const showToast = (message, type = 'success') => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:105',message:'showToast entry',data:{message,type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
-        // #endregion
         setToast({ message, type });
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:108',message:'showToast after setToast',data:{message,type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         setTimeout(() => setToast(null), 5000);
     };
 
@@ -143,6 +129,8 @@ const StoreProducts = () => {
             price: product.price,
             stock: product.stock,
             category: product.category,
+            weight_kg: product.weight_kg || '',
+            length_m: product.length_m || '',
             image: null
         });
         setShowProductModal(true);
@@ -173,7 +161,7 @@ const StoreProducts = () => {
                 }
                 setShowProductModal(false);
                 setEditingProduct(null);
-                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', image: null });
+                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', image: null });
             }
         } catch (error) {
             console.error("Error saving product", error);
@@ -192,21 +180,12 @@ const StoreProducts = () => {
     const confirmDelete = async () => {
         if (!confirmDeleteProduct || deletingProductId) return;
         
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:157',message:'confirmDelete entry',data:{productId:confirmDeleteProduct},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
-        // #endregion
         
         setDeletingProductId(confirmDeleteProduct);
         try {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:162',message:'Before deleteProduct API call',data:{productId:confirmDeleteProduct},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             
             const response = await deleteProduct(confirmDeleteProduct);
             
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:165',message:'deleteProduct API response',data:{responseSuccess:response?.success,responseMessage:response?.message,responseError:response?.error,responseFull:response},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
-            // #endregion
             
             if (response?.success) {
                 // Retirer immédiatement le produit de la liste (même s'il est désactivé au lieu d'être supprimé)
@@ -220,9 +199,6 @@ const StoreProducts = () => {
                 setConfirmDeleteProduct(null);
             }
         } catch (error) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:173',message:'Error in confirmDelete',data:{errorMessage:error?.message,errorResponse:error?.response?.data,errorStatus:error?.response?.status,errorFull:JSON.stringify(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
-            // #endregion
             console.error("Error deleting product", error);
             const errorMessage = error?.response?.data?.error?.message 
                 || error?.response?.data?.error
@@ -273,17 +249,11 @@ const StoreProducts = () => {
                     </button> */}
                     <button 
                         onClick={async () => {
-                            // #region agent log
-                            fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:264',message:'Button onClick triggered',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                            // #endregion
                             
                             // Vérifier si le magasin peut ajouter des produits
                             const canAdd = subscriptionInfo?.features?.can_add_more_products ?? subscriptionInfo?.limits?.products?.can_add_more ?? true;
                             
                             if (!canAdd) {
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/3034891a-d8c4-4be8-b0a8-8720a23ed625',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StoreProducts.jsx:270',message:'Product limit reached',data:{canAdd,subscriptionInfo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                                // #endregion
                                 
                                 const currentProducts = subscriptionInfo?.limits?.products?.current ?? subscriptionInfo?.features?.current_products ?? 0;
                                 const maxProducts = subscriptionInfo?.limits?.products?.max ?? subscriptionInfo?.features?.max_products ?? null;
@@ -388,6 +358,14 @@ const StoreProducts = () => {
                             <div>
                                 <span className="font-semibold text-gray-700">Stock:</span>
                                 <span className="ml-2">{viewingProduct.stock} unités</span>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-gray-700">Poids:</span>
+                                <span className="ml-2">{viewingProduct.weight_kg ? `${viewingProduct.weight_kg} kg` : '?'}</span>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-gray-700">Longueur:</span>
+                                <span className="ml-2">{viewingProduct.length_m ? `${viewingProduct.length_m} m` : '?'}</span>
                             </div>
                             <div>
                                 <span className="font-semibold text-gray-700">Catégorie:</span>
@@ -511,6 +489,35 @@ const StoreProducts = () => {
                                     />
                                 </div>
                             </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Poids (kg)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="w-full border rounded p-2"
+                                        value={newProduct.weight_kg}
+                                        onChange={e => setNewProduct({...newProduct, weight_kg: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Longueur (m)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="5"
+                                        className="w-full border rounded p-2"
+                                        value={newProduct.length_m}
+                                        onChange={e => setNewProduct({...newProduct, length_m: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-1">Catégorie</label>
                                 <select 
@@ -564,7 +571,7 @@ const StoreProducts = () => {
                                     onClick={() => {
                                         setShowProductModal(false);
                                         setEditingProduct(null);
-                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', image: null });
+                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', image: null });
                                     }}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
                                 >

@@ -164,7 +164,7 @@ const ClientOrders = () => {
 
       const res = await confirmDelivery(orderId, payload);
       if (res.success) {
-        alert('✓ Réception confirmée avec succès !');
+        alert('? Réception confirmée avec succès !');
         setDetail(null);
         setShowPinModal(false);
         setPinInput('');
@@ -172,10 +172,10 @@ const ClientOrders = () => {
         fetchOrders(); // Rafraîchir la liste
       } else {
         const msg = res.error?.message || 'Erreur lors de la confirmation';
-        setPinError(`❌ ${msg}`);
+        setPinError(`? ${msg}`);
       }
     } catch (err) {
-      setPinError(`❌ Erreur: ${err.message}`);
+      setPinError(`? Erreur: ${err.message}`);
     } finally {
       setConfirming(false);
     }
@@ -288,7 +288,7 @@ const ClientOrders = () => {
                 <p className="text-xs text-gray-500">Commande #{detail.id}</p>
                 <h3 className="text-lg font-semibold text-gray-900">{detail.store_name || 'Commande'}</h3>
               </div>
-              <button className="text-gray-500 hover:text-gray-800" onClick={() => setDetail(null)}>✕</button>
+              <button className="text-gray-500 hover:text-gray-800" onClick={() => setDetail(null)}>?</button>
             </div>
 
             <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -336,7 +336,7 @@ const ClientOrders = () => {
                     disabled={confirming}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {confirming ? 'Confirmation...' : '✓ Confirmer la réception'}
+                    {confirming ? 'Confirmation...' : '? Confirmer la réception'}
                   </button>
                 )}
               </div>
@@ -353,7 +353,7 @@ const ClientOrders = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-96">
             <div className="text-center mb-6">
-              <div className="text-4xl mb-2">📦</div>
+              <div className="text-4xl mb-2">??</div>
               <h3 className="text-lg font-semibold text-gray-800">
                 Livraison arrivée !
               </h3>

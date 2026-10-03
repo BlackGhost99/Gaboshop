@@ -8,10 +8,31 @@ const AssignedOrdersList = () => {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     fetchAssignedOrders();
   }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const getAssignmentCountdown = (order) => {
+    if (!order?.assigned_at || !order?.assignment_timeout_minutes) return null;
+    const assignedMs = new Date(order.assigned_at).getTime();
+    if (Number.isNaN(assignedMs)) return null;
+    const deadlineMs = assignedMs + order.assignment_timeout_minutes * 60 * 1000;
+    const diffMs = deadlineMs - now;
+    const clampedMs = Math.max(0, diffMs);
+    const minutes = Math.floor(clampedMs / 60000);
+    const seconds = Math.floor((clampedMs % 60000) / 1000);
+    return {
+      label: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+      expired: diffMs <= 0
+    };
+  };
 
   const fetchAssignedOrders = async () => {
     try {
@@ -166,79 +187,87 @@ const AssignedOrdersList = () => {
             </p>
           </div>
         ) : (
-          filteredOrders.map((order) => (
-            <div key={order.id} className="px-6 py-4 hover:bg-gray-50 transition">
-              <div className="flex items-start justify-between gap-4">
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      Commande #{order.order_number}
-                    </h4>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
-                      {order.status_display}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    <strong>Magasin:</strong> {order.store_name}
-                  </p>
-                  <p className="text-sm text-gray-600 mb-2">
-                    <strong>Client:</strong> {order.client_name} ({order.client_phone})
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
-                    <div>
-                      <strong>Adresse pickup:</strong>
-                      <p className="text-xs">{order.pickup_address}</p>
+          filteredOrders.map((order) => {
+            const countdown = getAssignmentCountdown(order);
+            return (
+              <div key={order.id} className="px-6 py-4 hover:bg-gray-50 transition">
+                <div className="flex items-start justify-between gap-4">
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-sm font-semibold text-gray-900">
+                        Commande #{order.order_number}
+                      </h4>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
+                        {order.status_display}
+                      </span>
                     </div>
-                    <div>
-                      <strong>Adresse livraison:</strong>
-                      <p className="text-xs">{order.delivery_address}</p>
+                    {countdown && ['assigned', 'pending'].includes(order.status) && (
+                      <p className={`text-xs ${countdown.expired ? 'text-red-600' : 'text-amber-600'} mb-2`}>
+                        Temps restant pour accepter: {countdown.label}
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-600 mb-2">
+                      <strong>Magasin:</strong> {order.store_name}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      <strong>Client:</strong> {order.client_name} ({order.client_phone})
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
+                      <div>
+                        <strong>Adresse pickup:</strong>
+                        <p className="text-xs">{order.pickup_address}</p>
+                      </div>
+                      <div>
+                        <strong>Adresse livraison:</strong>
+                        <p className="text-xs">{order.delivery_address}</p>
+                      </div>
                     </div>
-                  </div>
-                  {order.estimated_duration && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Durée estimée: {order.estimated_duration} min
-                    </p>
-                  )}
-                </div>
-
-                {/* Right side - Amount & Actions */}
-                <div className="flex flex-col items-end gap-3">
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-gray-900">
-                      {formatCurrency(order.total_amount)}
-                    </p>
-                    <p className="text-xs text-green-600 font-medium">
-                      +{formatCurrency(order.fee)} frais
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {order.items_count} article(s)
-                    </p>
+                    {order.estimated_duration && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Duree estimee: {order.estimated_duration} min
+                      </p>
+                    )}
                   </div>
 
-                  {/* Actions */}
-                  {['assigned', 'pending'].includes(order.status) && (
-                    <div className="flex gap-2 w-full">
-                      <button
-                        onClick={() => handleAccept(order.id)}
-                        disabled={actionLoading[order.id]}
-                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
-                      >
-                        {actionLoading[order.id] ? 'Traitement...' : 'Accepter'}
-                      </button>
-                      <button
-                        onClick={() => handleReject(order.id)}
-                        disabled={actionLoading[order.id]}
-                        className="flex-1 px-3 py-2 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition"
-                      >
-                        {actionLoading[order.id] ? 'Traitement...' : 'Refuser'}
-                      </button>
+                  {/* Right side - Amount & Actions */}
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-gray-900">
+                        {formatCurrency(order.total_amount)}
+                      </p>
+                      <p className="text-xs text-green-600 font-medium">
+                        Frais livraison: {formatCurrency(order.delivery_fee || order.fee)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {order.items_count} article(s)
+                      </p>
                     </div>
-                  )}
+
+                    {/* Actions */}
+                    {['assigned', 'pending'].includes(order.status) && (
+                      <div className="flex gap-2 w-full">
+                        <button
+                          onClick={() => handleAccept(order.id)}
+                          disabled={actionLoading[order.id]}
+                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
+                        >
+                          {actionLoading[order.id] ? 'Traitement...' : 'Accepter'}
+                        </button>
+                        <button
+                          onClick={() => handleReject(order.id)}
+                          disabled={actionLoading[order.id]}
+                          className="flex-1 px-3 py-2 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition"
+                        >
+                          {actionLoading[order.id] ? 'Traitement...' : 'Refuser'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

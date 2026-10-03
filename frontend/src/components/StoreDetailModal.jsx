@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { getStoreDetailAdmin } from '../services/adminService';
-import StoreB2BModal from './StoreB2BModal';
+import StoreMarketModeModal from './StoreMarketModeModal';
 
 /**
  * Modal pour afficher les détails d'un store
@@ -102,8 +102,8 @@ const StoreDetailModal = ({ isOpen, onClose, storeId }) => {
 									<span className="text-xs text-gray-600">B2C</span>
 								</div>
 								<div className="flex items-center gap-2">
-									<span className={`px-2 py-1 text-xs rounded-full ${store.is_b2b ? 'bg-purple-50 text-purple-700' : 'bg-gray-50 text-gray-700'}`}>
-										{store.is_b2b ? 'B2B' : 'Non B2B'}
+									<span className={`px-2 py-1 text-xs rounded-full ${'Mode B2B/B2C'}`}>
+										{'Mode B2B/B2C'}
 									</span>
 									<span className="text-xs text-gray-600">B2B</span>
 								</div>
@@ -130,7 +130,7 @@ const StoreDetailModal = ({ isOpen, onClose, storeId }) => {
 								onClick={() => setShowB2BModal(true)}
 								className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
 							>
-								{store.is_b2b ? 'Gérer B2B' : 'Activer B2B'}
+								{'Mode B2B/B2C'}
 							</button>
 							<button
 								onClick={onClose}
@@ -145,7 +145,7 @@ const StoreDetailModal = ({ isOpen, onClose, storeId }) => {
 
 			{/* Modal B2B */}
 			{store && (
-				<StoreB2BModal
+				<StoreMarketModeModal
 					isOpen={showB2BModal}
 					onClose={() => {
 						setShowB2BModal(false);

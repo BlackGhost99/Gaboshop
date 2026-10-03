@@ -1,4 +1,4 @@
-# 📋 PIN Delivery Confirmation Implementation Guide
+# ?? PIN Delivery Confirmation Implementation Guide
 
 ## Overview
 
@@ -33,7 +33,7 @@ class Delivery(models.Model):
 **Where:** `api/v1/delivery.py` - `DeliveryAcceptAssignmentView`  
 **Process:**
 1. Livreur clicks "Accepter la livraison" button
-2. Delivery status changes from `pending` → `accepted`
+2. Delivery status changes from `pending` ? `accepted`
 3. PIN is retrieved from `delivery.delivery_code`
 4. Notification Service sends PIN to client via:
    - SMS (primary)
@@ -62,9 +62,9 @@ NotificationService._send_to_client(client.phone, client.email, template, messag
 **Steps:**
 
 #### Step 1: Capture Photos & GPS
-- 📸 **ID Card Photo** (MANDATORY) - Client's identification
-- 📦 **Package Photo** (OPTIONAL) - Proof of package delivery
-- 📍 **GPS Location** (MANDATORY) - Delivery location coordinates
+- ?? **ID Card Photo** (MANDATORY) - Client's identification
+- ?? **Package Photo** (OPTIONAL) - Proof of package delivery
+- ?? **GPS Location** (MANDATORY) - Delivery location coordinates
 
 #### Step 2: Verification Method Selection
 Livreur chooses between:
@@ -76,8 +76,8 @@ Livreur chooses between:
 2. Frontend validates PIN length (4-6 digits)
 3. Frontend calls `verifyPIN` endpoint to validate against `delivery.delivery_code`
 4. On success:
-   - Shows success message: "✓ Code PIN vérifié avec succès"
-   - Enables "✓ Confirmer la livraison" button
+   - Shows success message: "? Code PIN vérifié avec succès"
+   - Enables "? Confirmer la livraison" button
    - Input field becomes disabled
 5. On failure:
    - Shows error: "PIN incorrect"
@@ -132,13 +132,13 @@ if pin_code:
 ### 7. Delivery Completion
 
 When both:
-- ✓ Livreur uploaded proof with correct PIN
-- ✓ Client confirmed with correct PIN
+- ? Livreur uploaded proof with correct PIN
+- ? Client confirmed with correct PIN
 
 **Results:**
-- `Delivery.status` → `delivered`
-- `DeliveryProof.pin_verified` → `True`
-- `DeliveryProof.client_received_status` → `True`
+- `Delivery.status` ? `delivered`
+- `DeliveryProof.pin_verified` ? `True`
+- `DeliveryProof.client_received_status` ? `True`
 - Audit log entry created
 - Notifications sent to all parties
 
@@ -231,8 +231,8 @@ disabled={
 ### Security Measures
 - PINs are delivery-specific (not reusable)
 - PIN verification requires both:
-  - ✓ Livreur uploads valid proof
-  - ✓ Client verifies correct PIN
+  - ? Livreur uploads valid proof
+  - ? Client verifies correct PIN
 - Audit logs track all PIN verifications
 - Failed attempts can be tracked/limited
 
@@ -331,11 +331,11 @@ Body: { "pin_code": "123456" }
 - [ ] Check SMS/WhatsApp for PIN notification
 - [ ] Livreur uploads photos + GPS
 - [ ] Livreur selects PIN verification method
-- [ ] Livreur enters correct PIN → success message
-- [ ] Livreur tries wrong PIN → error, can retry
-- [ ] Livreur submits with correct PIN → success
+- [ ] Livreur enters correct PIN ? success message
+- [ ] Livreur tries wrong PIN ? error, can retry
+- [ ] Livreur submits with correct PIN ? success
 - [ ] Client receives notification
-- [ ] Client enters correct PIN in app → delivery confirmed
+- [ ] Client enters correct PIN in app ? delivery confirmed
 - [ ] Verify audit logs recorded all steps
 
 ## Error Handling

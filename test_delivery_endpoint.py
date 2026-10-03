@@ -24,16 +24,16 @@ def test_endpoint():
         print(f"Response: {response.text[:200]}")
         
         if response.status_code == 404:
-            print("❌ Endpoint not found. The server might not have reloaded the URL configuration.")
+            print("? Endpoint not found. The server might not have reloaded the URL configuration.")
         elif response.status_code == 401:
-            print("✅ Endpoint exists (Auth required). URL routing is working.")
+            print("? Endpoint exists (Auth required). URL routing is working.")
         elif response.status_code == 200:
-            print("✅ Success!")
+            print("? Success!")
         else:
-            print(f"⚠️ Unexpected status: {response.status_code}")
+            print(f"?? Unexpected status: {response.status_code}")
             
     except requests.exceptions.ConnectionError:
-        print("❌ Could not connect to server. Is it running on port 8000?")
+        print("? Could not connect to server. Is it running on port 8000?")
 
 if __name__ == "__main__":
     test_endpoint()

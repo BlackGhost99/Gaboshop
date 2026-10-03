@@ -32,17 +32,15 @@ def get_sales_summary(store, date_from=None, date_to=None, **filters):
     aggregates = orders.aggregate(
         gross_sales=Coalesce(Sum('items_total'), Decimal('0')),
         total_commission=Coalesce(Sum('commission_amount'), Decimal('0')),
-        total_service_fees=Coalesce(Sum('service_fee'), Decimal('0')),
         total_delivery_fees=Coalesce(Sum('delivery_fee'), Decimal('0')),
         payment_fees=Coalesce(Sum('payment_fees'), Decimal('0')),
         orders_count=Count('id'),
     )
     
-    # Net reçu = gross - commission - service_fees
+    # Net recu = gross - commission
     aggregates['net_received'] = (
         aggregates['gross_sales'] - 
-        aggregates['total_commission'] - 
-        aggregates['total_service_fees']
+        aggregates['total_commission']
     )
     
     # Refunds

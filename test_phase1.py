@@ -43,7 +43,7 @@ def print_header(text):
     print(f"{Colors.BOLD}{Colors.CYAN}{'='*70}{Colors.ENDC}\n")
 
 def print_test(name, passed, message=""):
-    icon = f"{Colors.GREEN}✓{Colors.ENDC}" if passed else f"{Colors.RED}✗{Colors.ENDC}"
+    icon = f"{Colors.GREEN}?{Colors.ENDC}" if passed else f"{Colors.RED}?{Colors.ENDC}"
     status = f"{Colors.GREEN}PASS{Colors.ENDC}" if passed else f"{Colors.RED}FAIL{Colors.ENDC}"
     print(f"{icon} {name:<50} {status}", end="")
     if message:
@@ -102,10 +102,10 @@ def setup_test_data():
         status='pending'
     )
     
-    print(f"  {Colors.GREEN}✓{Colors.ENDC} Manager created: {manager.email}")
-    print(f"  {Colors.GREEN}✓{Colors.ENDC} Driver created: {driver.email}")
-    print(f"  {Colors.GREEN}✓{Colors.ENDC} Order created: #{order.id}")
-    print(f"  {Colors.GREEN}✓{Colors.ENDC} Delivery created: #{delivery.id}\n")
+    print(f"  {Colors.GREEN}?{Colors.ENDC} Manager created: {manager.email}")
+    print(f"  {Colors.GREEN}?{Colors.ENDC} Driver created: {driver.email}")
+    print(f"  {Colors.GREEN}?{Colors.ENDC} Order created: #{order.id}")
+    print(f"  {Colors.GREEN}?{Colors.ENDC} Delivery created: #{delivery.id}\n")
     
     return manager, driver, store, order, delivery
 
@@ -119,7 +119,7 @@ def test_valid_transitions():
     tests_total = 4
     
     # Test 1.1: Accept delivery
-    print(f"{Colors.BLUE}1.1 Testing: Accept Delivery (pending → accepted){Colors.ENDC}")
+    print(f"{Colors.BLUE}1.1 Testing: Accept Delivery (pending ? accepted){Colors.ENDC}")
     client.login(username='driver@test.com', password='test123')
     response = client.post(f'/api/v1/dashboard/delivery/{delivery.id}/accept/')
     
@@ -135,7 +135,7 @@ def test_valid_transitions():
         tests_total += 1
     
     # Test 1.2: Start delivery
-    print(f"\n{Colors.BLUE}1.2 Testing: Start Delivery (accepted → in_transit){Colors.ENDC}")
+    print(f"\n{Colors.BLUE}1.2 Testing: Start Delivery (accepted ? in_transit){Colors.ENDC}")
     response = client.post(f'/api/v1/dashboard/delivery/{delivery.id}/start/')
     
     passed = response.status_code == 200
@@ -150,7 +150,7 @@ def test_valid_transitions():
         tests_total += 1
     
     # Test 1.3: Complete delivery
-    print(f"\n{Colors.BLUE}1.3 Testing: Complete Delivery (in_transit → delivered){Colors.ENDC}")
+    print(f"\n{Colors.BLUE}1.3 Testing: Complete Delivery (in_transit ? delivered){Colors.ENDC}")
     response = client.post(f'/api/v1/dashboard/delivery/{delivery.id}/complete/')
     
     passed = response.status_code == 200
@@ -285,7 +285,7 @@ def test_audit_logging():
     tests_passed += log_created
     tests_total += 1
     print_test("Audit log created on status change", log_created,
-              f"Logs: {initial_log_count} → {new_log_count}")
+              f"Logs: {initial_log_count} ? {new_log_count}")
     
     # Test 4.2: Check log details
     print(f"\n{Colors.BLUE}4.2 Testing: Audit Log Details{Colors.ENDC}")
@@ -359,10 +359,10 @@ def main():
     print(f"{Colors.CYAN}{Colors.BOLD}Success Rate:{Colors.ENDC} {passed_pct:.1f}%")
     
     if total_passed == total_tests:
-        print(f"\n{Colors.GREEN}{Colors.BOLD}✓ ALL TESTS PASSED - Phase 1 is working correctly!{Colors.ENDC}\n")
+        print(f"\n{Colors.GREEN}{Colors.BOLD}? ALL TESTS PASSED - Phase 1 is working correctly!{Colors.ENDC}\n")
         return 0
     else:
-        print(f"\n{Colors.RED}{Colors.BOLD}✗ SOME TESTS FAILED - Please review the output above{Colors.ENDC}\n")
+        print(f"\n{Colors.RED}{Colors.BOLD}? SOME TESTS FAILED - Please review the output above{Colors.ENDC}\n")
         return 1
 
 if __name__ == '__main__':

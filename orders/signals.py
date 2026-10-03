@@ -31,6 +31,12 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 	Gère les changements de statut de commande
 	"""
 	order = instance
+	if not created:
+		try:
+			from payments.direct_service import sync_on_order_status
+			sync_on_order_status(order)
+		except Exception:
+			pass
 	
 	# 1. Notifications et Actions à la création
 	if created:
@@ -68,14 +74,14 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 				commission_amount=commission_calc['commission_amount'],
 				delivery_fee_share=commission_calc['delivery_fee_share'],
 			)
-			print(f"✅ Commission créée pour commande {order.order_number}: {commission_calc['commission_amount']} FCFA")
+			print(f"? Commission créée pour commande {order.order_number}: {commission_calc['commission_amount']} FCFA")
 	
 	# 4. Confirmer la commande après paiement
 	if order.status == 'paid' and not order.confirmed_at:
 		order.status = 'confirmed'
 		order.confirmed_at = timezone.now()
 		order.save(update_fields=['status', 'confirmed_at'])
-		print(f"✅ Commande {order.order_number} confirmée")
+		print(f"? Commande {order.order_number} confirmée")
 	
 	# 5. Mettre à jour l'inventaire du store B2C quand commande B2B est livrée
 	if order.is_b2b and order.source_store and hasattr(order, '_old_status'):
@@ -139,14 +145,14 @@ def handle_payment_success(sender, instance, created, **kwargs):
 		order.status = 'paid'
 		order.save(update_fields=['status'])
 		
-		print(f"✅ Paiement validé pour commande {order.order_number}")
+		print(f"? Paiement validé pour commande {order.order_number}")
 		
 		# 3. Déclencher l'assignation du livreur (via Celery task)
 		# Import ici pour éviter circular import
 		try:
 			from delivery.tasks import assign_nearest_delivery_agent
 			assign_nearest_delivery_agent.delay(order.id)
-			print(f"🚀 Task d'assignation livreur lancée pour {order.order_number}")
+			print(f"?? Task d'assignation livreur lancée pour {order.order_number}")
 		except ImportError:
 			# Si Celery n'est pas encore configuré, on passe
-			print(f"⚠️ Celery task non disponible pour {order.order_number}")
+			print(f"?? Celery task non disponible pour {order.order_number}")

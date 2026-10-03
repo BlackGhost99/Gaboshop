@@ -19,7 +19,7 @@ class NotificationService:
             
             # En production, utiliser l'API WhatsApp Business
             # Pour le MVP, on simule l'envoi
-            logger.info(f"📱 WhatsApp envoyé à {formatted_phone}: {template_name} - {parameters}")
+            logger.info(f"?? WhatsApp envoyé à {formatted_phone}: {template_name} - {parameters}")
             
             # Simulation d'envoi réussi
             return True
@@ -48,7 +48,7 @@ class NotificationService:
             """
             
         except Exception as e:
-            logger.error(f"❌ Erreur envoi WhatsApp: {e}")
+            logger.error(f"? Erreur envoi WhatsApp: {e}")
             return False
     
     @staticmethod
@@ -58,12 +58,12 @@ class NotificationService:
         """
         try:
             formatted_phone = NotificationService._format_phone(phone)
-            logger.info(f"📞 SMS envoyé à {formatted_phone}: {message}")
+            logger.info(f"?? SMS envoyé à {formatted_phone}: {message}")
             
             # Intégration avec service SMS (Twilio, InfoBip, etc.)
             return True
         except Exception as e:
-            logger.error(f"❌ Erreur envoi SMS: {e}")
+            logger.error(f"? Erreur envoi SMS: {e}")
             return False
     
     @staticmethod
@@ -79,7 +79,7 @@ class NotificationService:
     def notify_new_order(order):
         """Notifier le magasin d'une nouvelle commande"""
         store_phone = order.store.phone
-        message = f"🛍️ Nouvelle commande #{order.order_number} - {order.total_amount} FCFA"
+        message = f"??? Nouvelle commande #{order.order_number} - {order.total_amount} FCFA"
         
         # WhatsApp
         success = NotificationService.send_whatsapp_message(
@@ -103,7 +103,7 @@ class NotificationService:
     def notify_delivery_assigned(delivery):
         """Notifier le livreur d'une nouvelle mission"""
         if delivery.delivery_agent:
-            message = f"🚗 Nouvelle livraison #{delivery.tracking_number} - {delivery.delivery_fee} FCFA"
+            message = f"?? Nouvelle livraison #{delivery.tracking_number} - {delivery.delivery_fee} FCFA"
             
             NotificationService.send_whatsapp_message(
                 phone=delivery.delivery_agent.phone,
@@ -122,7 +122,7 @@ class NotificationService:
     @staticmethod
     def notify_order_status_update(order, old_status, new_status):
         """Notifier le client du changement de statut"""
-        message = f"📦 Commande #{order.order_number}: {old_status} → {new_status}"
+        message = f"?? Commande #{order.order_number}: {old_status} ? {new_status}"
         
         NotificationService.send_whatsapp_message(
             phone=order.client.phone,
