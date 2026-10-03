@@ -79,7 +79,8 @@ if not SECRET_KEY:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set.")
 
 # Allow local hosts by default; override with DJANGO_ALLOWED_HOSTS
-_default_allowed_hosts = ["localhost", "127.0.0.1", "testserver", "web"]
+# 10.0.2.2 is how the Android emulator reaches the host machine.
+_default_allowed_hosts = ["localhost", "127.0.0.1", "testserver", "web", "10.0.2.2"]
 _allowed_hosts_env = env("DJANGO_ALLOWED_HOSTS", "")
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
@@ -267,6 +268,10 @@ _cors_env = env("DJANGO_CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_env.split(",") if origin.strip()]
 if DEBUG and not CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS = _local_frontend_origins
+# The Capacitor Android/iOS shells load the bundled frontend from these
+# origins. Set DJANGO_MOBILE_APP_ORIGINS="" to disable mobile access.
+_mobile_env = env("DJANGO_MOBILE_APP_ORIGINS", "https://localhost,capacitor://localhost")
+CORS_ALLOWED_ORIGINS += [o.strip() for o in _mobile_env.split(",") if o.strip() and o.strip() not in CORS_ALLOWED_ORIGINS]
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 

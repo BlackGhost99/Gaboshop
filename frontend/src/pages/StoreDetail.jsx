@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import api from '../services/api';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService'; // Need a getStoreDetail really, but getStores filter might work or I'll use list for now
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -29,12 +30,12 @@ const StoreDetail = () => {
                 // Actually, let's rely on standard fetch if service is unknown, or better, check service first.
                 // But for speed, I'll stick to what I know: api/v1/stores/${id}/
 
-                const token = sessionStorage.getItem('token');
-                const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-                const storeRes = await fetch(`http://localhost:8000/api/v1/stores/${id}/`, { headers });
-                if (!storeRes.ok) throw new Error('Impossible de charger le magasin');
-                const storeJson = await storeRes.json();
+                let storeJson;
+                try {
+                    ({ data: storeJson } = await api.get(`/stores/${id}/`));
+                } catch {
+                    throw new Error('Impossible de charger le magasin');
+                }
                 setStore(storeJson.data);
 
                 // 2. Fetch Products for this store

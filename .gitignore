@@ -10,6 +10,9 @@ venv-1/
 .env
 .env.*
 !.env.example
+# Mobile build configs only hold the public API URL
+!frontend/.env.android
+!frontend/.env.android-dev
 .tools/
 .idea/
 .vscode/
