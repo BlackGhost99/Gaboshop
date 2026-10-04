@@ -1,9 +1,80 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/*
+ * Thème Gaboshop : blanc métallisé, or dégradé, accents noirs.
+ * Les échelles ci-dessous remplacent les couleurs utilisées partout dans l'app
+ * (indigo = actions principales -> graphite/noir, cta = appels à l'action -> or).
+ * Note : tailwind.config.js n'est pas lu par Tailwind 4, le thème vit ici.
+ */
+@theme {
+  --font-sans: 'Manrope', 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', 'Times New Roman', serif;
+
+  /* Or (appels à l'action) */
+  --color-cta-50: #fffaeb;
+  --color-cta-100: #fff1c2;
+  --color-cta-200: #ffe48a;
+  --color-cta-300: #f6d155;
+  --color-cta-400: #e8b923;
+  --color-cta-500: #d4a017;
+  --color-cta-600: #b8860b;
+  --color-cta-700: #8f6708;
+  --color-cta-800: #6b4d07;
+  --color-cta-900: #473305;
+
+  /* Graphite / noir (actions principales, surbrillances) */
+  --color-primary-50: #f6f6f7;
+  --color-primary-100: #eceded;
+  --color-primary-200: #d8dadd;
+  --color-primary-300: #b9bcc2;
+  --color-primary-400: #8c9099;
+  --color-primary-500: #5d616a;
+  --color-primary-600: #1c1c20;
+  --color-primary-700: #111114;
+  --color-primary-800: #0a0a0c;
+  --color-primary-900: #000000;
+
+  --color-indigo-50: #f6f6f7;
+  --color-indigo-100: #eceded;
+  --color-indigo-200: #d8dadd;
+  --color-indigo-300: #b9bcc2;
+  --color-indigo-400: #8c9099;
+  --color-indigo-500: #3a3a40;
+  --color-indigo-600: #1c1c20;
+  --color-indigo-700: #111114;
+  --color-indigo-800: #0a0a0c;
+  --color-indigo-900: #000000;
+
+  /* Violet -> or : meme identite sur tous les badges et degrades existants */
+  --color-purple-50: #fffaeb;
+  --color-purple-100: #fff1c2;
+  --color-purple-200: #ffe48a;
+  --color-purple-300: #f6d155;
+  --color-purple-400: #e8b923;
+  --color-purple-500: #d4a017;
+  --color-purple-600: #b8860b;
+  --color-purple-700: #8f6708;
+  --color-purple-800: #6b4d07;
+  --color-purple-900: #473305;
+  --color-violet-50: #fffaeb;
+  --color-violet-100: #fff1c2;
+  --color-violet-200: #ffe48a;
+  --color-violet-300: #f6d155;
+  --color-violet-400: #e8b923;
+  --color-violet-500: #d4a017;
+  --color-violet-600: #b8860b;
+  --color-violet-700: #8f6708;
+  --color-violet-800: #6b4d07;
+  --color-violet-900: #473305;
+}
+
 :root {
   --font-sans: 'Manrope', 'Segoe UI', sans-serif;
   --font-display: 'Fraunces', 'Times New Roman', serif;
+  --gold-gradient: linear-gradient(135deg, #f8e58a 0%, #e0b73a 38%, #b8860b 72%, #e9c45a 100%);
+  --gold-gradient-soft: linear-gradient(135deg, #fff3bf 0%, #f0cf63 50%, #d4a017 100%);
+  --metal-gradient: linear-gradient(135deg, #ffffff 0%, #eef0f3 38%, #fafafb 55%, #e3e6ea 100%);
 }
 
 @layer utilities {
@@ -14,7 +85,7 @@
 
 body {
   font-family: var(--font-sans);
-  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  background: var(--metal-gradient);
   min-height: 100vh;
 }
 
@@ -39,4 +110,112 @@ body {
 
 .animate-fade-up {
   animation: fade-up 0.7s ease both;
+}
+
+/* ---------- Boutons or ---------- */
+.bg-cta-600,
+.btn-gold {
+  background-image: var(--gold-gradient);
+  color: #17120a;
+  box-shadow: 0 6px 14px -6px rgba(184, 134, 11, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.bg-cta-600.text-white,
+.bg-cta-600 .text-white {
+  color: #17120a;
+}
+.bg-cta-600:hover,
+.hover\:bg-cta-700:hover,
+.btn-gold:hover {
+  filter: brightness(1.06) saturate(1.05);
+}
+.bg-cta-600:active,
+.btn-gold:active {
+  transform: translateY(1px) scale(0.985);
+  box-shadow: 0 2px 6px -3px rgba(184, 134, 11, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- Carte 3D légère (CSS uniquement, sans bibliothèque) ---------- */
+.card-3d {
+  position: relative;
+  border-radius: 1rem;
+  background: linear-gradient(150deg, #ffffff 0%, #f3f4f6 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 14px 26px -16px rgba(15, 15, 20, 0.45),
+    0 2px 6px rgba(15, 15, 20, 0.08);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease;
+  will-change: transform;
+}
+/* Liseré or dégradé */
+.card-3d::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(240, 207, 99, 0.95), rgba(212, 160, 23, 0.12) 42%, rgba(255, 255, 255, 0) 60%, rgba(184, 134, 11, 0.65));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .card-3d:hover {
+    transform: perspective(900px) translateY(-6px) rotateX(2.5deg) rotateY(-2deg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 26px 36px -18px rgba(15, 15, 20, 0.5),
+      0 4px 10px rgba(15, 15, 20, 0.1);
+  }
+}
+.card-3d:active {
+  transform: perspective(900px) translateY(-2px) scale(0.985);
+}
+
+/* ---------- Barre du haut : métal clair + filet or ---------- */
+.nav-metal {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(238, 240, 243, 0.94) 100%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, rgba(212, 160, 23, 0), rgba(212, 160, 23, 0.9), rgba(212, 160, 23, 0)) 1;
+  box-shadow: 0 8px 18px -14px rgba(15, 15, 20, 0.5);
+}
+
+/* ---------- Bandeau héros : reflet qui glisse ---------- */
+@keyframes sheen {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  60%, 100% { transform: translateX(220%) skewX(-18deg); }
+}
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+  animation: sheen 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Accessibilité et téléphones modestes : pas d'animation si demandé */
+@media (prefers-reduced-motion: reduce) {
+  .card-3d,
+  .bg-cta-600,
+  .btn-gold {
+    transition: none;
+  }
+  .card-3d:hover,
+  .card-3d:active {
+    transform: none;
+  }
+  .sheen::after,
+  .animate-fade-up {
+    animation: none;
+  }
 }

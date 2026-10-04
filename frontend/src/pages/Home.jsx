@@ -354,7 +354,7 @@ const Home = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen">
       {/* New Navbar */}
       <HomeNavbar
         cartCount={cart.length}
@@ -372,7 +372,7 @@ const Home = () => {
       <CategoriesGrid categories={categories} />
 
       <section className="relative overflow-hidden py-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-white to-emerald-50" />
+        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 via-white to-amber-50" />
         <div className="absolute -top-16 right-16 h-40 w-40 rounded-full bg-amber-200/40 blur-3xl" />
         <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-emerald-200/40 blur-3xl" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -399,7 +399,7 @@ const Home = () => {
                 {premiumShowcase.map(({ store, product }) => (
                   <div
                     key={store.id}
-                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-transform hover:-translate-y-1"
+                    className="card-3d p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>

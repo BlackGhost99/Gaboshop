@@ -15,7 +15,7 @@ const HeroBanner = ({ promotions = [] }) => {
       title: 'Boutiques locales',
       subtitle: 'Decouvrez les magasins et leurs produits du quotidien',
       cta: 'Voir les boutiques',
-      bg: 'bg-gradient-to-r from-slate-900 to-emerald-600',
+      bg: 'bg-gradient-to-r from-zinc-950 via-zinc-800 to-amber-600',
       icon: 'SHOP',
     },
     {
@@ -23,7 +23,7 @@ const HeroBanner = ({ promotions = [] }) => {
       title: 'Catalogue B2C',
       subtitle: 'Produits pour la maison, la famille, et plus',
       cta: 'Explorer',
-      bg: 'bg-gradient-to-r from-emerald-500 to-teal-400',
+      bg: 'bg-gradient-to-r from-zinc-900 via-stone-700 to-yellow-600',
       icon: 'B2C',
     },
     {
@@ -31,7 +31,7 @@ const HeroBanner = ({ promotions = [] }) => {
       title: 'Business & Pro',
       subtitle: 'Les boutiques premium mises en avant',
       cta: 'Decouvrir',
-      bg: 'bg-gradient-to-r from-amber-500 to-orange-400',
+      bg: 'bg-gradient-to-r from-amber-700 via-amber-600 to-yellow-500',
       icon: 'PRO',
     },
   ];
@@ -51,7 +51,7 @@ const HeroBanner = ({ promotions = [] }) => {
   return (
     <div className="relative w-full overflow-hidden">
       {/* Carousel */}
-      <div className="relative h-64 md:h-96 flex items-center justify-center overflow-hidden">
+      <div className="relative h-64 md:h-96 flex items-center justify-center overflow-hidden sheen">
         {slides.map((slide, index) => (
           <div
             key={slide.id}
@@ -61,7 +61,7 @@ const HeroBanner = ({ promotions = [] }) => {
           >
             <div className="absolute inset-0 bg-black/20" />
             <div className="relative h-full flex flex-col items-center justify-center text-center px-6 py-8">
-              <div className="text-5xl md:text-6xl mb-4">{slide.icon || '💼'}</div>
+              <div className="text-5xl md:text-6xl mb-4 font-display text-amber-300 drop-shadow">{slide.icon || '💼'}</div>
               <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 font-display">
                 {slide.title}
               </h2>
@@ -70,7 +70,7 @@ const HeroBanner = ({ promotions = [] }) => {
               </p>
               <Link
                 to="/products"
-                className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
+                className="px-6 py-3 btn-gold font-semibold rounded-lg shadow-lg"
               >
                 {slide.cta || 'Découvrir'}
               </Link>

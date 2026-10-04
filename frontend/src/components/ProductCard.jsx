@@ -13,7 +13,7 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
   const finalPrice = product.price * (1 - discount / 100);
 
   return (
-    <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden group">
+    <div className="card-3d overflow-hidden group">
       {/* Image Container */}
       <div
         className="relative overflow-hidden bg-gray-200 aspect-square cursor-pointer"

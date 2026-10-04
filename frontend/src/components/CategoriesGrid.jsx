@@ -107,7 +107,7 @@ const CategoriesGrid = ({ categories = [] }) => {
   });
 
   return (
-    <section id="categories" className="py-8 px-4 bg-gray-50">
+    <section id="categories" className="py-8 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
@@ -129,15 +129,13 @@ const CategoriesGrid = ({ categories = [] }) => {
                 className="group"
               >
                 <div
-                  className={`${category.color || 'bg-gray-100'} rounded-lg p-4 text-center hover:shadow-lg transition-all duration-300 cursor-pointer transform group-hover:scale-105`}
+                  className="card-3d p-4 text-center cursor-pointer"
                 >
-                  <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/70 text-slate-700 shadow-sm">
+                  <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-2xl btn-gold">
                     {Icon ? <Icon className="w-7 h-7" /> : <span className="text-xs">CAT</span>}
                   </div>
                   <h3
-                    className={`font-semibold text-sm md:text-base ${
-                      category.textColor || 'text-gray-700'
-                    } group-hover:underline`}
+                    className="font-semibold text-sm md:text-base text-slate-900"
                   >
                     {category.name || 'Categorie'}
                   </h3>
