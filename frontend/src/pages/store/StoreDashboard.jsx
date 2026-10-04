@@ -406,7 +406,40 @@ const StoreDashboard = () => {
               </div>
 
               {dashboardData?.b2c_pending_orders?.length > 0 ? (
-                <div className="overflow-x-auto">
+                <>
+                <div className="md:hidden space-y-3">
+                  {dashboardData.b2c_pending_orders.map((order) => {
+                    const statusBadge = getOrderStatusBadge(order.status);
+                    const action = getNextAction(order.status);
+                    return (
+                      <div key={order.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-base font-semibold text-gray-900">#{order.id}</p>
+                            <p className="text-sm text-gray-700">{order.client_name || 'Client'}</p>
+                            <p className="text-xs text-gray-500">{formatDateTime(order.created_at)}</p>
+                          </div>
+                          <p className="text-base font-semibold text-gray-900">{formatCurrency(order.total)}</p>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.className}`}>
+                            {statusBadge.label}
+                          </span>
+                          {action && (
+                            <button
+                              onClick={() => handleAdvanceStatus(order)}
+                              disabled={!!actionLoading[order.id]}
+                              className={`px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium ${actionLoading[order.id] ? 'cursor-wait opacity-60' : ''}`}
+                            >
+                              {action.label}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
@@ -473,6 +506,7 @@ const StoreDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+                </>
               ) : (
                 <div className="text-center py-12">
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -164,7 +164,7 @@ const StoreOrders = () => {
 
   return (
     <StoreLayout title="Mes Commandes">
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white shadow rounded-lg p-4 sm:p-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Vue globale</h3>
           <button
@@ -204,7 +204,52 @@ const StoreOrders = () => {
             <p className="mt-4 text-gray-500">Aucune commande dans cette catégorie</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden space-y-3">
+            {filteredOrders.map((order) => (
+              <div key={order.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-base font-semibold text-gray-900">#{order.id}</p>
+                    <p className="text-sm text-gray-700">{order.client_phone || order.client}</p>
+                    <p className="text-xs text-gray-500">{formatDateTime(order.created_at)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-base font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</p>
+                    <p className="text-xs text-gray-500">{order.items?.length || order.items_count || 0} article(s)</p>
+                  </div>
+                </div>
+                <div className="mt-2 text-sm">{renderStatus(order.status)}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => openDetail(order.id)}
+                    className="flex-1 min-w-[90px] px-3 py-2 rounded-md border border-indigo-200 text-indigo-700 text-sm font-medium"
+                  >
+                    Voir
+                  </button>
+                  {nextAction(order) && (
+                    <button
+                      onClick={() => handleAdvance(order)}
+                      disabled={!!actionLoading[order.id]}
+                      className={`flex-1 min-w-[90px] px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium ${actionLoading[order.id] ? 'cursor-wait opacity-60' : ''}`}
+                    >
+                      {nextAction(order).to === 'ready' ? 'Marquer prête' : nextAction(order).label}
+                    </button>
+                  )}
+                  {canCancel(order.status) && (
+                    <button
+                      onClick={() => handleCancel(order)}
+                      disabled={!!actionLoading[order.id]}
+                      className={`flex-1 min-w-[90px] px-3 py-2 rounded-md border border-red-200 text-red-600 text-sm font-medium ${actionLoading[order.id] ? 'cursor-wait opacity-60' : ''}`}
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -270,6 +315,7 @@ const StoreOrders = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
