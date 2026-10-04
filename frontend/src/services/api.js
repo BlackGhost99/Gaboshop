@@ -1,4 +1,5 @@
 import axios from 'axios';
+import authStorage from '../utils/authStorage';
 
 // Configuration de base pour Axios
 // Use VITE_API_URL when provided (development/production override),
@@ -13,7 +14,7 @@ const api = axios.create({
 // Intercepteur pour ajouter le token JWT et gérer Content-Type
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem('token');
+    const token = authStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -56,8 +57,8 @@ api.interceptors.response.use(
     
     if (status === 401) {
       // Token expiré ou invalide
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('refresh_token');
+      authStorage.removeItem('token');
+      authStorage.removeItem('refresh_token');
       localStorage.removeItem('last_api_error');
       window.location.href = '/login';
     }

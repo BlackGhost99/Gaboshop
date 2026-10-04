@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { fetchNotifications, markNotificationRead, deleteNotification } from '../services/notificationService';
 import { formatDateTime } from '../utils/helpers';
+import authStorage from '../utils/authStorage';
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -26,7 +27,7 @@ const HomeNavbar = ({
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
-  const isLoggedIn = !!sessionStorage.getItem('token');
+  const isLoggedIn = !!authStorage.getItem('token');
   const canSearch = typeof onSearchChange === 'function' || typeof onSearchSubmit === 'function';
   const currentSearch = canSearch ? searchTerm : localSearch;
   const trimmedSearch = currentSearch.trim();
@@ -581,16 +582,16 @@ const HomeNavbar = ({
                   </svg>
                 </button>
               ) : (
-                <div className="hidden md:flex items-center space-x-3">
+                <div className="flex items-center space-x-1 md:space-x-3">
                   <Link
                     to="/login"
-                    className="px-4 py-2 text-slate-900 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-2 py-2 text-sm md:px-4 md:text-base text-slate-900 font-medium hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Connexion
                   </Link>
                   <Link
                     to="/register"
-                    className="px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                    className="px-3 py-2 text-sm md:px-4 md:text-base bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
                   >
                     S'inscrire
                   </Link>

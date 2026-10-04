@@ -1,16 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 
 const StoreLayout = ({ children, title, userName }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="h-screen bg-gray-100 flex overflow-hidden">
-      <Sidebar role="store_manager" />
+      {menuOpen && (
+        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMenuOpen(false)} />
+      )}
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar 
             userRole="GERANT" 
             userName={userName || 'Gérant'} 
+            onMenuClick={() => setMenuOpen(true)}
         />
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">

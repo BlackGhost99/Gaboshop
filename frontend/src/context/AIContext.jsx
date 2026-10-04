@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
+import authStorage from '../utils/authStorage';
 
 const AIContext = createContext(null);
 
@@ -26,7 +27,7 @@ export const AIContextProvider = ({ children }) => {
       const context = {
         page: path.split('/').filter(Boolean).join('_') || 'home',
         route: path,
-        is_authenticated: !!sessionStorage.getItem('token'),
+        is_authenticated: !!authStorage.getItem('token'),
       };
 
       // Détecter le rôle depuis le token ou la route
@@ -41,7 +42,7 @@ export const AIContextProvider = ({ children }) => {
       }
 
       // Récupérer store_id si disponible (depuis localStorage ou autre)
-      const storeId = sessionStorage.getItem('store_id');
+      const storeId = authStorage.getItem('store_id');
       if (storeId) {
         context.store_id = parseInt(storeId);
       }

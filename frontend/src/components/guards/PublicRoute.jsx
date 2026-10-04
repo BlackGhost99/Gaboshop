@@ -2,18 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import LoadingSpinner from '../LoadingSpinner';
+import authStorage from '../../utils/authStorage';
 
 /**
  * Routes accessibles UNIQUEMENT aux clients non-stores
  * Bloque automatiquement les store_managers et les redirige vers leur dashboard
+ * (sauf pages de consultation du catalogue avec allowStoreManager)
  */
-export default function PublicRoute({ children }) {
+export default function PublicRoute({ children, allowStoreManager = false }) {
 	const navigate = useNavigate();
 	const [isAllowed, setIsAllowed] = useState(null);
 
 	useEffect(() => {
 		const checkUserType = async () => {
-			const token = sessionStorage.getItem('token');
+			const token = authStorage.getItem('token');
 			
 			// Si non authentifié, autoriser l'accès (site public)
 			if (!token) {
@@ -27,7 +29,7 @@ export default function PublicRoute({ children }) {
 					const userType = response.data.data.user_type;
 					
 					// BLOQUER les store_managers du site public
-					if (userType === 'store_manager') {
+					if (userType === 'store_manager' && !allowStoreManager) {
 						navigate('/store/dashboard');
 					} else {
 						// Autoriser les clients et autres rôles

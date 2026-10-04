@@ -11,6 +11,7 @@ import { getDeliveryDashboard, updateDeliveryProfile } from '../../services/dash
 import { startDelivery, acceptDelivery, rejectDelivery, getAvailableDeliveries, claimDelivery, updateAvailability } from '../../services/deliveryService';
 import { formatCurrency, getDeliveryStatusBadge } from '../../utils/helpers';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from '../../services/notificationService';
+import authStorage from '../../utils/authStorage';
 
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -364,8 +365,8 @@ const DeliveryDashboard = () => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('refresh_token');
+    authStorage.removeItem('token');
+    authStorage.removeItem('refresh_token');
     window.location.href = '/login';
   };
 

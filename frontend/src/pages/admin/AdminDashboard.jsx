@@ -79,6 +79,7 @@ import AdminPayoutsSection from '../../components/AdminPayoutsSection';
 import AlertModal from '../../components/AlertModal';
 import ConfirmModal from '../../components/ConfirmModal';
 import StoreDetailModal from '../../components/StoreDetailModal';
+import authStorage from '../../utils/authStorage';
 
 const StatCard = ({ title, value, hint }) => (
   <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
@@ -254,8 +255,8 @@ const AdminDashboard = () => {
   }, []);
 
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('refresh_token');
+    authStorage.removeItem('token');
+    authStorage.removeItem('refresh_token');
     navigate('/login');
   };
 

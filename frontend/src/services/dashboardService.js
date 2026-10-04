@@ -1,4 +1,5 @@
 import api from './api';
+import authStorage from '../utils/authStorage';
 
 // Dashboard Client
 export const getClientDashboard = async () => {
@@ -39,8 +40,8 @@ export const register = async (payload) => {
 };
 
 export const logout = () => {
-  sessionStorage.removeItem('token');
-  sessionStorage.removeItem('refresh_token');
+  authStorage.removeItem('token');
+  authStorage.removeItem('refresh_token');
   window.location.href = '/login';
 };
 

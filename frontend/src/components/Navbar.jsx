@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from '../services/notificationService';
 import { formatDateTime } from '../utils/helpers';
+import authStorage from '../utils/authStorage';
 
 const POLL_INTERVAL_MS = 20000;
 
-const Navbar = ({ userRole, userName }) => {
+const Navbar = ({ userRole, userName, onMenuClick }) => {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -120,13 +121,24 @@ const Navbar = ({ userRole, userName }) => {
     <nav className="bg-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-8">
-            <h1 className="text-2xl font-bold text-slate-900">GABOSHOP</h1>
+          <div className="flex items-center space-x-3 md:space-x-8">
+            {onMenuClick && (
+              <button
+                onClick={onMenuClick}
+                className="md:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100"
+                aria-label="Ouvrir le menu"
+              >
+                <svg className="w-6 h-6 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            )}
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-900">GABOSHOP</h1>
             <a href="/" className="text-slate-900 hover:text-slate-700 font-medium">
               Accueil
             </a>
           </div>
-          <div className="flex items-center space-x-4 relative">
+          <div className="flex items-center space-x-2 sm:space-x-4 relative">
             <div className="relative">
               <button
                 onClick={handleToggle}
@@ -149,7 +161,7 @@ const Navbar = ({ userRole, userName }) => {
               </button>
 
               {open && (
-                <div className="absolute right-0 mt-3 w-96 bg-white shadow-xl border border-gray-100 rounded-lg z-50">
+                <div className="fixed left-2 right-2 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-auto mt-3 sm:w-96 bg-white shadow-xl border border-gray-100 rounded-lg z-50">
                   <div className="flex items-center justify-between px-4 py-3 border-b">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Notifications</p>
@@ -201,14 +213,14 @@ const Navbar = ({ userRole, userName }) => {
               )}
             </div>
 
-            <span className="text-sm text-slate-900">
+            <span className="hidden sm:inline text-sm text-slate-900">
               {getRoleName(userRole)} - {userName}
             </span>
             <button
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium"
+              className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
               onClick={() => {
-                sessionStorage.removeItem('token');
-                sessionStorage.removeItem('refresh_token');
+                authStorage.removeItem('token');
+                authStorage.removeItem('refresh_token');
                 window.location.href = '/login';
               }}
             >

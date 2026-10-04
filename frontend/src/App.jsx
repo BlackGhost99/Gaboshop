@@ -26,6 +26,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import PrivateRoute from './components/guards/PrivateRoute';
 import PublicRoute from './components/guards/PublicRoute';
+import authStorage from './utils/authStorage';
 
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
@@ -34,9 +35,9 @@ function App() {
     let timeoutId;
 
     const handleLogout = () => {
-      if (sessionStorage.getItem('token')) {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('refresh_token');
+      if (authStorage.getItem('token')) {
+        authStorage.removeItem('token');
+        authStorage.removeItem('refresh_token');
         window.location.href = '/login';
       }
     };
@@ -73,9 +74,9 @@ function App() {
         {/* Routes publiques (BLOQUEES pour store_managers) */}
         <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
         <Route path="/products" element={<PublicRoute><ProductsRedirect /></PublicRoute>} />
-        <Route path="/categories" element={<PublicRoute><StoreCategories /></PublicRoute>} />
-        <Route path="/boutiques" element={<PublicRoute><Stores /></PublicRoute>} />
-        <Route path="/stores/:id" element={<PublicRoute><StoreDetail /></PublicRoute>} />
+        <Route path="/categories" element={<PublicRoute allowStoreManager><StoreCategories /></PublicRoute>} />
+        <Route path="/boutiques" element={<PublicRoute allowStoreManager><Stores /></PublicRoute>} />
+        <Route path="/stores/:id" element={<PublicRoute allowStoreManager><StoreDetail /></PublicRoute>} />
         
         {/* Auth (accessible à tous) */}
         <Route path="/login" element={<Login />} />

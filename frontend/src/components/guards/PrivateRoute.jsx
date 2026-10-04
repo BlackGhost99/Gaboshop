@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import LoadingSpinner from '../LoadingSpinner';
+import authStorage from '../../utils/authStorage';
 
 /**
  * Composant réutilisable pour routes authentifiées avec contrôle de rôle
@@ -15,7 +16,7 @@ export default function PrivateRoute({ children, allowedRoles = [] }) {
 
 	useEffect(() => {
 		const checkAuth = async () => {
-			const token = sessionStorage.getItem('token');
+			const token = authStorage.getItem('token');
 			if (!token) {
 				navigate('/login');
 				return;

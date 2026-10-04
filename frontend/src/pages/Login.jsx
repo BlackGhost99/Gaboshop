@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../services/dashboardService';
+import authStorage from '../utils/authStorage';
 
 const Login = () => {
   const [phone, setPhone] = useState('');
@@ -19,8 +20,8 @@ const Login = () => {
       
       if (response.success && response.data && response.data.tokens) {
         // Stocker le token
-        sessionStorage.setItem('token', response.data.tokens.access);
-        sessionStorage.setItem('refresh_token', response.data.tokens.refresh);
+        authStorage.setItem('token', response.data.tokens.access);
+        authStorage.setItem('refresh_token', response.data.tokens.refresh);
 
         // Direct redirect for admin users, otherwise go to /dashboard
         const userType = response.data.user?.user_type || response.data.user_type;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../services/dashboardService';
+import authStorage from '../utils/authStorage';
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -102,8 +103,8 @@ const Register = () => {
 
       const res = await register(payload);
       if (res.success && res.data?.tokens) {
-        sessionStorage.setItem('token', res.data.tokens.access);
-        sessionStorage.setItem('refresh_token', res.data.tokens.refresh);
+        authStorage.setItem('token', res.data.tokens.access);
+        authStorage.setItem('refresh_token', res.data.tokens.refresh);
         // If the created user is an admin, redirect to admin dashboard
         const createdUserType = res.data.user?.user_type || res.data.user_type;
         if (createdUserType === 'admin') {
