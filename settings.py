@@ -190,6 +190,8 @@ if _database_url:
             'PORT': _db.port or 5432,
             'CONN_MAX_AGE': 60,
             'OPTIONS': {'sslmode': env('DATABASE_SSLMODE', 'require')},
+            # A mettre a 1 derriere un pooler en mode transaction (ex: Supabase port 6543)
+            'DISABLE_SERVER_SIDE_CURSORS': env_bool('DATABASE_DISABLE_SERVER_SIDE_CURSORS', False),
         }
     }
 

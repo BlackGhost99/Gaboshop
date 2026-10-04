@@ -1,8 +1,9 @@
-# Gaboshop - environnement de TEST sur Render (offres gratuites).
+# Gaboshop - phase gratuite : Render (API + site web) + Supabase (PostgreSQL).
+# L'app Android embarque son propre frontend : seule l'API doit etre en ligne.
 # Limites a connaitre : le service gratuit s'endort apres ~15 min d'inactivite
-# (premiere requete lente), la base gratuite expire apres un delai fixe, et les
-# fichiers envoyes (photos) sont perdus a chaque redeploiement.
-# Ne pas utiliser tel quel pour de vrais paiements : voir PAYMENT_SIMULATION_MODE.
+# (premiere requete lente), un projet Supabase gratuit peut etre mis en pause apres
+# une semaine d'inactivite, et les fichiers envoyes (photos) sont perdus a chaque
+# redeploiement. Ne pas utiliser pour de vrais paiements : voir PAYMENT_SIMULATION_MODE.
 services:
   - type: web
     name: gaboshop-api
@@ -23,10 +24,14 @@ services:
         value: "1"
       - key: DJANGO_SECURE_SSL_REDIRECT
         value: "1"
+      # Supabase : Connect > Session pooler (compatible IPv4), a coller dans Render.
       - key: DATABASE_URL
-        fromDatabase:
-          name: gaboshop-db
-          property: connectionString
+        sync: false
+      # Adresse du site web statique (ci-dessous) une fois connue, sans / final.
+      - key: DJANGO_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -57,8 +62,18 @@ services:
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
-databases:
-  - name: gaboshop-db
-    plan: free
-    databaseName: gaboshop
-    user: gaboshop
+  # Site web (optionnel pour l'app Android).
+  - type: web
+    name: gaboshop-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Adresse de l'API, ex: https://gaboshop-api.onrender.com (sans / final)
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
