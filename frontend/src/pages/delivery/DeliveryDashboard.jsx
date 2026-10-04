@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -23,12 +23,40 @@ L.Icon.Default.mergeOptions({
 
 const NOTIF_POLL_MS = 20000;
 
+const GAB_CENTER = [0.4162, 9.4673];
+
+const mapsLink = (address) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address || '')}&travelmode=driving`;
+
+const DELIVERY_STEPS = ['Acceptée', 'Colis récupéré', 'En route', 'Livrée'];
+const stepsDone = (status) => ({ accepted: 1, picked_up: 2, in_transit: 3, delivered: 4 }[status] || 0);
+
+function RecenterMap({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) map.setView(position, 15);
+  }, [map, position]);
+  return null;
+}
+
 const DeliveryDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [error, setError] = useState(null);
   const [isAvailable, setIsAvailable] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' ou 'assigned'
+  const [myPosition, setMyPosition] = useState(null);
+
+  // Position réelle du livreur (si autorisée)
+  useEffect(() => {
+    if (!navigator.geolocation) return undefined;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setMyPosition([pos.coords.latitude, pos.coords.longitude]),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
   // Notification Detail Modal State
   const [selectedNotification, setSelectedNotification] = useState(null);
@@ -385,7 +413,7 @@ const DeliveryDashboard = () => {
   const profile = dashboardData?.profile || {};
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
       {/* Custom Header */}
       <div className="bg-white shadow-sm px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors" onClick={() => setShowProfileModal(true)}>
@@ -411,14 +439,14 @@ const DeliveryDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* En-tête avec disponibilité */}
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8 flex flex-wrap justify-between items-center gap-4">
           <div>
             <h2 className="text-3xl font-bold text-gray-900">
               Dashboard
             </h2>
             <p className="text-gray-600 mt-2">Gérez vos livraisons en temps réel</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-gray-700">Disponibilité:</span>
             <button
               onClick={toggleAvailability}
@@ -514,8 +542,8 @@ const DeliveryDashboard = () => {
         {activeTab === 'overview' && (
           <>
             {/* Missions / notifications */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Missions & notifications</h3>
                   <p className="text-sm text-gray-500">Tâches qui te sont confiées</p>
@@ -585,7 +613,7 @@ const DeliveryDashboard = () => {
             </div>
 
             {/* Missions disponibles */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Missions disponibles</h3>
@@ -649,7 +677,7 @@ const DeliveryDashboard = () => {
             </div>
 
             {/* Livraison active */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-900">Livraison en cours</h3>
                 <button className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium">
@@ -662,7 +690,7 @@ const DeliveryDashboard = () => {
                   {/* MAP ADDITION */}
                   <div className="h-64 w-full rounded-xl overflow-hidden shadow-inner mb-4 z-0 relative">
                     <MapContainer
-                      center={[0.4162, 9.4673]}
+                      center={myPosition || GAB_CENTER}
                       zoom={13}
                       style={{ height: '100%', width: '100%' }}
                       scrollWheelZoom={false}
@@ -671,16 +699,14 @@ const DeliveryDashboard = () => {
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       />
-                      <Marker position={[0.4162, 9.4673]}>
-                        <Popup>
-                          Vous êtes ici (Simulé)
-                        </Popup>
-                      </Marker>
-                      <Marker position={[0.42, 9.48]}>
-                        <Popup>
-                          Destination Client
-                        </Popup>
-                      </Marker>
+                      {myPosition && (
+                        <>
+                          <RecenterMap position={myPosition} />
+                          <Marker position={myPosition}>
+                            <Popup>Vous êtes ici</Popup>
+                          </Marker>
+                        </>
+                      )}
                     </MapContainer>
                   </div>
 
@@ -704,42 +730,87 @@ const DeliveryDashboard = () => {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <p className="text-sm text-gray-600">Adresse de livraison:</p>
-                            <p className="text-sm font-medium text-gray-900">{delivery.delivery_address}</p>
+                        {stepsDone(delivery.status) > 0 && (
+                          <div className="flex items-center gap-1 mb-4" aria-label="Progression de la livraison">
+                            {DELIVERY_STEPS.map((label, i) => (
+                              <div key={label} className="flex-1">
+                                <div className={`h-1.5 rounded-full ${i < stepsDone(delivery.status) ? 'bg-green-500' : 'bg-gray-200'}`} />
+                                <p className={`mt-1 text-[10px] leading-tight ${i < stepsDone(delivery.status) ? 'text-green-700 font-semibold' : 'text-gray-400'}`}>{label}</p>
+                              </div>
+                            ))}
                           </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Client:</p>
-                            <p className="text-sm font-medium text-gray-900">{delivery.client_name || delivery.client_phone}</p>
-                            <p className="text-sm text-gray-600">{delivery.client_phone}</p>
+                        )}
+
+                        <div className="space-y-3 mb-4">
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">1. Récupérer chez {delivery.store_name}</p>
+                            <p className="text-sm font-medium text-gray-900 mt-1">{delivery.pickup_address || 'Adresse du magasin non renseignée'}</p>
+                            {delivery.pickup_address && (
+                              <a
+                                href={mapsLink(delivery.pickup_address)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
+                              >
+                                Itinéraire
+                              </a>
+                            )}
+                          </div>
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">2. Livrer à {delivery.client_name || 'Client'}</p>
+                            <p className="text-sm font-medium text-gray-900 mt-1">{delivery.delivery_address || 'Adresse non renseignée'}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {delivery.delivery_address && (
+                                <a
+                                  href={mapsLink(delivery.delivery_address)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
+                                >
+                                  Itinéraire
+                                </a>
+                              )}
+                              {delivery.client_phone && (
+                                <a
+                                  href={`tel:${delivery.client_phone}`}
+                                  className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+                                >
+                                  Appeler {delivery.client_phone}
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
 
                         {countdown && ['assigned', 'pending'].includes(delivery.status) && (
                           <p className={`text-xs ${countdown.expired ? 'text-red-600' : 'text-amber-600'} mb-3`}>Temps restant pour accepter: {countdown.label}</p>
                         )}
-                        <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                          <div>
-                            <span className="text-sm text-gray-600">Frais livraison (client): </span>
-                            <span className="text-lg font-bold text-green-600">
-                              {formatCurrency(delivery.delivery_fee || delivery.fee || 0)}
-                            </span>
+                        <div className="flex flex-col gap-4 pt-4 border-t border-gray-200">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                            <div>
+                              <span className="text-sm text-gray-600">Votre gain : </span>
+                              <span className="text-lg font-bold text-green-600">
+                                {formatCurrency(delivery.agent_commission ?? delivery.fee ?? 0)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Frais payés par le client : {formatCurrency(delivery.delivery_fee || 0)}
+                            </div>
                           </div>
-                          <div className="space-x-2">
+                          <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
                             {['assigned', 'pending'].includes(delivery.status) && (
                               <>
                                 <button
                                   onClick={() => handleAcceptDelivery(delivery.id)}
                                   disabled={actionLoading[delivery.id]}
-                                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                  className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 >
                                   {actionLoading[delivery.id] ? 'Traitement...' : 'Accepter'}
                                 </button>
                                 <button
                                   onClick={() => handleRejectDelivery(delivery.id)}
                                   disabled={actionLoading[delivery.id]}
-                                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                  className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 >
                                   {actionLoading[delivery.id] ? 'Traitement...' : 'Refuser'}
                                 </button>
@@ -750,14 +821,14 @@ const DeliveryDashboard = () => {
                                 <button
                                   onClick={() => handleRejectDelivery(delivery.id)}
                                   disabled={actionLoading[delivery.id]}
-                                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                  className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 >
                                   {actionLoading[delivery.id] ? 'Traitement...' : 'Annuler'}
                                 </button>
                                 <button
                                   onClick={() => handleStartDelivery(delivery.id)}
                                   disabled={actionLoading[delivery.id]}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 >
                                   {actionLoading[delivery.id] ? 'Traitement...' : '📦 Récupérer le colis'}
                                 </button>
@@ -767,7 +838,7 @@ const DeliveryDashboard = () => {
                               <button
                                 onClick={() => handleStartDelivery(delivery.id)}
                                 disabled={actionLoading[delivery.id]}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                               >
                                 {actionLoading[delivery.id] ? 'Traitement...' : '🚗 Démarrer la livraison'}
                               </button>
@@ -776,7 +847,7 @@ const DeliveryDashboard = () => {
                               <button
                                 onClick={() => handleCompleteDelivery(delivery.id)}
                                 disabled={actionLoading[delivery.id]}
-                                className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                className="bg-slate-900 hover:bg-slate-800 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                               >
                                 {actionLoading[delivery.id] ? 'Traitement...' : '✓ Confirmer livraison'}
                               </button>
@@ -785,7 +856,7 @@ const DeliveryDashboard = () => {
                               <button
                                 onClick={() => handleCompleteDelivery(delivery.id)}
                                 disabled={actionLoading[delivery.id]}
-                                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+                                className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto px-4 py-3 sm:py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 title={`Statut: ${delivery.status}`}
                               >
                                 {actionLoading[delivery.id] ? 'Traitement...' : '✓ Confirmer livraison (preuve prête)'}
