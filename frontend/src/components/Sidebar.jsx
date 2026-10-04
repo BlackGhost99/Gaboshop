@@ -21,7 +21,7 @@ const Sidebar = ({ open = false, onClose }) => {
   }, []);
   
   const isActive = (path) => {
-    return location.pathname === path ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-700';
+    return location.pathname === path ? 'sidebar-active bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-700';
   };
 
   const links = [

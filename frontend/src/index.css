@@ -203,6 +203,38 @@ body {
   pointer-events: none;
 }
 
+/* ---------- Espaces connectés (gérant, livreur, client, admin) ----------
+ * Les tableaux de bord utilisent déjà « bg-white rounded-lg shadow » : on leur donne
+ * le rendu métal + liseré or sans toucher à chaque page. Les fenêtres (shadow-xl) restent unies. */
+.bg-white.rounded-lg.shadow,
+.bg-white.rounded-lg.shadow-sm,
+.bg-white.rounded-lg.shadow-md,
+.bg-white.rounded-lg.shadow-lg,
+.bg-white.rounded-xl.shadow,
+.bg-white.rounded-xl.shadow-md,
+.bg-white.rounded-2xl.shadow-md,
+.bg-white.rounded-2xl.shadow-lg {
+  background-image: linear-gradient(150deg, #ffffff 0%, #f4f5f7 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(212, 160, 23, 0.22),
+    0 14px 26px -18px rgba(15, 15, 20, 0.45),
+    0 2px 6px rgba(15, 15, 20, 0.06);
+}
+/* Fond des pages connectées : même métal que l'accueil */
+.min-h-screen.bg-gray-100,
+.h-screen.bg-gray-100,
+main.bg-gray-100,
+.bg-gray-100.flex {
+  background-image: var(--metal-gradient);
+  background-color: #f3f4f6;
+}
+/* Menu latéral : lien actif avec barre or */
+.sidebar-active {
+  box-shadow: inset 3px 0 0 #e0b73a;
+  background-image: linear-gradient(90deg, rgba(224, 183, 58, 0.18), rgba(224, 183, 58, 0));
+}
+
 /* Accessibilité et téléphones modestes : pas d'animation si demandé */
 @media (prefers-reduced-motion: reduce) {
   .card-3d,
