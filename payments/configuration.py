@@ -102,10 +102,14 @@ def available_payment_options(store, delivery_requested=True):
     policy = get_payment_policy(store)
     labels = {
         'direct_split': 'Paiement séparé', 'store_collects_all': 'Tout au commerce',
-        'courier_cash': 'Espèces au livreur', 'platform_online': 'Paiement en ligne Gaboshop',
+        'courier_cash': 'Espèces à la livraison', 'platform_online': 'Paiement en ligne Gaboshop (Mobile Money)',
     }
     options = []
     ordered_flows = [policy['default_flow']] + [flow for flow in policy['enabled_flows'] if flow != policy['default_flow']]
+    # Le paiement en ligne (Mobile Money via Gaboshop) est proposé en premier quand il est disponible.
+    if 'platform_online' in ordered_flows:
+        ordered_flows.remove('platform_online')
+        ordered_flows.insert(0, 'platform_online')
     for flow in ordered_flows:
         for method in policy['enabled_methods']:
             if flow == 'courier_cash' and (method != 'cash' or not delivery_requested):
