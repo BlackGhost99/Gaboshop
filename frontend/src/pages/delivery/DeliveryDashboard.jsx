@@ -207,10 +207,10 @@ const DeliveryDashboard = () => {
       setActionLoading(prev => ({ ...prev, [deliveryId]: true }));
       const res = await acceptDelivery(deliveryId);
       if (res.success) {
-        alert('? Livraison acceptée avec succès !');
+        alert('✓ Livraison acceptée avec succès !');
         fetchDashboard();
       } else {
-        alert(`? ${res.error?.message || res.error || 'Erreur lors de l\'acceptation'}`);
+        alert(`❌ ${res.error?.message || res.error || 'Erreur lors de l\'acceptation'}`);
       }
     } catch (err) {
       alert('Erreur: ' + err.message);
@@ -552,7 +552,7 @@ const DeliveryDashboard = () => {
                         <p className="text-sm text-gray-700 mt-1 line-clamp-2">{n.body}</p>
                         <div className="flex items-center gap-3 mt-2">
                           {n.metadata?.from && n.metadata?.to && (
-                            <p className="text-xs text-gray-500">{n.metadata.from} ? {n.metadata.to}</p>
+                            <p className="text-xs text-gray-500">{n.metadata.from} → {n.metadata.to}</p>
                           )}
                           {n.order && (
                             <p className="text-xs text-gray-500">Commande #{n.order}</p>
@@ -759,7 +759,7 @@ const DeliveryDashboard = () => {
                                   disabled={actionLoading[delivery.id]}
                                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 >
-                                  {actionLoading[delivery.id] ? 'Traitement...' : '?? Récupérer le colis'}
+                                  {actionLoading[delivery.id] ? 'Traitement...' : '📦 Récupérer le colis'}
                                 </button>
                               </>
                             )}
@@ -769,7 +769,7 @@ const DeliveryDashboard = () => {
                                 disabled={actionLoading[delivery.id]}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                               >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '?? Démarrer la livraison'}
+                                {actionLoading[delivery.id] ? 'Traitement...' : '🚗 Démarrer la livraison'}
                               </button>
                             )}
                             {delivery.status === 'in_transit' && (
@@ -778,7 +778,7 @@ const DeliveryDashboard = () => {
                                 disabled={actionLoading[delivery.id]}
                                 className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                               >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '? Confirmer livraison'}
+                                {actionLoading[delivery.id] ? 'Traitement...' : '✓ Confirmer livraison'}
                               </button>
                             )}
                             {delivery.can_complete_delivery && delivery.status !== 'in_transit' && (
@@ -788,7 +788,7 @@ const DeliveryDashboard = () => {
                                 className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
                                 title={`Statut: ${delivery.status}`}
                               >
-                                {actionLoading[delivery.id] ? 'Traitement...' : '? Confirmer livraison (preuve prête)'}
+                                {actionLoading[delivery.id] ? 'Traitement...' : '✓ Confirmer livraison (preuve prête)'}
                               </button>
                             )}
                           </div>
@@ -949,14 +949,14 @@ const DeliveryDashboard = () => {
                           selectedNotification.notif_type === 'warning' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-gray-100 text-gray-700'
                     }`}>
-                    {selectedNotification.notif_type === 'delivery' && '?? Livraison'}
-                    {selectedNotification.notif_type === 'order' && '?? Commande'}
-                    {selectedNotification.notif_type === 'payment' && '?? Paiement'}
-                    {selectedNotification.notif_type === 'warning' && '?? Alerte'}
-                    {selectedNotification.notif_type === 'info' && '?? Info'}
+                    {selectedNotification.notif_type === 'delivery' && '🚚 Livraison'}
+                    {selectedNotification.notif_type === 'order' && '📦 Commande'}
+                    {selectedNotification.notif_type === 'payment' && '💰 Paiement'}
+                    {selectedNotification.notif_type === 'warning' && '⚠️ Alerte'}
+                    {selectedNotification.notif_type === 'info' && 'ℹ️ Info'}
                   </span>
                   {selectedNotification.is_read && (
-                    <span className="text-xs text-gray-500">? Lu</span>
+                    <span className="text-xs text-gray-500">✓ Lu</span>
                   )}
                 </div>
 

@@ -281,7 +281,7 @@ const StoreOrders = () => {
                 <p className="text-xs text-gray-500">Commande #{detail.id}</p>
                 <h3 className="text-lg font-semibold text-gray-900">{detail.store_name || 'Commande'}</h3>
               </div>
-              <button className="text-gray-500 hover:text-gray-800" onClick={() => setDetail(null)}>?</button>
+              <button className="text-gray-500 hover:text-gray-800" onClick={() => setDetail(null)}>✕</button>
             </div>
 
             <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">

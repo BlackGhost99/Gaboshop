@@ -733,7 +733,7 @@ const Home = () => {
       <div className="fixed bottom-4 right-4 z-50">
         <div className="bg-white shadow-xl border border-green-100 text-gray-900 rounded-lg px-4 py-3 flex items-center gap-3 animate-slide-up">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700">
-            ?
+            ✓
           </span>
           <span className="text-sm font-medium">{toast.message}</span>
         </div>

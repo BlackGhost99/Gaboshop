@@ -27,7 +27,7 @@ function logTest(testName, passed, details = '') {
     timestamp: new Date().toLocaleTimeString()
   });
   
-  const icon = passed ? '?' : '?';
+  const icon = passed ? '✓' : '✗';
   const color = passed ? 'color: green' : 'color: red';
   console.log(`%c${icon} ${testName}`, color, details);
 }
@@ -91,7 +91,7 @@ async function testGetAssignedDeliveries(token) {
   }
 }
 
-// Test 3: Valid transition - Accept delivery (pending ? accepted)
+// Test 3: Valid transition - Accept delivery (pending → accepted)
 async function testValidAcceptance(token, deliveryId) {
   console.log('\n%c=== TEST 3: Valid Transition - Accept Delivery ===', 'font-weight: bold; font-size: 12px');
   
@@ -132,7 +132,7 @@ async function testInvalidTransition(token, deliveryId) {
   }
 }
 
-// Test 5: Start delivery (accepted ? in_transit)
+// Test 5: Start delivery (accepted → in_transit)
 async function testStartDelivery(token, deliveryId) {
   console.log('\n%c=== TEST 5: Valid Transition - Start Delivery ===', 'font-weight: bold; font-size: 12px');
   
@@ -152,7 +152,7 @@ async function testStartDelivery(token, deliveryId) {
   }
 }
 
-// Test 6: Complete delivery (in_transit ? delivered)
+// Test 6: Complete delivery (in_transit → delivered)
 async function testCompleteDelivery(token, deliveryId) {
   console.log('\n%c=== TEST 6: Valid Transition - Complete Delivery ===', 'font-weight: bold; font-size: 12px');
   
@@ -244,7 +244,7 @@ export async function runPhase1Tests() {
   
   // Show details
   testResults.details.forEach(detail => {
-    const icon = detail.passed ? '?' : '?';
+    const icon = detail.passed ? '✓' : '✗';
     const color = detail.passed ? 'color: green' : 'color: red';
     console.log(`%c${icon} [${detail.timestamp}] ${detail.name}`, color, detail.details);
   });

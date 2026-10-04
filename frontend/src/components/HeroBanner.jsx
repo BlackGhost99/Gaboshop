@@ -61,7 +61,7 @@ const HeroBanner = ({ promotions = [] }) => {
           >
             <div className="absolute inset-0 bg-black/20" />
             <div className="relative h-full flex flex-col items-center justify-center text-center px-6 py-8">
-              <div className="text-5xl md:text-6xl mb-4">{slide.icon || '??'}</div>
+              <div className="text-5xl md:text-6xl mb-4">{slide.icon || '💼'}</div>
               <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 font-display">
                 {slide.title}
               </h2>

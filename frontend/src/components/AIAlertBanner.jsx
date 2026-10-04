@@ -53,7 +53,7 @@ const AIAlertBanner = () => {
           >
             <div className="flex items-center gap-3">
               <span className="text-lg">
-                {alert.severity === 'error' ? '??' : '??'}
+                {alert.severity === 'error' ? '⚠️' : 'ℹ️'}
               </span>
               <p className="text-sm font-medium">{alert.message}</p>
             </div>

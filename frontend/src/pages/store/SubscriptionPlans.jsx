@@ -81,11 +81,11 @@ const SubscriptionPlans = () => {
 
   const getPlanIcon = (planType) => {
     const icons = {
-      free: '??',
-      pro: '??',
-      business: '??'
+      free: '🆓',
+      pro: '💼',
+      business: '👑'
     };
-    return icons[planType] || '??';
+    return icons[planType] || '📦';
   };
 
   const getPlanColor = (planType) => {
@@ -180,9 +180,9 @@ const SubscriptionPlans = () => {
                     {currentPlan.days_until_expiry > 7 ? (
                       <>Expire le {new Date(currentPlan.end_date).toLocaleDateString('fr-FR')}</>
                     ) : currentPlan.days_until_expiry > 0 ? (
-                      <span className="text-orange-700 font-semibold">?? Expire dans {currentPlan.days_until_expiry} jour{currentPlan.days_until_expiry > 1 ? 's' : ''}</span>
+                      <span className="text-orange-700 font-semibold">⚠️ Expire dans {currentPlan.days_until_expiry} jour{currentPlan.days_until_expiry > 1 ? 's' : ''}</span>
                     ) : (
-                      <span className="text-red-700 font-semibold">? Plan expiré</span>
+                      <span className="text-red-700 font-semibold">❌ Plan expiré</span>
                     )}
                   </p>
                 )}
@@ -190,7 +190,7 @@ const SubscriptionPlans = () => {
               {currentPlan.plan_type === 'free' && (
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Passez au plan Business pour débloquer :</p>
-                  <p className="text-xs text-indigo-600 font-semibold mt-1">? Accès B2B ? Commission 0-2% ? Analytics avancés</p>
+                  <p className="text-xs text-indigo-600 font-semibold mt-1">✓ Accès B2B ✓ Commission 0-2% ✓ Analytics avancés</p>
                 </div>
               )}
             </div>
@@ -213,12 +213,12 @@ const SubscriptionPlans = () => {
                 {/* Badge "Recommandé" ou "Actuel" */}
                 {isHighlighted && !isCurrent && (
                   <div className="absolute top-4 right-4 bg-indigo-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
-                    ? RECOMMANDÉ
+                    ⭐ RECOMMANDÉ
                   </div>
                 )}
                 {isCurrent && (
                   <div className="absolute top-4 right-4 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
-                    ? ACTUEL
+                    ✓ ACTUEL
                   </div>
                 )}
 
@@ -271,7 +271,7 @@ const SubscriptionPlans = () => {
                       disabled
                       className="w-full py-4 px-6 bg-green-100 text-green-700 rounded-lg font-bold cursor-default border-2 border-green-300"
                     >
-                      ? Plan actif
+                      ✓ Plan actif
                     </button>
                   ) : (
                     <button

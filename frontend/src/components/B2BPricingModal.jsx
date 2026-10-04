@@ -300,13 +300,13 @@ const B2BPricingModal = ({ isOpen, onClose, store, onSuccess }) => {
 															onClick={handleUpdatePricing}
 															className="text-green-600 hover:text-green-800 mr-2"
 														>
-															?
+															✓
 														</button>
 														<button
 															onClick={() => setEditingPricing(null)}
 															className="text-gray-600 hover:text-gray-800"
 														>
-															?
+															✓
 														</button>
 													</td>
 												</>
@@ -326,13 +326,13 @@ const B2BPricingModal = ({ isOpen, onClose, store, onSuccess }) => {
 															onClick={() => setEditingPricing({ ...pricing })}
 															className="text-indigo-600 hover:text-indigo-800 mr-2"
 														>
-															??
+															✓
 														</button>
 														<button
 															onClick={() => handleDeletePricing(pricing.id)}
 															className="text-red-600 hover:text-red-800"
 														>
-															???
+															✓
 														</button>
 													</td>
 												</>

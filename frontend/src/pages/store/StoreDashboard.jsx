@@ -90,7 +90,7 @@ const StoreDashboard = () => {
     try {
       const res = await updateOrderStatus(order.id, action.next);
       if (res.success) {
-        setToast({ type: 'success', message: `Commande #${order.id} ? ${action.next}` });
+        setToast({ type: 'success', message: `Commande #${order.id} → ${action.next}` });
         fetchDashboard();
       } else {
         const detail = res.error?.details;
@@ -140,7 +140,7 @@ const StoreDashboard = () => {
         {dashboardData?.store?.store_type === 'wholesaler' && (
           <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded shadow-sm">
             <p className="font-bold flex items-center gap-2">
-              <span className="text-xl">??</span>
+              <span className="text-xl">🏭</span>
               MODE GROSSISTE ACTIVÉ
             </p>
             <p className="text-sm">
@@ -152,7 +152,7 @@ const StoreDashboard = () => {
         {dashboardData?.store?.store_type === 'industry' && (
           <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded shadow-sm">
             <p className="font-bold flex items-center gap-2">
-              <span className="text-xl">??</span>
+              <span className="text-xl">🏭</span>
               MODE INDUSTRIE / USINE
             </p>
             <p className="text-sm">
@@ -172,7 +172,7 @@ const StoreDashboard = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                   <div className="flex-1">
-                    <p className="font-bold text-lg mb-2">?? Votre abonnement expire bientôt !</p>
+                    <p className="font-bold text-lg mb-2">⚠️ Votre abonnement expire bientôt !</p>
                     <p className="text-sm mb-3">
                       Votre plan <strong>{dashboardData.subscription.plan_name}</strong> expire dans <strong className="text-orange-900">{dashboardData.subscription.days_until_expiry} jour{dashboardData.subscription.days_until_expiry > 1 ? 's' : ''}</strong>.
                       Renouvelez-le maintenant pour conserver tous vos avantages.
@@ -199,7 +199,7 @@ const StoreDashboard = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div className="flex-1">
-                    <p className="font-bold text-lg mb-2">? Votre abonnement a expiré</p>
+                    <p className="font-bold text-lg mb-2">❌ Votre abonnement a expiré</p>
                     <p className="text-sm mb-3">
                       Votre plan <strong>{dashboardData.subscription.plan_name}</strong> a expiré. 
                       Vous avez été automatiquement basculé sur le plan Free avec des limitations.
@@ -227,7 +227,7 @@ const StoreDashboard = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   <div className="flex-1">
-                    <p className="font-bold text-lg mb-2">? Passez au plan Business !</p>
+                    <p className="font-bold text-lg mb-2">✨ Passez au plan Business !</p>
                     <p className="text-sm mb-3">
                       Débloquez l'accès B2B : 0% de commission sur l'alimentaire (gratuit) et le vrai bénéfice sur le non-alimentaire, analytics avancés et bien plus encore.
                     </p>
@@ -303,7 +303,7 @@ const StoreDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
                 <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">??</span>
+                  <span className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">📊</span>
                   Évolution des ventes (Semaine)
                 </h3>
                 <div className="h-64 w-full">
@@ -488,7 +488,7 @@ const StoreDashboard = () => {
               <div className="bg-indigo-50 rounded-lg shadow-md p-6 mb-8 border border-indigo-200">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
-                    <span className="text-2xl">??</span>
+                    <span className="text-2xl">🏭</span>
                     Commandes B2B Reçues (Magasins)
                   </h3>
                 </div>

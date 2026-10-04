@@ -273,13 +273,13 @@ const AdminForfaitsSection = () => {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">?</button>
+          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">✕</button>
         </div>
       )}
       {success && (
         <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded text-sm flex justify-between items-center">
           <span>{success}</span>
-          <button onClick={() => setSuccess(null)} className="text-green-600 hover:text-green-800">?</button>
+          <button onClick={() => setSuccess(null)} className="text-green-600 hover:text-green-800">✕</button>
         </div>
       )}
 

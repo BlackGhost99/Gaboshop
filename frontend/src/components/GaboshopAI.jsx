@@ -113,7 +113,7 @@ const GaboshopAI = () => {
                 const successMsg = {
                     id: Date.now(),
                     type: 'bot',
-                    text: `? ${response.data.message || 'Action confirmée avec succès!'}`,
+                    text: `✅ ${response.data.message || 'Action confirmée avec succès!'}`,
                     timestamp: new Date().toISOString(),
                 };
                 // Note: On devrait utiliser le contexte pour ajouter le message
@@ -157,7 +157,7 @@ const GaboshopAI = () => {
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                                <span className="text-xl">??</span>
+                                <span className="text-xl">🤖</span>
                             </div>
                             <div>
                                 <h3 className="text-white font-bold text-sm">Gaboshop AI</h3>
@@ -174,7 +174,7 @@ const GaboshopAI = () => {
                                     className="text-white/80 hover:text-white text-xs px-2 py-1 bg-white/20 rounded"
                                     title="Effacer l'erreur"
                                 >
-                                    ?
+                                    ✕
                                 </button>
                             )}
                             <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white">
@@ -283,7 +283,7 @@ const GaboshopAI = () => {
                     onClick={() => setIsOpen(true)}
                     className="group flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-indigo-500/50 hover:scale-110 transition-all duration-300 relative"
                 >
-                    <span className="text-2xl animate-[wiggle_1s_ease-in-out_infinite]">??</span>
+                    <span className="text-2xl animate-[wiggle_1s_ease-in-out_infinite]">🤖</span>
                     {lastError && (
                         <span className="absolute -top-1 -right-1 flex h-4 w-4">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>

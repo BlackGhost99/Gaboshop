@@ -711,14 +711,14 @@ const HomeNavbar = ({
                       selectedNotification.notif_type
                     )}`}
                   >
-                    {selectedNotification.notif_type === 'delivery' && '?? Livraison'}
-                    {selectedNotification.notif_type === 'order' && '?? Commande'}
-                    {selectedNotification.notif_type === 'payment' && '?? Paiement'}
-                    {selectedNotification.notif_type === 'warning' && '?? Alerte'}
-                    {selectedNotification.notif_type === 'info' && '?? Info'}
+                    {selectedNotification.notif_type === 'delivery' && '🚚 Livraison'}
+                    {selectedNotification.notif_type === 'order' && '📦 Commande'}
+                    {selectedNotification.notif_type === 'payment' && '💰 Paiement'}
+                    {selectedNotification.notif_type === 'warning' && '⚠️ Alerte'}
+                    {selectedNotification.notif_type === 'info' && 'ℹ️ Info'}
                   </span>
                   {selectedNotification.is_read && (
-                    <span className="text-xs text-gray-500">? Lu</span>
+                    <span className="text-xs text-gray-500">✓ Lu</span>
                   )}
                 </div>
 

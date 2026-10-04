@@ -249,19 +249,19 @@ const AdminDeliverySection = () => {
                 onClick={() => setShowAddModal(true)}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700"
               >
-                ? Ajouter un livreur
+                ➕ Ajouter un livreur
               </button>
               <button 
                 onClick={() => alert('Fonctionnalité Carte à venir')}
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
               >
-                ?? Carte
+                📍 Carte
               </button>
               <button 
                 onClick={() => alert('Export non disponible')}
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
               >
-                ?? Exporter
+                🧾 Exporter
               </button>
             </div>
           </div>
@@ -305,20 +305,20 @@ const AdminDeliverySection = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">{agent.total_deliveries}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">{agent.daily_deliveries}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 text-center font-bold">
-                      {agent.rating} ?
+                      {agent.rating} ⭐
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {getStatusBadge(agent.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button onClick={() => handleViewAgent(agent)} className="text-indigo-600 hover:text-indigo-900 mr-3">
-                        ??? Voir
+                        👁️ Voir
                       </button>
                       <button onClick={() => handleEditAgent(agent)} className="text-blue-600 hover:text-blue-900 mr-3">
-                        ?? Modifier
+                        ✏️ Modifier
                       </button>
                       <button onClick={() => handleToggleAgent(agent)} className="text-red-600 hover:text-red-900">
-                        {agent.is_active ? '?? Désactiver' : '? Activer'}
+                        {agent.is_active ? '🚫 Désactiver' : '✅ Activer'}
                       </button>
                     </td>
                   </tr>
@@ -500,10 +500,10 @@ const AdminDeliverySection = () => {
                 <div><span className="font-medium">Statut:</span> {getStatusBadge(selectedAgent.status)}</div>
                 <div><span className="font-medium">Total Livraisons:</span> {selectedAgent.total_deliveries}</div>
                 <div><span className="font-medium">Aujourd'hui:</span> {selectedAgent.daily_deliveries}</div>
-                <div><span className="font-medium">Note:</span> {selectedAgent.rating} ?</div>
-                <div><span className="font-medium">Actif:</span> {selectedAgent.is_active ? '? Oui' : '? Non'}</div>
-                <div><span className="font-medium">Vérifié:</span> {selectedAgent.is_verified ? '? Oui' : '? Non'}</div>
-                <div><span className="font-medium">Disponible:</span> {selectedAgent.is_available ? '? Oui' : '? Non'}</div>
+                <div><span className="font-medium">Note:</span> {selectedAgent.rating} ⭐</div>
+                <div><span className="font-medium">Actif:</span> {selectedAgent.is_active ? '✅ Oui' : '❌ Non'}</div>
+                <div><span className="font-medium">Vérifié:</span> {selectedAgent.is_verified ? '✅ Oui' : '❌ Non'}</div>
+                <div><span className="font-medium">Disponible:</span> {selectedAgent.is_available ? '✅ Oui' : '❌ Non'}</div>
               </div>
             </div>
             <div className="flex justify-end mt-6">

@@ -89,7 +89,7 @@ const AIActionModal = ({ isOpen, onClose, actionData, onConfirm, onCancel, isLoa
           {requires_confirmation && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <p className="text-sm text-yellow-800">
-                ?? Veuillez vérifier les détails avant de confirmer.
+                ⚠️ Veuillez vérifier les détails avant de confirmer.
               </p>
             </div>
           )}

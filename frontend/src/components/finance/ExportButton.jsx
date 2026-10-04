@@ -118,7 +118,7 @@ const ExportButton = ({
       {/* Locked Badge */}
       {!isAllowed && (
         <div className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
-          ?? {planName === 'Free' ? 'Pro+' : 'Business'}
+          🔒 {planName === 'Free' ? 'Pro+' : 'Business'}
         </div>
       )}
 
