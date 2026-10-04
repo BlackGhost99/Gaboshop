@@ -1,6 +1,6 @@
 import React from 'react';
 
-const AdminSidebar = ({ activeTab, onTabChange }) => {
+const AdminSidebar = ({ activeTab, onTabChange, mobileOpen = false, onClose = () => {} }) => {
   const links = [
     { id: 'overview', label: 'Vue globale', icon: 'M3 12l2-2 7-7 7 7-2 2v7a1 1 0 01-1 1h-3m-6 0h6m-6 0a1 1 0 01-1-1v-7' },
     { id: 'users', label: 'Utilisateurs', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2a3 3 0 00-.879-2.121M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2a3 3 0 01.879-2.121m0 0a3 3 0 014.242 0M12 6a3 3 0 110 6 3 3 0 010-6zm-5 3a3 3 0 105.879 1.121' },
@@ -25,22 +25,28 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
   ];
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white z-30 border-r border-gray-800">
-      <div className="h-16 flex items-center px-5 border-b border-gray-800">
+    <>
+    {/* Fond sombre derrière le menu sur mobile */}
+    {mobileOpen && (
+      <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={onClose} aria-hidden="true" />
+    )}
+    <aside className={`fixed inset-y-0 left-0 w-64 max-w-[80vw] bg-gray-900 text-white z-40 border-r border-gray-800 flex flex-col transform transition-transform duration-200 lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="h-16 shrink-0 flex items-center justify-between px-5 border-b border-gray-800">
         <span className="text-xl font-extrabold tracking-tight">Gabo Admin</span>
+        <button onClick={onClose} className="lg:hidden p-1 text-gray-300 hover:text-white" aria-label="Fermer le menu">✕</button>
       </div>
-      <nav className="p-3 space-y-1">
+      <nav className="p-3 space-y-1 overflow-y-auto flex-1">
         {links.map((link) => {
           const active = activeTab === link.id;
           return (
             <button
               key={link.id}
-              onClick={() => onTabChange(link.id)}
+              onClick={() => { onTabChange(link.id); onClose(); }}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition ${
                 active ? 'bg-gray-100 text-gray-900' : 'text-gray-200 hover:bg-gray-800'
               }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={link.icon} />
               </svg>
               <span>{link.label}</span>
@@ -49,6 +55,7 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
         })}
       </nav>
     </aside>
+    </>
   );
 };
 

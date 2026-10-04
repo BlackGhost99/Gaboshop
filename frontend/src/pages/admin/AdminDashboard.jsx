@@ -99,6 +99,7 @@ const AdminDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userFilter, setUserFilter] = useState('all');
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ phone: '', user_type: 'client', first_name: '', last_name: '', email: '', city: 'Libreville', password: '' });
@@ -1882,7 +1883,7 @@ const AdminDashboard = () => {
         </button>
         <h2 className="text-lg font-semibold">Magasins - {selectedStoreCategory.name}</h2>
       </div>
-      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -1926,7 +1927,7 @@ const AdminDashboard = () => {
           Ajouter
         </button>
       </div>
-      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -1993,7 +1994,7 @@ const AdminDashboard = () => {
   const productCategoriesSection = (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Catégories de produits (par magasin)</h2>
-      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -2024,7 +2025,7 @@ const AdminDashboard = () => {
   const paymentMethodsSection = (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Transactions (Paiements)</h2>
-      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -2061,7 +2062,7 @@ const AdminDashboard = () => {
 
   const settingsSection = (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-2xl font-bold text-gray-900">⚙️ Configuration Globale</h2>
         {!editingSettings ? (
           <button
@@ -2396,9 +2397,9 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-      <AdminNavbar onRefresh={() => loadData(false)} onLogout={handleLogout} refreshing={refreshing} />
-      <main className="pt-20 pl-64 pr-6 pb-10">
+      <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+      <AdminNavbar onRefresh={() => loadData(false)} onLogout={handleLogout} refreshing={refreshing} onMenuClick={() => setMobileMenuOpen(true)} />
+      <main className="pt-20 px-3 sm:px-6 lg:pl-64 lg:pr-6 pb-10">
         {/* Navigation désormais uniquement via la sidebar */}
         
         {/* Messages de succès/erreur */}

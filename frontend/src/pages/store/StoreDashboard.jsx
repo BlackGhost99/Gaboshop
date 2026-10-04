@@ -10,6 +10,13 @@ import { getStoreDashboard } from '../../services/dashboardService';
 import { updateOrderStatus } from '../../services/orderService';
 import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils/helpers';
 
+// Axe des ventes en FCFA : entiers lisibles (750, 15 k, 1,2 M) au lieu de 0.004k
+const compactFcfa = new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 });
+const formatFcfaAxis = (value) => {
+  const n = Math.round(Number(value) || 0);
+  return Math.abs(n) < 1000 ? n.toLocaleString('fr-FR') : compactFcfa.format(n);
+};
+
 const StoreDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
@@ -249,12 +256,12 @@ const StoreDashboard = () => {
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 -mt-6 mb-8">
           <p className="text-gray-600">Gérez vos commandes et suivez vos performances</p>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {dashboardData?.store?.id && (
               <Link
                 to={`/stores/${dashboardData.store.id}`}
                 target="_blank"
-                className="inline-flex items-center px-4 py-2 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 font-medium transition-colors"
+                className="inline-flex items-center px-4 py-2 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 font-medium transition-colors whitespace-nowrap"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -273,7 +280,7 @@ const StoreDashboard = () => {
                 setActiveTab('supply');
               }}
               disabled={dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              className={`px-4 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
                 dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : activeTab === 'supply'
@@ -290,7 +297,7 @@ const StoreDashboard = () => {
             </button>
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${activeTab === 'overview' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              className={`px-4 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${activeTab === 'overview' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
             >
               Vue d'ensemble
             </button>
@@ -312,8 +319,9 @@ const StoreDashboard = () => {
                       <BarChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} tickFormatter={(value) => `${value / 1000}k`} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} tickFormatter={formatFcfaAxis} width={56} allowDecimals={false} />
                         <Tooltip
+                          formatter={(value) => [`${Math.round(Number(value) || 0).toLocaleString('fr-FR')} FCFA`, 'Ventes']}
                           cursor={{ fill: '#f3f4f6' }}
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                         />

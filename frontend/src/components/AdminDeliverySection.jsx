@@ -266,7 +266,7 @@ const AdminDeliverySection = () => {
             </div>
           </div>
 
-          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
             {error && (
               <div className="p-4 bg-red-50 text-red-700 border-b border-red-100">
                 {error}

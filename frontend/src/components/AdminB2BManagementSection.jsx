@@ -205,12 +205,12 @@ const AdminB2BManagementSection = () => {
 
       {/* Sub-tabs */}
       <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
+        <nav className="flex gap-6 sm:gap-8 overflow-x-auto">
           {subTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`py-4 px-1 shrink-0 whitespace-nowrap border-b-2 font-medium text-sm ${
                 activeSubTab === tab.id
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -233,7 +233,7 @@ const AdminB2BManagementSection = () => {
       {/* Profils B2B */}
       {!loading && activeSubTab === 'profiles' && (
         <div className="space-y-4">
-          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -328,7 +328,7 @@ const AdminB2BManagementSection = () => {
               + Créer une catégorie
             </button>
           </div>
-          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -417,7 +417,7 @@ const AdminB2BManagementSection = () => {
             )}
           </div>
           {selectedStoreForPricing && (
-            <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+            <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -542,7 +542,7 @@ const AdminB2BManagementSection = () => {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -676,7 +676,7 @@ const AdminB2BManagementSection = () => {
             {selectedOrder.items && selectedOrder.items.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">Articles</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
