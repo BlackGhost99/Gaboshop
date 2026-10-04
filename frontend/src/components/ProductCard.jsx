@@ -15,7 +15,10 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
   return (
     <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden group">
       {/* Image Container */}
-      <div className="relative overflow-hidden bg-gray-200 aspect-square">
+      <div
+        className="relative overflow-hidden bg-gray-200 aspect-square cursor-pointer"
+        onClick={() => onViewDetails?.(product)}
+      >
         <img
           src={product.image || '/placeholder.png'}
           alt={product.name}
@@ -33,10 +36,11 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
         )}
 
         {/* Quick Actions */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <div className="pointer-coarse:hidden absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <button
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               onViewDetails?.(product);
             }}
             className="p-2 bg-white rounded-full hover:bg-gray-100 transition-colors"
@@ -60,6 +64,7 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
           <button
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               onAddToCart?.(product);
             }}
             className="p-2 bg-cta-600 rounded-full hover:bg-cta-700 transition-colors text-white"
@@ -78,7 +83,7 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         {/* Store Name */}
         {product.store_name && (
           <p className="text-xs text-gray-500 font-medium mb-1">
@@ -118,7 +123,7 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
 
         {/* Pricing */}
         <div className="flex items-baseline gap-2 mb-3">
-          <span className="text-lg font-bold text-primary-600">
+          <span className="text-base sm:text-lg font-bold text-primary-600">
             {formatCurrency(finalPrice)}
           </span>
           {discount > 0 && (
@@ -131,7 +136,7 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
         {/* CTA */}
         <button
           onClick={() => onAddToCart?.(product)}
-          className="w-full py-2 bg-cta-600 text-white font-semibold rounded-lg hover:bg-cta-700 transition-colors text-sm"
+          className="w-full py-2.5 bg-cta-600 text-white font-semibold rounded-lg hover:bg-cta-700 transition-colors text-xs sm:text-sm"
         >
           Ajouter au panier
         </button>
