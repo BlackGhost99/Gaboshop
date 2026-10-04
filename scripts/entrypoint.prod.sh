@@ -17,6 +17,6 @@ echo "Demarrage de gunicorn sur le port ${PORT:-8000}"
 
 exec gunicorn wsgi:application \
   --bind 0.0.0.0:${PORT:-8000} \
-  --workers "${GUNICORN_WORKERS:-3}" \
+  --workers "${GUNICORN_WORKERS:-${WEB_CONCURRENCY:-3}}" \
   --threads "${GUNICORN_THREADS:-2}" \
   --timeout "${GUNICORN_TIMEOUT:-60}"

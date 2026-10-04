@@ -40,6 +40,9 @@ services:
       # Pas de worker gratuit : les taches Celery s'executent dans la requete.
       - key: CELERY_TASK_ALWAYS_EAGER
         value: "1"
+      # 512 Mo de memoire : un seul processus gunicorn
+      - key: GUNICORN_WORKERS
+        value: "1"
       # Paiements simules tant que SingPay n'est pas configure ni valide.
       - key: PAYMENT_SIMULATION_MODE
         value: "1"
