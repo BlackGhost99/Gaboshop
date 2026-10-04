@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from .models import StoreCategory, Store
@@ -88,6 +89,13 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'description', 'phone', 'email', 'address', 
             'zone', 'latitude', 'longitude', 'logo', 'banner_image',
-            'opening_time', 'closing_time', 'offers_delivery', 'delivery_fee', 'min_order_amount'
+            'opening_time', 'closing_time', 'offers_delivery', 'delivery_fee', 'min_order_amount',
+            'agent_code'
         ]
+
+    def validate_agent_code(self, value):
+        value = (value or '').strip()
+        if value and not re.fullmatch(r'[A-Za-z0-9_.\-]{3,100}', value):
+            raise serializers.ValidationError(_('Code agent invalide (lettres, chiffres, - _ . uniquement).'))
+        return value
         

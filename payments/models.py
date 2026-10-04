@@ -810,6 +810,50 @@ class Payout(models.Model):
 		return f"{payout_type_display} - {self.user.phone} - {self.amount} FCFA ({self.status})"
 
 
+class StorePayout(models.Model):
+	"""
+	Versement de la part du commerce, déclenché par la confirmation de la commande par le commerce.
+
+	Une seule ligne par commande (idempotence). Si le commerce gère sa livraison, la part livraison
+	est incluse ici et aucun paiement livreur séparé n'est émis par Gaboshop.
+	"""
+	STATUSES = [
+		('pending', 'En attente'),
+		('processing', 'En traitement'),
+		('paid', 'Payé'),
+		('failed', 'Échec'),
+		('skipped', 'Sans objet'),
+	]
+
+	order = models.OneToOneField('orders.Order', on_delete=models.PROTECT, related_name='store_payout')
+	store = models.ForeignKey('stores.Store', on_delete=models.PROTECT, related_name='store_payouts')
+	amount = models.DecimalField(max_digits=12, decimal_places=2)
+	products_amount = models.DecimalField(max_digits=12, decimal_places=2)
+	commission_amount = models.DecimalField(max_digits=12, decimal_places=2)
+	delivery_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+	includes_delivery = models.BooleanField(default=False, help_text="Le commerce gère sa livraison: part livraison incluse")
+	agent_code = models.CharField(max_length=100, blank=True, default='', help_text="Code agent du commerce au moment du versement")
+	reference = models.CharField(max_length=100, unique=True)
+	status = models.CharField(max_length=20, choices=STATUSES, default='pending', db_index=True)
+	note = models.CharField(max_length=255, blank=True, default='')
+	provider_response = models.JSONField(default=dict, blank=True)
+	attempts = models.PositiveIntegerField(default=0)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	paid_at = models.DateTimeField(null=True, blank=True)
+
+	class Meta:
+		verbose_name = "Versement commerce"
+		verbose_name_plural = "Versements commerces"
+		ordering = ['-created_at']
+		constraints = [
+			models.CheckConstraint(condition=models.Q(amount__gte=0), name='store_payout_amount_nonnegative'),
+		]
+
+	def __str__(self):
+		return f"Versement {self.amount} FCFA - {self.store} ({self.status})"
+
+
 # Registered with the payments app; kept separate from provider transactions.
 from .direct_models import (  # noqa: E402,F401
 	PaymentArrangement, PaymentObligation, PaymentReceipt, PaymentAdjustment,

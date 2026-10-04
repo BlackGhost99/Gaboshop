@@ -60,6 +60,13 @@ class Store(models.Model):
 	# Indique si le magasin gère les livraisons lui-même (optionnel)
 	# Par défaut, le magasin ne gère pas la livraison (False)
 	offers_delivery = models.BooleanField(default=False, help_text="Le magasin gère-t-il la livraison ? (par défaut: non)")
+	# Destinataire des versements Gaboshop vers le commerce (jamais exposé publiquement)
+	agent_code = models.CharField(
+		max_length=100,
+		blank=True,
+		default='',
+		help_text="Code agent / disbursement SingPay du commerce pour recevoir ses versements"
+	)
 	delivery_fee_express = models.DecimalField(
 		max_digits=8, 
 		decimal_places=2, 

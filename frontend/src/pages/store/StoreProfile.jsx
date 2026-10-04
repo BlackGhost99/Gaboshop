@@ -18,6 +18,7 @@ const StoreProfile = () => {
         delivery_fee: '',
         min_order_amount: '',
         offers_delivery: false,
+        agent_code: '',
         manager_first_name: '',
         manager_last_name: '',
         manager_email: '',
@@ -35,7 +36,8 @@ const StoreProfile = () => {
         try {
             const dashboardRes = await getStoreDashboard();
             if (dashboardRes.success) {
-                const storeId = (dashboardRes.data.store || dashboardRes.data.store_info).id;
+                const dashboardStore = dashboardRes.data.store || dashboardRes.data.store_info;
+                const storeId = dashboardStore.id;
                 const detailsRes = await getStoreDetails(storeId);
                 if (detailsRes.success) {
                     const data = detailsRes.data;
@@ -52,6 +54,7 @@ const StoreProfile = () => {
                             delivery_fee: data.delivery_fee || '',
                             min_order_amount: data.min_order_amount || '',
                             offers_delivery: !!data.offers_delivery,
+                            agent_code: dashboardStore.agent_code || '',
                         manager_first_name: data.manager_details?.first_name || '',
                         manager_last_name: data.manager_details?.last_name || '',
                         manager_email: data.manager_details?.email || '',
@@ -94,6 +97,9 @@ const StoreProfile = () => {
             // Always send boolean flags (including false). For others, skip empty strings.
             if (typeof value === 'boolean') {
                 data.append(key, value ? 'true' : 'false');
+            } else if (key === 'agent_code') {
+                // Toujours envoyé pour pouvoir aussi effacer le code
+                data.append(key, value || '');
             } else if (value !== null && value !== '') {
                 data.append(key, value);
             }
@@ -253,7 +259,22 @@ const StoreProfile = () => {
                                 onChange={handleChange}
                                 className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
                             />
-                            <label htmlFor="offers_delivery" className="text-sm text-gray-700">Le magasin gère la livraison</label>
+                            <label htmlFor="offers_delivery" className="text-sm text-gray-700">Le magasin gère la livraison avec ses propres livreurs</label>
+                        </div>
+                        <p className="md:col-span-2 -mt-3 text-xs text-gray-500">
+                            Si coché, Gaboshop ne paie pas de livreur : vous recevez la part livraison avec le versement du commerce, en un seul paiement. Par défaut : décoché (livreurs indépendants Gaboshop).
+                        </p>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">Code agent (Mobile Money)</label>
+                            <input
+                                type="text" name="agent_code" value={formData.agent_code} onChange={handleChange}
+                                autoComplete="off" maxLength={100}
+                                className="mt-1 block w-full border rounded-md shadow-sm p-2"
+                                placeholder="Code sur lequel Gaboshop verse vos ventes"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                Gaboshop verse votre part (produits moins commission) sur ce code dès que vous confirmez une commande payée en ligne. Sans code, le versement reste en attente.
+                            </p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Frais de livraison (FCFA)</label>

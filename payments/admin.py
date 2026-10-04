@@ -7,7 +7,7 @@ from .models import (
 	Forfait, ClientForfait, Payout, PaymentCallbackLog,
 	CategoryCommission
 )
-from .models import PaymentArrangement, PaymentObligation, PaymentReceipt, PaymentAdjustment, CommissionSettlement, SettlementAllocation
+from .models import PaymentArrangement, PaymentObligation, PaymentReceipt, PaymentAdjustment, CommissionSettlement, SettlementAllocation, StorePayout
 
 from .models import CategoryCommissionChangeLog
 
@@ -852,3 +852,28 @@ class PayoutAdmin(admin.ModelAdmin):
 		)
 	status_display.short_description = 'Statut'
 
+
+
+@admin.register(StorePayout)
+class StorePayoutAdmin(admin.ModelAdmin):
+	"""Versements Gaboshop vers les commerces (lecture seule, relance possible)"""
+	list_display = ('reference', 'store', 'order', 'amount', 'includes_delivery', 'status', 'attempts', 'paid_at')
+	list_filter = ('status', 'includes_delivery', 'created_at')
+	search_fields = ('reference', 'store__name', 'order__order_number', 'agent_code')
+	readonly_fields = [f.name for f in StorePayout._meta.fields]
+	actions = ['retry_payouts']
+
+	def has_add_permission(self, request):
+		return False
+
+	def has_delete_permission(self, request, obj=None):
+		return False
+
+	@admin.action(description="Relancer les versements en attente ou échoués")
+	def retry_payouts(self, request, queryset):
+		from .store_payout_service import release_store_payment
+		retried = 0
+		for payout in queryset.filter(status__in=['pending', 'failed']):
+			release_store_payment(payout.order_id)
+			retried += 1
+		self.message_user(request, f"{retried} versement(s) relancé(s).")

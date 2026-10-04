@@ -317,6 +317,7 @@ class StoreDashboardView(APIView):
                     'city': store.city,
                     'id': store.id,
                     'logo': request.build_absolute_uri(store.logo.url) if store.logo else None,
+                    'agent_code': store.agent_code,
                 },
                 'owner': {
                     'email': store.manager.email or '',

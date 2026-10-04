@@ -459,6 +459,14 @@ class PaymentService:
         try:
             if delivery.status != 'delivered' or delivery.order.status in ('cancelled', 'refunded'):
                 return {'success': False, 'error': 'La livraison doit être livrée et non annulée'}
+            if delivery.order.store.offers_delivery:
+                # Le commerce gère sa livraison : la part livraison est incluse dans son versement.
+                return {
+                    'success': True,
+                    'skipped': True,
+                    'message': 'Livraison assurée par le commerce : rémunération incluse dans son versement',
+                    'transaction_id': None,
+                }
             if not hasattr(delivery, 'proof'):
                 return {'success': False, 'error': 'Preuve de livraison requise'}
             if not delivery.agent_commission or delivery.agent_commission <= 0:
@@ -587,6 +595,9 @@ class PaymentService:
                     is_settled=False,
                     order__status='delivered',
                     order__delivered_at__range=[period_start, period_end]
+                ).exclude(
+                    # Déjà versé commande par commande à la confirmation du commerce
+                    order__store_payout__status__in=['processing', 'paid']
                 )
                 
                 if not unsettled_commissions.exists():
