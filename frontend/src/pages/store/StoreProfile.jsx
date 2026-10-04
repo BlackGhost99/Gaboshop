@@ -27,6 +27,9 @@ const StoreProfile = () => {
     const [bannerFile, setBannerFile] = useState(null);
     const [previewLogo, setPreviewLogo] = useState(null);
     const [previewBanner, setPreviewBanner] = useState(null);
+    // La description est réservée aux forfaits avec page personnalisée : le serveur refuse
+    // toute requête qui la contient. On ne l'envoie donc que si elle a vraiment changé.
+    const [initialDescription, setInitialDescription] = useState('');
 
     useEffect(() => {
         fetchStoreData();
@@ -59,6 +62,7 @@ const StoreProfile = () => {
                         manager_last_name: data.manager_details?.last_name || '',
                         manager_email: data.manager_details?.email || '',
                     });
+                    setInitialDescription(data.description || '');
                     setPreviewLogo(data.logo);
                     setPreviewBanner(data.banner_image);
                 }
@@ -95,6 +99,9 @@ const StoreProfile = () => {
         Object.keys(formData).forEach(key => {
             const value = formData[key];
             // Always send boolean flags (including false). For others, skip empty strings.
+            if (key === 'description' && value === initialDescription) {
+                return;
+            }
             if (typeof value === 'boolean') {
                 data.append(key, value ? 'true' : 'false');
             } else if (key === 'agent_code') {
@@ -112,12 +119,15 @@ const StoreProfile = () => {
             if (res.success) {
                 alert("Profil mis à jour avec succès !");
                 setStore(res.data);
+                setInitialDescription(res.data?.description ?? formData.description);
             }
         } catch (error) {
             console.error("Error updating store", error);
-            const message = error.error?.details 
-                ? Object.values(error.error.details).flat().join('\n')
-                : "Erreur lors de la mise à jour.";
+            // Afficher la vraie raison renvoyée par le serveur (forfait, champ invalide…)
+            const apiError = error.response?.data?.error;
+            const message = apiError?.details
+                ? Object.values(apiError.details).flat().join('\n')
+                : apiError?.message || "Erreur lors de la mise à jour.";
             alert(message);
         }
     };
