@@ -3,6 +3,7 @@ import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { getOrders, getOrderDetail, confirmDelivery } from '../../services/dashboardService';
 import { formatCurrency, formatDateTime } from '../../utils/helpers';
+import useVisibleInterval from '../../hooks/useVisibleInterval';
 
 const STATUS_MAP = {
   created: { label: 'Créée', className: 'bg-gray-200 text-gray-800' },
@@ -63,12 +64,7 @@ const ClientOrders = () => {
   }, []);
 
   // Polling automatique pour mettre à jour les commandes toutes les 5 secondes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchOrders();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  useVisibleInterval(fetchOrders, 5000);
 
   // Auto-afficher la popup d'acceptation avec PIN quand la livraison est acceptée
   useEffect(() => {
@@ -81,22 +77,16 @@ const ClientOrders = () => {
   }, [detail?.status, detail?.client_confirmation_pending, detail?.id, showPinModal]);
 
   // Polling du détail de la commande ouverte toutes les 2 secondes
-  useEffect(() => {
-    if (!detail?.id) return;
-    
-    const interval = setInterval(async () => {
-      try {
-        const res = await getOrderDetail(detail.id);
-        if (res.success) {
-          setDetail(res.data || res);
-        }
-      } catch {
-        // Silencieux : c'est juste un refresh
+  useVisibleInterval(async () => {
+    try {
+      const res = await getOrderDetail(detail.id);
+      if (res.success) {
+        setDetail(res.data || res);
       }
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, [detail?.id]);
+    } catch {
+      // Silencieux : c'est juste un refresh
+    }
+  }, 2000, Boolean(detail?.id));
 
   const counts = useMemo(() => {
     const base = { active: 0, delivered: 0, cancelled: 0, all: orders.length };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StoreLayout from '../../components/StoreLayout';
 import api from '../../services/api';
+import useVisibleInterval from '../../hooks/useVisibleInterval';
 
 const SubscriptionPlans = () => {
   const [plans, setPlans] = useState([]);
@@ -73,6 +74,9 @@ const SubscriptionPlans = () => {
       setSubscribing(null);
     }
   };
+
+  // Paiement en attente : suivre l'activation du plan (et au retour dans l'app)
+  useVisibleInterval(fetchPlans, 10000, Boolean(lastIntent));
 
   const showToast = (message, type) => {
     setToast({ message, type });
