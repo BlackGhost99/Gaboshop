@@ -7,8 +7,10 @@ android {
         applicationId "com.gaboshop.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Sur GitHub Actions, chaque APK a un numéro croissant pour s'installer par-dessus le précédent
+        def ciRun = System.getenv("GITHUB_RUN_NUMBER")
+        versionCode ciRun ? ciRun.toInteger() + 1 : 1
+        versionName ciRun ? "1.0.${ciRun}" : "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

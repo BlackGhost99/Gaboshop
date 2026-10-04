@@ -1,0 +1,88 @@
+# Construit l'APK Android de Gaboshop à chaque poussée sur main (frontend modifié)
+# et le publie dans la release « android-latest », téléchargeable depuis un téléphone :
+# https://github.com/BlackGhost99/gaboshop/releases/tag/android-latest
+name: APK Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      # Même clé de signature d'une version à l'autre, sinon le téléphone refuse la mise à jour.
+      # Pas de clé dans le dépôt (public) : elle vit dans le cache GitHub Actions.
+      - name: Restaurer la clé de signature
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: gaboshop-debug-keystore-v1
+
+      - name: Créer la clé si absente
+        run: |
+          if [ ! -f ~/.android/debug.keystore ]; then
+            mkdir -p ~/.android
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Gaboshop Debug,O=Gaboshop,C=GA"
+          fi
+
+      - run: npm ci
+      - name: Build web + synchronisation Capacitor (API de production)
+        run: npm run android:prod
+
+      - name: Construire l'APK
+        working-directory: frontend/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/gaboshop.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gaboshop-apk-${{ github.run_number }}
+          path: gaboshop.apk
+
+      - name: Publier dans la release android-latest
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --cleanup-tag -y || true
+          gh release create android-latest gaboshop.apk \
+            --target "$GITHUB_SHA" \
+            --title "APK Android (version ${{ github.run_number }})" \
+            --notes "Construit automatiquement depuis ${GITHUB_SHA::7}. Télécharger gaboshop.apk puis l'installer."
