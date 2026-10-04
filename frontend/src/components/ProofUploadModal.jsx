@@ -192,10 +192,10 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg p-4 sm:p-6 w-full min-w-0 max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">
-            Preuve de livraison - Commande #{delivery.order_id}
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
+            Preuve de livraison - Commande #{delivery.order_number || delivery.order_id}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,16 +210,16 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
               1
             </div>
-            <span className="ml-2 text-sm font-medium">Photos + GPS</span>
+            <span className="ml-2 text-xs sm:text-sm font-medium">Photos + GPS</span>
           </div>
-          <div className="flex-1 h-1 mx-4 bg-gray-200">
+          <div className="flex-1 h-1 mx-2 sm:mx-4 bg-gray-200">
             <div className={`h-1 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'} transition-all`} style={{ width: step >= 2 ? '100%' : '0%' }} />
           </div>
           <div className={`flex items-center ${step >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
               2
             </div>
-            <span className="ml-2 text-sm font-medium">Vérification</span>
+            <span className="ml-2 text-xs sm:text-sm font-medium">Vérification</span>
           </div>
         </div>
 
@@ -415,7 +415,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
                         {loading ? 'Vérification...' : 'Vérifier'}
                       </button>
                     ) : (
-                      <div className="px-4 py-2 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center min-w-max">
+                      <div className="px-3 py-2 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center whitespace-nowrap">
                         ✓ Vérifié
                       </div>
                     )}
@@ -438,7 +438,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
               </div>
             )}
 
-            <div className="flex justify-between space-x-3">
+            <div className="flex justify-between gap-3">
               <button
                 onClick={() => setStep(1)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium transition"
@@ -448,7 +448,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
               <button
                 onClick={handleSubmit}
                 disabled={loading || (verificationMethod === 'signature' && !signature) || (verificationMethod === 'pin' && !pinVerified)}
-                className={`px-8 py-3 rounded-md font-bold text-base transition transform ${
+                className={`flex-1 sm:flex-none px-4 sm:px-8 py-3 rounded-md font-bold text-sm sm:text-base transition transform ${
                   loading || (verificationMethod === 'signature' && !signature) || (verificationMethod === 'pin' && !pinVerified)
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
                     : 'bg-green-600 text-white hover:bg-green-700 active:scale-95 shadow-lg hover:shadow-xl'

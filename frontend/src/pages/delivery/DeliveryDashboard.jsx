@@ -446,7 +446,7 @@ const DeliveryDashboard = () => {
             </h2>
             <p className="text-gray-600 mt-2">Gérez vos livraisons en temps réel</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full sm:w-auto items-center gap-3">
             <span className="text-sm font-medium text-gray-700">Disponibilité:</span>
             <button
               onClick={toggleAvailability}
