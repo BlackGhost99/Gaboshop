@@ -351,7 +351,7 @@ const HomeNavbar = ({
                   <span className="hidden sm:inline">Menu</span>
                 </button>
                 {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-72 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
+                  <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
                     <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                       <p className="text-xs uppercase tracking-wider text-slate-500">Navigation rapide</p>
                       <p className="text-sm font-semibold text-slate-900">Fonctionnalites</p>

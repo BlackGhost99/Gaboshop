@@ -135,9 +135,9 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
             )}
             <a href="/" className="flex items-center gap-2" aria-label="Gaboshop">
               <img src="/logo.png" alt="" className="w-9 h-9 object-contain" />
-              <h1 className="text-lg sm:text-2xl font-bold text-slate-900">GABOSHOP</h1>
+              <h1 className="hidden sm:block text-lg sm:text-2xl font-bold text-slate-900">GABOSHOP</h1>
             </a>
-            <a href="/" className="text-slate-900 hover:text-slate-700 font-medium">
+            <a href="/" className="text-sm sm:text-base text-slate-900 hover:text-slate-700 font-medium">
               Accueil
             </a>
           </div>
@@ -220,7 +220,7 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
               {getRoleName(userRole)} - {userName}
             </span>
             <button
-              className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              className="bg-red-500 hover:bg-red-600 text-white px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap"
               onClick={() => {
                 authStorage.removeItem('token');
                 authStorage.removeItem('refresh_token');
