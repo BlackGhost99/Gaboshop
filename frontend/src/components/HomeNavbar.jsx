@@ -301,9 +301,7 @@ const HomeNavbar = ({
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">G</span>
-              </div>
+              <img src="/logo.png" alt="Gaboshop" className="w-11 h-11 object-contain" />
               <span className="hidden sm:inline-block font-bold text-lg text-slate-900 font-display">
                 GABOSHOP
               </span>

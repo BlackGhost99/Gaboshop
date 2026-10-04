@@ -133,7 +133,10 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
                 </svg>
               </button>
             )}
-            <h1 className="text-lg sm:text-2xl font-bold text-slate-900">GABOSHOP</h1>
+            <a href="/" className="flex items-center gap-2" aria-label="Gaboshop">
+              <img src="/logo.png" alt="" className="w-9 h-9 object-contain" />
+              <h1 className="text-lg sm:text-2xl font-bold text-slate-900">GABOSHOP</h1>
+            </a>
             <a href="/" className="text-slate-900 hover:text-slate-700 font-medium">
               Accueil
             </a>
