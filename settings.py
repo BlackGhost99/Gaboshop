@@ -194,6 +194,21 @@ if _database_url:
             'DISABLE_SERVER_SIDE_CURSORS': env_bool('DATABASE_DISABLE_SERVER_SIDE_CURSORS', False),
         }
     }
+elif env("DATABASE_HOST", ""):
+    # Alternative sans URL (evite les erreurs de format / caracteres speciaux du mot de passe)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('DATABASE_NAME', 'postgres'),
+            'USER': env('DATABASE_USER', ''),
+            'PASSWORD': env('DATABASE_PASSWORD', ''),
+            'HOST': env('DATABASE_HOST'),
+            'PORT': env('DATABASE_PORT', '5432'),
+            'CONN_MAX_AGE': 60,
+            'OPTIONS': {'sslmode': env('DATABASE_SSLMODE', 'require')},
+            'DISABLE_SERVER_SIDE_CURSORS': env_bool('DATABASE_DISABLE_SERVER_SIDE_CURSORS', False),
+        }
+    }
 
 
 # Password validation
