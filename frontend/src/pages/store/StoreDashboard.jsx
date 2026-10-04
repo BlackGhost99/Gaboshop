@@ -17,6 +17,16 @@ const formatFcfaAxis = (value) => {
   return Math.abs(n) < 1000 ? n.toLocaleString('fr-FR') : compactFcfa.format(n);
 };
 
+// Expiré seulement si le serveur le dit, ou si une vraie date de fin est passée.
+// (Le plan Free et le super admin n'ont pas de date de fin : days_until_expiry vaut null.)
+const isSubscriptionExpired = (sub) => {
+  if (!sub) return false;
+  if (sub.status === 'expired') return true;
+  if (typeof sub.days_until_expiry !== 'number' || !sub.end_date) return false;
+  const today = new Date(new Date().toDateString());
+  return sub.days_until_expiry <= 0 && new Date(sub.end_date) < today;
+};
+
 const StoreDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
@@ -199,7 +209,7 @@ const StoreDashboard = () => {
             )}
 
             {/* Alerte plan expiré */}
-            {dashboardData.subscription.status === 'expired' || (dashboardData.subscription.days_until_expiry !== undefined && dashboardData.subscription.days_until_expiry <= 0) && (
+            {isSubscriptionExpired(dashboardData.subscription) && (
               <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-5 mb-6 rounded-lg shadow-lg">
                 <div className="flex items-start gap-3">
                   <svg className="w-7 h-7 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,7 +237,7 @@ const StoreDashboard = () => {
             )}
 
             {/* Encouragement upgrade si Free */}
-            {dashboardData.subscription.plan_type === 'free' && !dashboardData.subscription.status === 'expired' && (
+            {dashboardData.subscription.plan_type === 'free' && !isSubscriptionExpired(dashboardData.subscription) && (
               <div className="bg-indigo-50 border-l-4 border-indigo-500 text-indigo-800 p-5 mb-6 rounded-lg shadow-sm">
                 <div className="flex items-start gap-3">
                   <svg className="w-7 h-7 text-indigo-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

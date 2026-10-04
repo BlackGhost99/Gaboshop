@@ -218,6 +218,20 @@ class StoreDashboardView(APIView):
                     'days_until_expiry': days_until_expiry,
                 }
 
+        # Super admin : tous les avantages du plan le plus complet, sans abonnement ni expiration
+        if store.is_superadmin_store:
+            top_plan = store.get_current_plan()
+            if top_plan:
+                subscription_payload = {
+                    'plan_name': f"{top_plan.name} (super admin)",
+                    'plan_type': top_plan.plan_type,
+                    'status': 'active',
+                    'end_date': None,
+                    'auto_renew': False,
+                    'monthly_fee': 0,
+                    'days_until_expiry': None,
+                }
+
         # Si aucun abonnement trouvé, utiliser le plan Free par défaut
         if not subscription_payload:
             subscription_payload = {
