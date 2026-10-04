@@ -1,0 +1,3 @@
+# Scripts executed inside Linux containers must keep LF line endings
+*.sh text eol=lf
+frontend/android/gradlew text eol=lf

@@ -1,3 +1,35 @@
+# Gaboshop - local development stack.
+# Use ./gaboshop.ps1 (up, down, logs, test, apk...) rather than calling this directly.
+# Production: docker-compose.prod.yml
+
+x-backend-env: &backend-env
+  DJANGO_SETTINGS_MODULE: settings
+  DJANGO_DEBUG: "1"
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-development-only-change-this-before-production}
+  # GABOSHOP_LAN_IP lets a phone on the same Wi-Fi reach the API (set by gaboshop.ps1)
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web,10.0.2.2,${GABOSHOP_LAN_IP:-127.0.0.1}
+  REDIS_URL: redis://redis:6379/0
+  SQLITE_PATH: /app/db.sqlite3
+  SINGPAY_BASE_URL: ${SINGPAY_BASE_URL:-https://gateway.singpay.ga/v1}
+  SINGPAY_CLIENT_ID: ${SINGPAY_CLIENT_ID:-}
+  SINGPAY_CLIENT_SECRET: ${SINGPAY_CLIENT_SECRET:-}
+  SINGPAY_WALLET_ID: ${SINGPAY_WALLET_ID:-}
+  SINGPAY_DISBURSEMENT_ID: ${SINGPAY_DISBURSEMENT_ID:-}
+  SINGPAY_TIMEOUT: ${SINGPAY_TIMEOUT:-30}
+  SINGPAY_ENABLE_TRANSFER: ${SINGPAY_ENABLE_TRANSFER:-False}
+  PAYMENT_SIMULATION_MODE: ${PAYMENT_SIMULATION_MODE:-False}
+
+x-backend: &backend
+  build:
+    context: .
+  restart: unless-stopped
+  volumes:
+    - .:/app
+  environment: *backend-env
+  depends_on:
+    redis:
+      condition: service_healthy
+
 services:
   redis:
     image: redis:7-alpine
@@ -13,31 +45,18 @@ services:
       retries: 5
 
   web:
-    build:
-      context: .
-    restart: unless-stopped
+    <<: *backend
     command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - .:/app
     ports:
       - "8000:8000"
-    environment:
-      DJANGO_SETTINGS_MODULE: settings
-      DJANGO_DEBUG: "1"
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-development-only-change-this-before-production}
-      REDIS_URL: redis://redis:6379/0
-      SQLITE_PATH: /app/db.sqlite3
-      SINGPAY_BASE_URL: ${SINGPAY_BASE_URL}
-      SINGPAY_CLIENT_ID: ${SINGPAY_CLIENT_ID}
-      SINGPAY_CLIENT_SECRET: ${SINGPAY_CLIENT_SECRET}
-      SINGPAY_WALLET_ID: ${SINGPAY_WALLET_ID}
-      SINGPAY_DISBURSEMENT_ID: ${SINGPAY_DISBURSEMENT_ID}
-      SINGPAY_TIMEOUT: ${SINGPAY_TIMEOUT:-30}
-      SINGPAY_ENABLE_TRANSFER: ${SINGPAY_ENABLE_TRANSFER:-False}
-      PAYMENT_SIMULATION_MODE: ${PAYMENT_SIMULATION_MODE:-False}
-    depends_on:
-      redis:
-        condition: service_healthy
+
+  celery_worker:
+    <<: *backend
+    command: celery -A celery_app worker --loglevel=info --concurrency=2
+
+  celery_beat:
+    <<: *backend
+    command: celery -A celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 
   frontend:
     build:
@@ -57,56 +76,24 @@ services:
       web:
         condition: service_started
 
-  celery_worker:
+  # Android APK builder - only runs on demand: ./gaboshop.ps1 apk
+  android:
+    profiles: ["android"]
     build:
-      context: .
-    restart: unless-stopped
-    command: celery -A celery_app worker --loglevel=info --concurrency=2
+      context: ./frontend
+      dockerfile: Dockerfile.android
     volumes:
-      - .:/app
+      - ./frontend:/app
+      - android_node_modules:/app/node_modules
+      - android_gradle:/root/.gradle
+      - ./builds/android:/out
     environment:
-      DJANGO_SETTINGS_MODULE: settings
-      DJANGO_DEBUG: "1"
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-development-only-change-this-before-production}
-      REDIS_URL: redis://redis:6379/0
-      SQLITE_PATH: /app/db.sqlite3
-      SINGPAY_BASE_URL: ${SINGPAY_BASE_URL}
-      SINGPAY_CLIENT_ID: ${SINGPAY_CLIENT_ID}
-      SINGPAY_CLIENT_SECRET: ${SINGPAY_CLIENT_SECRET}
-      SINGPAY_WALLET_ID: ${SINGPAY_WALLET_ID}
-      SINGPAY_DISBURSEMENT_ID: ${SINGPAY_DISBURSEMENT_ID}
-      SINGPAY_TIMEOUT: ${SINGPAY_TIMEOUT:-30}
-      SINGPAY_ENABLE_TRANSFER: ${SINGPAY_ENABLE_TRANSFER:-False}
-      PAYMENT_SIMULATION_MODE: ${PAYMENT_SIMULATION_MODE:-False}
-    depends_on:
-      redis:
-        condition: service_healthy
-
-  celery_beat:
-    build:
-      context: .
-    restart: unless-stopped
-    command: celery -A celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    volumes:
-      - .:/app
-    environment:
-      DJANGO_SETTINGS_MODULE: settings
-      DJANGO_DEBUG: "1"
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-development-only-change-this-before-production}
-      REDIS_URL: redis://redis:6379/0
-      SQLITE_PATH: /app/db.sqlite3
-      SINGPAY_BASE_URL: ${SINGPAY_BASE_URL}
-      SINGPAY_CLIENT_ID: ${SINGPAY_CLIENT_ID}
-      SINGPAY_CLIENT_SECRET: ${SINGPAY_CLIENT_SECRET}
-      SINGPAY_WALLET_ID: ${SINGPAY_WALLET_ID}
-      SINGPAY_DISBURSEMENT_ID: ${SINGPAY_DISBURSEMENT_ID}
-      SINGPAY_TIMEOUT: ${SINGPAY_TIMEOUT:-30}
-      SINGPAY_ENABLE_TRANSFER: ${SINGPAY_ENABLE_TRANSFER:-False}
-      PAYMENT_SIMULATION_MODE: ${PAYMENT_SIMULATION_MODE:-False}
-    depends_on:
-      redis:
-        condition: service_healthy
+      APK_MODE: ${APK_MODE:-dev}
+      # Address of the API as seen from the phone
+      VITE_API_URL: ${APK_API_URL:-http://10.0.2.2:8000}
 
 volumes:
   redis_data:
   frontend_node_modules:
+  android_node_modules:
+  android_gradle:
