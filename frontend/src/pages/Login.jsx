@@ -36,7 +36,14 @@ const Login = () => {
       
     } catch (err) {
       console.error(err);
-      setError('Identifiants invalides. Veuillez réessayer.');
+      if (!err.response) {
+        // Pas de réponse : serveur endormi, réseau coupé ou accès refusé (CORS)
+        setError('Impossible de joindre le serveur. Vérifiez votre connexion et réessayez dans une minute.');
+      } else if (err.response.status >= 500) {
+        setError('Le serveur rencontre un problème. Réessayez dans un instant.');
+      } else {
+        setError('Identifiants invalides. Veuillez réessayer.');
+      }
     } finally {
       setLoading(false);
     }
