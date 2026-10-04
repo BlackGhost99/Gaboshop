@@ -1,0 +1,64 @@
+# Gaboshop - environnement de TEST sur Render (offres gratuites).
+# Limites a connaitre : le service gratuit s'endort apres ~15 min d'inactivite
+# (premiere requete lente), la base gratuite expire apres un delai fixe, et les
+# fichiers envoyes (photos) sont perdus a chaque redeploiement.
+# Ne pas utiliser tel quel pour de vrais paiements : voir PAYMENT_SIMULATION_MODE.
+services:
+  - type: web
+    name: gaboshop-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.prod
+    plan: free
+    healthCheckPath: /api/v1/stores/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: settings
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com
+      - key: DJANGO_BEHIND_PROXY
+        value: "1"
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gaboshop-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: gaboshop-redis
+          property: connectionString
+      # Pas de worker gratuit : les taches Celery s'executent dans la requete.
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "1"
+      # Paiements simules tant que SingPay n'est pas configure ni valide.
+      - key: PAYMENT_SIMULATION_MODE
+        value: "1"
+      - key: SINGPAY_ENABLE_TRANSFER
+        value: "False"
+      - key: SINGPAY_BASE_URL
+        sync: false
+      - key: SINGPAY_CLIENT_ID
+        sync: false
+      - key: SINGPAY_CLIENT_SECRET
+        sync: false
+      - key: SINGPAY_WALLET_ID
+        sync: false
+      - key: SINGPAY_DISBURSEMENT_ID
+        sync: false
+
+  - type: keyvalue
+    name: gaboshop-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+databases:
+  - name: gaboshop-db
+    plan: free
+    databaseName: gaboshop
+    user: gaboshop

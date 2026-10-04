@@ -86,6 +86,10 @@ if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
 else:
     ALLOWED_HOSTS = _default_allowed_hosts
+# Render injects the public hostname of the service
+_render_host = env("RENDER_EXTERNAL_HOSTNAME", "")
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
 
 
 # Application definition
@@ -169,6 +173,25 @@ DATABASES = {
         },
     }
 }
+
+# Hosted deployments provide DATABASE_URL (postgres://user:pass@host:port/name).
+# Without it the SQLite configuration above is kept unchanged.
+_database_url = env("DATABASE_URL", "")
+if _database_url:
+    from urllib.parse import urlparse, unquote
+    _db = urlparse(_database_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _db.path.lstrip('/'),
+            'USER': unquote(_db.username or ''),
+            'PASSWORD': unquote(_db.password or ''),
+            'HOST': _db.hostname,
+            'PORT': _db.port or 5432,
+            'CONN_MAX_AGE': 60,
+            'OPTIONS': {'sslmode': env('DATABASE_SSLMODE', 'require')},
+        }
+    }
 
 
 # Password validation
@@ -285,6 +308,9 @@ if DEBUG and not CSRF_TRUSTED_ORIGINS:
 # defaults keep the current HTTP-only Docker topology functional while making
 # the required production controls configurable.
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+if env_bool("DJANGO_BEHIND_PROXY", False):
+    # TLS is terminated by the hosting proxy (Render, ...)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", SECURE_SSL_REDIRECT)
 CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", SECURE_SSL_REDIRECT)
 SECURE_HSTS_SECONDS = int(env("DJANGO_SECURE_HSTS_SECONDS", "0"))
@@ -407,6 +433,9 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Africa/Libreville'
+# Test deployments without a worker run tasks inline (no beat/worker needed).
+CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
+CELERY_TASK_EAGER_PROPAGATES = False
 CELERY_ENABLE_UTC = True
 
 # Beat Schedule (tâches périodiques)
