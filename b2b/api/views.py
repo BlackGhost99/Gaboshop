@@ -99,7 +99,7 @@ def get_detailed_b2b_access_error(user):
 		logger.warning(f"get_detailed_b2b_access_error: Plan {plan.name} (plan_type: {plan.plan_type}) n'a pas can_access_b2b=True pour store {store.id}")
 		return False, {
 			'code': status.HTTP_403_FORBIDDEN,
-			'message': f'Votre forfait actuel ({plan.name}) ne permet pas l\'accès au B2B. Un forfait Pro ou Business est requis.'
+			'message': f'Votre forfait actuel ({plan.name}) n\'inclut pas l\'accès au B2B. L\'administrateur doit l\'activer pour ce forfait.'
 		}
 	
 	# Vérification finale avec can_access_b2b

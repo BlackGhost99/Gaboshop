@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import AndroidBackButton from './components/AndroidBackButton';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -69,6 +70,7 @@ function App() {
 
   return (
     <Router>
+      <AndroidBackButton />
       <AIContextProvider>
         <Routes>
         {/* Routes publiques (BLOQUEES pour store_managers) */}
