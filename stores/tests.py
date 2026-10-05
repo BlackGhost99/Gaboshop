@@ -98,3 +98,48 @@ class AdminProductCategoryTests(TestCase):
 		self.client.force_authenticate(self.admin)
 		res = self.client.post('/api/v1/admin/product-categories/', {'name': 'X'}, format='json')
 		self.assertEqual(res.status_code, 400)
+
+
+class AdminProductFormTests(TestCase):
+	"""Le formulaire produit de l'admin enregistre poids, taille et caractéristiques."""
+
+	def setUp(self):
+		self.admin = User.objects.create_superuser(phone='062300002', password='secret123', email='')
+		manager = User.objects.create_user(phone='077000030', password='secret123', user_type='store_manager')
+		category = StoreCategory.objects.create(name='Prêt-à-porter')
+		self.store = Store.objects.create(
+			name='Mode', category=category, manager=manager,
+			phone='077000031', zone='Louis', address='Rue 1',
+		)
+		self.client = APIClient()
+		self.client.force_authenticate(self.admin)
+
+	def test_create_keeps_weight_length_and_attributes(self):
+		res = self.client.post('/api/v1/admin/products/create/', {
+			'name': 'T-shirt', 'store_id': self.store.id, 'price': '15000', 'stock': '10',
+			'weight_kg': '0.1', 'length_m': '0.3',
+			'attributes': {'brand': 'Nike', 'sizes': '40, 41', 'secret': 'x'},
+		}, format='json')
+		self.assertEqual(res.status_code, 201, res.content)
+		product = self.store.products.get()
+		self.assertEqual(str(product.weight_kg), '0.10')
+		self.assertEqual(str(product.length_m), '0.30')
+		self.assertEqual(product.attributes, {'brand': 'Nike', 'sizes': '40, 41'})
+
+	def test_update_changes_specs(self):
+		from products.models import Product
+		product = Product.objects.create(name='Chaussure', store=self.store, price=20000, stock=1)
+		res = self.client.patch(f'/api/v1/admin/products/{product.id}/update/', {
+			'weight_kg': '0.8', 'length_m': '0.35', 'attributes': {'model': 'Air Max'},
+		}, format='json')
+		self.assertEqual(res.status_code, 200, res.content)
+		product.refresh_from_db()
+		self.assertEqual(str(product.weight_kg), '0.80')
+		self.assertEqual(product.attributes, {'model': 'Air Max'})
+
+	def test_create_reports_error_instead_of_hanging(self):
+		res = self.client.post('/api/v1/admin/products/create/', {
+			'name': 'Sans magasin', 'price': '1000',
+		}, format='json')
+		self.assertEqual(res.status_code, 400)
+		self.assertIn('error', res.json())

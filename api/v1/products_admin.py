@@ -119,6 +119,9 @@ class ProductsListView(APIView):
                 'price': float(display_price),
                 'promo_price': float(display_promo_price) if display_promo_price else None,
                 'on_promo': on_promo,
+                'weight_kg': float(product.weight_kg) if product.weight_kg is not None else None,
+                'length_m': float(product.length_m) if product.length_m is not None else None,
+                'attributes': product.attributes or {},
                 'stock': product.stock,
                 'stock_status': stock_status,
                 'is_available': product.is_available,
@@ -159,9 +162,7 @@ class ProductDetailView(APIView):
             stock_status = 'low_stock'
         
         # Check if on promo
-        on_promo = False
-        if product.promo_price and product.promo_price < product.price:
-            on_promo = True
+        on_promo = bool(product.compare_price and product.compare_price > product.price)
         
         data = {
             'id': product.id,
@@ -172,9 +173,12 @@ class ProductDetailView(APIView):
             'category_name': product.category.name if product.category else None,
             'store_id': product.store_id,
             'store_name': product.store.name if product.store else None,
-            'price': float(product.price),
-            'promo_price': float(product.promo_price) if product.promo_price else None,
+            'price': float(product.compare_price if on_promo else product.price),
+            'promo_price': float(product.price) if on_promo else None,
             'on_promo': on_promo,
+            'weight_kg': float(product.weight_kg) if product.weight_kg is not None else None,
+            'length_m': float(product.length_m) if product.length_m is not None else None,
+            'attributes': product.attributes or {},
             'stock': product.stock,
             'stock_status': stock_status,
             'is_available': product.is_available,
@@ -192,6 +196,19 @@ class ProductDetailView(APIView):
             'success': True,
             'data': data
         })
+
+
+def _decimal_or_none(value):
+    if value in (None, ''):
+        return None
+    return Decimal(str(value).replace(',', '.'))
+
+
+def _clean_attributes(value):
+    from products.serializers import ProductAttributesField
+    if value in (None, ''):
+        return {}
+    return ProductAttributesField().to_internal_value(value)
 
 
 class ProductCreateView(APIView):
@@ -225,18 +242,27 @@ class ProductCreateView(APIView):
             # Check store exists
             store = get_object_or_404(Store, id=data.get('store_id'))
             
-            # Create product
+            # Prix promo : le prix affiché devient le prix promo, l'ancien prix sert de comparaison
+            promo_price = _decimal_or_none(data.get('promo_price'))
+            compare_price = None
+            if promo_price is not None and 0 < promo_price < price:
+                compare_price, price = price, promo_price
+
             product = Product.objects.create(
                 name=data.get('name'),
-                description=data.get('description', ''),
+                description=data.get('description', '') or '',
                 store=store,
                 category_id=data.get('category_id') if data.get('category_id') else None,
                 price=price,
-                promo_price=Decimal(str(data.get('promo_price'))) if data.get('promo_price') else None,
+                compare_price=compare_price,
                 stock=stock,
-                is_available=data.get('is_available', True),
+                sku=data.get('sku') or '',
+                weight_kg=_decimal_or_none(data.get('weight_kg')),
+                length_m=_decimal_or_none(data.get('length_m')),
+                attributes=_clean_attributes(data.get('attributes')),
+                is_available=data.get('is_available', True) not in (False, 'false', '0'),
             )
-            
+
             # Handle image upload if provided
             if request.FILES.get('image'):
                 product.image = request.FILES['image']
@@ -275,9 +301,20 @@ class ProductUpdateView(APIView):
                 price = Decimal(str(data['price']))
                 if price < 0:
                     return Response({'success': False, 'error': 'Price cannot be negative'}, status=status.HTTP_400_BAD_REQUEST)
-                product.price = price
-            if 'promo_price' in data:
-                product.promo_price = Decimal(str(data['promo_price'])) if data['promo_price'] else None
+                # Le formulaire admin envoie le prix normal et, à part, le prix promo
+                promo_price = _decimal_or_none(data.get('promo_price'))
+                if promo_price is not None and 0 < promo_price < price:
+                    product.price, product.compare_price = promo_price, price
+                else:
+                    product.price = price
+                    if 'promo_price' in data:
+                        product.compare_price = None
+            if 'weight_kg' in data:
+                product.weight_kg = _decimal_or_none(data['weight_kg'])
+            if 'length_m' in data:
+                product.length_m = _decimal_or_none(data['length_m'])
+            if 'attributes' in data:
+                product.attributes = _clean_attributes(data['attributes'])
             if 'compare_price' in data:
                 product.compare_price = Decimal(str(data['compare_price'])) if data['compare_price'] else None
             if 'stock' in data:

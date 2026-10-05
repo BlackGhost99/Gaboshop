@@ -78,6 +78,11 @@ class Product(models.Model):
 		blank=True,
 		help_text="Longueur du produit en mètres"
 	)
+	attributes = models.JSONField(
+		default=dict,
+		blank=True,
+		help_text="Caractéristiques libres, ex: {'brand': 'Nike', 'model': 'Air Max', 'sizes': '40, 41, 42'}"
+	)
 	estimated_weight_kg = models.DecimalField(
 		max_digits=8,
 		decimal_places=2,

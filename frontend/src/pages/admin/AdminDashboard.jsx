@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import B2CCategoryModal from '../../components/B2CCategoryModal';
+import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import PaymentPolicySettings from '../../components/PaymentPolicySettings';
 import { 
 	activateStoreB2B, 
@@ -138,7 +139,9 @@ const AdminDashboard = () => {
   // Product CRUD
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [newProduct, setNewProduct] = useState({ name: '', description: '', price: 0, promo_price: null, stock: 0, weight_kg: '', length_m: '', is_available: true, store_id: '', category_id: '', sku: '' });
+  const [productFormError, setProductFormError] = useState('');
+  const [productSaving, setProductSaving] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: '', description: '', price: 0, promo_price: null, stock: 0, weight_kg: '', length_m: '', is_available: true, store_id: '', category_id: '', sku: '', attributes: {} });
   const [viewingProduct, setViewingProduct] = useState(null);
   const [productsListAdmin, setProductsListAdmin] = useState([]);
   const [productStats, setProductStats] = useState(null);
@@ -826,33 +829,56 @@ const AdminDashboard = () => {
     return forType.length ? forType : allProductCategories;
   };
 
+  const categoryName = (id) => allProductCategories.find(c => String(c.id) === String(id))?.name || '';
+  const apiErrorMessage = (err, fallback) => {
+    const e = err?.response?.data?.error ?? err?.error;
+    if (typeof e === 'string') return e;
+    if (e?.details) return Object.values(e.details).flat().join('\n');
+    return e?.message || fallback;
+  };
+  // L'image saisie est une adresse : le serveur n'accepte que des fichiers, on ne l'envoie pas
+  const productPayload = ({ image: _image, ...rest }) => rest;
+
   const handleCreateProduct = async (e) => {
     e.preventDefault();
+    if (productSaving) return;
+    setProductFormError('');
+    setProductSaving(true);
     try {
-      const res = await createProductAdmin(newProduct);  // Using adminService.createProductAdmin
+      const res = await createProductAdmin(productPayload(newProduct));
       if (res?.success) {
         setShowAddProduct(false);
-        setNewProduct({ name: '', description: '', price: 0, promo_price: null, stock: 0, weight_kg: '', length_m: '', is_available: true, store_id: '', category_id: '', sku: '' });
+        setNewProduct({ name: '', description: '', price: 0, promo_price: null, stock: 0, weight_kg: '', length_m: '', is_available: true, store_id: '', category_id: '', sku: '', attributes: {} });
         loadProductsData();
         loadData(false);
+      } else {
+        setProductFormError(apiErrorMessage({ error: res?.error }, 'Erreur création produit'));
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur création produit');
+      setProductFormError(apiErrorMessage(err, 'Erreur création produit'));
+    } finally {
+      setProductSaving(false);
     }
   };
 
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
-    if (!editingProduct?.id) return;
+    if (!editingProduct?.id || productSaving) return;
+    setProductFormError('');
+    setProductSaving(true);
     try {
-      const res = await updateProductAdmin(editingProduct.id, editingProduct);  // Using adminService.updateProductAdmin
+      const res = await updateProductAdmin(editingProduct.id, productPayload(editingProduct));
       if (res?.success) {
         setEditingProduct(null);
         loadProductsData();
         loadData(false);
+      } else {
+        setProductFormError(apiErrorMessage({ error: res?.error }, 'Erreur mise à jour produit'));
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur mise à jour produit');
+      setProductFormError(apiErrorMessage(err, 'Erreur mise à jour produit'));
+    } finally {
+      setProductSaving(false);
     }
   };
 
@@ -3347,11 +3373,11 @@ const AdminDashboard = () => {
       )}
 
       {showAddProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 z-40 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-black bg-opacity-40 z-[60] flex items-center justify-center px-3">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md px-5 pt-5 space-y-4 overflow-y-auto max-h-[85dvh]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Ajouter un produit</h3>
-              <button onClick={() => setShowAddProduct(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => { setProductFormError(''); setShowAddProduct(false); }} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={handleCreateProduct} className="space-y-3">
               <div>
@@ -3384,21 +3410,24 @@ const AdminDashboard = () => {
                 <label className="text-sm font-semibold text-gray-700">Prix</label>
                 <input type="number" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
               </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Poids (kg)</label>
-                <input type="number" step="0.01" min="0" value={newProduct.weight_kg || ''} onChange={(e) => setNewProduct({ ...newProduct, weight_kg: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Longueur (m)</label>
-                <input type="number" step="0.01" min="0" max="5" value={newProduct.length_m || ''} onChange={(e) => setNewProduct({ ...newProduct, length_m: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
-              </div>
+              <ProductSpecsFields
+                key={newProduct.id || 'new'}
+                weightKg={newProduct.weight_kg}
+                lengthM={newProduct.length_m}
+                attributes={newProduct.attributes || {}}
+                fashion={isFashionCategory(categoryName(newProduct.category_id))}
+                onChange={(patch) => setNewProduct((prev) => ({ ...prev, ...patch }))}
+              />
               <div>
                 <label className="text-sm font-semibold text-gray-700">Stock</label>
                 <input type="number" value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowAddProduct(false)} className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white hover:bg-gray-50">Annuler</button>
-                <button type="submit" className="px-3 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Créer</button>
+              {productFormError && (
+                <p className="text-sm text-red-600 whitespace-pre-line bg-red-50 border border-red-200 rounded-md px-3 py-2">{productFormError}</p>
+              )}
+              <div className="sticky bottom-0 -mx-5 px-5 py-3 bg-white border-t border-gray-100 flex justify-end gap-2">
+                <button type="button" onClick={() => { setProductFormError(''); setShowAddProduct(false); }} className="px-4 py-2 text-sm rounded-md border border-gray-200 bg-white hover:bg-gray-50">Annuler</button>
+                <button type="submit" disabled={productSaving} className="px-4 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">{productSaving ? 'Création…' : 'Créer'}</button>
               </div>
             </form>
           </div>
@@ -3406,11 +3435,11 @@ const AdminDashboard = () => {
       )}
 
       {editingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 z-40 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-black bg-opacity-40 z-[60] flex items-center justify-center px-3">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md px-5 pt-5 space-y-4 overflow-y-auto max-h-[85dvh]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Modifier produit</h3>
-              <button onClick={() => setEditingProduct(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => { setProductFormError(''); setEditingProduct(null); }} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={handleUpdateProduct} className="space-y-3">
               <div>
@@ -3436,14 +3465,14 @@ const AdminDashboard = () => {
                 <label className="text-sm font-semibold text-gray-700">Prix</label>
                 <input type="number" value={editingProduct.price} onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
               </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Poids (kg)</label>
-                <input type="number" step="0.01" min="0" value={editingProduct.weight_kg || ''} onChange={(e) => setEditingProduct({ ...editingProduct, weight_kg: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Longueur (m)</label>
-                <input type="number" step="0.01" min="0" max="5" value={editingProduct.length_m || ''} onChange={(e) => setEditingProduct({ ...editingProduct, length_m: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
-              </div>
+              <ProductSpecsFields
+                key={editingProduct.id || 'new'}
+                weightKg={editingProduct.weight_kg}
+                lengthM={editingProduct.length_m}
+                attributes={editingProduct.attributes || {}}
+                fashion={isFashionCategory(categoryName(editingProduct.category_id))}
+                onChange={(patch) => setEditingProduct((prev) => ({ ...prev, ...patch }))}
+              />
               <div>
                 <label className="text-sm font-semibold text-gray-700">Stock</label>
                 <input type="number" value={editingProduct.stock} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required />
@@ -3452,9 +3481,12 @@ const AdminDashboard = () => {
                 <input type="checkbox" checked={editingProduct.is_available} onChange={(e) => setEditingProduct({ ...editingProduct, is_available: e.target.checked })} />
                 <label className="text-sm text-gray-700">Disponible</label>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setEditingProduct(null)} className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white hover:bg-gray-50">Annuler</button>
-                <button type="submit" className="px-3 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Mettre à jour</button>
+              {productFormError && (
+                <p className="text-sm text-red-600 whitespace-pre-line bg-red-50 border border-red-200 rounded-md px-3 py-2">{productFormError}</p>
+              )}
+              <div className="sticky bottom-0 -mx-5 px-5 py-3 bg-white border-t border-gray-100 flex justify-end gap-2">
+                <button type="button" onClick={() => { setProductFormError(''); setEditingProduct(null); }} className="px-4 py-2 text-sm rounded-md border border-gray-200 bg-white hover:bg-gray-50">Annuler</button>
+                <button type="submit" disabled={productSaving} className="px-4 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">{productSaving ? 'Enregistrement…' : 'Mettre à jour'}</button>
               </div>
             </form>
           </div>

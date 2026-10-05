@@ -1,3 +1,4 @@
+import json
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from .models import ProductCategory, Product
@@ -43,6 +44,27 @@ class ProductCategorySerializer(serializers.ModelSerializer):
             )
         return value
 
+ALLOWED_ATTRIBUTE_KEYS = ('brand', 'model', 'sizes', 'color')
+
+
+class ProductAttributesField(serializers.JSONField):
+    """Caractéristiques produit (marque, modèle, tailles...). Accepte aussi une chaîne JSON (formulaire multipart)."""
+
+    def to_internal_value(self, data):
+        if isinstance(data, str):
+            try:
+                data = json.loads(data) if data.strip() else {}
+            except ValueError:
+                raise serializers.ValidationError(_('Caractéristiques invalides.'))
+        if not isinstance(data, dict):
+            raise serializers.ValidationError(_('Caractéristiques invalides.'))
+        return {
+            k: str(v).strip()[:100]
+            for k, v in data.items()
+            if k in ALLOWED_ATTRIBUTE_KEYS and v not in (None, '') and str(v).strip()
+        }
+
+
 class ProductSerializer(serializers.ModelSerializer):
     """Serializer de base pour les produits"""
     store_name = serializers.CharField(source='store.name', read_only=True)
@@ -57,7 +79,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
-            'weight_kg', 'length_m', 'estimated_weight_kg',
+            'weight_kg', 'length_m', 'estimated_weight_kg', 'attributes',
             'image', 'image_2', 'image_3', 'created_at'
         ]
         read_only_fields = ['store', 'created_at']
@@ -77,7 +99,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'price', 'compare_price',
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
-            'weight_kg', 'length_m', 'estimated_weight_kg',
+            'weight_kg', 'length_m', 'estimated_weight_kg', 'attributes',
             'image', 'image_2', 'image_3', 'created_at', 'updated_at',
             'variants', 'images'
         ]
@@ -88,12 +110,14 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
 class ProductCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de produit"""
+    attributes = ProductAttributesField(required=False)
+
     class Meta:
         model = Product
         fields = [
             'name', 'description', 'category', 'price', 'compare_price',
             'stock', 'sku', 'barcode', 'is_featured', 'image',
-            'image_2', 'image_3', 'weight_kg', 'length_m'
+            'image_2', 'image_3', 'weight_kg', 'length_m', 'attributes'
         ]
     
     def validate(self, attrs):
@@ -131,12 +155,14 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
     """Serializer pour la mise à jour de produit"""
+    attributes = ProductAttributesField(required=False)
+
     class Meta:
         model = Product
         fields = [
             'name', 'description', 'category', 'price', 'compare_price',
             'stock', 'sku', 'barcode', 'is_available', 'is_featured',
-            'image', 'image_2', 'image_3', 'weight_kg', 'length_m'
+            'image', 'image_2', 'image_3', 'weight_kg', 'length_m', 'attributes'
         ]
 
     def validate_length_m(self, value):

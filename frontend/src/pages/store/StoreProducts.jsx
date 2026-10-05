@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StoreLayout from '../../components/StoreLayout';
+import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import ConfirmModal from '../../components/ConfirmModal';
 import { getStoreDashboard } from '../../services/dashboardService';
 import { 
@@ -25,7 +26,7 @@ const StoreProducts = () => {
     
     // Form states
     const [newProduct, setNewProduct] = useState({
-        name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', image: null
+        name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null
     });
     const [newCategory, setNewCategory] = useState({
         name: '', description: '', commission_rate: '8.00', order: 0
@@ -130,6 +131,7 @@ const StoreProducts = () => {
             category: product.category,
             weight_kg: product.weight_kg || '',
             length_m: product.length_m || '',
+            attributes: product.attributes || {},
             image: null
         });
         setShowProductModal(true);
@@ -139,7 +141,9 @@ const StoreProducts = () => {
         e.preventDefault();
         const formData = new FormData();
         Object.keys(newProduct).forEach(key => {
-            if (newProduct[key] !== null && newProduct[key] !== '') {
+            if (key === 'attributes') {
+                formData.append(key, JSON.stringify(newProduct.attributes || {}));
+            } else if (newProduct[key] !== null && newProduct[key] !== '') {
                 formData.append(key, newProduct[key]);
             }
         });
@@ -160,7 +164,7 @@ const StoreProducts = () => {
                 }
                 setShowProductModal(false);
                 setEditingProduct(null);
-                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', image: null });
+                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null });
             }
         } catch (error) {
             console.error("Error saving product", error);
@@ -366,6 +370,14 @@ const StoreProducts = () => {
                                 <span className="font-semibold text-gray-700">Longueur:</span>
                                 <span className="ml-2">{viewingProduct.length_m ? `${viewingProduct.length_m} m` : '?'}</span>
                             </div>
+                            {[['brand', 'Marque'], ['model', 'Modèle'], ['sizes', 'Tailles / pointures'], ['color', 'Couleur']]
+                                .filter(([k]) => viewingProduct.attributes?.[k])
+                                .map(([k, label]) => (
+                                    <div key={k}>
+                                        <span className="font-semibold text-gray-700">{label}:</span>
+                                        <span className="ml-2">{viewingProduct.attributes[k]}</span>
+                                    </div>
+                                ))}
                             <div>
                                 <span className="font-semibold text-gray-700">Catégorie:</span>
                                 <span className="ml-2 bg-gray-100 px-2 py-1 rounded text-sm">
@@ -462,11 +474,11 @@ const StoreProducts = () => {
 
             {/* Product Modal */}
             {showProductModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-lg my-8">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 z-[60]">
+                    <div className="bg-white rounded-lg px-5 pt-5 w-full max-w-lg max-h-[85dvh] overflow-y-auto">
                         <h3 className="text-lg font-bold mb-4">{editingProduct ? 'Modifier le Produit' : 'Nouveau Produit'}</h3>
                         <form onSubmit={handleSaveProduct}>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Nom</label>
                                     <input 
@@ -489,34 +501,6 @@ const StoreProducts = () => {
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Poids (kg)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        className="w-full border rounded p-2"
-                                        value={newProduct.weight_kg}
-                                        onChange={e => setNewProduct({...newProduct, weight_kg: e.target.value})}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Longueur (m)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max="5"
-                                        className="w-full border rounded p-2"
-                                        value={newProduct.length_m}
-                                        onChange={e => setNewProduct({...newProduct, length_m: e.target.value})}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-1">Catégorie</label>
                                 <select 
@@ -534,6 +518,18 @@ const StoreProducts = () => {
                                 {!hasCategories && (
                                     <p className="text-sm text-gray-500 mt-2">Aucune catégorie disponible pour votre magasin. Contactez l'administrateur.</p>
                                 )}
+                            </div>
+                            <div className="space-y-4 mb-4">
+                                <ProductSpecsFields
+                                    key={editingProduct?.id || 'new'}
+                                    weightKg={newProduct.weight_kg}
+                                    lengthM={newProduct.length_m}
+                                    attributes={newProduct.attributes || {}}
+                                    fashion={isFashionCategory(categories.find(c => String(c.id) === String(newProduct.category))?.name)}
+                                    onChange={(patch) => setNewProduct(prev => ({ ...prev, ...patch }))}
+                                    inputClass="w-full border rounded p-2"
+                                    labelClass="block text-sm font-medium"
+                                />
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-1">Description</label>
@@ -564,13 +560,13 @@ const StoreProducts = () => {
                                     <p className="text-xs text-gray-500 mt-1">Laissez vide pour conserver l'image actuelle.</p>
                                 )}
                             </div>
-                            <div className="flex justify-end space-x-2">
+                            <div className="sticky bottom-0 -mx-5 px-5 py-3 bg-white border-t border-gray-100 flex justify-end space-x-2">
                                 <button 
                                     type="button"
                                     onClick={() => {
                                         setShowProductModal(false);
                                         setEditingProduct(null);
-                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', image: null });
+                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null });
                                     }}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
                                 >
