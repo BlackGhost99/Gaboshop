@@ -69,12 +69,11 @@ const StoreProducts = () => {
                     const activeProducts = allProducts.filter(p => p.is_available !== false);
                     setProducts(activeProducts);
                 }
-                // Prefer global list when available, otherwise use store-specific
-                if (allCategoriesRes && allCategoriesRes.success) {
-                    setCategories(allCategoriesRes.data || []);
-                } else if (storeCategoriesRes && storeCategoriesRes.success) {
-                    setCategories(storeCategoriesRes.data || []);
-                }
+                // Catégories créées par l'admin pour le type de ce magasin ; à défaut, toutes
+                // les catégories existantes. Les suggestions sans id ne sont pas attribuables.
+                const withId = (res) => (res && res.success ? (res.data || []).filter(c => c.id) : []);
+                const storeCats = withId(storeCategoriesRes);
+                setCategories(storeCats.length ? storeCats : withId(allCategoriesRes));
             }
         } catch (error) {
             console.error("Error fetching data", error);

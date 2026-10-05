@@ -3,7 +3,7 @@
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
 from datetime import timedelta
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -468,126 +468,135 @@ class AdminStoreCategoriesView(APIView):
         return Response({"success": True})
 
 
+def _serialize_product_category(c):
+    store_category = getattr(c, 'store_category', None)
+    return {
+        "id": c.id,
+        "name": c.name,
+        "description": c.description or '',
+        "store_category_id": store_category.id if store_category else None,
+        "store_category_name": store_category.name if store_category else '',
+        "store_id": c.store.id if c.store else None,
+        "store_name": c.store.name if c.store else (store_category.name if store_category else ''),
+        "order": c.order or 0,
+        "commission_rate": str(c.commission_rate),
+        "product_count": c.products.count(),
+    }
+
+
 class AdminProductCategoriesView(APIView):
+    """
+    Catégories de produits gérées par l'admin. Chaque catégorie est rattachée à un
+    type de magasin (StoreCategory) : tous les magasins de ce type la voient
+    lorsqu'ils ajoutent un produit.
+    """
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
-        # List all product categories with store info
         search = request.query_params.get('search', '')
         store_id = request.query_params.get('store_id', '')
-        
+        store_category_id = request.query_params.get('store_category_id', '')
+
         qs = ProductCategory.objects.select_related('store', 'store_category').all()
-        
+
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
         if store_id:
-            qs = qs.filter(store_id=store_id)
-        
-        qs = qs.order_by('store__name', 'order', 'name')[:300]  # Limit to avoid huge payload
-        
-        data = [
-            {
-                "id": c.id,
-                "name": c.name,
-                "description": c.description or '',
-                "store_id": c.store.id if c.store else None,
-                "store_name": c.store.name if c.store else (c.store_category.name if getattr(c, 'store_category', None) else ''),
-                "order": c.order or 0,
-            }
-            for c in qs
-        ]
-        return Response({"success": True, "data": data})
-    
-    def post(self, request):
-        """Create a new product category"""
-        from products.models import ProductCategory
+            qs = qs.filter(Q(store_id=store_id) | Q(store_category__stores__id=store_id)).distinct()
+        if store_category_id:
+            qs = qs.filter(store_category_id=store_category_id)
+
+        qs = qs.order_by('store_category__name', 'order', 'name')[:300]  # Limit to avoid huge payload
+        return Response({"success": True, "data": [_serialize_product_category(c) for c in qs]})
+
+    @staticmethod
+    def _resolve_store_category(data):
+        """Type de magasin choisi, ou à défaut celui du magasin indiqué."""
         from stores.models import Store
-        
-        name = request.data.get('name')
+        store_category_id = data.get('store_category_id')
+        if store_category_id:
+            return StoreCategory.objects.get(id=store_category_id)
+        store_id = data.get('store_id')
+        if store_id:
+            return Store.objects.select_related('category').get(id=store_id).category
+        return None
+
+    def post(self, request):
+        """Créer une catégorie de produit"""
+        name = (request.data.get('name') or '').strip()
         if not name:
             return Response({"success": False, "error": "Nom requis"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
-            store_id = request.data.get('store_id')
-            store = Store.objects.get(id=store_id) if store_id else None
-            
-            category = ProductCategory.objects.create(
-                name=name,
-                description=request.data.get('description', ''),
-                store=store,
-                order=request.data.get('order', 0)
-            )
-            
-            return Response({
-                "success": True,
-                "data": {
-                    "id": category.id,
-                    "name": category.name,
-                    "description": category.description or '',
-                    "store_id": category.store.id if category.store else None,
-                    "store_name": category.store.name if category.store else '',
-                    "order": category.order or 0,
-                }
-            }, status=status.HTTP_201_CREATED)
-        except Exception as e:
+            store_category = self._resolve_store_category(request.data)
+        except (StoreCategory.DoesNotExist, Store.DoesNotExist):
+            return Response({"success": False, "error": "Type de magasin introuvable"}, status=status.HTTP_400_BAD_REQUEST)
+        if not store_category:
+            return Response({"success": False, "error": "Choisissez le type de magasin"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                category = ProductCategory.objects.create(
+                    name=name,
+                    description=request.data.get('description', '') or '',
+                    store_category=store_category,
+                    order=int(request.data.get('order') or 0),
+                    commission_rate=request.data.get('commission_rate') or 8,
+                )
+        except IntegrityError:
+            return Response({"success": False, "error": "Cette catégorie existe déjà pour ce type de magasin"}, status=status.HTTP_400_BAD_REQUEST)
+        except (TypeError, ValueError) as e:
             return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
+        return Response({"success": True, "data": _serialize_product_category(category)}, status=status.HTTP_201_CREATED)
+
     def patch(self, request):
-        """Update a product category"""
-        from products.models import ProductCategory
-        
+        """Modifier une catégorie de produit"""
         category_id = request.data.get('id')
         if not category_id:
             return Response({"success": False, "error": "ID requis"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
-            category = ProductCategory.objects.get(id=category_id)
-            
-            if 'name' in request.data:
-                category.name = request.data['name']
-            if 'description' in request.data:
-                category.description = request.data['description']
-            if 'order' in request.data:
-                category.order = request.data['order']
-            if 'store_id' in request.data:
-                from stores.models import Store
-                store_id = request.data['store_id']
-                category.store = Store.objects.get(id=store_id) if store_id else None
-            
-            category.save()
-            
-            return Response({
-                "success": True,
-                "data": {
-                    "id": category.id,
-                    "name": category.name,
-                    "description": category.description or '',
-                    "store_id": category.store.id if category.store else None,
-                    "store_name": category.store.name if category.store else '',
-                    "order": category.order or 0,
-                }
-            })
+            category = ProductCategory.objects.select_related('store', 'store_category').get(id=category_id)
         except ProductCategory.DoesNotExist:
             return Response({"success": False, "error": "Catégorie introuvable"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
+        if 'name' in request.data:
+            name = (request.data.get('name') or '').strip()
+            if not name:
+                return Response({"success": False, "error": "Nom requis"}, status=status.HTTP_400_BAD_REQUEST)
+            category.name = name
+        if 'description' in request.data:
+            category.description = request.data.get('description') or ''
+        if 'order' in request.data:
+            category.order = int(request.data.get('order') or 0)
+        if 'commission_rate' in request.data and request.data.get('commission_rate') not in (None, ''):
+            category.commission_rate = request.data['commission_rate']
+        if request.data.get('store_category_id') or request.data.get('store_id'):
+            try:
+                category.store_category = self._resolve_store_category(request.data)
+            except (StoreCategory.DoesNotExist, Store.DoesNotExist):
+                return Response({"success": False, "error": "Type de magasin introuvable"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                category.save()
+        except IntegrityError:
+            return Response({"success": False, "error": "Cette catégorie existe déjà pour ce type de magasin"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"success": True, "data": _serialize_product_category(category)})
+
     def delete(self, request):
-        """Delete a product category"""
-        from products.models import ProductCategory
-        
+        """Supprimer une catégorie de produit (les produits passent en « sans catégorie »)"""
         category_id = request.query_params.get('id') or request.data.get('id')
         if not category_id:
             return Response({"success": False, "error": "ID requis"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
-            category = ProductCategory.objects.get(id=category_id)
-            category.delete()
-            return Response({"success": True})
+            ProductCategory.objects.get(id=category_id).delete()
         except ProductCategory.DoesNotExist:
             return Response({"success": False, "error": "Catégorie introuvable"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"success": True})
 
 
 class AdminStoresView(APIView):

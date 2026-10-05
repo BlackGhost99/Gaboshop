@@ -52,3 +52,49 @@ class StoreProfileUpdateTests(TestCase):
 		self.store.refresh_from_db()
 		self.assertEqual(self.store.description, 'Nouvelle description')
 		self.assertTrue(self.store.banner_image)
+
+
+class AdminProductCategoryTests(TestCase):
+	"""L'admin crée une catégorie de produit liée à un type de magasin ; le magasin la voit."""
+
+	def setUp(self):
+		self.admin = User.objects.create_superuser(phone='062300001', password='secret123', email='')
+		self.manager = User.objects.create_user(phone='077000020', password='secret123', user_type='store_manager')
+		self.category = StoreCategory.objects.create(name='Supermarché')
+		self.store = Store.objects.create(
+			name='Mag', category=self.category, manager=self.manager,
+			phone='077000021', zone='Louis', address='Rue 1',
+		)
+		from payments.models import SubscriptionPlan
+		SubscriptionPlan.objects.get_or_create(plan_type='free', defaults={'name': 'Free', 'slug': 'free', 'price': 0})
+		self.client = APIClient()
+
+	def test_create_then_store_sees_and_assigns_it(self):
+		self.client.force_authenticate(self.admin)
+		res = self.client.post('/api/v1/admin/product-categories/', {
+			'name': 'Boissons', 'store_category_id': self.category.id, 'order': 1,
+		}, format='json')
+		self.assertEqual(res.status_code, 201, res.content)
+		cat_id = res.json()['data']['id']
+		self.assertEqual(res.json()['data']['store_category_name'], 'Supermarché')
+
+		dup = self.client.post('/api/v1/admin/product-categories/', {
+			'name': 'Boissons', 'store_category_id': self.category.id,
+		}, format='json')
+		self.assertEqual(dup.status_code, 400)
+
+		self.client.force_authenticate(self.manager)
+		cats = self.client.get(f'/api/v1/stores/{self.store.id}/categories/').json()['data']
+		self.assertEqual([c['id'] for c in cats], [cat_id])
+
+		res = self.client.post(f'/api/v1/stores/{self.store.id}/products/create/', {
+			'name': 'Coca', 'price': '500', 'stock': '10', 'category': cat_id,
+			'weight_kg': '1', 'length_m': '0.3',
+		}, format='multipart')
+		self.assertIn(res.status_code, (200, 201), res.content)
+		self.assertEqual(self.store.products.get().category_id, cat_id)
+
+	def test_create_requires_store_type(self):
+		self.client.force_authenticate(self.admin)
+		res = self.client.post('/api/v1/admin/product-categories/', {'name': 'X'}, format='json')
+		self.assertEqual(res.status_code, 400)

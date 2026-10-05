@@ -4,46 +4,38 @@ import {
   createB2CCategory,
   updateB2CCategory
 } from '../services/adminService';
-import { getStoresListAdmin } from '../services/adminService';
+import { getStoreCategories } from '../services/adminService';
 
 /**
- * Modal pour créer/modifier une catégorie B2C (ProductCategory)
+ * Modal pour créer/modifier une catégorie de produit (ProductCategory).
+ * La catégorie est rattachée à un type de magasin : tous les magasins de ce type
+ * peuvent l'attribuer à leurs produits.
  */
 const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [stores, setStores] = useState([]);
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    store_id: '',
-    order: 0
-  });
+  const [storeCategories, setStoreCategories] = useState([]);
+
+  const emptyForm = { name: '', description: '', store_category_id: '', order: 0, commission_rate: '8.00' };
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     if (isOpen) {
-      // Load stores for dropdown
-      getStoresListAdmin({ status: 'all' }).then(res => {
-        if (res?.success) {
-          setStores(res.data || []);
-        }
-      });
-      
+      setError(null);
+      getStoreCategories().then(res => {
+        if (res?.success) setStoreCategories(res.data || []);
+      }).catch(() => {});
+
       if (category) {
         setFormData({
           name: category.name || '',
           description: category.description || '',
-          store_id: category.store_id || '',
-          order: category.order || 0
+          store_category_id: category.store_category_id || '',
+          order: category.order || 0,
+          commission_rate: category.commission_rate || '8.00'
         });
       } else {
-        setFormData({
-          name: '',
-          description: '',
-          store_id: '',
-          order: 0
-        });
+        setFormData(emptyForm);
       }
     }
   }, [isOpen, category]);
@@ -55,10 +47,7 @@ const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
 
     try {
       let res;
-      const payload = {
-        ...formData,
-        store_id: formData.store_id || null
-      };
+      const payload = { ...formData };
       
       if (category?.id) {
         res = await updateB2CCategory(category.id, payload);
@@ -75,7 +64,7 @@ const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
         setError(res?.error || 'Erreur lors de l\'enregistrement');
       }
     } catch (err) {
-      setError(err?.message || 'Erreur lors de l\'enregistrement');
+      setError(err?.response?.data?.error || err?.message || 'Erreur lors de l\'enregistrement');
     } finally {
       setLoading(false);
     }
@@ -87,7 +76,7 @@ const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={category ? 'Modifier la catégorie B2C' : 'Créer une catégorie B2C'}
+      title={category ? 'Modifier la catégorie de produit' : 'Créer une catégorie de produit'}
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,21 +115,37 @@ const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Magasin (optionnel)
+            Type de magasin *
           </label>
           <select
-            value={formData.store_id}
-            onChange={(e) => setFormData({ ...formData, store_id: e.target.value })}
+            value={formData.store_category_id}
+            onChange={(e) => setFormData({ ...formData, store_category_id: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
           >
-            <option value="">Tous les magasins (catégorie globale)</option>
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>{store.name}</option>
+            <option value="">Choisir un type de magasin</option>
+            {storeCategories.map(sc => (
+              <option key={sc.id} value={sc.id}>{sc.name}</option>
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1">
-            Si aucun magasin n'est sélectionné, la catégorie sera globale
+            Tous les magasins de ce type pourront choisir cette catégorie pour leurs produits.
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Commission (%)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={formData.commission_rate}
+            onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
         </div>
 
         <div>

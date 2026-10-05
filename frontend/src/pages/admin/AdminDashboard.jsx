@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
+import B2CCategoryModal from '../../components/B2CCategoryModal';
 import PaymentPolicySettings from '../../components/PaymentPolicySettings';
 import { 
 	activateStoreB2B, 
@@ -26,6 +27,7 @@ import {
   updateStoreCategory,
   deleteStoreCategory,
   getAllProductCategories,
+  deleteB2CCategory,
   getStoreDetailAdmin,
   getStoreOrdersAdmin,
   getStoreDeliveryAgentsAdmin,
@@ -124,6 +126,7 @@ const AdminDashboard = () => {
   const [editingStoreCat, setEditingStoreCat] = useState(null);
   const [newStoreCat, setNewStoreCat] = useState({ name: '', description: '', icon: '', is_active: true });
   const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
+  const [productCatModal, setProductCatModal] = useState({ open: false, category: null });
 
   // Store CRUD
   const [showAddStore, setShowAddStore] = useState(false);
@@ -325,6 +328,34 @@ const AdminDashboard = () => {
     } catch (err) {
       setActionError(err?.message || 'Erreur mise à jour catégorie');
     }
+  };
+
+  const reloadProductCategories = async () => {
+    try {
+      const pc = await getAllProductCategories();
+      setAllProductCategories(pc?.data || []);
+    } catch (err) {
+      setActionError(err?.message || 'Erreur chargement catégories de produits');
+    }
+  };
+
+  const handleDeleteProductCat = (cat) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Supprimer la catégorie de produit',
+      message: cat.product_count
+        ? `« ${cat.name} » contient ${cat.product_count} produit(s). Ils passeront en « Sans catégorie ». Continuer ?`
+        : `Supprimer « ${cat.name} » ?`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteB2CCategory(cat.id);
+          reloadProductCategories();
+        } catch (err) {
+          setActionError(err?.response?.data?.error || err?.message || 'Erreur suppression catégorie');
+        }
+      },
+    });
   };
 
   const handleDeleteStoreCat = async (id) => {
@@ -785,6 +816,14 @@ const AdminDashboard = () => {
         }
       },
     });
+  };
+
+  // Catégories de produits proposées pour un magasin : celles de son type de magasin
+  const productCategoriesForStore = (storeId) => {
+    const store = stores.find(st => String(st.id) === String(storeId));
+    if (!store) return [];
+    const forType = allProductCategories.filter(c => c.store_category_id === store.category_id);
+    return forType.length ? forType : allProductCategories;
   };
 
   const handleCreateProduct = async (e) => {
@@ -1993,32 +2032,59 @@ const AdminDashboard = () => {
 
   const productCategoriesSection = (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Catégories de produits (par magasin)</h2>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <h2 className="text-lg font-semibold">Catégories de produits</h2>
+        <button
+          onClick={() => setProductCatModal({ open: true, category: null })}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-semibold hover:bg-indigo-700"
+        >
+          Ajouter
+        </button>
+      </div>
+      <p className="text-sm text-gray-500">
+        Chaque catégorie est liée à un type de magasin. Les magasins de ce type la choisissent en ajoutant un produit.
+      </p>
       <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Magasin</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type de magasin</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produits</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordre</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {allProductCategories.map((c) => (
               <tr key={c.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.store_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.description}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {c.name}
+                  {c.description && <div className="text-xs text-gray-500 font-normal">{c.description}</div>}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {c.store_category_name || <span className="text-orange-600">Non lié (à modifier)</span>}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.product_count ?? 0}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.order}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button onClick={() => setProductCatModal({ open: true, category: c })} className="text-indigo-600 hover:text-indigo-900 mr-4">Modifier</button>
+                  <button onClick={() => handleDeleteProductCat(c)} className="text-red-600 hover:text-red-900">Supprimer</button>
+                </td>
               </tr>
             ))}
             {allProductCategories.length === 0 && (
-              <tr><td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">Aucune catégorie trouvée</td></tr>
+              <tr><td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">Aucune catégorie. Cliquez sur « Ajouter » pour en créer une.</td></tr>
             )}
           </tbody>
         </table>
       </div>
+      <B2CCategoryModal
+        isOpen={productCatModal.open}
+        category={productCatModal.category}
+        onClose={() => setProductCatModal({ open: false, category: null })}
+        onSuccess={reloadProductCategories}
+      />
     </div>
   );
 
@@ -3302,9 +3368,16 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label className="text-sm font-semibold text-gray-700">Magasin</label>
-                <select value={newProduct.store_id} onChange={(e) => setNewProduct({ ...newProduct, store_id: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required>
+                <select value={newProduct.store_id} onChange={(e) => setNewProduct({ ...newProduct, store_id: e.target.value, category_id: '' })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required>
                   <option value="">Sélectionner...</option>
                   {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Catégorie</label>
+                <select value={newProduct.category_id} onChange={(e) => setNewProduct({ ...newProduct, category_id: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" disabled={!newProduct.store_id}>
+                  <option value="">{newProduct.store_id ? 'Sans catégorie' : "Choisir d'abord le magasin"}</option>
+                  {productCategoriesForStore(newProduct.store_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
@@ -3351,6 +3424,13 @@ const AdminDashboard = () => {
               <div>
                 <label className="text-sm font-semibold text-gray-700">Image (URL)</label>
                 <input type="text" value={editingProduct.image || ''} onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="https://..." />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Catégorie</label>
+                <select value={editingProduct.category_id || ''} onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value || null })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  <option value="">Sans catégorie</option>
+                  {productCategoriesForStore(editingProduct.store_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-sm font-semibold text-gray-700">Prix</label>
