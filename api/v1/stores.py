@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from django.core.exceptions import PermissionDenied
 
 from stores.models import Store, StoreCategory
 from stores.serializers import (
@@ -176,19 +175,8 @@ class StoreUpdateView(APIView):
 				}
 			}, status=status.HTTP_403_FORBIDDEN)
         
-		from payments.subscription_check import SubscriptionChecker
-		custom_fields = ['description', 'banner_image']
-		if any(field in request.data for field in custom_fields):
-			try:
-				SubscriptionChecker.check_can_customize_store(store)
-			except PermissionDenied as e:
-				return Response({
-					'success': False,
-					'error': {
-						'code': status.HTTP_403_FORBIDDEN,
-						'message': str(e)
-					}
-				}, status=status.HTTP_403_FORBIDDEN)
+		# Paramètres du magasin ouverts à tous les forfaits pour l'instant
+		# (restrictions par forfait à définir plus tard).
 
 		from stores.serializers import StoreUpdateSerializer
 		serializer = StoreUpdateSerializer(
