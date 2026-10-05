@@ -217,19 +217,12 @@ class Store(models.Model):
 		except StoreSubscription.DoesNotExist:
 			return None
 	
-	@property
-	def is_superadmin_store(self):
-		"""Magasin géré par le compte super admin (is_superuser) : tous les avantages, sans abonnement."""
-		manager = getattr(self, 'manager', None)
-		return bool(manager and manager.is_superuser)
-
 	def get_current_plan(self):
 		"""
 		Récupère le plan ACTUEL du magasin
 		Pour les stores B2B (grossistes), retourne B2BSubscriptionPlan
 		Pour les stores B2C, retourne SubscriptionPlan
 		Retourne le plan d'abonnement ou le plan Free par défaut
-		Le magasin du super admin reçoit toujours le plan le plus complet.
 		"""
 		# Si c'est un store B2B (grossiste), utiliser B2BSubscriptionPlan
 		if self.is_b2b:
@@ -237,11 +230,6 @@ class Store(models.Model):
 		
 		# Sinon, utiliser SubscriptionPlan (B2C)
 		from payments.models import SubscriptionPlan
-
-		if self.is_superadmin_store:
-			top_plan = SubscriptionPlan.objects.order_by('-price').first()
-			if top_plan:
-				return top_plan
 		
 		subscription = self.get_active_subscription()
 		
@@ -260,11 +248,6 @@ class Store(models.Model):
 		Retourne B2BSubscriptionPlan ou le plan Free B2B par défaut
 		"""
 		from b2b.models import B2BStoreSubscription, B2BSubscriptionPlan
-
-		if self.is_superadmin_store:
-			top_plan = B2BSubscriptionPlan.objects.order_by('-price').first()
-			if top_plan:
-				return top_plan
 		
 		try:
 			b2b_subscription = self.b2b_subscription

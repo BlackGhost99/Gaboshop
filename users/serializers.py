@@ -35,6 +35,15 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'date_joined', 'is_verified']
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Un compte superutilisateur / staff (ex. créé avec createsuperuser, dont le
+        # user_type reste « client » par défaut) est l'administrateur : le frontend
+        # l'envoie vers l'espace admin. Les permissions admin du backend acceptent déjà is_staff.
+        if instance.is_superuser or instance.is_staff:
+            data['user_type'] = 'admin'
+        return data
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     password_confirm = serializers.CharField(write_only=True, min_length=6)
