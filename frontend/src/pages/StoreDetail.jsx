@@ -73,7 +73,7 @@ const StoreDetail = () => {
             <div className="bg-white shadow">
                 <div className="h-48 md:h-64 bg-gray-800 w-full relative overflow-hidden">
                     {store.banner_image ? (
-                        <img src={store.banner_image} alt="Banner" className="w-full h-full object-cover opacity-75" />
+                        <img src={store.banner_image} alt="" className="w-full h-full object-cover opacity-75" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     ) : (
                         <div className="w-full h-full bg-gradient-to-r from-indigo-900 to-purple-900" />
                     )}
@@ -86,7 +86,7 @@ const StoreDetail = () => {
                     <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col md:flex-row items-center md:items-start gap-6">
                         <div className="h-24 w-24 rounded-full bg-indigo-100 border-4 border-white shadow-md flex items-center justify-center overflow-hidden flex-shrink-0">
                             {store.logo ? (
-                                <img src={store.logo} alt="Logo" className="w-full h-full object-cover" />
+                                <img src={store.logo} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                             ) : (
                                 <span className="text-3xl font-bold text-indigo-600">{store.name.charAt(0)}</span>
                             )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
 import { getPromotions, getCategories } from '../services/promotionService';
@@ -27,6 +27,7 @@ const Home = () => {
   const [promotions, setPromotions] = useState([]);
   const [categories, setCategories] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
+  const navigate = useNavigate();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
@@ -315,14 +316,9 @@ const Home = () => {
     setTimeout(() => setToast(null), 1800);
   };
 
+  // Un clic sur une boutique ouvre sa page (vitrine du commerce)
   const handleStoreClick = (storeId) => {
-    if (selectedStore === storeId) {
-      setSelectedStore(null);
-      fetchProducts(searchTerm, null);
-    } else {
-      setSelectedStore(storeId);
-      fetchProducts(searchTerm, storeId);
-    }
+    navigate(`/stores/${storeId}`);
   };
 
   const handleSearchSubmit = (term) => {
@@ -424,6 +420,7 @@ const Home = () => {
                             src={product.image}
                             alt={product.name}
                             className="h-full w-full object-cover"
+                            onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
                           />
                         ) : (
                           <span className="text-xs text-slate-400">Produit</span>
@@ -542,10 +539,13 @@ const Home = () => {
                           : 'hover:bg-gray-50 border-gray-100'
                       }`}
                     >
-                      <div className={`flex-shrink-0 h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg ${
+                      <div className={`relative flex-shrink-0 h-12 w-12 rounded-full overflow-hidden flex items-center justify-center font-bold text-lg ${
                         selectedStore === store.id ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600'
                       }`}>
                         {store.name.charAt(0)}
+                        {store.logo && (
+                          <img src={store.logo} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
@@ -611,9 +611,10 @@ const Home = () => {
                       </div>
                       <div className="w-1/2 relative">
                         <img 
-                          src={product.image} 
+                          src={product.image || '/placeholder.svg'} 
                           alt={product.name} 
                           className="absolute inset-0 w-full h-full object-cover opacity-90"
+                          onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
                         />
                       </div>
                     </div>
@@ -664,6 +665,7 @@ const Home = () => {
                   src={selectedProduct.image}
                   alt={selectedProduct.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-400">

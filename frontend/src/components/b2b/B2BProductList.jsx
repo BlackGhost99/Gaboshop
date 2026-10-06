@@ -57,11 +57,11 @@ const B2BProductList = ({ products, onAddToCart, loading }) => {
 						{/* Image */}
 						<div className="relative h-48 bg-gray-200">
 							<img
-								src={product.image || '/placeholder.png'}
+								src={product.image || '/placeholder.svg'}
 								alt={product.name}
 								className="w-full h-full object-cover"
 								onError={(e) => {
-									e.target.src = '/placeholder.png';
+									e.target.src = '/placeholder.svg';
 								}}
 							/>
 						</div>

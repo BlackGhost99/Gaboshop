@@ -20,11 +20,11 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
         onClick={() => onViewDetails?.(product)}
       >
         <img
-          src={product.image || '/placeholder.png'}
+          src={product.image || '/placeholder.svg'}
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
           onError={(e) => {
-            e.target.src = '/placeholder.png';
+            e.target.src = '/placeholder.svg';
           }}
         />
 

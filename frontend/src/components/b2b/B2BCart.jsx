@@ -60,11 +60,11 @@ const B2BCart = ({ cartItems, onRemoveItem, onUpdateQuantity, onCheckout, loadin
 					<div key={item.id} className="flex items-center gap-4 pb-4 border-b border-gray-200">
 						{/* Image */}
 						<img
-							src={item.image || '/placeholder.png'}
+							src={item.image || '/placeholder.svg'}
 							alt={item.name}
 							className="w-16 h-16 object-cover rounded"
 							onError={(e) => {
-								e.target.src = '/placeholder.png';
+								e.target.src = '/placeholder.svg';
 							}}
 						/>
 

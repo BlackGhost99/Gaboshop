@@ -94,10 +94,10 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 						<div key={item.id} className="flex items-center justify-between pb-3 border-b border-gray-200">
 							<div className="flex items-center gap-3">
 								<img
-									src={item.image || '/placeholder.png'}
+									src={item.image || '/placeholder.svg'}
 									alt={item.name}
 									className="w-12 h-12 object-cover rounded"
-									onError={(e) => { e.target.src = '/placeholder.png'; }}
+									onError={(e) => { e.target.src = '/placeholder.svg'; }}
 								/>
 								<div>
 									<p className="font-bold text-sm text-black">{item.name}</p>
