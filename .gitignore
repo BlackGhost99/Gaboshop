@@ -27,3 +27,8 @@ db.sqlite3.*
 .cursor/
 .testdeps/
 builds/
+
+# Clé de signature Android (jamais en clair dans le dépôt)
+*.jks
+*.keystore
+!*.jks.enc

@@ -121,14 +121,14 @@ const Footer = () => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <a href="#" className="text-sm hover:text-white transition-colors">
-                  CGV
-                </a>
+                <Link to="/cgu" className="text-sm hover:text-white transition-colors">
+                  CGU / CGV
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-sm hover:text-white transition-colors">
+                <Link to="/confidentialite" className="text-sm hover:text-white transition-colors">
                   Politique de confidentialité
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className="text-sm hover:text-white transition-colors">
@@ -136,9 +136,14 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-sm hover:text-white transition-colors">
+                <Link to="/mentions-legales" className="text-sm hover:text-white transition-colors">
                   Mentions légales
-                </a>
+                </Link>
+              </li>
+              <li>
+                <Link to="/suppression-compte" className="text-sm hover:text-white transition-colors">
+                  Suppression du compte
+                </Link>
               </li>
             </ul>
           </div>

@@ -7,7 +7,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .users import (
-    RegisterView, LoginView, ProfileView, RefreshTokenView
+    RegisterView, LoginView, ProfileView, RefreshTokenView, DeleteAccountView
 )
 from .stores import (
     StoreCategoryListView, StoreListView, StoreDetailView, StoreCreateView,
@@ -121,6 +121,7 @@ urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='auth-register'),
     path('auth/login/', LoginView.as_view(), name='auth-login'),
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
+    path('auth/account/delete/', DeleteAccountView.as_view(), name='auth-account-delete'),
     path('auth/token/refresh/', RefreshTokenView.as_view(), name='token-refresh'),
 
     # Notifications

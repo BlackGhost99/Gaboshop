@@ -528,15 +528,19 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # Cache Configuration
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': env('REDIS_URL', default='redis://localhost:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+# Sans REDIS_URL (environnement de test sur Render, poste local), cache en mémoire du processus.
+if env('REDIS_URL', default=''):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': env('REDIS_URL'),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            }
         }
     }
-}
+else:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'gaboshop'}}
 
 # ============================================================================
 # CINETPAY / AIRTEL MONEY / MOOV MONEY CONFIGURATION

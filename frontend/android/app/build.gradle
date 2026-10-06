@@ -9,8 +9,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Sur GitHub Actions, chaque APK a un numéro croissant pour s'installer par-dessus le précédent
         def ciRun = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode ciRun ? ciRun.toInteger() + 1 : 1
-        versionName ciRun ? "1.0.${ciRun}" : "1.0"
+        def playVersion = System.getenv("GABOSHOP_VERSION_CODE")
+        versionCode playVersion ? playVersion.toInteger() : (ciRun ? ciRun.toInteger() + 1 : 1)
+        versionName playVersion ? "1.1.${playVersion}" : (ciRun ? "1.0.${ciRun}" : "1.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,8 +19,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Signature Play Store : la clé d'envoi est fournie par le workflow « Version Play Store »
+    // (variables d'environnement), jamais écrite dans le dépôt.
+    def releaseKeystore = System.getenv("GABOSHOP_UPLOAD_KEYSTORE")
+    signingConfigs {
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv("GABOSHOP_UPLOAD_KEY_PASSWORD")
+                keyAlias "upload"
+                keyPassword System.getenv("GABOSHOP_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseKeystore) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

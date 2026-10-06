@@ -31,7 +31,7 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [gpsLoading, setGpsLoading] = useState(false);
+  const [, setGpsLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const nextPath = safeNextPath(location.search);
@@ -335,6 +335,12 @@ const Register = () => {
                 {loading ? 'Création...' : 'Créer mon compte'}
               </button>
             </div>
+            <p className="text-xs text-gray-500 text-center sm:text-right">
+              En créant un compte, vous acceptez les{' '}
+              <Link to="/cgu" className="text-indigo-600 underline hover:text-indigo-500">CGU</Link>
+              {' '}et la{' '}
+              <Link to="/confidentialite" className="text-indigo-600 underline hover:text-indigo-500">Politique de confidentialité</Link>.
+            </p>
           </form>
         </div>
       </div>

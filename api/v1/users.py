@@ -169,6 +169,62 @@ class ProfileView(APIView):
 			}
 		}, status=status.HTTP_400_BAD_REQUEST)
 
+class DeleteAccountView(APIView):
+	"""Suppression de compte demandée par l'utilisateur (exigée par Google Play).
+
+	Le compte est désactivé et anonymisé : les commandes restent pour la comptabilité,
+	sans nom, téléphone ni e-mail rattachés."""
+	permission_classes = [permissions.IsAuthenticated]
+	DONE_ORDER = ('delivered', 'cancelled', 'refunded')
+	DONE_DELIVERY = ('delivered', 'failed', 'cancelled')
+
+	def blocker(self, user):
+		from orders.models import Order
+		from delivery.models import Delivery
+		from payments.direct_models import PaymentObligation
+		if user.is_superuser or user.is_staff or user.user_type == 'admin':
+			return "Un compte administrateur se supprime par un autre administrateur."
+		if Order.objects.filter(client=user).exclude(status__in=self.DONE_ORDER).exists():
+			return "Vous avez une commande en cours. Attendez sa livraison ou annulez-la avant de supprimer le compte."
+		if Order.objects.filter(store__manager=user).exclude(status__in=self.DONE_ORDER).exists():
+			return "Votre commerce a des commandes en cours. Terminez-les avant de supprimer le compte."
+		if PaymentObligation.objects.filter(arrangement__store__manager=user, kind='commission', status__in=['unpaid', 'overdue', 'partially_paid']).exists():
+			return "Votre commerce doit encore des commissions à Gaboshop. Réglez-les avant de supprimer le compte."
+		if Delivery.objects.filter(delivery_agent=user).exclude(status__in=self.DONE_DELIVERY).exists():
+			return "Vous avez une livraison en cours. Terminez-la avant de supprimer le compte."
+		return ''
+
+	def post(self, request):
+		user = request.user
+		if not user.check_password(request.data.get('password') or ''):
+			return Response({'success': False, 'error': {'code': 400, 'message': 'Mot de passe incorrect.'}}, status=status.HTTP_400_BAD_REQUEST)
+		reason = self.blocker(user)
+		if reason:
+			return Response({'success': False, 'error': {'code': 409, 'message': reason}}, status=status.HTTP_409_CONFLICT)
+		from stores.models import Store
+		Store.objects.filter(manager=user).update(is_active=False)
+		DeliveryAgentApiKey.objects.filter(user=user).delete()
+		for relation in ('client_profile', 'livreur_profile', 'gerant_profile'):
+			profile = getattr(user, relation, None)
+			if profile is not None:
+				profile.delete()
+		if user.profile_picture:
+			user.profile_picture.delete(save=False)
+		user.phone = f'supprime-{user.id}'
+		user.username = f'supprime-{user.id}'
+		user.first_name = user.last_name = user.email = ''
+		user.current_location = ''
+		user.is_active = False
+		user.set_unusable_password()
+		user.save()
+		AuditLog.log_action(
+			action_type='user_account_deleted', user=user, object_type='user', object_id=user.id,
+			old_value='active', new_value='deleted', ip_address=request.META.get('REMOTE_ADDR'),
+			user_agent=request.META.get('HTTP_USER_AGENT', ''), reason='Suppression demandée par l’utilisateur',
+		)
+		return Response({'success': True, 'message': 'Votre compte a été supprimé.'})
+
+
 class RefreshTokenView(APIView):
 	permission_classes = [permissions.AllowAny]
     

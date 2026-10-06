@@ -28,6 +28,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PrivateRoute from './components/guards/PrivateRoute';
 import PublicRoute from './components/guards/PublicRoute';
 import authStorage from './utils/authStorage';
+import CGU from './pages/legal/CGU';
+import Confidentialite from './pages/legal/Confidentialite';
+import MentionsLegales from './pages/legal/MentionsLegales';
+import SuppressionCompte from './pages/legal/SuppressionCompte';
+import DeleteAccount from './pages/DeleteAccount';
 
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
@@ -84,6 +89,13 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<DashboardRedirect />} />
+
+        {/* Pages légales (publiques, accessibles à tous) */}
+        <Route path="/cgu" element={<CGU />} />
+        <Route path="/confidentialite" element={<Confidentialite />} />
+        <Route path="/mentions-legales" element={<MentionsLegales />} />
+        <Route path="/suppression-compte" element={<SuppressionCompte />} />
+        <Route path="/supprimer-mon-compte" element={<DeleteAccount />} />
 
         {/* Client routes (PROTEGEES) */}
         <Route path="/client/dashboard" element={
