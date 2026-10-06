@@ -190,3 +190,61 @@ class AdminProductFormTests(TestCase):
 		}, format='json')
 		self.assertEqual(res.status_code, 400)
 		self.assertIn('error', res.json())
+
+
+@override_settings(
+	AI_PROVIDER='local',
+	CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class ShoppingAssistantTests(TestCase):
+	"""L'assistant d'achat trouve de vrais produits, sans clé d'IA et sans être connecté."""
+
+	def setUp(self):
+		from products.models import Product
+		manager = User.objects.create_user(phone='077000040', password='secret123', user_type='store_manager')
+		self.store = Store.objects.create(
+			name='Chez Paul', category=StoreCategory.objects.create(name='Mode'), manager=manager,
+			phone='077000041', zone='Louis', address='Rue 1',
+		)
+		Product.objects.create(store=self.store, name='Baskets Nike Air', price=25000, stock=3,
+			attributes={'brand': 'Nike', 'sizes': '40, 41, 42'})
+		Product.objects.create(store=self.store, name='Baskets en toile', price=8000, stock=5)
+		Product.objects.create(store=self.store, name='Riz parfumé 5 kg', price=4500, stock=10)
+		self.client = APIClient()
+
+	def ask(self, message):
+		res = self.client.post('/api/v1/ai/shop/', {'message': message}, format='json')
+		self.assertEqual(res.status_code, 200, res.content)
+		return res.json()['data']
+
+	def test_finds_products_with_budget(self):
+		data = self.ask('Je cherche des baskets à moins de 10 000 F')
+		self.assertEqual([p['name'] for p in data['products']], ['Baskets en toile'])
+		self.assertIn('Chez Paul', data['message'])
+		self.assertIn('8 000 FCFA', data['message'])
+		self.assertEqual(data['provider'], 'local')
+
+	def test_best_match_first(self):
+		data = self.ask('baskets nike')
+		self.assertEqual(data['products'][0]['name'], 'Baskets Nike Air')
+		self.assertEqual(data['products'][0]['sizes'], '40, 41, 42')
+
+	def test_small_questions(self):
+		self.assertIn('Mobile Money', self.ask('Comment je paie ?')['message'])
+		data = self.ask('Combien coûte la livraison ?')
+		self.assertIn('livraison', data['message'].lower())
+		self.assertEqual(data['products'], [])
+
+	def test_nothing_found(self):
+		data = self.ask('télévision samsung')
+		self.assertEqual(data['products'], [])
+		self.assertIn('aucun produit', data['message'].lower())
+
+	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='test-key')
+	def test_uses_free_ai_with_real_products_only(self):
+		from unittest import mock
+		with mock.patch('api.v1.ai.shopping.AIProvider.call_ai', return_value='Je vous conseille le riz parfumé.') as call:
+			data = self.ask('du riz svp')
+		self.assertEqual(data['provider'], 'groq')
+		self.assertEqual(data['message'], 'Je vous conseille le riz parfumé.')
+		self.assertIn('Riz parfumé 5 kg', call.call_args[0][1])

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import authStorage from '../utils/authStorage';
+import { isShoppingRoute } from '../utils/session';
 
 const AIContext = createContext(null);
 
@@ -83,6 +84,35 @@ export const AIContextProvider = ({ children }) => {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
+    if (isShoppingRoute(location.pathname)) {
+      try {
+        const history = messages.slice(-6).map((m) => ({ role: m.type, text: m.text }));
+        const response = await api.post('/ai/shop/', { message, history });
+        const data = response.data?.data || {};
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          type: 'bot',
+          text: data.message || "Je n'ai pas compris, pouvez-vous reformuler ?",
+          products: Array.isArray(data.products) ? data.products : [],
+          timestamp: new Date().toISOString(),
+        }]);
+      } catch (error) {
+        const tooMany = error.response?.status === 429;
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          type: 'bot',
+          text: tooMany
+            ? 'Beaucoup de messages en peu de temps. Patientez une minute puis réessayez.'
+            : "Je n'arrive pas à joindre le serveur. Vérifiez votre connexion et réessayez.",
+          timestamp: new Date().toISOString(),
+          isError: true,
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     try {
       const frontendContext = {
         ...pageContext,
@@ -118,7 +148,7 @@ export const AIContextProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [pageContext, lastError, reportError]);
+  }, [pageContext, lastError, reportError, location.pathname, messages]);
 
   // Récupérer le contexte backend
   const getContext = useCallback(async () => {

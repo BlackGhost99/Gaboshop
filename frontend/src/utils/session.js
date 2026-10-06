@@ -64,3 +64,7 @@ export const applyPendingCartItem = () => {
     return null;
   }
 };
+
+// Hors des espaces commerce / livreur / admin, l'IA est un assistant d'achat
+// ouvert à tous (même sans compte) qui cherche dans le catalogue.
+export const isShoppingRoute = (path) => !/^\/(store|admin|delivery)(\/|$)/.test(path || '');

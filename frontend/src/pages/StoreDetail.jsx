@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService'; // Need a getStoreDetail really, but getStores filter might work or I'll use list for now
@@ -26,6 +26,18 @@ const StoreDetail = () => {
     const [toast, setToast] = useState(null);
 
     const [loginPromptProduct, setLoginPromptProduct] = useState(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const requestedProductId = Number(searchParams.get('product')) || null;
+
+    // Lien depuis l'assistant d'achat : ouvre directement la fiche du produit
+    useEffect(() => {
+        if (!requestedProductId) return undefined;
+        const timer = setTimeout(() => {
+            setSelectedProduct({ id: requestedProductId });
+            setSearchParams({}, { replace: true });
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [requestedProductId, setSearchParams]);
 
     // Même panier que la page d'accueil (stocké sur l'appareil)
     const handleAddToCart = (product) => {

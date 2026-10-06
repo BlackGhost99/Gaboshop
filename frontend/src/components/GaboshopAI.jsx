@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAIContext } from '../context/AIContext';
+import { isShoppingRoute } from '../utils/session';
+import { formatCurrency } from '../utils/helpers';
 import AIActionModal from './AIActionModal';
 import aiService from '../services/aiService';
 
@@ -18,6 +21,14 @@ const GaboshopAI = () => {
     const [actionModal, setActionModal] = useState(null);
     const [confirmingAction, setConfirmingAction] = useState(false);
     const messagesEndRef = useRef(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const shopping = isShoppingRoute(location.pathname);
+
+    const openProduct = (product) => {
+        setIsOpen(false);
+        navigate(`/stores/${product.store}?product=${product.id}`);
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -29,7 +40,7 @@ const GaboshopAI = () => {
 
     // Afficher automatiquement une explication d'erreur si présente
     useEffect(() => {
-        if (lastError && isOpen && messages.length === 0) {
+        if (!shopping && lastError && isOpen && messages.length === 0) {
             const errorMessage = `Je remarque qu'une erreur s'est produite (code ${lastError.status}). ` +
                 `Souhaitez-vous que je vous explique ce qui s'est passé et comment résoudre le problème ?`;
             sendMessage("Explique-moi cette erreur");
@@ -44,10 +55,10 @@ const GaboshopAI = () => {
         
         // Détecter les intentions d'action
         const lowerMessage = message.toLowerCase();
-        const isOrderIntent = lowerMessage.includes('commander') || 
+        const isOrderIntent = !shopping && (lowerMessage.includes('commander') || 
                              lowerMessage.includes('acheter') || 
                              lowerMessage.includes('commande') ||
-                             lowerMessage.includes('ajouter au panier');
+                             lowerMessage.includes('ajouter au panier'));
         
         if (isOrderIntent) {
             // Préparer la commande
@@ -140,6 +151,14 @@ const GaboshopAI = () => {
 
     // Suggestions contextuelles selon la page
     const getSuggestions = () => {
+        if (shopping) {
+            return [
+                'Je cherche des baskets',
+                'Riz moins de 5000 F',
+                'Comment se passe la livraison ?',
+                'Comment payer ?',
+            ];
+        }
         const suggestions = [
             "Comment puis-je vous aider ?",
             "Explique-moi cette erreur",
@@ -152,7 +171,7 @@ const GaboshopAI = () => {
         <div className="fixed bottom-6 right-6 z-50 font-sans">
             {/* Chat Window */}
             {isOpen && (
-                <div className="bg-white/90 backdrop-blur-md border border-white/20 shadow-2xl rounded-2xl w-80 sm:w-96 flex flex-col mb-4 overflow-hidden animate-slide-up ring-1 ring-black/5">
+                <div className="bg-white/90 backdrop-blur-md border border-white/20 shadow-2xl rounded-2xl w-[calc(100vw-2rem)] max-w-sm sm:w-96 flex flex-col mb-4 overflow-hidden animate-slide-up ring-1 ring-black/5">
                     {/* Header */}
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex justify-between items-center">
                         <div className="flex items-center gap-3">
@@ -168,7 +187,7 @@ const GaboshopAI = () => {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            {lastError && (
+                            {!shopping && lastError && (
                                 <button
                                     onClick={clearError}
                                     className="text-white/80 hover:text-white text-xs px-2 py-1 bg-white/20 rounded"
@@ -186,7 +205,7 @@ const GaboshopAI = () => {
                     </div>
 
                     {/* Alertes d'erreur */}
-                    {lastError && (
+                    {!shopping && lastError && (
                         <div className="bg-red-50 border-l-4 border-red-500 p-3 mx-4 mt-2 rounded">
                             <div className="flex items-center">
                                 <span className="text-red-500 text-sm font-semibold">
@@ -204,13 +223,13 @@ const GaboshopAI = () => {
                         {messages.length === 0 && (
                             <div className="text-center text-gray-500 text-sm py-4">
                                 <p className="mb-2">Bonjour ! Je suis l'IA de Gaboshop.</p>
-                                <p>Comment puis-je vous aider aujourd'hui ?</p>
+                                <p>{shopping ? 'Dites-moi ce que vous cherchez, je vous montre les produits.' : "Comment puis-je vous aider aujourd'hui ?"}</p>
                             </div>
                         )}
                         
                         {messages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                            <div key={msg.id} className={`flex flex-col ${msg.type === 'user' ? 'items-end' : 'items-start'}`}>
+                                <div className={`max-w-[85%] whitespace-pre-line rounded-2xl px-4 py-2 text-sm shadow-sm ${
                                     msg.type === 'user'
                                         ? 'bg-indigo-600 text-white rounded-br-none'
                                         : msg.isError
@@ -219,6 +238,30 @@ const GaboshopAI = () => {
                                 }`}>
                                     {msg.text}
                                 </div>
+                                {msg.products?.length > 0 && (
+                                    <div className="mt-2 w-full space-y-2">
+                                        {msg.products.map((p) => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => openProduct(p)}
+                                                className="w-full flex items-center gap-3 bg-white border border-gray-100 rounded-xl p-2 text-left shadow-sm hover:border-indigo-300"
+                                            >
+                                                <img
+                                                    src={p.image || '/placeholder.svg'}
+                                                    alt=""
+                                                    className="w-12 h-12 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+                                                    onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+                                                />
+                                                <span className="flex-1 min-w-0">
+                                                    <span className="block text-sm font-semibold text-gray-900 truncate">{p.name}</span>
+                                                    <span className="block text-xs text-gray-500 truncate">{p.store_name}{p.stock <= 0 ? ' · rupture' : ''}</span>
+                                                </span>
+                                                <span className="text-sm font-bold text-indigo-700 whitespace-nowrap">{formatCurrency(p.price)}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))}
                         
@@ -238,7 +281,7 @@ const GaboshopAI = () => {
                     {messages.length === 0 && !isLoading && (
                         <div className="px-4 pb-2">
                             <div className="flex flex-wrap gap-2">
-                                {getSuggestions().slice(0, 2).map((suggestion, idx) => (
+                                {getSuggestions().slice(0, shopping ? 4 : 2).map((suggestion, idx) => (
                                     <button
                                         key={idx}
                                         onClick={() => sendMessage(suggestion)}
@@ -284,7 +327,7 @@ const GaboshopAI = () => {
                     className="group flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-indigo-500/50 hover:scale-110 transition-all duration-300 relative"
                 >
                     <span className="text-2xl animate-[wiggle_1s_ease-in-out_infinite]">🤖</span>
-                    {lastError && (
+                    {!shopping && lastError && (
                         <span className="absolute -top-1 -right-1 flex h-4 w-4">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] items-center justify-center font-bold">!</span>
