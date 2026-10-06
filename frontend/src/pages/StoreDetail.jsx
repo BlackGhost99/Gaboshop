@@ -5,11 +5,14 @@ import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService'; // Need a getStoreDetail really, but getStores filter might work or I'll use list for now
 import LoadingSpinner from '../components/LoadingSpinner';
 import ProductCard from '../components/ProductCard';
+import ProductDetailModal from '../components/ProductDetailModal';
 import HomeNavbar from '../components/HomeNavbar'; // Reusing HomeNavbar
 import Footer from '../components/Footer';
 
 // Temporary service patch if getStoreDetail doesn't exist, we will try to filter from getStores or assume an endpoint exists
 // Actually, let's assume we can fetch products by store.
+
+const CART_KEY = 'gaboshop_cart';
 
 const StoreDetail = () => {
     const { id } = useParams();
@@ -17,6 +20,41 @@ const StoreDetail = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [toast, setToast] = useState(null);
+
+    // Même panier que la page d'accueil (stocké sur l'appareil)
+    const handleAddToCart = (product) => {
+        let cart = [];
+        try {
+            cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+        } catch {
+            cart = [];
+        }
+        const existing = cart.find((item) => item.id === product.id);
+        if (existing) {
+            existing.quantity += 1;
+        } else {
+            cart.push({
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                image: product.image,
+                weight_kg: product.weight_kg,
+                length_m: product.length_m,
+                store_name: product.store_name,
+                store_id: product.store,
+                quantity: 1
+            });
+        }
+        try {
+            localStorage.setItem(CART_KEY, JSON.stringify(cart));
+        } catch {
+            // stockage indisponible
+        }
+        setToast(`${product.name} ajouté au panier`);
+        setTimeout(() => setToast(null), 1800);
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -113,7 +151,12 @@ const StoreDetail = () => {
                 {products.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {products.map(product => (
-                            <ProductCard key={product.id} product={product} />
+                            <ProductCard
+                                key={product.id}
+                                product={product}
+                                onAddToCart={handleAddToCart}
+                                onViewDetails={setSelectedProduct}
+                            />
                         ))}
                     </div>
                 ) : (
@@ -124,6 +167,21 @@ const StoreDetail = () => {
             </div>
 
             <Footer />
+
+            {selectedProduct && (
+                <ProductDetailModal
+                    key={selectedProduct.id}
+                    product={selectedProduct}
+                    onClose={() => setSelectedProduct(null)}
+                    onAddToCart={handleAddToCart}
+                />
+            )}
+
+            {toast && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] bg-white shadow-xl border border-green-100 rounded-lg px-4 py-3 text-sm font-medium text-gray-900">
+                    ✓ {toast}
+                </div>
+            )}
         </div>
     );
 };

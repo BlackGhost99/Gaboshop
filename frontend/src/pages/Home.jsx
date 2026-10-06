@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import HomeNavbar from '../components/HomeNavbar';
 import HeroBanner from '../components/HeroBanner';
 import CategoriesGrid from '../components/CategoriesGrid';
+import ProductDetailModal from '../components/ProductDetailModal';
 import ProductCard from '../components/ProductCard';
 import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/helpers';
@@ -656,79 +657,12 @@ const Home = () => {
     </div>
 
     {selectedProduct && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            <div className="md:w-1/2 h-64 md:h-auto bg-gray-100 relative">
-              {selectedProduct.image ? (
-                <img
-                  src={selectedProduct.image}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              )}
-              {selectedProduct.has_discount && (
-                <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                  -{selectedProduct.discount_percentage}%
-                </span>
-              )}
-            </div>
-            <div className="md:w-1/2 p-6 flex flex-col gap-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">{selectedProduct.store_name}</p>
-                  <h3 className="text-2xl font-bold text-gray-900 leading-tight">{selectedProduct.name}</h3>
-                </div>
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                  aria-label="Fermer"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <p className="text-gray-600 text-sm leading-relaxed">
-                {selectedProduct.description || 'Pas de description fournie.'}
-              </p>
-
-              <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold text-gray-900">{formatCurrency(selectedProduct.price)}</span>
-                {selectedProduct.has_discount && (
-                  <span className="text-sm text-gray-400 line-through">{formatCurrency(selectedProduct.compare_price)}</span>
-                )}
-              </div>
-
-              <div className="flex gap-3 mt-auto">
-                <button
-                  onClick={() => handleAddToCart(selectedProduct)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg shadow"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  Ajouter au panier
-                </button>
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="inline-flex items-center justify-center px-4 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
-                >
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProductDetailModal
+        key={selectedProduct.id}
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={handleAddToCart}
+      />
     )}
 
     {toast && (
