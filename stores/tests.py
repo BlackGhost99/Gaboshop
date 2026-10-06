@@ -367,3 +367,36 @@ class AssistantTests(TestCase):
 			self.assertTrue(data['last_call']['ok'])
 			again = self.client.get('/api/v1/ai/assistant/status/?test=1').json()['data']
 		self.assertIn('skipped', again['test'])
+
+
+	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='test-key')
+	def test_failed_model_is_skipped_and_no_double_cart(self):
+		from unittest import mock
+		from types import SimpleNamespace as NS
+		from api.v1.ai import assistant
+		assistant._MODEL_STATE.update({'working': None, 'failed': {}})
+		call = NS(id='c1', function=NS(name='add_to_cart', arguments=f'{{"product_id": {self.adidas.id}}}'))
+		used = []
+
+		def create(**kw):
+			used.append(kw['model'])
+			if kw['model'] != 'openai/gpt-oss-20b':
+				if kw.get('messages', [{}])[-1].get('role') == 'tool':
+					raise Exception('model_decommissioned')
+				return NS(choices=[NS(message=NS(tool_calls=[call], content=None))])
+			if kw['messages'][-1].get('role') == 'tool':
+				return NS(choices=[NS(message=NS(tool_calls=None, content='Ajouté !'))])
+			return NS(choices=[NS(message=NS(tool_calls=[call], content=None))])
+
+		fake = mock.MagicMock()
+		fake.chat.completions.create.side_effect = create
+		with mock.patch('api.v1.ai.assistant._client', return_value=fake), \
+				mock.patch('api.v1.ai.assistant.FALLBACK_MODELS', ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']):
+			data = self.ask('je prends les adidas', user=self.client_user)
+			self.assertEqual(data['provider'], 'groq')
+			self.assertEqual(len(data['actions']), 1)
+			self.assertEqual(assistant._MODEL_STATE['working'], 'openai/gpt-oss-20b')
+			used.clear()
+			self.ask('et un autre', user=self.client_user)
+		self.assertEqual(used[0], 'openai/gpt-oss-20b')
+		assistant._MODEL_STATE.update({'working': None, 'failed': {}})

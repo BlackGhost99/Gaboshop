@@ -527,13 +527,39 @@ def _client(config):
     return openai.OpenAI(api_key=config['api_key'], base_url=config.get('base_url'), timeout=20, max_retries=0)
 
 
+FALLBACK_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant']
+MODEL_RETRY_AFTER = 3600  # un modèle en échec n'est retenté qu'au bout d'une heure
+_MODEL_STATE = {'working': None, 'failed': {}}
+
+
 def candidate_models(config):
-    preferred = [config.get('model'), 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-20b']
-    seen = []
+    """Le dernier modèle qui a marché d'abord, puis les autres ; ceux en échec récent passent en dernier."""
+    preferred = [_MODEL_STATE['working'], config.get('model')] + FALLBACK_MODELS
+    ordered = []
     for m in preferred:
-        if m and m not in seen:
-            seen.append(m)
-    return seen
+        if m and m not in ordered:
+            ordered.append(m)
+    now = timezone.now()
+    fresh = [m for m in ordered if not (m in _MODEL_STATE['failed']
+             and (now - _MODEL_STATE['failed'][m][0]).total_seconds() < MODEL_RETRY_AFTER)]
+    return fresh + [m for m in ordered if m not in fresh]
+
+
+def mark_model(model, error=None):
+    if error is None:
+        _MODEL_STATE['working'] = model
+        _MODEL_STATE['failed'].pop(model, None)
+    else:
+        _MODEL_STATE['failed'][model] = (timezone.now(), str(error)[:200])
+        if _MODEL_STATE['working'] == model:
+            _MODEL_STATE['working'] = None
+
+
+def model_options(model, max_tokens):
+    """Les modèles gpt-oss « réfléchissent » avant de répondre : on limite cette réflexion."""
+    if 'gpt-oss' in model:
+        return {'max_tokens': max_tokens * 3, 'extra_body': {'reasoning_effort': 'low'}}
+    return {'max_tokens': max_tokens}
 
 
 _LAST_STATUS = {}
@@ -561,13 +587,16 @@ def live_check(config):
     for model in candidate_models(config):
         try:
             resp = client.chat.completions.create(
-                model=model, messages=[{'role': 'user', 'content': 'Réponds seulement: OK'}], max_tokens=5)
+                model=model, messages=[{'role': 'user', 'content': 'Réponds seulement: OK'}],
+                **model_options(model, 20))
+            mark_model(model)
             record_status(True, config['name'], model)
             return {'ok': True, 'model': model, 'answer': (resp.choices[0].message.content or '').strip()[:20]}
         except Exception as exc:
             last_error = exc
             if any(k in str(exc).lower() for k in ('invalid api key', 'invalid_api_key', '401', 'authentication')):
                 break
+            mark_model(model, exc)
     record_status(False, config['name'], error=last_error)
     return {'ok': False, 'error': str(last_error)[:300]}
 
@@ -584,19 +613,25 @@ def run_llm(ctx, message, history, page, config):
     messages.append({'role': 'user', 'content': message})
 
     last_error = None
-    for model in candidate_models(config):
+    for model in candidate_models(config)[:3]:
         convo = list(messages)
+        # Repartir de zéro : un essai raté ne doit pas laisser d'actions en double (panier)
+        ctx.products, ctx.actions, ctx.confirmations = {}, [], []
         try:
             for _ in range(MAX_STEPS):
                 resp = client.chat.completions.create(
                     model=model, messages=convo, tools=tools, tool_choice='auto',
-                    temperature=0.3, max_tokens=700,
+                    temperature=0.3, **model_options(model, 700),
                 )
                 msg = resp.choices[0].message
                 calls = msg.tool_calls or []
                 if not calls:
+                    text = (msg.content or '').strip()
+                    if not text:
+                        raise ValueError('réponse vide')
+                    mark_model(model)
                     record_status(True, config['name'], model)
-                    return (msg.content or '').strip() or None
+                    return text
                 convo.append({'role': 'assistant', 'content': msg.content or '', 'tool_calls': [
                     {'id': c.id, 'type': 'function',
                      'function': {'name': c.function.name, 'arguments': c.function.arguments or '{}'}}
@@ -610,16 +645,22 @@ def run_llm(ctx, message, history, page, config):
                     convo.append({'role': 'tool', 'tool_call_id': c.id,
                                   'content': json.dumps(result, ensure_ascii=False, default=str)[:4000]})
             # Trop d'étapes : on demande une réponse finale sans outil
-            resp = client.chat.completions.create(model=model, messages=convo, temperature=0.3, max_tokens=500)
+            resp = client.chat.completions.create(model=model, messages=convo, temperature=0.3,
+                                                  **model_options(model, 500))
+            text = (resp.choices[0].message.content or '').strip()
+            if not text:
+                raise ValueError('réponse vide')
+            mark_model(model)
             record_status(True, config['name'], model)
-            return (resp.choices[0].message.content or '').strip() or None
+            return text
         except Exception as exc:
             last_error = exc
             logger.warning('Assistant IA : échec avec %s : %s', model, exc)
             text = str(exc).lower()
-            # Clé refusée ou quota épuisé : inutile d'essayer un autre modèle
+            # Clé refusée : inutile d'essayer un autre modèle
             if any(k in text for k in ('invalid api key', 'invalid_api_key', '401', 'authentication')):
                 break
+            mark_model(model, exc)
             continue
     record_status(False, config['name'], error=last_error)
     return None
@@ -893,6 +934,8 @@ def ai_assistant_status(request):
             data['test'] = live_check(config)
             _LAST_STATUS['_tested_at'] = now
             data['last_call'] = {k: v for k, v in _LAST_STATUS.items() if not k.startswith('_')}
+    data['working_model'] = _MODEL_STATE['working']
+    data['failed_models'] = {m: err for m, (_, err) in _MODEL_STATE['failed'].items()}
     if isinstance(data['last_call'], dict):
         data['last_call'] = {k: v for k, v in data['last_call'].items() if not str(k).startswith('_')}
     return Response({'success': True, 'data': data})
