@@ -351,3 +351,19 @@ class AssistantTests(TestCase):
 		status = self.client.get('/api/v1/ai/assistant/status/').json()['data']
 		self.assertFalse(status['last_call']['ok'])
 		self.assertIn('invalid api key', status['last_call']['error'])
+
+
+	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='test-key')
+	def test_status_live_check(self):
+		from unittest import mock
+		from types import SimpleNamespace as NS
+		from api.v1.ai import assistant
+		assistant._LAST_STATUS.clear()
+		fake = mock.MagicMock()
+		fake.chat.completions.create.return_value = NS(choices=[NS(message=NS(content='OK'))])
+		with mock.patch('api.v1.ai.assistant._client', return_value=fake):
+			data = self.client.get('/api/v1/ai/assistant/status/?test=1').json()['data']
+			self.assertTrue(data['test']['ok'])
+			self.assertTrue(data['last_call']['ok'])
+			again = self.client.get('/api/v1/ai/assistant/status/?test=1').json()['data']
+		self.assertIn('skipped', again['test'])

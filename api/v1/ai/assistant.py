@@ -536,15 +536,40 @@ def candidate_models(config):
     return seen
 
 
+_LAST_STATUS = {}
+
+
 def record_status(ok, provider, model=None, error=None):
+    data = {
+        'ok': ok, 'provider': provider, 'model': model,
+        'error': (str(error)[:300] if error else None),
+        'at': timezone.now().isoformat(),
+    }
+    # Copie en mémoire (un seul processus sur Render) au cas où le cache Redis manque
+    _LAST_STATUS.clear()
+    _LAST_STATUS.update(data)
     try:
-        cache.set(STATUS_CACHE_KEY, {
-            'ok': ok, 'provider': provider, 'model': model,
-            'error': (str(error)[:300] if error else None),
-            'at': timezone.now().isoformat(),
-        }, 24 * 3600)
+        cache.set(STATUS_CACHE_KEY, data, 24 * 3600)
     except Exception:
         pass
+
+
+def live_check(config):
+    """Petit appel réel à Groq pour savoir tout de suite si la clé et le modèle marchent."""
+    client = _client(config)
+    last_error = None
+    for model in candidate_models(config):
+        try:
+            resp = client.chat.completions.create(
+                model=model, messages=[{'role': 'user', 'content': 'Réponds seulement: OK'}], max_tokens=5)
+            record_status(True, config['name'], model)
+            return {'ok': True, 'model': model, 'answer': (resp.choices[0].message.content or '').strip()[:20]}
+        except Exception as exc:
+            last_error = exc
+            if any(k in str(exc).lower() for k in ('invalid api key', 'invalid_api_key', '401', 'authentication')):
+                break
+    record_status(False, config['name'], error=last_error)
+    return {'ok': False, 'error': str(last_error)[:300]}
 
 
 def run_llm(ctx, message, history, page, config):
@@ -852,9 +877,22 @@ def ai_assistant_status(request):
         last = cache.get(STATUS_CACHE_KEY)
     except Exception:
         pass
-    return Response({'success': True, 'data': {
+    data = {
         'provider': config.get('name'),
         'key_present': bool(config.get('api_key')),
         'model': config.get('model'),
-        'last_call': last,
-    }})
+        'last_call': last or (dict(_LAST_STATUS) if _LAST_STATUS else None),
+    }
+    # ?test=1 : essai réel, limité à une fois par minute pour ne pas gaspiller le quota gratuit
+    if request.query_params.get('test') and config.get('available') and config.get('name') != 'local':
+        now = timezone.now()
+        last_test = _LAST_STATUS.get('_tested_at')
+        if last_test and (now - last_test).total_seconds() < 60:
+            data['test'] = {'skipped': 'Un essai par minute maximum, réessayez plus tard.'}
+        else:
+            data['test'] = live_check(config)
+            _LAST_STATUS['_tested_at'] = now
+            data['last_call'] = {k: v for k, v in _LAST_STATUS.items() if not k.startswith('_')}
+    if isinstance(data['last_call'], dict):
+        data['last_call'] = {k: v for k, v in data['last_call'].items() if not str(k).startswith('_')}
+    return Response({'success': True, 'data': data})
