@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAIContext } from '../context/AIContext';
 import { formatCurrency } from '../utils/helpers';
 import { isLoggedIn, addToCart, savePendingCartItem } from '../utils/session';
+import { canListen, canSpeak, listenOnce, speak, stopListening, stopSpeaking } from '../utils/voice';
 
 // Suggestions adaptées à l'espace où se trouve l'utilisateur
 const SUGGESTIONS = {
@@ -24,6 +25,13 @@ const GaboshopAI = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [doneTokens, setDoneTokens] = useState({});
+    // Mode vocal : 'off' | 'listening' | 'thinking' | 'speaking'
+    const [voiceState, setVoiceState] = useState('off');
+    const [readAloud, setReadAloud] = useState(() => {
+        try { return localStorage.getItem('gaboshop_ai_voice') === '1'; } catch { return false; }
+    });
+    const [handsFree, setHandsFree] = useState(false);
+    const voiceLoop = useRef(false);
     const messagesEndRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
@@ -34,11 +42,63 @@ const GaboshopAI = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isOpen]);
 
+    const toggleReadAloud = () => {
+        const next = !readAloud;
+        setReadAloud(next);
+        try { localStorage.setItem('gaboshop_ai_voice', next ? '1' : '0'); } catch { /* ignoré */ }
+        if (!next) stopSpeaking();
+    };
+
     const handleSend = async (text) => {
         const message = (text ?? inputValue).trim();
         if (!message || isLoading) return;
         setInputValue('');
-        await sendMessage(message);
+        const reply = await sendMessage(message);
+        if (readAloud && reply && canSpeak()) {
+            setVoiceState('speaking');
+            await speak(reply);
+            setVoiceState('off');
+        }
+    };
+
+    // Parler à l'assistant : il écoute, répond à voix haute, et en mode
+    // « conversation » il réécoute tout seul jusqu'à ce qu'on se taise.
+    const talk = async (continuous = handsFree) => {
+        if (voiceState !== 'off') {
+            voiceLoop.current = false;
+            await stopListening();
+            await stopSpeaking();
+            setVoiceState('off');
+            return;
+        }
+        voiceLoop.current = true;
+        try {
+            do {
+                setVoiceState('listening');
+                const heard = await listenOnce();
+                if (!heard || !voiceLoop.current) break;
+                setVoiceState('thinking');
+                const reply = await sendMessage(heard);
+                if (!voiceLoop.current) break;
+                if (reply && canSpeak()) {
+                    setVoiceState('speaking');
+                    await speak(reply);
+                }
+            } while (continuous && voiceLoop.current);
+        } catch (err) {
+            addBotMessage(err.message || 'Le micro ne répond pas.', { isError: true });
+        } finally {
+            voiceLoop.current = false;
+            setVoiceState('off');
+        }
+    };
+
+    const closeChat = () => {
+        voiceLoop.current = false;
+        stopListening();
+        stopSpeaking();
+        setVoiceState('off');
+        setIsOpen(false);
     };
 
     const openProduct = (product) => {
@@ -84,12 +144,45 @@ const GaboshopAI = () => {
                                 </p>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white" aria-label="Fermer">
+                        <div className="flex items-center gap-1">
+                        {canSpeak() && (
+                            <button
+                                onClick={toggleReadAloud}
+                                className={`text-xs px-2 py-1 rounded-full ${readAloud ? 'bg-white text-indigo-700' : 'bg-white/20 text-white'}`}
+                                aria-label={readAloud ? 'Ne plus lire les réponses' : 'Lire les réponses à voix haute'}
+                                title="Lecture à voix haute"
+                            >
+                                {readAloud ? '🔊' : '🔈'}
+                            </button>
+                        )}
+                        {canListen() && (
+                            <button
+                                onClick={() => setHandsFree((v) => !v)}
+                                className={`text-xs px-2 py-1 rounded-full ${handsFree ? 'bg-white text-indigo-700' : 'bg-white/20 text-white'}`}
+                                aria-label="Mode conversation mains libres"
+                                title="Conversation mains libres"
+                            >
+                                {handsFree ? '🎙️ Conversation' : '🎙️'}
+                            </button>
+                        )}
+                        <button onClick={closeChat} className="text-white/80 hover:text-white" aria-label="Fermer">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+                        </div>
                     </div>
+
+                    {voiceState !== 'off' && (
+                        <div className="bg-indigo-50 text-indigo-800 text-xs px-4 py-2 flex items-center justify-between">
+                            <span>
+                                {voiceState === 'listening' && '🎙️ Je vous écoute…'}
+                                {voiceState === 'thinking' && '💭 Je réfléchis…'}
+                                {voiceState === 'speaking' && '🔊 Je vous réponds…'}
+                            </span>
+                            <button onClick={() => talk()} className="font-semibold underline">Arrêter</button>
+                        </div>
+                    )}
 
                     {/* Messages */}
                     <div className="flex-1 min-h-[16rem] overflow-y-auto p-4 space-y-3 bg-slate-50">
@@ -170,9 +263,15 @@ const GaboshopAI = () => {
 
                                 {msg.loginPrompt && (
                                     <div className="mt-2 flex gap-2">
-                                        <Link to={`/login?next=${next}`} onClick={() => setIsOpen(false)} className="text-xs font-semibold bg-slate-900 text-white rounded-lg px-3 py-2">Se connecter</Link>
+                                        <Link to={`/login?next=${next}`} onClick={closeChat} className="text-xs font-semibold bg-slate-900 text-white rounded-lg px-3 py-2">Se connecter</Link>
                                         <Link to={`/register?next=${next}`} onClick={() => setIsOpen(false)} className="text-xs font-semibold border border-slate-300 text-slate-900 rounded-lg px-3 py-2">Créer un compte</Link>
                                     </div>
+                                )}
+
+                                {msg.link && (
+                                    <Link to={msg.link.path} onClick={() => setIsOpen(false)} className="mt-2 text-xs font-semibold text-indigo-700 underline">
+                                        {msg.link.label}
+                                    </Link>
                                 )}
 
                                 {msg.cartChanged && (
@@ -223,6 +322,18 @@ const GaboshopAI = () => {
                             disabled={isLoading}
                             className="flex-1 bg-gray-100 border-0 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                         />
+                        {canListen() && !inputValue.trim() ? (
+                            <button
+                                type="button"
+                                onClick={() => talk()}
+                                className={`rounded-full p-2 flex-shrink-0 text-white ${voiceState === 'listening' ? 'bg-red-500 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                                aria-label={voiceState === 'off' ? 'Parler à l’assistant' : 'Arrêter'}
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5a6.5 6.5 0 006.5-6.5M12 18.5A6.5 6.5 0 015.5 12M12 18.5V22m-3.5 0h7M12 15a3 3 0 003-3V5a3 3 0 10-6 0v7a3 3 0 003 3z" />
+                                </svg>
+                            </button>
+                        ) : (
                         <button
                             type="submit"
                             disabled={isLoading || !inputValue.trim()}
@@ -233,6 +344,7 @@ const GaboshopAI = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                             </svg>
                         </button>
+                        )}
                     </form>
                 </div>
             )}

@@ -14,6 +14,7 @@ directement : l'assistant propose l'action, l'utilisateur la confirme d'un bouto
 (jeton signé, revérifié à la confirmation). Les actions côté appareil (panier,
 ouverture d'une page) sont renvoyées à l'application qui les exécute.
 """
+import hashlib
 import json
 import logging
 import re
@@ -333,6 +334,99 @@ def t_update_product(ctx, product_id, price=None, stock=None, visible=None):
             'message': "La modification attend que le gérant appuie sur « Confirmer »."}
 
 
+STORE_ORDER_STEPS = {'confirmed': 'confirmée', 'preparing': 'en préparation', 'ready': 'prête (un livreur sera appelé)',
+                     'cancelled': 'annulée'}
+
+
+def t_set_order_status(ctx, order_number, status_value):
+    """Fait avancer une commande du commerce (confirmée → en préparation → prête), après confirmation."""
+    store = ctx.store()
+    if not store:
+        return {'error': "Aucun commerce actif lié à ce compte."}
+    order = store.orders.filter(order_number__iexact=str(order_number).strip().lstrip('#')).first()
+    if not order:
+        return {'error': f"Commande {order_number} introuvable dans votre commerce."}
+    if status_value not in STORE_ORDER_STEPS:
+        return {'error': 'Statut possible : confirmed, preparing, ready ou cancelled.'}
+    from orders.serializers import OrderStatusUpdateSerializer
+    check = OrderStatusUpdateSerializer(order, data={'status': status_value}, partial=True)
+    if not check.is_valid():
+        return {'error': f"Impossible de passer de « {ORDER_STATUS_FR.get(order.status, order.status)} » à "
+                         f"« {STORE_ORDER_STEPS[status_value]} »."}
+    token = signing.dumps({'u': ctx.user.id, 'a': 'order_status', 'o': order.id, 'st': status_value}, salt=CONFIRM_SALT)
+    label = f"Commande {order.order_number} : passer en « {STORE_ORDER_STEPS[status_value]} »"
+    ctx.confirmations.append({'token': token, 'label': label})
+    return {'pending_confirmation': True, 'summary': label}
+
+
+def _store_categories(store):
+    from products.models import ProductCategory
+    return ProductCategory.objects.filter(Q(store=store) | Q(store_category_id=store.category_id)).order_by('order', 'name')
+
+
+def t_store_categories(ctx):
+    store = ctx.store()
+    if not store:
+        return {'error': "Aucun commerce actif lié à ce compte."}
+    return {'categories': [c.name for c in _store_categories(store)]}
+
+
+def t_create_product(ctx, name, price, stock=1, category=None, brand=None, model=None, color=None,
+                     sizes=None, description=None, compare_price=None):
+    """Prépare la création d'un produit ; il n'est créé qu'après « Confirmer »."""
+    store = ctx.store()
+    if not store:
+        return {'error': "Aucun commerce actif lié à ce compte."}
+    name = str(name or '').strip()[:200]
+    if len(name) < 2:
+        return {'error': 'Il faut un nom de produit.'}
+    try:
+        price_value = Decimal(str(price))
+    except (InvalidOperation, TypeError):
+        return {'error': 'Il faut un prix (en FCFA). Demande-le au gérant.'}
+    if price_value <= 0:
+        return {'error': 'Le prix doit être positif. Demande-le au gérant.'}
+    try:
+        stock = max(0, int(stock if stock not in (None, '') else 1))
+    except (TypeError, ValueError):
+        stock = 1
+    from django.core.exceptions import PermissionDenied
+    from payments.subscription_check import SubscriptionChecker
+    try:
+        SubscriptionChecker.check_can_add_product(store)
+    except PermissionDenied as exc:
+        return {'error': str(exc)}
+    cat = None
+    if category:
+        cats = list(_store_categories(store))
+        wanted = _plain(str(category))
+        cat = next((c for c in cats if _plain(c.name) == wanted), None) or \
+            next((c for c in cats if wanted in _plain(c.name) or _plain(c.name) in wanted), None)
+    attrs = {k: str(v).strip()[:100] for k, v in
+             (('brand', brand), ('model', model), ('color', color), ('sizes', sizes)) if v not in (None, '')}
+    fields = {'name': name, 'price': str(price_value), 'stock': stock, 'category': cat.id if cat else None,
+              'attributes': attrs, 'description': str(description or '').strip()[:1000]}
+    if compare_price not in (None, ''):
+        try:
+            cp = Decimal(str(compare_price))
+            if cp > price_value:
+                fields['compare_price'] = str(cp)
+        except InvalidOperation:
+            pass
+    token = signing.dumps({'u': ctx.user.id, 'a': 'create_product', 's': store.id, 'f': fields}, salt=CONFIRM_SALT)
+    details = [f"{stock} en stock", _price(float(price_value))]
+    if cat:
+        details.append(cat.name)
+    details += [v for v in attrs.values()]
+    label = f"Créer « {name} » : " + ', '.join(details)
+    ctx.confirmations.append({'token': token, 'label': label})
+    return {'pending_confirmation': True, 'summary': label,
+            'category_found': bool(cat),
+            'available_categories': [c.name for c in _store_categories(store)][:20],
+            'message': "Le produit sera créé quand le gérant appuiera sur « Confirmer ». "
+                       "Il pourra ensuite ajouter une photo dans « Mes produits »."}
+
+
 def t_my_deliveries(ctx, include_available=True):
     if ctx.user is None:
         return {'error': 'Non connecté.'}
@@ -449,6 +543,22 @@ TOOLS = {
         'update_product', "Préparer une modification de prix, de stock ou de visibilité d'un produit du commerce. "
                           "Le gérant devra confirmer d'un bouton.",
         {'product_id': _INT, 'price': _NUM, 'stock': _INT, 'visible': _BOOL}, ['product_id'])),
+    'set_order_status': (('store_manager',), t_set_order_status, _schema(
+        'set_order_status', "Faire avancer une commande du commerce : confirmed, preparing, ready (appelle un livreur) "
+                            "ou cancelled. Le gérant confirme d'un bouton.",
+        {'order_number': _STR, 'status_value': {**_STR, 'enum': list(STORE_ORDER_STEPS)}},
+        ['order_number', 'status_value'])),
+    'store_categories': (('store_manager',), t_store_categories, _schema(
+        'store_categories', 'Catégories de produits disponibles pour ce commerce.')),
+    'create_product': (('store_manager',), t_create_product, _schema(
+        'create_product', "Créer un NOUVEAU produit dans le commerce du gérant (ex: « ajoute 10 All Star noires à "
+                          "25000 F »). Le prix est obligatoire : s'il manque, demande-le d'abord. Rédige une courte "
+                          "description vendeuse. Le gérant confirme d'un bouton.",
+        {'name': {**_STR, 'description': 'nom du produit, ex: Converse All Star'}, 'price': _NUM,
+         'stock': {**_INT, 'description': 'quantité disponible'}, 'category': _STR, 'brand': _STR, 'model': _STR,
+         'color': _STR, 'sizes': {**_STR, 'description': 'tailles ou pointures séparées par des virgules'},
+         'description': _STR, 'compare_price': {**_NUM, 'description': 'ancien prix si promotion'}},
+        ['name', 'price'])),
     'my_deliveries': (('delivery_agent',), t_my_deliveries, _schema(
         'my_deliveries', 'Livraisons en cours du livreur, adresses, et nombre de livraisons disponibles.',
         {'include_available': _BOOL})),
@@ -491,8 +601,11 @@ ROLE_GUIDE = {
               "conseiller (taille, budget), ajouter au panier, puis l'inviter à valider sa commande. "
               "Tu peux aussi suivre ses commandes.",
     'store_manager': "C'est le gérant d'un commerce. Aide-le à gérer sa boutique : commandes à préparer, stock faible, "
-                     "prix, produits masqués, conseils de vente. Les modifications passent par update_product puis "
-                     "sa confirmation.",
+                     "prix, produits masqués, conseils de vente. Pour AJOUTER un produit à sa boutique, utilise "
+                     "create_product (search_products cherche seulement dans tout le marché, ce n'est pas un ajout). "
+                     "Pour faire avancer une commande (confirmer, préparer, prête) utilise set_order_status. "
+                     "Créations et modifications attendent sa confirmation par un bouton. Les photos s'ajoutent "
+                     "ensuite dans « Mes produits » (open_page store_products).",
     'delivery_agent': "C'est un livreur. Aide-le à organiser ses livraisons : adresses, contacts, ordre de passage, "
                       "livraisons disponibles.",
     'admin': "C'est l'administrateur de Gaboshop. Donne des chiffres précis, repère les problèmes (commerces non "
@@ -783,7 +896,58 @@ def _local_shop(ctx, message, text):
             "Que cherchez-vous ?")
 
 
+COLORS = ['noir', 'noire', 'blanc', 'blanche', 'rouge', 'bleu', 'bleue', 'vert', 'verte', 'jaune', 'gris', 'grise',
+          'rose', 'marron', 'beige', 'orange', 'violet', 'violette', 'dore', 'doree', 'argent']
+CREATE_RE = re.compile(r"\b(ajout\w*|cree\w*|creer|nouveau produit|mets? en vente|met en vente|enregistre\w*)\b")
+
+
+def _local_create_product(ctx, text):
+    """« ajoute 10 all star noires à 25000 F taille 38 à 44 » → proposition de création."""
+    price = None
+    m = re.search(r"(?:a|prix(?: de)?|pour|vendu(?:es?)? a)\s*(\d+(?:[ .]\d{3})*)\s*(?:f\b|fcfa|cfa|francs?)?", text) \
+        or re.search(r"(\d+(?:[ .]\d{3})*)\s*(?:f\b|fcfa|cfa|francs?)", text)
+    if m:
+        price = int(re.sub(r"[ .]", '', m.group(1)))
+        text_wo_price = text.replace(m.group(0), ' ')
+    else:
+        text_wo_price = text
+    sizes = None
+    m = re.search(r"(?:tailles?|pointures?)\s*(\d{1,2}\s*(?:a|-|au)\s*\d{1,2}|[a-z0-9 ,]+?)(?=$|\s(?:a|prix|couleur|de couleur)\b)", text_wo_price)
+    if m:
+        sizes = re.sub(r"\s*(?:a|-|au)\s*", '-', m.group(1).strip()) if re.search(r"\d\s*(a|-|au)\s*\d", m.group(1)) else m.group(1).strip()
+        text_wo_price = text_wo_price.replace(m.group(0), ' ')
+    stock = 1
+    m = re.search(r"\b(\d{1,4})\b", text_wo_price)
+    if m:
+        stock = int(m.group(1))
+        text_wo_price = text_wo_price.replace(m.group(0), ' ', 1)
+    color = next((c for c in COLORS if re.search(rf"\b{c}s?\b", text_wo_price)), None)
+    words = [w for w in re.findall(r"[a-z0-9']+", CREATE_RE.sub(' ', text_wo_price))
+             if w not in STOP_CREATE and not (color and w.rstrip('s') == color)]
+    name = ' '.join(words).strip()
+    if len(name) < 3:
+        return ("Je peux créer le produit pour vous. Dites-moi son nom, son prix et la quantité, par exemple : "
+                "« ajoute 10 All Star noires à 25 000 F, tailles 38 à 44 ».")
+    name = name.title()
+    if price is None:
+        return f"D'accord pour « {name} »{f' ({stock})' if stock > 1 else ''}. À quel prix le vendez-vous ? Répétez la demande avec le prix, par exemple « ajoute {stock} {name.lower()} à 25 000 F »."
+    result = t_create_product(ctx, name=name, price=price, stock=stock,
+                              color=(color.capitalize() if color else None), sizes=sizes)
+    if result.get('error'):
+        return result['error']
+    return f"Je prépare « {name} » : {stock} en stock à {_price(price)}. Appuyez sur « Confirmer » pour le mettre en vente."
+
+
+STOP_CREATE = {'je', 'veux', 'que', 'tu', 'vous', 'fasses', 'fassiez', 'fais', 'faites', 'l', 'le', 'la', 'les', 'un',
+               'une', 'des', 'de', 'du', 'd', 'au', 'aux', 'a', 'mon', 'ma', 'mes', 'magasin', 'boutique', 'stock',
+               'produit', 'produits', 'nouveau', 'nouvelle', 'nouveaux', 'en', 'vente', 'dans', 'pour', 'svp', 'stp',
+               'couleur', 'peux', 'pouvez', 'moi', 'me', 'merci', 'aussi', 'et', 'avec', 'pieces', 'piece', 'unites',
+               'paires', 'paire', 'exemplaires', 'catalogue'}
+
+
 def _local_store(ctx, text):
+    if CREATE_RE.search(text):
+        return _local_create_product(ctx, text)
     if not re.search(r"vente|chiffre|commande|stock|bilan|resume|boutique|magasin|produit|rupture", text):
         return None
     data = t_store_overview(ctx)
@@ -878,6 +1042,16 @@ def ai_assistant(request):
     }})
 
 
+_USED_TOKENS = {}  # une création confirmée ne peut pas être rejouée (double appui)
+
+
+def _cache_get(key):
+    try:
+        return cache.get(key)
+    except Exception:
+        return None
+
+
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def ai_assistant_confirm(request):
@@ -891,6 +1065,67 @@ def ai_assistant_confirm(request):
         return Response({'success': False, 'error': {'message': 'Action invalide.'}}, status=status.HTTP_400_BAD_REQUEST)
     if data.get('u') != request.user.id:
         return Response({'success': False, 'error': {'message': 'Action non autorisée.'}}, status=status.HTTP_403_FORBIDDEN)
+    if data.get('a') == 'order_status':
+        from orders.models import Order
+        from orders.serializers import OrderStatusUpdateSerializer
+        order = Order.objects.filter(id=data.get('o'), store__manager=request.user).first()
+        if not order:
+            return Response({'success': False, 'error': {'message': 'Commande introuvable.'}}, status=status.HTTP_404_NOT_FOUND)
+        serializer = OrderStatusUpdateSerializer(order, data={'status': data.get('st')}, partial=True)
+        if not serializer.is_valid():
+            return Response({'success': False, 'error': {'message': "Ce changement n'est plus possible (la commande a changé)."}},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if data.get('st') == 'ready':
+            from payments.direct_service import can_dispatch
+            if not can_dispatch(order):
+                return Response({'success': False, 'error': {'message': "Le paiement requis avant l'expédition n'est pas confirmé."}},
+                                status=status.HTTP_409_CONFLICT)
+        serializer.save()
+        order.refresh_from_db()
+        if order.status == 'ready':
+            try:
+                from api.v1.orders import auto_assign_delivery
+                auto_assign_delivery(order)
+            except Exception:
+                logger.exception('Assignation livreur après action IA')
+        return Response({'success': True, 'data': {
+            'message': f"C'est fait : commande {order.order_number} {ORDER_STATUS_FR.get(order.status, order.status)}.",
+            'path': '/store/orders',
+        }})
+    if data.get('a') == 'create_product':
+        from django.core.exceptions import PermissionDenied
+        from payments.subscription_check import SubscriptionChecker
+        from products.models import ProductCategory
+        from stores.models import Store
+        store = Store.objects.filter(id=data.get('s'), manager=request.user, is_active=True).first()
+        if not store:
+            return Response({'success': False, 'error': {'message': 'Commerce introuvable.'}}, status=status.HTTP_404_NOT_FOUND)
+        f = data.get('f') or {}
+        cat = ProductCategory.objects.filter(id=f.get('category')).first() if f.get('category') else None
+        try:
+            SubscriptionChecker.check_can_add_product(store)
+            SubscriptionChecker.check_can_add_non_food_product(store, cat)
+        except PermissionDenied as exc:
+            return Response({'success': False, 'error': {'message': str(exc)}}, status=status.HTTP_403_FORBIDDEN)
+        used_key = 'ai_confirm_used:' + hashlib.sha256(str(request.data.get('token')).encode()).hexdigest()
+        if _USED_TOKENS.get(used_key) or _cache_get(used_key):
+            return Response({'success': False, 'error': {'message': 'Ce produit a déjà été créé.'}},
+                            status=status.HTTP_400_BAD_REQUEST)
+        product = Product.objects.create(
+            store=store, name=f['name'], price=Decimal(f['price']), stock=int(f.get('stock') or 0),
+            category=cat, description=f.get('description', ''), attributes=f.get('attributes') or {},
+            compare_price=Decimal(f['compare_price']) if f.get('compare_price') else None,
+        )
+        _USED_TOKENS[used_key] = True
+        try:
+            cache.set(used_key, True, CONFIRM_MAX_AGE)
+        except Exception:
+            pass
+        return Response({'success': True, 'data': {
+            'message': f"C'est fait : « {product.name} » est en vente dans votre boutique. "
+                       "Ajoutez-lui une photo dans « Mes produits ».",
+            'path': '/store/products',
+        }})
     if data.get('a') == 'update_product':
         p = Product.objects.filter(id=data.get('p'), store__manager=request.user).first()
         if not p:

@@ -122,21 +122,22 @@ export const AIContextProvider = ({ children }) => {
       });
       const data = response.data?.data || {};
       const needsLogin = runActions(data.actions);
-      addBotMessage(data.message || "Je n'ai pas compris, pouvez-vous reformuler ?", {
+      const replyText = data.message || "Je n'ai pas compris, pouvez-vous reformuler ?";
+      addBotMessage(replyText, {
         products: Array.isArray(data.products) ? data.products : [],
         confirmations: Array.isArray(data.confirmations) ? data.confirmations : [],
         loginPrompt: needsLogin,
         cartChanged: (data.actions || []).some((a) => a.type === 'add_to_cart'),
       });
+      return replyText;
     } catch (error) {
       reportError(error);
       const tooMany = error.response?.status === 429;
-      addBotMessage(
-        tooMany
-          ? 'Beaucoup de messages en peu de temps. Patientez une minute puis réessayez.'
-          : "Je n'arrive pas à joindre le serveur. Vérifiez votre connexion et réessayez.",
-        { isError: true },
-      );
+      const errorText = tooMany
+        ? 'Beaucoup de messages en peu de temps. Patientez une minute puis réessayez.'
+        : "Je n'arrive pas à joindre le serveur. Vérifiez votre connexion et réessayez.";
+      addBotMessage(errorText, { isError: true });
+      return errorText;
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +147,8 @@ export const AIContextProvider = ({ children }) => {
   const confirmAction = useCallback(async (token) => {
     try {
       const response = await api.post('/ai/assistant/confirm/', { token });
-      addBotMessage(response.data?.data?.message || "C'est fait.");
+      const done = response.data?.data || {};
+      addBotMessage(done.message || "C'est fait.", done.path ? { link: { path: done.path, label: 'Ouvrir' } } : {});
       return true;
     } catch (error) {
       addBotMessage(error.response?.data?.error?.message || "La modification n'a pas pu être faite.", { isError: true });

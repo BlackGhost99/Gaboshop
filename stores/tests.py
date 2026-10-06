@@ -400,3 +400,45 @@ class AssistantTests(TestCase):
 			self.ask('et un autre', user=self.client_user)
 		self.assertEqual(used[0], 'openai/gpt-oss-20b')
 		assistant._MODEL_STATE.update({'working': None, 'failed': {}})
+
+	def test_store_manager_creates_product_locally_with_confirmation(self):
+		from products.models import Product
+		from payments.models import SubscriptionPlan
+		SubscriptionPlan.objects.get_or_create(plan_type='free', defaults={'name': 'Free', 'slug': 'free', 'price': 0})
+		data = self.ask("je veux que tu fasses l'ajout de 10 all stars couleur noir", user=self.manager)
+		self.assertIn('prix', data['message'])
+		self.assertEqual(data['confirmations'], [])
+		data = self.ask('ajoute 10 all stars noires à 25 000 F tailles 38 à 44', user=self.manager)
+		self.assertEqual(len(data['confirmations']), 1, data)
+		label = data['confirmations'][0]['label']
+		self.assertIn('All Stars', label)
+		self.assertIn('25 000 FCFA', label)
+		token = data['confirmations'][0]['token']
+		res = self.client.post('/api/v1/ai/assistant/confirm/', {'token': token}, format='json')
+		self.assertEqual(res.status_code, 200, res.content)
+		p = Product.objects.get(name='All Stars')
+		self.assertEqual((p.stock, int(p.price), p.store_id), (10, 25000, self.store.id))
+		self.assertEqual(p.attributes.get('color'), 'Noire')
+		self.assertEqual(p.attributes.get('sizes'), '38-44')
+		# Un double appui ne crée pas un deuxième produit
+		again = self.client.post('/api/v1/ai/assistant/confirm/', {'token': token}, format='json')
+		self.assertEqual(again.status_code, 400)
+		self.assertEqual(Product.objects.filter(name='All Stars').count(), 1)
+
+	def test_store_manager_moves_order_forward(self):
+		from orders.models import Order
+		from api.v1.ai.assistant import Ctx, t_set_order_status
+		order = Order.objects.create(client=self.client_user, store=self.store, status='paid',
+			delivery_address='Rue 2', delivery_phone='077000099', delivery_zone='Louis')
+		req = type('R', (), {'user': self.manager, 'build_absolute_uri': lambda self, x: x})()
+		ctx = Ctx(req, 'store_manager', [])
+		self.assertIn('error', t_set_order_status(ctx, order.order_number, 'ready'))
+		order.refresh_from_db()
+		res0 = t_set_order_status(ctx, order.order_number, 'preparing')
+		self.assertTrue(ctx.confirmations, (order.status, res0))
+		token = ctx.confirmations[0]['token']
+		self.client.force_authenticate(self.manager)
+		res = self.client.post('/api/v1/ai/assistant/confirm/', {'token': token}, format='json')
+		self.assertEqual(res.status_code, 200, res.content)
+		order.refresh_from_db()
+		self.assertEqual(order.status, 'preparing')
