@@ -1,7 +1,8 @@
 import io
+import tempfile
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from PIL import Image
 from rest_framework.test import APIClient
 
@@ -15,6 +16,7 @@ def _image(name):
 	return SimpleUploadedFile(name, buf.getvalue(), content_type='image/png')
 
 
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class StoreProfileUpdateTests(TestCase):
 	"""Le gérant peut modifier tout le profil du magasin, quel que soit son forfait."""
 
@@ -52,6 +54,10 @@ class StoreProfileUpdateTests(TestCase):
 		self.store.refresh_from_db()
 		self.assertEqual(self.store.description, 'Nouvelle description')
 		self.assertTrue(self.store.banner_image)
+		# L'image envoyée est bien servie par l'API
+		from urllib.parse import urlparse
+		served = self.client.get(urlparse(self.store.logo.url).path)
+		self.assertEqual(served.status_code, 200)
 
 
 class AdminProductCategoryTests(TestCase):

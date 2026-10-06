@@ -8,7 +8,6 @@ in development (when `DEBUG` is True).
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.conf.urls.static import static
 from django.http import HttpResponse
 from django.views.generic.base import RedirectView
 
@@ -25,6 +24,9 @@ urlpatterns = [
     path('api/v1/delivery/', include('delivery.urls')),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Fichiers envoyés (logos, bannières, photos) servis par l'API quand ils sont stockés
+# sur son disque. Avec Supabase Storage, les images ont leur propre adresse publique.
+if settings.SERVE_MEDIA:
+    from django.urls import re_path
+    from django.views.static import serve
+    urlpatterns += [re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT})]

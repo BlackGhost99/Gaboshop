@@ -16,3 +16,5 @@ anthropic>=0.34.0
 openai>=1.0.0
 gunicorn>=21.2
 whitenoise>=6.6
+django-storages[s3]>=1.14
+boto3>=1.34

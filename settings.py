@@ -335,8 +335,49 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
 SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
 
 # === FILE UPLOADS ===
-MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Le site web et l'app Android sont sur d'autres adresses que l'API : une image
+# doit avoir une adresse complète. Render fournit RENDER_EXTERNAL_URL tout seul.
+PUBLIC_API_URL = (env("PUBLIC_API_URL", "") or env("RENDER_EXTERNAL_URL", "")).rstrip('/')
+MEDIA_URL = f"{PUBLIC_API_URL}/media/" if PUBLIC_API_URL else '/media/'
+# Sans stockage externe, l'API sert elle-même les fichiers envoyés (perdus à chaque
+# redéploiement sur Render gratuit : configurer Supabase Storage ci-dessous).
+SERVE_MEDIA = env_bool("DJANGO_SERVE_MEDIA", True)
+
+# Supabase Storage (compatible S3) : les images survivent aux redéploiements.
+# Variables à saisir dans Render, jamais dans le code :
+#   SUPABASE_STORAGE_ENDPOINT   https://<projet>.supabase.co/storage/v1/s3
+#   SUPABASE_STORAGE_BUCKET     nom d'un bucket public, ex. media
+#   SUPABASE_STORAGE_ACCESS_KEY_ID / SUPABASE_STORAGE_SECRET_ACCESS_KEY
+#   SUPABASE_STORAGE_REGION     région affichée dans Supabase (ex. eu-west-3)
+SUPABASE_STORAGE_ENDPOINT = env("SUPABASE_STORAGE_ENDPOINT", "").rstrip('/')
+SUPABASE_STORAGE_BUCKET = env("SUPABASE_STORAGE_BUCKET", "")
+USE_SUPABASE_STORAGE = bool(
+    SUPABASE_STORAGE_ENDPOINT and SUPABASE_STORAGE_BUCKET
+    and env("SUPABASE_STORAGE_ACCESS_KEY_ID", "") and env("SUPABASE_STORAGE_SECRET_ACCESS_KEY", "")
+)
+if USE_SUPABASE_STORAGE:
+    _public_base = SUPABASE_STORAGE_ENDPOINT.replace('/storage/v1/s3', '/storage/v1/object/public')
+    STORAGES = {
+        **globals().get('STORAGES', {"staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}}),
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                "endpoint_url": SUPABASE_STORAGE_ENDPOINT,
+                "bucket_name": SUPABASE_STORAGE_BUCKET,
+                "access_key": env("SUPABASE_STORAGE_ACCESS_KEY_ID", ""),
+                "secret_key": env("SUPABASE_STORAGE_SECRET_ACCESS_KEY", ""),
+                "region_name": env("SUPABASE_STORAGE_REGION", "us-east-1"),
+                "signature_version": "s3v4",
+                "addressing_style": "path",
+                "querystring_auth": False,
+                "file_overwrite": False,
+                "custom_domain": f"{_public_base.split('://', 1)[1]}/{SUPABASE_STORAGE_BUCKET}",
+            },
+        },
+    }
+    MEDIA_URL = f"{_public_base}/{SUPABASE_STORAGE_BUCKET}/"
+    SERVE_MEDIA = False
 
 # Maximum file size for uploads (10MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760
