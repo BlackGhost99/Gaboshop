@@ -9,6 +9,9 @@ import B2BProcurementEmbedded from '../../components/b2b/B2BProcurementEmbedded'
 import { getStoreDashboard } from '../../services/dashboardService';
 import { updateOrderStatus } from '../../services/orderService';
 import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils/helpers';
+import PendingPayments from '../../components/payments/PendingPayments';
+import StorePaymentSettings from '../../components/payments/StorePaymentSettings';
+import OrderPaymentModal from '../../components/payments/OrderPaymentModal';
 
 // Axe des ventes en FCFA : entiers lisibles (750, 15 k, 1,2 M) au lieu de 0.004k
 const compactFcfa = new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 });
@@ -35,6 +38,7 @@ const StoreDashboard = () => {
   const [actionLoading, setActionLoading] = useState({});
   const [activeTab, setActiveTab] = useState('overview'); // overview, supply
   const [showAllB2BOrders, setShowAllB2BOrders] = useState(false); // Pour afficher toutes les commandes B2B
+  const [paymentOrder, setPaymentOrder] = useState(null); // { id, label } : fenêtre de paiement direct
 
   const fetchDashboard = async () => {
     try {
@@ -316,6 +320,8 @@ const StoreDashboard = () => {
 
         {activeTab === 'overview' && (
           <>
+            <PendingPayments />
+            <StorePaymentSettings />
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -453,6 +459,12 @@ const StoreDashboard = () => {
                             </button>
                           )}
                         </div>
+                        <button
+                          onClick={() => setPaymentOrder({ id: order.id, label: `#${order.id}` })}
+                          className="mt-2 w-full rounded-md border border-indigo-200 py-2 text-sm font-medium text-indigo-700"
+                        >
+                          💳 Paiement
+                        </button>
                       </div>
                     );
                   })}
@@ -505,8 +517,8 @@ const StoreDashboard = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                              <button className="text-indigo-400 cursor-not-allowed font-medium" disabled>
-                                Voir
+                              <button className="text-indigo-600 hover:text-indigo-900 font-medium" onClick={() => setPaymentOrder({ id: order.id, label: `#${order.id}` })}>
+                                💳 Paiement
                               </button>
                               {action && (
                                 <button
@@ -593,6 +605,9 @@ const StoreDashboard = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                              <button className="font-bold px-3 py-1 rounded border-2 border-indigo-300 text-indigo-700" onClick={() => setPaymentOrder({ id: order.id, label: `#${order.id} (B2B)` })}>
+                                💳 Paiement
+                              </button>
                               {action && (
                                 <button
                                   onClick={() => handleAdvanceStatus(order)}
@@ -682,6 +697,12 @@ const StoreDashboard = () => {
                               <div className="flex items-center gap-2">
                                 <div className={`w-2 h-2 rounded-full ${isDelivered ? 'bg-green-500' : isInProgress ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`}></div>
                                 <span className="text-sm font-bold text-indigo-700">#{order.order_number || order.id}</span>
+                                <button
+                                  onClick={() => setPaymentOrder({ id: order.id, label: `#${order.order_number || order.id}` })}
+                                  className="rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white"
+                                >
+                                  💳 Payer
+                                </button>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -783,7 +804,13 @@ const StoreDashboard = () => {
             />
           </div>
         )}
-      </StoreLayout>
+      <OrderPaymentModal
+        orderId={paymentOrder?.id}
+        orderLabel={paymentOrder?.label}
+        onClose={() => setPaymentOrder(null)}
+        onChange={fetchDashboard}
+      />
+    </StoreLayout>
       {toast && (
         <div className="fixed bottom-5 right-5 z-50">
           <div

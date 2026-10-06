@@ -498,17 +498,17 @@ class ProviderCallbackAPIView(APIView):
 
         logger.info(f"📨 Callback reçu: {provider} | Payload: {payload}")
 
-        # Vérifier la signature si disponible
-        if provider == "cinetpay":
-            header_sig = request.headers.get("X-Signature") or request.headers.get("x-signature")
-            if getattr(settings, "CINETPAY_SECRET", None) and header_sig:
-                ok = verify_hmac_signature(settings.CINETPAY_SECRET, request.body, header_sig)
-                if not ok:
-                    logger.warning(f"❌ Signature invalide pour {provider}")
-                    return Response(
-                        {"detail": "Invalid signature"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+        # Signature obligatoire pour tous les fournisseurs : sans elle, n'importe qui pourrait
+        # déclarer un paiement réussi. Sans secret configuré, l'endpoint refuse tout.
+        secret = getattr(settings, "CINETPAY_SECRET", "") if provider == "cinetpay" else getattr(settings, "PAYMENT_WEBHOOK_SECRET", "")
+        header_sig = (
+            request.headers.get("X-Webhook-Signature")
+            or request.headers.get("X-Signature")
+            or request.headers.get("X-SingPay-Signature")
+        )
+        if not secret or not header_sig or not verify_hmac_signature(request.body, header_sig, secret):
+            logger.warning(f"❌ Callback {provider} refusé : signature absente ou invalide")
+            return Response({"detail": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Extraire la référence
         reference = (
@@ -681,7 +681,7 @@ class CheckPaymentAPIView(APIView):
     Vérifier le statut d'un paiement
     POST /api/v1/payments/check/
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAdminUser]
 
     def post(self, request):
         """Vérifier une transaction"""

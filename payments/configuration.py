@@ -77,6 +77,9 @@ def validate_store_preferences(value, global_policy=None):
     instructions = result.get('instructions', {})
     if not isinstance(instructions, dict):
         raise ValidationError({'instructions': 'Objet attendu.'})
+    for method, text in instructions.items():
+        if method not in METHODS or not isinstance(text, str) or len(text) > 200:
+            raise ValidationError({'instructions': 'Indiquez un texte court (200 caractères maximum) par moyen de paiement.'})
     return result
 
 
@@ -101,8 +104,8 @@ def get_payment_policy(store=None):
 def available_payment_options(store, delivery_requested=True):
     policy = get_payment_policy(store)
     labels = {
-        'direct_split': 'Paiement séparé', 'store_collects_all': 'Tout au commerce',
-        'courier_cash': 'Espèces à la livraison', 'platform_online': 'Paiement en ligne Gaboshop (Mobile Money)',
+        'direct_split': 'Payer le commerce directement', 'store_collects_all': 'Tout payer au commerce',
+        'courier_cash': 'Espèces au livreur à la livraison', 'platform_online': 'Paiement en ligne Gaboshop (Mobile Money)',
     }
     options = []
     ordered_flows = [policy['default_flow']] + [flow for flow in policy['enabled_flows'] if flow != policy['default_flow']]

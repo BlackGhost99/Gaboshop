@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import StatCard from '../../components/StatCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -7,6 +8,7 @@ import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils
 import { createOrder } from '../../services/orderService';
 import { getPaymentOptions, initPayment } from '../../services/paymentService';
 import { getProductDetails } from '../../services/productService';
+import { METHOD_LABELS } from '../../components/payments/paymentLabels';
 
 const CART_KEY = 'gaboshop_cart';
 const envBase = import.meta.env.VITE_API_URL;
@@ -49,6 +51,7 @@ const isStoreClosedMessage = (message) => {
 };
 
 const ClientDashboard = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [error, setError] = useState(null);
@@ -455,6 +458,11 @@ const ClientDashboard = () => {
         }
 
         setToast({ type: toastType, message: toastMessage });
+        // Paiement direct au commerce par Mobile Money : on montre tout de suite le code marchand
+        // et le formulaire pour déclarer l'ID de transaction.
+        if (orderId && payment_flow !== 'platform_online' && payment_method !== 'cash') {
+          navigate(`/client/orders?pay=${orderId}`);
+        }
       } else {
         const details = res.error?.details;
         const detailMsg = getReadableApiErrorMessage(details, res.error?.message);
@@ -797,12 +805,12 @@ const ClientDashboard = () => {
                       {!paymentOptions[storeName]?.length && <option value="|">Aucune option disponible</option>}
                       {(paymentOptions[storeName] || []).map((option) => (
                         <option key={`${option.flow}-${option.method}`} value={`${option.flow}|${option.method}`}>
-                          {option.label} — {option.method.replace('_', ' ')}
+                          {option.label} — {METHOD_LABELS[option.method] || option.method}
                         </option>
                       ))}
                     </select>
                     <div className="md:col-span-2 text-xs text-gray-500 -mt-1">
-                      Le paiement en ligne déclenche un prompt opérateur. Les autres circuits sont suivis par reçus confirmés.
+                      Mobile Money : vous payez le commerce à son code marchand, puis vous déclarez l'ID de transaction reçu par SMS. Le commerce confirme avant de préparer.
                     </div>
                     <textarea
                       className="md:col-span-2 w-full border border-gray-200 rounded-md px-3 py-2"

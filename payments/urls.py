@@ -1,5 +1,4 @@
 from django.urls import include, path
-from . import webhooks
 from .views import (
     CreatePaymentAPIView,
     ProviderCallbackAPIView,
@@ -12,9 +11,8 @@ from .views import (
 
 urlpatterns = [
     path('', include('payments.direct_urls')),
-    # Anciens webhooks (conservés pour compatibilité)
-    path('webhooks/airtel/', webhooks.airtel_money_webhook, name='webhook_airtel'),
-    path('webhooks/moov/', webhooks.moov_money_webhook, name='webhook_moov'),
+    # Anciens webhooks Airtel/Moov retirés : sans signature, n'importe qui pouvait marquer un paiement comme payé.
+    # Le webhook signé est /api/v1/payments/webhook/ (PaymentWebhookView).
     
     # ============================================================================
     # NOUVEAUX ENDPOINTS CINETPAY / AIRTEL / MOOV

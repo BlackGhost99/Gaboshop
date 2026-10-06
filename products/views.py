@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
 
 from .models import Product, ProductVariant, ProductImage
@@ -37,6 +38,11 @@ class ProductViewSet(viewsets.ModelViewSet):
             qs = qs.filter(category_id=category_id)
         if q:
             qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
+        # Modifier, supprimer ou ajouter une photo : seulement les produits de ses propres magasins.
+        if self.action not in ('list', 'retrieve'):
+            user = self.request.user
+            if not (user.is_superuser or getattr(user, 'user_type', '') == 'admin'):
+                qs = qs.filter(store__manager=user)
         return qs
 
     def perform_create(self, serializer):
@@ -57,7 +63,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             store = request.user.managed_stores.first()
 
         if not store:
-            raise Exception('Utilisateur non associé à un magasin ou non autorisé à créer des produits')
+            raise PermissionDenied('Utilisateur non associé à un magasin ou non autorisé à créer des produits')
 
         serializer.save(store=store)
 

@@ -45,17 +45,25 @@ class StoreDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'is_verified']
     
+    def _can_see_manager_contact(self, obj):
+        # Le téléphone du magasin reste public ; les coordonnées personnelles du gérant, non.
+        user = getattr(self.context.get('request'), 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        return user.id == obj.manager_id or user.is_superuser or getattr(user, 'user_type', '') == 'admin'
+
     def get_manager_name(self, obj):
         if obj.manager.first_name and obj.manager.last_name:
             return f"{obj.manager.first_name} {obj.manager.last_name}"
-        return obj.manager.phone
+        return obj.manager.phone if self._can_see_manager_contact(obj) else ''
 
     def get_manager_details(self, obj):
+        private = self._can_see_manager_contact(obj)
         return {
             'first_name': obj.manager.first_name,
             'last_name': obj.manager.last_name,
-            'email': obj.manager.email,
-            'phone': obj.manager.phone
+            'email': obj.manager.email if private else '',
+            'phone': obj.manager.phone if private else '',
         }
 
 class StoreCreateSerializer(serializers.ModelSerializer):

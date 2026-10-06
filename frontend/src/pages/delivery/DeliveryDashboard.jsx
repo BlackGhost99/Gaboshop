@@ -12,6 +12,7 @@ import { startDelivery, acceptDelivery, rejectDelivery, getAvailableDeliveries, 
 import { formatCurrency, getDeliveryStatusBadge } from '../../utils/helpers';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from '../../services/notificationService';
 import authStorage from '../../utils/authStorage';
+import PendingPayments from '../../components/payments/PendingPayments';
 
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -438,6 +439,7 @@ const DeliveryDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PendingPayments title="Paiements à confirmer" />
         {/* En-tête avec disponibilité */}
         <div className="mb-8 flex flex-wrap justify-between items-center gap-4">
           <div>

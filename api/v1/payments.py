@@ -431,8 +431,10 @@ class PaymentDetailView(APIView):
                     order_id=order_id,
                     order__store__manager=request.user
                 )
-            else:
+            elif request.user.is_superuser or getattr(request.user, 'user_type', '') == 'admin':
                 payment = Payment.objects.get(order_id=order_id)
+            else:
+                payment = Payment.objects.get(order_id=order_id, order__delivery__delivery_agent=request.user)
             
             serializer = PaymentSerializer(payment)
             

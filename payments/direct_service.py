@@ -87,7 +87,10 @@ def can_dispatch(order):
     if not hasattr(order, 'payment_arrangement'):
         return True
     arrangement = order.payment_arrangement
-    if arrangement.policy_snapshot.get('payment_timing') != 'before_dispatch':
+    # Mobile Money / virement payé directement au commerce : rien ne part avant la confirmation du paiement.
+    # Espèces : payé à la livraison, sauf si la politique exige le paiement avant l'expédition.
+    prepaid_method = arrangement.flow != 'platform_online' and arrangement.method != 'cash'
+    if not prepaid_method and arrangement.policy_snapshot.get('payment_timing') != 'before_dispatch':
         return True
     required = arrangement.obligations.filter(kind='products').first()
     return not required or _refresh_status(required) == 'paid'
@@ -106,6 +109,48 @@ def sync_on_order_status(order):
         arrangement.obligations.filter(kind='commission', status='not_due').update(status='cancelled')
 
 
+def is_admin_user(user):
+    return bool(user and (user.is_superuser or getattr(user, 'user_type', '') == 'admin'))
+
+
+def role_user_id(obligation, role):
+    """Compte qui joue un rôle (client, commerce, livreur) dans la commande de l'obligation."""
+    arrangement = obligation.arrangement
+    delivery = getattr(arrangement.order, 'delivery', None)
+    return {
+        'client': arrangement.order.client_id,
+        'store': arrangement.store.manager_id,
+        'courier': getattr(delivery, 'delivery_agent_id', None),
+    }.get(role)
+
+
+def can_declare(user, obligation):
+    # Seuls le payeur et le bénéficiaire déclarent un paiement (jamais un tiers de la commande).
+    if is_admin_user(user):
+        return True
+    return user.id in (role_user_id(obligation, obligation.payer), role_user_id(obligation, obligation.payee))
+
+
+def can_review(user, obligation):
+    # Seul celui qui reçoit l'argent confirme ou refuse ; ce qui est dû à Gaboshop, seul l'admin.
+    if is_admin_user(user):
+        return True
+    if obligation.payee == 'platform':
+        return False
+    payee_id = role_user_id(obligation, obligation.payee)
+    return payee_id is not None and user.id == payee_id
+
+
+def receipt_payload(receipt):
+    return {
+        'id': receipt.id, 'receipt_number': receipt.receipt_number, 'amount': str(receipt.amount),
+        'method': receipt.method, 'reference': receipt.reference, 'comment': receipt.comment,
+        'status': receipt.status, 'rejection_reason': receipt.rejection_reason,
+        'declared_by_payee': receipt.actor_id == role_user_id(receipt.obligation, receipt.obligation.payee),
+        'created_at': receipt.created_at,
+    }
+
+
 def payment_summary(value, user=None):
     arrangement = value if isinstance(value, PaymentArrangement) else getattr(value, 'payment_arrangement', None)
     if not arrangement:
@@ -113,18 +158,36 @@ def payment_summary(value, user=None):
     obligations = []
     for obligation in arrangement.obligations.all():
         _refresh_status(obligation)
-        obligations.append({'id': obligation.id, 'kind': obligation.kind, 'payer': obligation.payer, 'payee': obligation.payee, 'amount': str(obligation.amount), 'received_amount': str(obligation.received_amount), 'remaining_amount': str(obligation.remaining_amount), 'status': obligation.status, 'due_at': obligation.due_at})
-    return {'id': arrangement.id, 'flow': arrangement.flow, 'method': arrangement.method, 'products_amount': str(arrangement.products_amount), 'delivery_amount': str(arrangement.delivery_amount), 'commission_rate': str(arrangement.commission_rate), 'commission_amount': str(arrangement.commission_amount), 'obligations': obligations}
+        item = {'id': obligation.id, 'kind': obligation.kind, 'payer': obligation.payer, 'payee': obligation.payee, 'amount': str(obligation.amount), 'received_amount': str(obligation.received_amount), 'remaining_amount': str(obligation.remaining_amount), 'status': obligation.status, 'due_at': obligation.due_at}
+        if user is not None:
+            item['can_declare'] = can_declare(user, obligation)
+            item['can_review'] = can_review(user, obligation)
+            item['i_am_payer'] = user.id == role_user_id(obligation, obligation.payer)
+            item['i_am_payee'] = user.id == role_user_id(obligation, obligation.payee)
+            item['receipts'] = [receipt_payload(r) for r in obligation.receipts.all()]
+        obligations.append(item)
+    order = arrangement.order
+    live = ((arrangement.store.payment_preferences or {}).get('instructions') or {}).get(arrangement.method, '')
+    instructions = live or (arrangement.policy_snapshot.get('instructions') or {}).get(arrangement.method, '')
+    return {
+        'id': arrangement.id, 'flow': arrangement.flow, 'method': arrangement.method,
+        'order_id': order.id, 'order_number': order.order_number, 'is_b2b': getattr(order, 'is_b2b', False),
+        'store_name': arrangement.store.name, 'store_phone': arrangement.store.phone,
+        'instructions': instructions,
+        'products_amount': str(arrangement.products_amount), 'delivery_amount': str(arrangement.delivery_amount), 'commission_rate': str(arrangement.commission_rate), 'commission_amount': str(arrangement.commission_amount), 'obligations': obligations,
+    }
 
 
 @transaction.atomic
-def confirm_receipt(receipt, user):
+def confirm_receipt(receipt, user, payee_acknowledgement=False):
+    # payee_acknowledgement : le bénéficiaire déclare lui-même avoir reçu l'argent (contre son intérêt),
+    # ce qui vaut confirmation.
     receipt = PaymentReceipt.objects.select_for_update().select_related('obligation').get(pk=receipt.pk)
     if receipt.status == 'confirmed':
         return receipt
     if receipt.status == 'rejected':
         raise ValidationError('Un reçu refusé ne peut pas être confirmé.')
-    if receipt.actor_id == user.id:
+    if receipt.actor_id == user.id and not payee_acknowledgement:
         raise ValidationError('Le déclarant ne peut pas confirmer son propre mouvement.')
     if receipt.obligation.received_amount + receipt.amount > receipt.obligation.amount:
         raise ValidationError('Le montant confirmé dépasserait le solde dû.')

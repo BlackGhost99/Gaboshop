@@ -181,7 +181,8 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_payment_arrangement(self, obj):
         from payments.direct_service import payment_summary
-        return payment_summary(obj, self.context.get('request'))
+        user = getattr(self.context.get('request'), 'user', None)
+        return payment_summary(obj, user if getattr(user, 'is_authenticated', False) else None)
 
 class OrderCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de commande"""
@@ -221,6 +222,8 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         store = attrs['store']
         items = attrs['items']
+        if any(item['product'].store_id != store.id for item in items):
+            raise serializers.ValidationError({'items': _('Tous les produits doivent venir du magasin de la commande.')})
         from payments.configuration import available_payment_options
         _, options = available_payment_options(store, attrs.get('delivery_requested', True))
         if not any(option['flow'] == attrs.get('payment_flow') and option['method'] == attrs.get('payment_method') for option in options):
@@ -329,6 +332,12 @@ class OrderStatusUpdateSerializer(serializers.ModelSerializer):
         }
         
         current_status = self.instance.status
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        is_admin = bool(user and (user.is_superuser or getattr(user, 'user_type', '') == 'admin'))
+        if value == 'paid' and not is_admin:
+            # « Payée » vient d'un paiement confirmé, jamais d'un simple changement de statut.
+            raise serializers.ValidationError(_('Le statut « payée » est fixé par la confirmation du paiement.'))
         if value not in valid_transitions.get(current_status, []):
             raise serializers.ValidationError(
                 _(f'Transition invalide: {current_status} ? {value}')

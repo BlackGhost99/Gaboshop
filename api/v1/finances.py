@@ -216,11 +216,12 @@ class IsStaffOrStoreManager(rf_permissions.BasePermission):
 
 	def has_permission(self, request, view):
 		user = request.user
-		return bool(
-			user
-			and user.is_authenticated
-			and (user.is_staff or user.user_type == 'admin' or user.user_type == 'store_manager')
-		)
+		if not (user and user.is_authenticated):
+			return False
+		if user.is_staff or user.is_superuser or user.user_type == 'admin':
+			return True
+		# Un commerce peut consulter les taux, jamais les modifier.
+		return user.user_type == 'store_manager' and request.method in rf_permissions.SAFE_METHODS
 
 
 class CategoryCommissionListCreateView(generics.ListCreateAPIView):
@@ -263,6 +264,14 @@ class CategoryCommissionDetailView(generics.RetrieveUpdateAPIView):
 	queryset = CategoryCommission.objects.select_related('store_category').all()
 	serializer_class = CategoryCommissionSerializer
 	permission_classes = [IsStaffOrStoreManager]
+
+	def get_queryset(self):
+		user = self.request.user
+		qs = super().get_queryset()
+		if user.is_staff or user.is_superuser or user.user_type == 'admin':
+			return qs
+		store = user.managed_stores.first() if hasattr(user, 'managed_stores') else None
+		return qs.filter(store_category=store.category) if store and store.category_id else qs.none()
 
 	def perform_update(self, serializer):
 		# capture old value

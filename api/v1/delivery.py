@@ -816,10 +816,15 @@ class DeliveryProofUploadView(APIView):
 			
 			# Vérifier le PIN si fourni
 			if pin_code:
+				from delivery import pin_guard
+				if pin_guard.is_locked(delivery):
+					return Response({'success': False, 'error': {'code': 'pin_locked', 'message': pin_guard.LOCKED_MESSAGE}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 				if pin_code.strip() == delivery.delivery_code.strip():
+					pin_guard.reset(delivery)
 					delivery.code_verified = True
 					proof_data['pin_verified'] = True
 				else:
+					pin_guard.record_failure(delivery)
 					return Response({
 						'success': False,
 						'error': {
@@ -953,8 +958,12 @@ class DeliveryVerifyPINView(APIView):
 					'error': 'Code PIN requis'
 				}, status=status.HTTP_400_BAD_REQUEST)
 			
-			# Vérifier le PIN
+			# Vérifier le PIN (essais limités)
+			from delivery import pin_guard
+			if pin_guard.is_locked(delivery):
+				return Response({'success': False, 'error': pin_guard.LOCKED_MESSAGE}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 			if pin_code == delivery.delivery_code.strip():
+				pin_guard.reset(delivery)
 				delivery.code_verified = True
 				delivery.save()
 				
@@ -993,6 +1002,7 @@ class DeliveryVerifyPINView(APIView):
 					}
 				})
 			else:
+				pin_guard.record_failure(delivery)
 				# Log tentative échouée
 				AuditLog.log_action(
 					action_type='delivery_pin_failed',

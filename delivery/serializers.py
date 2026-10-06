@@ -27,12 +27,19 @@ class VehicleTypeSerializer(serializers.ModelSerializer):
 class DeliverySerializer(serializers.ModelSerializer):
     """Serializer pour les livraisons"""
     order_number = serializers.CharField(source='order.order_number', read_only=True)
-    client_phone = serializers.CharField(source='order.client.phone', read_only=True)
+    client_phone = serializers.SerializerMethodField()
     store_name = serializers.CharField(source='order.store.name', read_only=True)
     store_address = serializers.CharField(source='pickup_address', read_only=True)
     delivery_agent_phone = serializers.CharField(source='delivery_agent.phone', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     tracking_history = DeliveryTrackingSerializer(many=True, read_only=True)
+
+    def get_client_phone(self, obj):
+        # Un livreur ne voit le téléphone du client qu'une fois la course à lui.
+        user = getattr(self.context.get('request'), 'user', None)
+        if user is not None and getattr(user, 'user_type', '') == 'delivery_agent' and obj.delivery_agent_id != user.id:
+            return ''
+        return obj.order.client.phone
     vehicle_type_detail = VehicleTypeSerializer(source='vehicle_type', read_only=True)
     selected_vehicle_type_detail = VehicleTypeSerializer(source='selected_vehicle_type', read_only=True)
     minimum_required_vehicle_type_detail = VehicleTypeSerializer(source='minimum_required_vehicle_type', read_only=True)

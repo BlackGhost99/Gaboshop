@@ -11,6 +11,7 @@ from users.serializers import (
 	UserUpdateSerializer
 )
 from users.models import User
+from users.throttles import AuthIPThrottle, LoginPhoneThrottle
 from core.models import AuditLog
 from users.models import DeliveryAgentApiKey
 from rest_framework import permissions
@@ -20,6 +21,7 @@ from rest_framework import status
 
 class RegisterView(APIView):
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [AuthIPThrottle]
 
 	def post(self, request):
 		serializer = RegisterSerializer(data=request.data)
@@ -77,6 +79,7 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [AuthIPThrottle, LoginPhoneThrottle]
     
 	def post(self, request):
 		serializer = LoginSerializer(data=request.data, context={'request': request})
@@ -175,6 +178,7 @@ class DeleteAccountView(APIView):
 	Le compte est désactivé et anonymisé : les commandes restent pour la comptabilité,
 	sans nom, téléphone ni e-mail rattachés."""
 	permission_classes = [permissions.IsAuthenticated]
+	throttle_classes = [AuthIPThrottle]
 	DONE_ORDER = ('delivered', 'cancelled', 'refunded')
 	DONE_DELIVERY = ('delivered', 'failed', 'cancelled')
 
@@ -229,7 +233,14 @@ class RefreshTokenView(APIView):
 	permission_classes = [permissions.AllowAny]
     
 	def post(self, request):
-		refresh_token = request.data.get('refresh')
+		from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+		from rest_framework_simplejwt.exceptions import TokenError
+		serializer = TokenRefreshSerializer(data={'refresh': request.data.get('refresh') or ''})
+		try:
+			serializer.is_valid(raise_exception=True)
+		except (TokenError, Exception):
+			return Response({'success': False, 'error': {'code': 401, 'message': 'Session expirée, reconnectez-vous.'}}, status=status.HTTP_401_UNAUTHORIZED)
+		return Response({'success': True, 'data': serializer.validated_data})
 
 
 class MyApiKeyView(APIView):

@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
 from django.db.models import Sum
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from stores.models import Store
 from .configuration import available_payment_options, get_payment_policy, validate_store_preferences
 from .direct_models import PaymentArrangement, PaymentObligation, PaymentReceipt, CommissionSettlement
-from .direct_service import payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure
+from .direct_service import can_declare, can_review, receipt_payload, role_user_id, payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure
 
 
 def _is_admin(user):
@@ -19,20 +20,15 @@ def _is_admin(user):
 
 
 def _can_access_arrangement(user, arrangement):
-    return _is_admin(user) or arrangement.order.client_id == user.id or arrangement.store.manager_id == user.id or getattr(arrangement.order.delivery, 'delivery_agent_id', None) == user.id
+    return _is_admin(user) or arrangement.order.client_id == user.id or arrangement.store.manager_id == user.id or getattr(getattr(arrangement.order, 'delivery', None), 'delivery_agent_id', None) == user.id
+
+
+def _can_declare_obligation(user, obligation):
+    return can_declare(user, obligation)
 
 
 def _can_review_obligation(user, obligation):
-    if _is_admin(user):
-        return True
-    arrangement = obligation.arrangement
-    delivery = getattr(arrangement.order, 'delivery', None)
-    role_ids = {
-        'client': arrangement.order.client_id,
-        'store': arrangement.store.manager_id,
-        'courier': getattr(delivery, 'delivery_agent_id', None),
-    }
-    return user.id in (role_ids.get(obligation.payer), role_ids.get(obligation.payee))
+    return can_review(user, obligation)
 
 
 class PaymentOptionsView(APIView):
@@ -77,11 +73,20 @@ class ArrangementDetailView(APIView):
 
 
 class ReceiptCreateView(APIView):
+    """Déclarer un paiement sur une obligation.
+
+    - Le payeur déclare (ex. le client indique l'ID de transaction Mobile Money reçu par SMS) :
+      le reçu attend la confirmation du bénéficiaire.
+    - Le bénéficiaire qui déclare avoir reçu l'argent (ex. espèces en main) : confirmé tout de suite,
+      sauf pour ce qui est dû à Gaboshop (validé par l'admin).
+    """
     permission_classes = [permissions.IsAuthenticated]
+    MAX_REJECTED = 3
+    REJECTED_WINDOW_DAYS = 30
 
     def post(self, request):
         obligation = get_object_or_404(PaymentObligation.objects.select_related('arrangement__order', 'arrangement__store'), pk=request.data.get('obligation_id'))
-        if not _can_access_arrangement(request.user, obligation.arrangement):
+        if not _can_declare_obligation(request.user, obligation):
             self.permission_denied(request)
         try:
             amount = Decimal(str(request.data.get('amount')))
@@ -89,13 +94,90 @@ class ReceiptCreateView(APIView):
             raise ValidationError({'amount': 'Montant invalide.'})
         if amount <= 0 or amount > obligation.remaining_amount:
             raise ValidationError({'amount': 'Le montant doit être positif et ne pas dépasser le solde.'})
-        method = request.data.get('method', '')
-        reference = request.data.get('reference', '').strip()
-        idem = request.data.get('idempotency_key', '').strip()
-        if not reference or not idem:
-            raise ValidationError('Une référence et une clé d’idempotence sont obligatoires.')
-        receipt, created = PaymentReceipt.objects.get_or_create(idempotency_key=idem, defaults={'obligation': obligation, 'actor': request.user, 'amount': amount, 'method': method, 'reference': reference, 'comment': request.data.get('comment', ''), 'proof': request.FILES.get('proof')})
-        return Response({'success': True, 'data': {'id': receipt.id, 'receipt_number': receipt.receipt_number, 'status': receipt.status}, 'created': created}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        method = (request.data.get('method') or obligation.arrangement.method or '').strip()
+        reference = (request.data.get('reference') or '').strip()
+        idem = (request.data.get('idempotency_key') or '').strip()
+        if not idem:
+            raise ValidationError('Une clé d’idempotence est obligatoire.')
+        existing = PaymentReceipt.objects.filter(idempotency_key=idem).first()
+        if existing:
+            return Response({'success': True, 'data': receipt_payload(existing), 'created': False}, status=status.HTTP_200_OK)
+
+        user = request.user
+        is_payee = user.id == role_user_id(obligation, obligation.payee)
+        if method == 'cash' and not reference:
+            reference = f'ESPECES-{timezone.now():%Y%m%d%H%M%S}-{user.id}'
+        if not reference:
+            raise ValidationError({'reference': 'Indiquez l’ID de transaction reçu par SMS.'})
+        if method != 'cash':
+            # Un même ID de transaction Mobile Money ne sert qu'une fois, sur toute la plateforme.
+            normalized = reference.replace(' ', '').upper()
+            used = PaymentReceipt.objects.filter(method=method).exclude(status='rejected').values_list('reference', flat=True)
+            if any(r.replace(' ', '').upper() == normalized for r in used):
+                raise ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'})
+        if PaymentReceipt.objects.filter(obligation=obligation, reference=reference).exists():
+            raise ValidationError({'reference': 'Cet ID a déjà été déclaré pour ce paiement.'})
+        if not is_payee and not _is_admin(user):
+            since = timezone.now() - timedelta(days=self.REJECTED_WINDOW_DAYS)
+            if PaymentReceipt.objects.filter(actor=user, status='rejected', rejected_at__gte=since).count() >= self.MAX_REJECTED:
+                return Response({'success': False, 'error': {'code': 403, 'message': 'Trop de paiements déclarés ont été refusés. Contactez le support Gaboshop.'}}, status=status.HTTP_403_FORBIDDEN)
+            if obligation.receipts.filter(status='pending').exists():
+                raise ValidationError('Un paiement déclaré attend déjà la confirmation du bénéficiaire.')
+
+        receipt = PaymentReceipt.objects.create(
+            idempotency_key=idem, obligation=obligation, actor=user, amount=amount, method=method,
+            reference=reference, comment=(request.data.get('comment') or '')[:500], proof=request.FILES.get('proof'),
+        )
+        if is_payee and obligation.payee != 'platform':
+            confirm_receipt(receipt, user, payee_acknowledgement=True)
+            receipt.refresh_from_db()
+        else:
+            _notify_payee(obligation, receipt)
+        return Response({'success': True, 'data': receipt_payload(receipt), 'created': True}, status=status.HTTP_201_CREATED)
+
+
+def _notify_payee(obligation, receipt):
+    payee_id = role_user_id(obligation, obligation.payee)
+    if not payee_id:
+        return
+    try:
+        from notifications.models import Notification
+        order = obligation.arrangement.order
+        Notification.objects.create(
+            user_id=payee_id, title='Paiement à vérifier',
+            body=f'{receipt.amount:.0f} FCFA déclarés pour la commande {order.order_number} (réf. {receipt.reference}). Vérifiez votre SMS puis confirmez ou refusez.',
+            notif_type='payment', order=order, metadata={'order_id': order.id, 'receipt_id': receipt.id},
+        )
+    except Exception:
+        pass
+
+
+class PendingReceiptsView(APIView):
+    """Paiements déclarés qui attendent ma confirmation (commerce, fournisseur B2B, livreur, admin)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = PaymentReceipt.objects.filter(status='pending').select_related('obligation__arrangement__order', 'obligation__arrangement__store', 'actor')
+        if not _is_admin(user):
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(obligation__payee='store', obligation__arrangement__store__manager=user)
+                | Q(obligation__payee='courier', obligation__arrangement__order__delivery__delivery_agent=user)
+                | Q(obligation__payee='client', obligation__arrangement__order__client=user)
+            )
+        data = []
+        for receipt in qs.order_by('created_at')[:100]:
+            order = receipt.obligation.arrangement.order
+            item = receipt_payload(receipt)
+            item.update({
+                'order_id': order.id, 'order_number': order.order_number, 'is_b2b': getattr(order, 'is_b2b', False),
+                'kind': receipt.obligation.kind, 'payer': receipt.obligation.payer,
+                'declared_by': (f'{receipt.actor.first_name} {receipt.actor.last_name}'.strip() or receipt.actor.phone),
+                'declared_by_phone': receipt.actor.phone,
+            })
+            data.append(item)
+        return Response({'success': True, 'data': data})
 
 
 class ReceiptConfirmView(APIView):
@@ -117,6 +199,16 @@ class ReceiptRejectView(APIView):
         if not _can_review_obligation(request.user, receipt.obligation):
             self.permission_denied(request)
         receipt = reject_receipt(receipt, request.user, request.data.get('reason', ''))
+        try:
+            from notifications.models import Notification
+            order = receipt.obligation.arrangement.order
+            Notification.objects.create(
+                user_id=receipt.actor_id, title='Paiement refusé', order=order,
+                body=f'Votre paiement de {receipt.amount:.0f} FCFA (réf. {receipt.reference}) pour la commande {order.order_number} a été refusé : {receipt.rejection_reason}',
+                notif_type='payment', metadata={'order_id': order.id, 'receipt_id': receipt.id},
+            )
+        except Exception:
+            pass
         return Response({'success': True, 'data': {'id': receipt.id, 'status': receipt.status, 'rejection_reason': receipt.rejection_reason}})
 
 

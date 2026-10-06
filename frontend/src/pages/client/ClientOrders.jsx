@@ -4,6 +4,16 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { getOrders, getOrderDetail, confirmDelivery } from '../../services/dashboardService';
 import { formatCurrency, formatDateTime } from '../../utils/helpers';
 import useVisibleInterval from '../../hooks/useVisibleInterval';
+import OrderPaymentPanel from '../../components/payments/OrderPaymentPanel';
+
+// Paiement direct (Mobile Money au code marchand) que le client doit encore faire ou déclarer.
+const needsPayment = (order) => {
+  const arrangement = order.payment_arrangement;
+  if (!arrangement || arrangement.flow === 'platform_online' || arrangement.method === 'cash') return false;
+  return (arrangement.obligations || []).some((o) => o.i_am_payer && o.kind !== 'commission'
+    && ['unpaid', 'partially_paid', 'overdue'].includes(o.status)
+    && !(o.receipts || []).some((r) => r.status === 'pending'));
+};
 
 const STATUS_MAP = {
   created: { label: 'Créée', className: 'bg-gray-200 text-gray-800' },
@@ -61,6 +71,8 @@ const ClientOrders = () => {
 
   useEffect(() => {
     fetchOrders();
+    const payId = new URLSearchParams(window.location.search).get('pay');
+    if (payId) openDetail(payId);
   }, []);
 
   // Polling automatique pour mettre à jour les commandes toutes les 5 secondes
@@ -243,12 +255,21 @@ const ClientOrders = () => {
                   </div>
                 </div>
                 <div className="mt-2 text-sm">{renderStatus(order.status)}</div>
-                <button
-                  onClick={() => openDetail(order.id)}
-                  className="mt-3 w-full px-3 py-2 rounded-md border border-indigo-200 text-indigo-700 text-sm font-medium"
-                >
-                  Voir le détail
-                </button>
+                {needsPayment(order) ? (
+                  <button
+                    onClick={() => openDetail(order.id)}
+                    className="mt-3 w-full px-3 py-2 rounded-md bg-amber-500 text-white text-sm font-semibold"
+                  >
+                    💳 Payer et déclarer mon paiement
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => openDetail(order.id)}
+                    className="mt-3 w-full px-3 py-2 rounded-md border border-indigo-200 text-indigo-700 text-sm font-medium"
+                  >
+                    Voir le détail
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -272,7 +293,14 @@ const ClientOrders = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.store_name || order.store}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(order.created_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{renderStatus(order.status)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {renderStatus(order.status)}
+                      {needsPayment(order) && (
+                        <button onClick={() => openDetail(order.id)} className="ml-2 rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-white">
+                          💳 À payer
+                        </button>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.items?.length || order.items_count || 0}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
@@ -326,6 +354,11 @@ const ClientOrders = () => {
                   <p className="font-semibold">Total</p>
                   <p>{formatCurrency(detail.total_amount || detail.total)}</p>
                 </div>
+              </div>
+
+              <div>
+                <p className="font-semibold text-gray-900 mb-2">Paiement</p>
+                <OrderPaymentPanel orderId={detail.id} onChange={fetchOrders} />
               </div>
 
               <div>
