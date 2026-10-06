@@ -7,14 +7,12 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
-import { isLoggedIn, savePendingCartItem, applyPendingCartItem, cartItemFromProduct } from '../utils/session';
+import { isLoggedIn, savePendingCartItem, applyPendingCartItem, addToCart } from '../utils/session';
 import HomeNavbar from '../components/HomeNavbar'; // Reusing HomeNavbar
 import Footer from '../components/Footer';
 
 // Temporary service patch if getStoreDetail doesn't exist, we will try to filter from getStores or assume an endpoint exists
 // Actually, let's assume we can fetch products by store.
-
-const CART_KEY = 'gaboshop_cart';
 
 const StoreDetail = () => {
     const { id } = useParams();
@@ -47,23 +45,7 @@ const StoreDetail = () => {
             setLoginPromptProduct(product);
             return;
         }
-        let cart = [];
-        try {
-            cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-        } catch {
-            cart = [];
-        }
-        const existing = cart.find((item) => item.id === product.id);
-        if (existing) {
-            existing.quantity += 1;
-        } else {
-            cart.push(cartItemFromProduct(product));
-        }
-        try {
-            localStorage.setItem(CART_KEY, JSON.stringify(cart));
-        } catch {
-            // stockage indisponible
-        }
+        addToCart(product, 1);
         setToast(`${product.name} ajouté au panier`);
         setTimeout(() => setToast(null), 1800);
     };

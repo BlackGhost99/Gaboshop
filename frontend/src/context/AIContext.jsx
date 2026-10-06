@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import authStorage from '../utils/authStorage';
-import { isShoppingRoute } from '../utils/session';
+import { readCart, addToCart, removeFromCart, savePendingCartItem } from '../utils/session';
 
 const AIContext = createContext(null);
 
@@ -20,6 +20,7 @@ export const AIContextProvider = ({ children }) => {
   const [lastError, setLastError] = useState(null);
   const [pageContext, setPageContext] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Détecter le contexte de la page automatiquement
   useEffect(() => {
@@ -71,84 +72,87 @@ export const AIContextProvider = ({ children }) => {
   }, []);
 
   // Envoyer un message à l'IA
+  const addBotMessage = useCallback((text, extra = {}) => {
+    setMessages(prev => [...prev, {
+      id: Date.now() + Math.random(),
+      type: 'bot',
+      text,
+      timestamp: new Date().toISOString(),
+      ...extra,
+    }]);
+  }, []);
+
+  // Exécute sur l'appareil les actions décidées par l'assistant
+  const runActions = useCallback((actions) => {
+    let needsLogin = false;
+    (actions || []).forEach((action) => {
+      if (action.type === 'add_to_cart' && action.product) {
+        addToCart(action.product, action.quantity, action.size);
+      } else if (action.type === 'remove_from_cart') {
+        removeFromCart(action.product_id);
+      } else if (action.type === 'login_required' && action.product) {
+        savePendingCartItem(action.product);
+        needsLogin = true;
+      } else if (action.type === 'navigate' && action.path?.startsWith('/')) {
+        navigate(action.path);
+      }
+    });
+    return needsLogin;
+  }, [navigate]);
+
+  // Envoyer un message à l'assistant (adapté au rôle de l'utilisateur côté serveur)
   const sendMessage = useCallback(async (message) => {
     if (!message.trim()) return;
 
-    const userMessage = {
+    setMessages(prev => [...prev, {
       id: Date.now(),
       type: 'user',
       text: message,
       timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    }]);
     setIsLoading(true);
 
-    if (isShoppingRoute(location.pathname)) {
-      try {
-        const history = messages.slice(-6).map((m) => ({ role: m.type, text: m.text }));
-        const response = await api.post('/ai/shop/', { message, history });
-        const data = response.data?.data || {};
-        setMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          type: 'bot',
-          text: data.message || "Je n'ai pas compris, pouvez-vous reformuler ?",
-          products: Array.isArray(data.products) ? data.products : [],
-          timestamp: new Date().toISOString(),
-        }]);
-      } catch (error) {
-        const tooMany = error.response?.status === 429;
-        setMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          type: 'bot',
-          text: tooMany
-            ? 'Beaucoup de messages en peu de temps. Patientez une minute puis réessayez.'
-            : "Je n'arrive pas à joindre le serveur. Vérifiez votre connexion et réessayez.",
-          timestamp: new Date().toISOString(),
-          isError: true,
-        }]);
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
     try {
-      const frontendContext = {
-        ...pageContext,
-        last_api_error: lastError,
-      };
-
-      const response = await api.post('/ai/chat/', {
-        message: message,
-        frontend_context: frontendContext,
+      const history = messages.slice(-8).map((m) => ({ role: m.type, text: m.text }));
+      const response = await api.post('/ai/assistant/', {
+        message,
+        history,
+        cart: readCart(),
+        page: location.pathname,
       });
-
-      if (response.data.success) {
-        const aiMessage = {
-          id: Date.now() + 1,
-          type: 'bot',
-          text: response.data.data.message,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } else {
-        throw new Error(response.data.error?.message || 'Erreur lors de la communication avec l\'IA');
-      }
+      const data = response.data?.data || {};
+      const needsLogin = runActions(data.actions);
+      addBotMessage(data.message || "Je n'ai pas compris, pouvez-vous reformuler ?", {
+        products: Array.isArray(data.products) ? data.products : [],
+        confirmations: Array.isArray(data.confirmations) ? data.confirmations : [],
+        loginPrompt: needsLogin,
+        cartChanged: (data.actions || []).some((a) => a.type === 'add_to_cart'),
+      });
     } catch (error) {
       reportError(error);
-      const errorMessage = {
-        id: Date.now() + 1,
-        type: 'bot',
-        text: error.response?.data?.error?.message || 'Désolé, une erreur s\'est produite. Veuillez réessayer.',
-        timestamp: new Date().toISOString(),
-        isError: true,
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      const tooMany = error.response?.status === 429;
+      addBotMessage(
+        tooMany
+          ? 'Beaucoup de messages en peu de temps. Patientez une minute puis réessayez.'
+          : "Je n'arrive pas à joindre le serveur. Vérifiez votre connexion et réessayez.",
+        { isError: true },
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [pageContext, lastError, reportError, location.pathname, messages]);
+  }, [location.pathname, messages, reportError, runActions, addBotMessage]);
+
+  // Confirme une modification proposée par l'assistant (prix, stock…)
+  const confirmAction = useCallback(async (token) => {
+    try {
+      const response = await api.post('/ai/assistant/confirm/', { token });
+      addBotMessage(response.data?.data?.message || "C'est fait.");
+      return true;
+    } catch (error) {
+      addBotMessage(error.response?.data?.error?.message || "La modification n'a pas pu être faite.", { isError: true });
+      return false;
+    }
+  }, [addBotMessage]);
 
   // Récupérer le contexte backend
   const getContext = useCallback(async () => {
@@ -192,6 +196,8 @@ export const AIContextProvider = ({ children }) => {
     lastError,
     pageContext,
     sendMessage,
+    confirmAction,
+    addBotMessage,
     getContext,
     reportError,
     clearMessages: () => setMessages([]),

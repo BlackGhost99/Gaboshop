@@ -194,6 +194,29 @@ const ClientDashboard = () => {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // L'assistant peut ajouter au panier pendant que la page est ouverte
+  useEffect(() => {
+    const reload = () => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+        setCartItems(parsed);
+        setCartByStore(groupByStore(parsed));
+        setStoreForms((prev) => {
+          const nextForms = { ...prev };
+          parsed.forEach((it) => {
+            const key = it.store_name || 'Magasin';
+            if (!nextForms[key]) nextForms[key] = { city: 'Libreville', address: '', phone: '', payment_phone: '', zone: '', notes: '', payment_flow: '', payment_method: '' };
+          });
+          return nextForms;
+        });
+      } catch {
+        // panier illisible : on garde l'affichage actuel
+      }
+    };
+    window.addEventListener('gaboshop:cart-updated', reload);
+    return () => window.removeEventListener('gaboshop:cart-updated', reload);
+  }, []);
+
   useEffect(() => {
     // Charge le panier local et regroupe par magasin pour affichage "porte-feuille"
     try {

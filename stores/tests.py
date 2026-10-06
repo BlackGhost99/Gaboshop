@@ -248,3 +248,106 @@ class ShoppingAssistantTests(TestCase):
 		self.assertEqual(data['provider'], 'groq')
 		self.assertEqual(data['message'], 'Je vous conseille le riz parfumé.')
 		self.assertIn('Riz parfumé 5 kg', call.call_args[0][1])
+
+
+@override_settings(
+	AI_PROVIDER='local',
+	CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class AssistantTests(TestCase):
+	"""L'assistant agit selon le rôle : client jusqu'au panier, commerce sur son stock, etc."""
+
+	def setUp(self):
+		from products.models import Product
+		self.manager = User.objects.create_user(phone='077000050', password='secret123', user_type='store_manager')
+		self.store = Store.objects.create(
+			name='TestMag1', category=StoreCategory.objects.create(name='Mode'), manager=self.manager,
+			phone='077000051', zone='Louis', address='Rue 1',
+		)
+		self.nike = Product.objects.create(store=self.store, name='Baskets', price=15000, stock=3,
+			attributes={'brand': 'Nike', 'sizes': '40, 41'})
+		self.adidas = Product.objects.create(store=self.store, name='Baskets', price=20000, stock=4,
+			attributes={'brand': 'Adidas', 'sizes': '40, 42'})
+		self.client_user = User.objects.create_user(phone='077000052', password='secret123', user_type='client')
+		self.client = APIClient()
+
+	def ask(self, message, user=None, **extra):
+		self.client.force_authenticate(user)
+		res = self.client.post('/api/v1/ai/assistant/', {'message': message, **extra}, format='json')
+		self.assertEqual(res.status_code, 200, res.content)
+		return res.json()['data']
+
+	def test_small_talk_is_not_a_search(self):
+		data = self.ask('comment vas tu ?')
+		self.assertEqual(data['products'], [])
+		self.assertIn('bien', data['message'])
+
+	def test_brand_filters_results(self):
+		data = self.ask('je cherche une basket adidas')
+		self.assertEqual([p['id'] for p in data['products']], [self.adidas.id])
+
+	def test_client_order_goes_to_cart(self):
+		data = self.ask('commande moi 2 adidas de taille 40', user=self.client_user)
+		add = [a for a in data['actions'] if a['type'] == 'add_to_cart']
+		self.assertEqual(len(add), 1, data)
+		self.assertEqual(add[0]['product']['id'], self.adidas.id)
+		self.assertEqual(add[0]['quantity'], 2)
+		self.assertEqual(add[0]['size'], '40')
+
+	def test_visitor_is_asked_to_log_in(self):
+		data = self.ask('ajoute la basket adidas au panier')
+		self.assertEqual(data['actions'][0]['type'], 'login_required')
+
+	def test_store_manager_summary_and_confirmed_update(self):
+		from api.v1.ai.assistant import Ctx, t_update_product
+		data = self.ask('résume ma boutique', user=self.manager)
+		self.assertIn('TestMag1', data['message'])
+		# La modification passe par une confirmation signée
+		req = type('R', (), {'user': self.manager, 'build_absolute_uri': lambda self, x: x})()
+		ctx = Ctx(req, 'store_manager', [])
+		t_update_product(ctx, self.nike.id, stock=12)
+		token = ctx.confirmations[0]['token']
+		other = User.objects.create_user(phone='077000053', password='secret123', user_type='store_manager')
+		self.client.force_authenticate(other)
+		self.assertEqual(self.client.post('/api/v1/ai/assistant/confirm/', {'token': token}, format='json').status_code, 403)
+		self.client.force_authenticate(self.manager)
+		self.assertEqual(self.client.post('/api/v1/ai/assistant/confirm/', {'token': token}, format='json').status_code, 200)
+		self.nike.refresh_from_db()
+		self.assertEqual(self.nike.stock, 12)
+
+	def test_tools_are_limited_by_role(self):
+		from api.v1.ai.assistant import tools_for
+		self.assertNotIn('update_product', tools_for('client'))
+		self.assertNotIn('platform_stats', tools_for('store_manager'))
+		self.assertIn('add_to_cart', tools_for('visitor'))
+
+	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='test-key')
+	def test_llm_agent_calls_tools(self):
+		from unittest import mock
+		from types import SimpleNamespace as NS
+
+		def reply(tool_calls=None, content=None):
+			return NS(choices=[NS(message=NS(tool_calls=tool_calls, content=content))])
+
+		call = NS(id='c1', function=NS(name='add_to_cart', arguments=f'{{"product_id": {self.adidas.id}, "quantity": 1}}'))
+		fake = mock.MagicMock()
+		fake.chat.completions.create.side_effect = [reply([call]), reply(content='Ajouté à votre panier !')]
+		with mock.patch('api.v1.ai.assistant._client', return_value=fake):
+			data = self.ask('je prends les adidas', user=self.client_user)
+		self.assertEqual(data['provider'], 'groq')
+		self.assertEqual(data['actions'][0]['type'], 'add_to_cart')
+		status = self.client.get('/api/v1/ai/assistant/status/').json()['data']
+		self.assertTrue(status['key_present'])
+		self.assertTrue(status['last_call']['ok'])
+
+	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='bad-key')
+	def test_llm_failure_falls_back_and_is_reported(self):
+		from unittest import mock
+		fake = mock.MagicMock()
+		fake.chat.completions.create.side_effect = Exception('Error code: 401 - invalid api key')
+		with mock.patch('api.v1.ai.assistant._client', return_value=fake):
+			data = self.ask('bonjour')
+		self.assertEqual(data['provider'], 'local')
+		status = self.client.get('/api/v1/ai/assistant/status/').json()['data']
+		self.assertFalse(status['last_call']['ok'])
+		self.assertIn('invalid api key', status['last_call']['error'])

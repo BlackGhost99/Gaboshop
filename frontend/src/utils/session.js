@@ -59,6 +59,7 @@ export const applyPendingCartItem = () => {
     if (existing) existing.quantity += 1;
     else cart.push(item);
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    window.dispatchEvent(new Event('gaboshop:cart-updated'));
     return item.name;
   } catch {
     return null;
@@ -68,3 +69,41 @@ export const applyPendingCartItem = () => {
 // Hors des espaces commerce / livreur / admin, l'IA est un assistant d'achat
 // ouvert à tous (même sans compte) qui cherche dans le catalogue.
 export const isShoppingRoute = (path) => !/^\/(store|admin|delivery)(\/|$)/.test(path || '');
+
+// Panier enregistré sur l'appareil, partagé par l'accueil, la page commerce,
+// l'espace client et l'assistant. Chaque changement prévient les pages ouvertes.
+export const CART_EVENT = 'gaboshop:cart-updated';
+
+export const readCart = () => {
+  try {
+    return JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const writeCart = (cart) => {
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  } catch {
+    // stockage indisponible
+  }
+  window.dispatchEvent(new Event(CART_EVENT));
+};
+
+export const addToCart = (product, quantity = 1, size = null) => {
+  const cart = readCart();
+  const qty = Math.max(1, Number(quantity) || 1);
+  const existing = cart.find((item) => item.id === product.id);
+  if (existing) {
+    existing.quantity = (Number(existing.quantity) || 0) + qty;
+    if (size) existing.size = size;
+  } else {
+    cart.push({ ...cartItemFromProduct(product), quantity: qty, ...(size ? { size } : {}) });
+  }
+  writeCart(cart);
+};
+
+export const removeFromCart = (productId) => {
+  writeCart(readCart().filter((item) => item.id !== productId));
+};

@@ -445,7 +445,7 @@ OPENAI_MODEL = env('OPENAI_MODEL', default='gpt-3.5-turbo')
 # Pour obtenir une clé: https://console.groq.com/
 # Groq est GRATUIT, ultra-rapide, pas de carte bancaire requise
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
-GROQ_MODEL = env('GROQ_MODEL', default='llama-3.1-8b-instant')  # ou 'mixtral-8x7b-32768'
+GROQ_MODEL = env('GROQ_MODEL', default='llama-3.3-70b-versatile')  # sait appeler des outils ; repli automatique sur d'autres modèles
 
 # Google Gemini API Configuration (GRATUIT - 1,500 requêtes/jour)
 # Pour obtenir une clé: https://makersuite.google.com/app/apikey

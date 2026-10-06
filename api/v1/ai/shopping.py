@@ -102,13 +102,24 @@ def search_catalog(criteria, limit=MAX_RESULTS):
         qs = qs.filter(price__lte=criteria['max_price'])
     if criteria.get('min_price'):
         qs = qs.filter(price__gte=criteria['min_price'])
+    if criteria.get('store_id'):
+        qs = qs.filter(store_id=criteria['store_id'])
+    if criteria.get('in_stock'):
+        qs = qs.filter(stock__gt=0)
+    if criteria.get('brand'):
+        b = str(criteria['brand'])
+        qs = qs.filter(Q(attributes__brand__icontains=b) | Q(name__icontains=b) | Q(description__icontains=b))
+    if criteria.get('size'):
+        qs = qs.filter(attributes__sizes__icontains=str(criteria['size']))
     if keywords:
         cond = Q()
         for k in keywords:
             cond |= (Q(name__icontains=k) | Q(description__icontains=k)
-                     | Q(category__name__icontains=k) | Q(store__name__icontains=k))
+                     | Q(category__name__icontains=k) | Q(store__name__icontains=k)
+                     | Q(attributes__brand__icontains=k) | Q(attributes__model__icontains=k)
+                     | Q(attributes__color__icontains=k))
         qs = qs.filter(cond)
-    elif not (criteria.get('max_price') or criteria.get('min_price')):
+    elif not any(criteria.get(k) for k in ('max_price', 'min_price', 'brand', 'size', 'store_id')):
         return []
 
     candidates = list(qs[:80])

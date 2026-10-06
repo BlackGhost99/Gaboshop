@@ -9,7 +9,7 @@ import HeroBanner from '../components/HeroBanner';
 import CategoriesGrid from '../components/CategoriesGrid';
 import ProductDetailModal from '../components/ProductDetailModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
-import { isLoggedIn, savePendingCartItem, applyPendingCartItem } from '../utils/session';
+import { isLoggedIn, savePendingCartItem, applyPendingCartItem, CART_EVENT } from '../utils/session';
 import ProductCard from '../components/ProductCard';
 import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/helpers';
@@ -106,10 +106,14 @@ const Home = () => {
     // Produit choisi avant la connexion : ajouté maintenant que le client est connecté
     const pendingName = applyPendingCartItem();
     setCart(loadCartFromStorage());
+    // L'assistant peut remplir le panier pendant que la page est ouverte
+    const reload = () => setCart(loadCartFromStorage());
+    window.addEventListener(CART_EVENT, reload);
     if (pendingName) {
       setToast({ message: `${pendingName} ajouté au panier`, type: 'success', at: Date.now() });
       setTimeout(() => setToast(null), 2500);
     }
+    return () => window.removeEventListener(CART_EVENT, reload);
   }, []);
 
   useEffect(() => {
