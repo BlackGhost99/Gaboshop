@@ -6,6 +6,8 @@ import { getStores } from '../services/storeService'; // Need a getStoreDetail r
 import LoadingSpinner from '../components/LoadingSpinner';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+import { isLoggedIn, savePendingCartItem, applyPendingCartItem, cartItemFromProduct } from '../utils/session';
 import HomeNavbar from '../components/HomeNavbar'; // Reusing HomeNavbar
 import Footer from '../components/Footer';
 
@@ -23,8 +25,16 @@ const StoreDetail = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [toast, setToast] = useState(null);
 
+    const [loginPromptProduct, setLoginPromptProduct] = useState(null);
+
     // Même panier que la page d'accueil (stocké sur l'appareil)
     const handleAddToCart = (product) => {
+        if (!isLoggedIn()) {
+            savePendingCartItem(product);
+            setSelectedProduct(null);
+            setLoginPromptProduct(product);
+            return;
+        }
         let cart = [];
         try {
             cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
@@ -35,17 +45,7 @@ const StoreDetail = () => {
         if (existing) {
             existing.quantity += 1;
         } else {
-            cart.push({
-                id: product.id,
-                name: product.name,
-                price: product.price,
-                image: product.image,
-                weight_kg: product.weight_kg,
-                length_m: product.length_m,
-                store_name: product.store_name,
-                store_id: product.store,
-                quantity: 1
-            });
+            cart.push(cartItemFromProduct(product));
         }
         try {
             localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -98,6 +98,15 @@ const StoreDetail = () => {
 
         if (id) fetchData();
     }, [id]);
+
+    // Produit choisi avant la connexion : ajouté maintenant que le client est connecté
+    useEffect(() => {
+        const pendingName = applyPendingCartItem();
+        if (!pendingName) return undefined;
+        const showId = setTimeout(() => setToast(`${pendingName} ajouté au panier`), 0);
+        const hideId = setTimeout(() => setToast(null), 2500);
+        return () => { clearTimeout(showId); clearTimeout(hideId); };
+    }, []);
 
     if (loading) return <LoadingSpinner />;
     if (error) return <div className="text-center py-10 text-red-600">Erreur: {error}</div>;
@@ -174,6 +183,13 @@ const StoreDetail = () => {
                     product={selectedProduct}
                     onClose={() => setSelectedProduct(null)}
                     onAddToCart={handleAddToCart}
+                />
+            )}
+
+            {loginPromptProduct && (
+                <LoginRequiredModal
+                    productName={loginPromptProduct.name}
+                    onClose={() => setLoginPromptProduct(null)}
                 />
             )}
 

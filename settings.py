@@ -340,9 +340,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # doit avoir une adresse complète. Render fournit RENDER_EXTERNAL_URL tout seul.
 PUBLIC_API_URL = (env("PUBLIC_API_URL", "") or env("RENDER_EXTERNAL_URL", "")).rstrip('/')
 MEDIA_URL = f"{PUBLIC_API_URL}/media/" if PUBLIC_API_URL else '/media/'
-# Sans stockage externe, l'API sert elle-même les fichiers envoyés (perdus à chaque
-# redéploiement sur Render gratuit : configurer Supabase Storage ci-dessous).
+# Sans stockage externe, l'API sert elle-même les fichiers envoyés.
 SERVE_MEDIA = env_bool("DJANGO_SERVE_MEDIA", True)
+# Le disque de Render gratuit est effacé à chaque déploiement : en production les
+# fichiers envoyés sont gardés dans la base (Supabase), qui elle ne s'efface pas.
+MEDIA_IN_DATABASE = env_bool("DJANGO_MEDIA_IN_DATABASE", not DEBUG)
+if MEDIA_IN_DATABASE:
+    STORAGES = {
+        **globals().get('STORAGES', {"staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}}),
+        "default": {"BACKEND": "core.storage.DatabaseStorage"},
+    }
 
 # Supabase Storage (compatible S3) : les images survivent aux redéploiements.
 # Variables à saisir dans Render, jamais dans le code :

@@ -131,3 +131,23 @@ class AuditLog(models.Model):
 			reason=(reason or ''),
 			is_suspicious=is_suspicious,
 		)
+
+
+class StoredFile(models.Model):
+	"""
+	Fichier envoyé (logo, bannière, photo produit) gardé dans la base de données.
+	Sur Render gratuit le disque est effacé à chaque déploiement : la base
+	(Supabase) est le seul endroit qui garde les images sans configuration.
+	"""
+	name = models.CharField(max_length=255, unique=True)
+	content = models.BinaryField()
+	content_type = models.CharField(max_length=100, blank=True)
+	size = models.PositiveIntegerField(default=0)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = "Fichier envoyé"
+		verbose_name_plural = "Fichiers envoyés"
+
+	def __str__(self):
+		return self.name

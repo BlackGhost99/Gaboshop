@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { register } from '../services/dashboardService';
 import authStorage from '../utils/authStorage';
+import { safeNextPath } from '../utils/session';
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -32,6 +33,8 @@ const Register = () => {
   const [error, setError] = useState('');
   const [gpsLoading, setGpsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const nextPath = safeNextPath(location.search);
 
   const isManager = form.user_type === 'store_manager';
   const isDelivery = form.user_type === 'delivery_agent';
@@ -109,6 +112,8 @@ const Register = () => {
         const createdUserType = res.data.user?.user_type || res.data.user_type;
         if (createdUserType === 'admin') {
           navigate('/admin/dashboard');
+        } else if (nextPath && createdUserType === 'client') {
+          navigate(nextPath);
         } else {
           navigate('/dashboard');
         }
@@ -321,7 +326,7 @@ const Register = () => {
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             <div className="flex items-center justify-between">
-              <Link to="/login" className="text-sm text-indigo-600 hover:text-indigo-500">Déjà inscrit ? Connexion</Link>
+              <Link to={`/login${location.search}`} className="text-sm text-indigo-600 hover:text-indigo-500">Déjà inscrit ? Connexion</Link>
               <button
                 type="submit"
                 disabled={loading}

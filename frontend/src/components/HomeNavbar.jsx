@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { fetchNotifications, markNotificationRead, deleteNotification } from '../services/notificationService';
 import { formatDateTime } from '../utils/helpers';
 import authStorage from '../utils/authStorage';
+import { logout } from '../utils/session';
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -292,6 +293,17 @@ const HomeNavbar = ({
         </svg>
       ),
     },
+    ...(isLoggedIn ? [{
+      key: 'logout',
+      label: 'Se déconnecter',
+      description: 'Quitter votre compte',
+      action: () => logout(),
+      icon: (
+        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      ),
+    }] : []),
   ];
 
   return (
@@ -559,6 +571,19 @@ const HomeNavbar = ({
                 )}
               </Link>
 
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="hidden md:flex items-center gap-1 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors font-medium text-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Déconnexion</span>
+                </button>
+              )}
+
               {/* Auth Buttons / Menu */}
               {isLoggedIn ? (
                 <button
@@ -651,6 +676,16 @@ const HomeNavbar = ({
               </svg>
               <span>Mon Dashboard</span>
             </Link>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="mt-2 w-full flex items-center space-x-2 px-4 py-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-colors font-medium"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span>Se déconnecter</span>
+            </button>
           </div>
         )}
       </nav>

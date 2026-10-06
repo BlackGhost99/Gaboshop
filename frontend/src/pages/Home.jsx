@@ -8,6 +8,8 @@ import HomeNavbar from '../components/HomeNavbar';
 import HeroBanner from '../components/HeroBanner';
 import CategoriesGrid from '../components/CategoriesGrid';
 import ProductDetailModal from '../components/ProductDetailModal';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+import { isLoggedIn, savePendingCartItem, applyPendingCartItem } from '../utils/session';
 import ProductCard from '../components/ProductCard';
 import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/helpers';
@@ -32,6 +34,7 @@ const Home = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
+  const [loginPromptProduct, setLoginPromptProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [storesLoading, setStoresLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,8 +103,13 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    // Charge un panier local pour les tests panier/achat
+    // Produit choisi avant la connexion : ajouté maintenant que le client est connecté
+    const pendingName = applyPendingCartItem();
     setCart(loadCartFromStorage());
+    if (pendingName) {
+      setToast({ message: `${pendingName} ajouté au panier`, type: 'success', at: Date.now() });
+      setTimeout(() => setToast(null), 2500);
+    }
   }, []);
 
   useEffect(() => {
@@ -288,6 +296,12 @@ const Home = () => {
   };
 
   const handleAddToCart = (product) => {
+    if (!isLoggedIn()) {
+      savePendingCartItem(product);
+      setSelectedProduct(null);
+      setLoginPromptProduct(product);
+      return;
+    }
     setCart((prev) => {
       const existingIndex = prev.findIndex((item) => item.id === product.id);
       if (existingIndex !== -1) {
@@ -662,6 +676,13 @@ const Home = () => {
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
         onAddToCart={handleAddToCart}
+      />
+    )}
+
+    {loginPromptProduct && (
+      <LoginRequiredModal
+        productName={loginPromptProduct.name}
+        onClose={() => setLoginPromptProduct(null)}
       />
     )}
 

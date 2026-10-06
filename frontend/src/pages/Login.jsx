@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '../services/dashboardService';
 import authStorage from '../utils/authStorage';
+import { safeNextPath } from '../utils/session';
 
 const Login = () => {
   const [phone, setPhone] = useState('');
@@ -9,6 +10,8 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const nextPath = safeNextPath(location.search);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,6 +30,9 @@ const Login = () => {
         const userType = response.data.user?.user_type || response.data.user_type;
         if (userType === 'admin') {
           navigate('/admin/dashboard');
+        } else if (nextPath && userType === 'client') {
+          // Retour là où le client était (ex. produit qu'il voulait ajouter au panier)
+          navigate(nextPath);
         } else {
           navigate('/dashboard');
         }
@@ -119,7 +125,7 @@ const Login = () => {
             </div>
             <div className="text-center text-sm text-gray-600">
               Pas de compte ?{' '}
-              <a href="/register" className="text-indigo-600 hover:text-indigo-500 font-medium">Créer un compte</a>
+              <a href={`/register${location.search}`} className="text-indigo-600 hover:text-indigo-500 font-medium">Créer un compte</a>
             </div>
           </form>
         </div>

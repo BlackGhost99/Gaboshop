@@ -1,6 +1,7 @@
 import io
 import tempfile
 
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from PIL import Image
@@ -58,6 +59,46 @@ class StoreProfileUpdateTests(TestCase):
 		from urllib.parse import urlparse
 		served = self.client.get(urlparse(self.store.logo.url).path)
 		self.assertEqual(served.status_code, 200)
+
+
+@override_settings(STORAGES={
+	"default": {"BACKEND": "core.storage.DatabaseStorage"},
+	"staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}, MEDIA_ROOT=tempfile.mkdtemp())
+class MediaInDatabaseTests(TestCase):
+	"""Les images envoyées sont gardées dans la base : elles survivent à un redéploiement."""
+
+	def setUp(self):
+		self.manager = User.objects.create_user(phone='077000030', password='secret123', user_type='store_manager')
+		self.store = Store.objects.create(
+			name='MagPhoto', category=StoreCategory.objects.create(name='Mode'), manager=self.manager,
+			phone='077000031', zone='Louis', address='Rue 1',
+		)
+		self.client = APIClient()
+		self.client.force_authenticate(self.manager)
+
+	def test_logo_survives_empty_disk_and_big_photo_is_shrunk(self):
+		import os
+		from urllib.parse import urlparse
+
+		from core.models import StoredFile
+		big = io.BytesIO()
+		Image.effect_noise((3000, 2000), 80).convert('RGB').save(big, 'JPEG', quality=95)
+		big_upload = SimpleUploadedFile('photo.jpg', big.getvalue(), content_type='image/jpeg')
+		res = self.client.patch(f'/api/v1/stores/{self.store.id}/update/', {
+			'logo': _image('logo.png'), 'banner_image': big_upload,
+		}, format='multipart')
+		self.assertEqual(res.status_code, 200, res.content)
+		self.store.refresh_from_db()
+		# Rien sur le disque : tout est dans la base
+		self.assertEqual(os.listdir(settings.MEDIA_ROOT), [])
+		self.assertEqual(StoredFile.objects.count(), 2)
+		served = self.client.get(urlparse(self.store.logo.url).path)
+		self.assertEqual(served.status_code, 200)
+		self.assertEqual(served['Content-Type'], 'image/png')
+		banner = StoredFile.objects.get(name=self.store.banner_image.name)
+		self.assertLess(banner.size, len(big.getvalue()))
+		self.assertLessEqual(max(Image.open(io.BytesIO(bytes(banner.content))).size), 1600)
 
 
 class AdminProductCategoryTests(TestCase):

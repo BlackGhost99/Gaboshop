@@ -24,9 +24,9 @@ urlpatterns = [
     path('api/v1/delivery/', include('delivery.urls')),
 ]
 
-# Fichiers envoyés (logos, bannières, photos) servis par l'API quand ils sont stockés
-# sur son disque. Avec Supabase Storage, les images ont leur propre adresse publique.
+# Fichiers envoyés (logos, bannières, photos) servis par l'API, depuis la base de
+# données ou son disque. Avec Supabase Storage, les images ont leur propre adresse.
 if settings.SERVE_MEDIA:
     from django.urls import re_path
-    from django.views.static import serve
-    urlpatterns += [re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT})]
+    from core.media_views import serve_media
+    urlpatterns += [re_path(r'^media/(?P<path>.*)$', serve_media)]

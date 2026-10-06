@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from '../services/notificationService';
 import { formatDateTime } from '../utils/helpers';
-import authStorage from '../utils/authStorage';
+import { logout } from '../utils/session';
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -221,11 +221,7 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
             </span>
             <button
               className="bg-red-500 hover:bg-red-600 text-white px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap"
-              onClick={() => {
-                authStorage.removeItem('token');
-                authStorage.removeItem('refresh_token');
-                window.location.href = '/login';
-              }}
+              onClick={() => logout('/login')}
             >
               Déconnexion
             </button>
