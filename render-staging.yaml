@@ -3,14 +3,24 @@
 #
 # Mise en place (une seule fois) sur Render : New > Blueprint > dépôt Gaboshop,
 # branche `staging`, « Blueprint Path » = render-staging.yaml.
-# Base de données : un DEUXIÈME projet Supabase (gratuit), jamais celui de la production.
-# Les paiements restent simulés et aucune clé de paiement réelle n'est à mettre ici.
+# Base de données : une base Postgres GRATUITE de Render, créée automatiquement ici
+# (le compte Supabase gratuit est limité à 2 projets). Elle expire 30 jours après sa création :
+# c'est une base de test, on la recrée (Render > Blueprint > Manual sync) et le compte admin
+# est recréé tout seul au démarrage. Jamais de vraies données ni de vraie clé de paiement ici.
+databases:
+  - name: gaboshop-db-staging
+    plan: free
+    region: frankfurt
+    databaseName: gaboshop_test
+    ipAllowList: []
+
 services:
   - type: web
     name: gaboshop-api-staging
     runtime: docker
     dockerfilePath: ./Dockerfile.prod
     plan: free
+    region: frankfurt
     branch: staging
     healthCheckPath: /api/v1/stores/
     envVars:
@@ -26,9 +36,13 @@ services:
         value: "1"
       - key: DJANGO_SECURE_SSL_REDIRECT
         value: "1"
-      # Supabase du projet de TEST : Connect > Session pooler, à coller dans Render.
+      # Base de test de Render (réseau privé de Render, même région).
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: gaboshop-db-staging
+          property: connectionString
+      - key: DATABASE_SSLMODE
+        value: prefer
       # Adresse du site web de test (ci-dessous), sans / final.
       - key: DJANGO_CORS_ALLOWED_ORIGINS
         sync: false
