@@ -17,8 +17,8 @@ SITES = [
     },
     {
         'name': 'Test (staging)',
-        'api': 'https://gaboshop-api-staging.onrender.com',
-        'web': 'https://gaboshop-web-staging.onrender.com',
+        'api': 'https://gaboshop-api-staging-uvn1.onrender.com',
+        'web': 'https://gaboshop-web-staging-uvn1.onrender.com',
     },
 ]
 
