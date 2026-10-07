@@ -1,0 +1,33 @@
+# Vérifie depuis GitHub que les sites Gaboshop (production et test) répondent bien,
+# et publie le résultat dans la release « site-check » (lisible sans compte) :
+# https://github.com/BlackGhost99/Gaboshop/releases/tag/site-check
+# Se lance en poussant sur la branche `site-check`, ou à la main (Actions > Run workflow).
+name: Vérifier les sites
+
+on:
+  push:
+    branches: [site-check]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Interroger les sites
+        run: python3 .github/scripts/site_check.py | tee report.md
+      - name: Publier le rapport
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete site-check --cleanup-tag -y || true
+          gh release create site-check --target "$GITHUB_SHA" --prerelease \
+            --title "Vérification des sites" --notes-file report.md
