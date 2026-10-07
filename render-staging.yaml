@@ -46,6 +46,11 @@ services:
       # Facultatif : la même clé Groq gratuite que la production pour tester l'assistant.
       - key: GROQ_API_KEY
         sync: false
+      # Compte admin créé au premier démarrage de la base de test (ton numéro, un mot de passe de test).
+      - key: DJANGO_SUPERUSER_PHONE
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
 
   - type: web
     name: gaboshop-web-staging
