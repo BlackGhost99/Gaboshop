@@ -123,6 +123,7 @@ const DeliveryDashboard = () => {
       const response = await getDeliveryDashboard();
       if (response.success) {
         setDashboardData(response.data);
+        setError(null);
         setIsAvailable(response.data?.status?.is_available || false);
 
         // Init profile form
@@ -399,9 +400,11 @@ const DeliveryDashboard = () => {
     window.location.href = '/login';
   };
 
-  if (loading) return <LoadingSpinner />;
+  // Spinner au premier chargement seulement : un rafraîchissement ne fait plus disparaître la page.
+  if (loading && !dashboardData) return <LoadingSpinner />;
 
-  if (error) {
+  // Une erreur de rafraîchissement ne remplace pas un tableau de bord déjà affiché.
+  if (error && !dashboardData) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">

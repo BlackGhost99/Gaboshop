@@ -46,6 +46,7 @@ const StoreDashboard = () => {
       const response = await getStoreDashboard();
       if (response.success) {
         setDashboardData(response.data);
+        setError(null);
       } else {
         setError('Impossible de charger les données');
       }
@@ -127,9 +128,11 @@ const StoreDashboard = () => {
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  // Spinner au premier chargement seulement : un rafraîchissement ne fait plus disparaître la page.
+  if (loading && !dashboardData) return <LoadingSpinner />;
 
-  if (error) {
+  // Une erreur de rafraîchissement ne remplace pas un tableau de bord déjà affiché.
+  if (error && !dashboardData) {
     return (
       <StoreLayout title="Erreur">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">

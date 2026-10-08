@@ -66,7 +66,11 @@ class ArrangementDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, order_id):
-        arrangement = get_object_or_404(PaymentArrangement.objects.select_related('order', 'store'), order_id=order_id)
+        arrangement = get_object_or_404(
+            PaymentArrangement.objects.select_related('order', 'order__delivery', 'store')
+            .prefetch_related('obligations__receipts', 'obligations__adjustments'),
+            order_id=order_id,
+        )
         if not _can_access_arrangement(request.user, arrangement):
             self.permission_denied(request)
         return Response({'success': True, 'data': payment_summary(arrangement, request.user)})

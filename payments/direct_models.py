@@ -78,11 +78,15 @@ class PaymentObligation(models.Model):
 
     @property
     def received_amount(self):
-        return sum((r.amount for r in self.receipts.filter(status='confirmed')), Decimal('0'))
+        # .all() puis filtre en Python : profite des reçus préchargés (prefetch_related) s'il y en a.
+        return sum((r.amount for r in self.receipts.all() if r.status == 'confirmed'), Decimal('0'))
 
     @property
     def refunded_amount(self):
-        return sum((a.amount for a in self.adjustments.filter(adjustment_type__in=['refund', 'commission_credit'], status='confirmed')), Decimal('0'))
+        return sum((
+            a.amount for a in self.adjustments.all()
+            if a.adjustment_type in ('refund', 'commission_credit') and a.status == 'confirmed'
+        ), Decimal('0'))
 
     @property
     def remaining_amount(self):

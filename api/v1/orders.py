@@ -9,6 +9,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 
 from orders.models import Order
 from orders.serializers import (
+	with_order_display_relations,
 	OrderSerializer, OrderCreateSerializer, 
 	OrderStatusUpdateSerializer
 )
@@ -95,13 +96,14 @@ class OrderDetailView(RetrieveAPIView):
 		user = self.request.user
         
 		if user.is_client():
-			return Order.objects.filter(client=user)
+			queryset = Order.objects.filter(client=user)
 		elif user.is_store_manager():
-			return Order.objects.filter(store__manager=user)
+			queryset = Order.objects.filter(store__manager=user)
 		elif user.is_delivery_agent():
-			return Order.objects.filter(delivery__delivery_agent=user)
+			queryset = Order.objects.filter(delivery__delivery_agent=user)
 		else:
-			return Order.objects.all()
+			queryset = Order.objects.all()
+		return with_order_display_relations(queryset)
     
 	def retrieve(self, request, *args, **kwargs):
 		instance = self.get_object()
@@ -120,13 +122,14 @@ class OrderListView(ListAPIView):
 		user = self.request.user
         
 		if user.is_client():
-			return Order.objects.filter(client=user).order_by('-created_at')
+			queryset = Order.objects.filter(client=user)
 		elif user.is_store_manager():
-			return Order.objects.filter(store__manager=user).order_by('-created_at')
+			queryset = Order.objects.filter(store__manager=user)
 		elif user.is_delivery_agent():
-			return Order.objects.filter(delivery__delivery_agent=user).order_by('-created_at')
+			queryset = Order.objects.filter(delivery__delivery_agent=user)
 		else:
-			return Order.objects.all().order_by('-created_at')
+			queryset = Order.objects.all()
+		return with_order_display_relations(queryset.order_by('-created_at'))
     
 	def list(self, request, *args, **kwargs):
 		queryset = self.filter_queryset(self.get_queryset())

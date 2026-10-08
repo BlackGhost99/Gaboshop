@@ -39,7 +39,17 @@ export default function OrderPaymentPanel({ orderId, onChange }) {
   };
 
   if (loading) return <p className="text-sm text-gray-500">Chargement du paiement…</p>;
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  // Une erreur de rafraîchissement ne cache pas un paiement déjà affiché.
+  if (error && !data) {
+    return (
+      <p className="text-sm text-red-600">
+        {error}{' '}
+        <button type="button" onClick={() => { setLoading(true); load(); }} className="font-semibold underline">
+          Réessayer
+        </button>
+      </p>
+    );
+  }
   if (!data) return null;
   if (data.flow === 'platform_online') {
     return data.online_payment ? (
