@@ -28,6 +28,7 @@ MARKERS = {
     'Correction « commandes qui clignotent » (8 oct.)': 'Le serveur ne répond pas pour le moment',
     'Paiement en ligne SingPay (carte de suivi client)': "J'ai validé, vérifier",
     'SingPay : opérateur vérifié selon le numéro': 'choisissez Moov Money',
+    'Versements : numéro Mobile Money du commerce': 'Recevoir vos ventes payées en ligne',
 }
 
 

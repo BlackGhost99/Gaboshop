@@ -98,7 +98,7 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
             'name', 'description', 'phone', 'email', 'address', 
             'zone', 'latitude', 'longitude', 'logo', 'banner_image',
             'opening_time', 'closing_time', 'offers_delivery', 'delivery_fee', 'min_order_amount',
-            'agent_code'
+            'agent_code', 'payout_phone'
         ]
 
     def validate_agent_code(self, value):
@@ -106,4 +106,18 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
         if value and not re.fullmatch(r'[A-Za-z0-9_.\-]{3,100}', value):
             raise serializers.ValidationError(_('Code agent invalide (lettres, chiffres, - _ . uniquement).'))
         return value
+
+    def validate_payout_phone(self, value):
+        digits = re.sub(r'\D', '', value or '')
+        if not digits:
+            return ''
+        if len(digits) == 11 and digits.startswith('241'):
+            digits = digits[3:]
+        if len(digits) == 8:
+            digits = '0' + digits
+        if not re.fullmatch(r'0[67]\d{7}', digits):
+            raise serializers.ValidationError(
+                _('Numéro Mobile Money invalide : un numéro Airtel (074, 076, 077) ou Moov (060, 062, 065, 066).')
+            )
+        return '+241' + digits[1:]
         

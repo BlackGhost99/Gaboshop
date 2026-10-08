@@ -3351,6 +3351,29 @@ const AdminDashboard = () => {
                 </label>
               </div>
 
+              <div className="rounded-md border border-gray-200 p-3 space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Versements des ventes en ligne</p>
+                <p className="text-xs text-gray-600">
+                  Indiqué par le commerce :{' '}
+                  {editingStore.payout_phone ? (
+                    <strong>{editingStore.payout_phone} ({editingStore.payout_operator === 'moov' ? 'Moov Money' : 'Airtel Money'})</strong>
+                  ) : 'aucun numéro'}
+                  {editingStore.agent_code ? <>, code agent <strong>{editingStore.agent_code}</strong></> : null}
+                </p>
+                <label className="text-sm font-medium text-gray-700" htmlFor="store_singpay_disbursement">Identifiant de décaissement SingPay</label>
+                <input
+                  id="store_singpay_disbursement"
+                  type="text"
+                  value={editingStore.singpay_disbursement_id || ''}
+                  onChange={(e) => setEditingStore({ ...editingStore, singpay_disbursement_id: e.target.value })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  Enregistrez le numéro ou le code agent du commerce comme décaissement dans l'espace marchand SingPay, puis collez ici l'identifiant obtenu. Sans lui, les versements restent manuels.
+                </p>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <button
                   type="button"

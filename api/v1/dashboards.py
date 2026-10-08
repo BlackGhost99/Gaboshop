@@ -318,6 +318,10 @@ class StoreDashboardView(APIView):
                     'id': store.id,
                     'logo': request.build_absolute_uri(store.logo.url) if store.logo else None,
                     'agent_code': store.agent_code,
+                    'payout_phone': store.payout_phone,
+                    'payout_operator': store.payout_operator,
+                    # Le commerce voit seulement si ses versements sont prêts, pas l'identifiant SingPay.
+                    'payouts_ready': bool(store.singpay_disbursement_id),
                 },
                 'owner': {
                     'email': store.manager.email or '',

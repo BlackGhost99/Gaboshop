@@ -1,5 +1,7 @@
 """Stores Management API for admin dashboard."""
 
+import re
+
 from django.db.models import Sum, Count, Q, Exists, OuterRef
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -176,6 +178,11 @@ class StoresListView(APIView):
                 'market_mode': store.market_mode,
                 'has_b2b_profile': has_b2b_profile,
                 'created_at': store.created_at.isoformat(),
+                # Versements des ventes : indiqués par le commerce, identifiant SingPay saisi par l'admin
+                'agent_code': store.agent_code,
+                'payout_phone': store.payout_phone,
+                'payout_operator': store.payout_operator,
+                'singpay_disbursement_id': store.singpay_disbursement_id,
             })
         
         return Response({
@@ -321,6 +328,14 @@ class StoreUpdateView(APIView):
                 store.email = data['email']
             if 'is_active' in data:
                 store.is_active = data['is_active']
+            if 'singpay_disbursement_id' in data:
+                disbursement_id = str(data['singpay_disbursement_id'] or '').strip()
+                if disbursement_id and not re.fullmatch(r'[A-Za-z0-9_.\-]{3,100}', disbursement_id):
+                    return Response(
+                        {'success': False, 'error': "Identifiant de décaissement SingPay invalide (lettres, chiffres, - _ . uniquement)."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                store.singpay_disbursement_id = disbursement_id
             
             store.save()
             

@@ -3,6 +3,16 @@ import StoreLayout from '../../components/StoreLayout';
 import { getStoreDashboard } from '../../services/dashboardService';
 import { getStoreDetails, updateStore } from '../../services/storeService';
 
+// Opérateur du numéro de versement, déduit de son début : 07… Airtel Money, 06… Moov Money.
+const payoutOperatorText = (phone) => {
+    const digits = (phone || '').replace(/\D/g, '').replace(/^241(?=\d{8}$)/, '');
+    const local = digits.length === 8 ? `0${digits}` : digits;
+    if (!local) return 'Numéro Airtel (074, 076, 077) ou Moov (060, 062, 065, 066).';
+    if (local.startsWith('07')) return 'Airtel Money';
+    if (local.startsWith('06')) return 'Moov Money';
+    return 'Numéro Airtel (07…) ou Moov (06…) uniquement.';
+};
+
 const StoreProfile = () => {
     const [store, setStore] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -19,6 +29,7 @@ const StoreProfile = () => {
         min_order_amount: '',
         offers_delivery: false,
         agent_code: '',
+        payout_phone: '',
         manager_first_name: '',
         manager_last_name: '',
         manager_email: '',
@@ -30,6 +41,7 @@ const StoreProfile = () => {
     // La description est réservée aux forfaits avec page personnalisée : le serveur refuse
     // toute requête qui la contient. On ne l'envoie donc que si elle a vraiment changé.
     const [initialDescription, setInitialDescription] = useState('');
+    const [payoutsReady, setPayoutsReady] = useState(false);
 
     useEffect(() => {
         fetchStoreData();
@@ -58,11 +70,13 @@ const StoreProfile = () => {
                             min_order_amount: data.min_order_amount || '',
                             offers_delivery: !!data.offers_delivery,
                             agent_code: dashboardStore.agent_code || '',
+                            payout_phone: dashboardStore.payout_phone || '',
                         manager_first_name: data.manager_details?.first_name || '',
                         manager_last_name: data.manager_details?.last_name || '',
                         manager_email: data.manager_details?.email || '',
                     });
                     setInitialDescription(data.description || '');
+                    setPayoutsReady(!!dashboardStore.payouts_ready);
                     setPreviewLogo(data.logo);
                     setPreviewBanner(data.banner_image);
                 }
@@ -104,8 +118,8 @@ const StoreProfile = () => {
             }
             if (typeof value === 'boolean') {
                 data.append(key, value ? 'true' : 'false');
-            } else if (key === 'agent_code') {
-                // Toujours envoyé pour pouvoir aussi effacer le code
+            } else if (key === 'agent_code' || key === 'payout_phone') {
+                // Toujours envoyés pour pouvoir aussi les effacer
                 data.append(key, value || '');
             } else if (value !== null && value !== '') {
                 data.append(key, value);
@@ -274,16 +288,38 @@ const StoreProfile = () => {
                         <p className="md:col-span-2 -mt-3 text-xs text-gray-500">
                             Si coché, Gaboshop ne paie pas de livreur : vous recevez la part livraison avec le versement du commerce, en un seul paiement. Par défaut : décoché (livreurs indépendants Gaboshop).
                         </p>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Code agent (Mobile Money)</label>
-                            <input
-                                type="text" name="agent_code" value={formData.agent_code} onChange={handleChange}
-                                autoComplete="off" maxLength={100}
-                                className="mt-1 block w-full border rounded-md shadow-sm p-2"
-                                placeholder="Code sur lequel Gaboshop verse vos ventes"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">
-                                Gaboshop verse votre part (produits moins commission) sur ce code dès que vous confirmez une commande payée en ligne. Sans code, le versement reste en attente.
+                        <div className="md:col-span-2 rounded-md border border-gray-200 p-4 space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">Recevoir vos ventes payées en ligne</h3>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Quand vous confirmez une commande payée en ligne, Gaboshop vous verse votre part (produits moins commission) sur le code agent ou le numéro ci-dessous.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Numéro Mobile Money</label>
+                                    <input
+                                        type="tel" name="payout_phone" value={formData.payout_phone} onChange={handleChange}
+                                        autoComplete="off" maxLength={20} inputMode="tel"
+                                        className="mt-1 block w-full border rounded-md shadow-sm p-2"
+                                        placeholder="Ex. 077 12 34 56"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">{payoutOperatorText(formData.payout_phone)}</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Code agent Mobile Money (option)</label>
+                                    <input
+                                        type="text" name="agent_code" value={formData.agent_code} onChange={handleChange}
+                                        autoComplete="off" maxLength={100}
+                                        className="mt-1 block w-full border rounded-md shadow-sm p-2"
+                                        placeholder="Si vous avez un code agent"
+                                    />
+                                </div>
+                            </div>
+                            <p className={`text-xs ${payoutsReady ? 'text-green-700' : 'text-amber-700'}`}>
+                                {payoutsReady
+                                    ? 'Versements activés : Gaboshop a enregistré votre compte chez SingPay.'
+                                    : "Versements en attente : Gaboshop doit d'abord enregistrer votre numéro ou code agent chez SingPay. D'ici là, vos ventes vous sont versées à la main."}
                             </p>
                         </div>
                         <div>

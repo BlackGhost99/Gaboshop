@@ -65,7 +65,22 @@ class Store(models.Model):
 		max_length=100,
 		blank=True,
 		default='',
-		help_text="Code agent / disbursement SingPay du commerce pour recevoir ses versements"
+		help_text="Code agent Mobile Money indiqué par le commerce pour recevoir ses ventes"
+	)
+	# Numéro Mobile Money indiqué par le commerce pour recevoir ses ventes (+241XXXXXXXX)
+	payout_phone = models.CharField(
+		max_length=20,
+		blank=True,
+		default='',
+		help_text="Numéro Mobile Money du commerce pour recevoir ses ventes (Airtel 07…, Moov 06…)"
+	)
+	# SingPay ne verse pas à un simple numéro : Gaboshop enregistre le code agent ou le numéro du
+	# commerce comme décaissement dans son espace marchand SingPay, puis colle ici l'identifiant obtenu.
+	singpay_disbursement_id = models.CharField(
+		max_length=100,
+		blank=True,
+		default='',
+		help_text="Identifiant de décaissement SingPay du commerce (créé par Gaboshop dans l'espace marchand SingPay)"
 	)
 	delivery_fee_express = models.DecimalField(
 		max_digits=8, 
@@ -161,6 +176,16 @@ class Store(models.Model):
 	@property
 	def market_mode(self):
 		return self.get_market_mode()
+
+	@property
+	def payout_operator(self):
+		"""Opérateur du numéro de versement : 07… Airtel Money, 06… Moov Money."""
+		local = '0' + self.payout_phone[4:] if self.payout_phone.startswith('+241') else ''
+		if local.startswith('07'):
+			return 'airtel'
+		if local.startswith('06'):
+			return 'moov'
+		return ''
 	
 	def set_market_mode(self, mode):
 		mode_normalized = (mode or '').strip().lower()

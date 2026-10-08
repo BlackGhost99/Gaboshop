@@ -56,6 +56,11 @@ class StoreAdmin(admin.ModelAdmin):
         ('Horaires et Statut', {
             'fields': ('opening_time', 'closing_time', 'is_active', 'is_verified')
         }),
+        ('Versements des ventes', {
+            'description': "Le commerce indique son code agent ou son numéro Mobile Money. Enregistrez-le comme "
+                           "décaissement dans l'espace marchand SingPay, puis collez ici l'identifiant obtenu.",
+            'fields': ('agent_code', 'payout_phone', 'singpay_disbursement_id')
+        }),
         ('Métadonnées', {
             'fields': ('created_at', 'updated_at', 'total_products_display'),
             'classes': ('collapse',)

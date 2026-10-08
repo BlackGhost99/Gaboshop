@@ -31,6 +31,7 @@ class StorePayoutTests(TestCase):
         self.store = Store.objects.create(
             name='Commerce test', category=category, manager=self.manager, phone='+24107000100',
             address='Libreville', zone='Centre', commission_rate=Decimal('8'), agent_code='AGENT-001',
+            singpay_disbursement_id='DISB-001',
             opening_time=time(0, 0), closing_time=time(23, 59),
         )
         product_category = ProductCategory.objects.create(store_category=category, name='Produits', commission_rate=Decimal('8'))
@@ -70,7 +71,7 @@ class StorePayoutTests(TestCase):
         self.assertIn('manuel', payout.note)
 
     @override_settings(SINGPAY_ENABLE_TRANSFER=True)
-    def test_enabled_transfer_pays_store_share_to_agent_code(self):
+    def test_enabled_transfer_pays_store_share_to_its_singpay_disbursement(self):
         order = self.make_order()
         with mock.patch(TRANSFER, return_value={'status': 'ok'}) as transfer:
             payout = release_store_payment(order.id)
@@ -78,9 +79,10 @@ class StorePayoutTests(TestCase):
         self.assertIsNotNone(payout.paid_at)
         transfer.assert_called_once()
         kwargs = transfer.call_args.kwargs
-        self.assertEqual(kwargs['disbursement'], 'AGENT-001')
+        self.assertEqual(kwargs['disbursement'], 'DISB-001')
         self.assertEqual(kwargs['amount'], 9200)
-        self.assertEqual(kwargs['reference'], f'STOREPAY_{order.id}')
+        # SingPay retrouve l'encaissement du client par sa référence marchande.
+        self.assertEqual(kwargs['reference'], f'GABOSHOP_{order.order_number}')
 
     @override_settings(SINGPAY_ENABLE_TRANSFER=True)
     def test_repeated_release_never_pays_twice(self):
@@ -93,20 +95,21 @@ class StorePayoutTests(TestCase):
         self.assertEqual(StorePayout.objects.filter(order=order).count(), 1)
 
     @override_settings(SINGPAY_ENABLE_TRANSFER=True)
-    def test_missing_agent_code_waits_then_can_be_retried(self):
-        self.store.agent_code = ''
-        self.store.save(update_fields=['agent_code'])
+    def test_missing_singpay_disbursement_waits_then_can_be_retried(self):
+        # Le code agent seul ne suffit pas : SingPay ne verse qu'à un décaissement enregistré.
+        self.store.singpay_disbursement_id = ''
+        self.store.save(update_fields=['singpay_disbursement_id'])
         order = self.make_order()
         with mock.patch(TRANSFER, return_value={'status': 'ok'}) as transfer:
             waiting = release_store_payment(order.id)
             self.assertEqual(waiting.status, 'pending')
-            self.assertIn('Code agent', waiting.note)
+            self.assertIn('décaissement SingPay', waiting.note)
             transfer.assert_not_called()
-            self.store.agent_code = 'AGENT-002'
-            self.store.save(update_fields=['agent_code'])
+            self.store.singpay_disbursement_id = 'DISB-002'
+            self.store.save(update_fields=['singpay_disbursement_id'])
             paid = release_store_payment(order.id)
         self.assertEqual(paid.status, 'paid')
-        self.assertEqual(paid.agent_code, 'AGENT-002')
+        self.assertEqual(paid.agent_code, 'DISB-002')
         self.assertEqual(transfer.call_count, 1)
 
     @override_settings(SINGPAY_ENABLE_TRANSFER=True)
@@ -239,3 +242,46 @@ class StorePayoutTests(TestCase):
         api.force_authenticate(self.other_manager)
         response = api.get('/api/v1/dashboard/store/')
         self.assertNotIn('AGENT-001', response.content.decode())
+
+    # --- numéro Mobile Money du commerce et identifiant SingPay -------------------------
+    def test_store_sets_its_mobile_money_number(self):
+        api = APIClient()
+        api.force_authenticate(self.manager)
+        url = f'/api/v1/stores/{self.store.id}/update/'
+        for typed, saved, operator in (('077 12 34 56', '+24177123456', 'airtel'), ('+241 62 30 83 63', '+24162308363', 'moov'), ('', '', '')):
+            response = api.patch(url, {'payout_phone': typed}, format='json')
+            self.assertEqual(response.status_code, 200, response.content)
+            self.store.refresh_from_db()
+            self.assertEqual(self.store.payout_phone, saved)
+            self.assertEqual(self.store.payout_operator, operator)
+        for bad in ('011234567', '12345', '0771234567890'):
+            self.assertEqual(api.patch(url, {'payout_phone': bad}, format='json').status_code, 400, bad)
+
+    def test_store_cannot_set_its_own_singpay_disbursement(self):
+        api = APIClient()
+        api.force_authenticate(self.manager)
+        api.patch(f'/api/v1/stores/{self.store.id}/update/', {'singpay_disbursement_id': 'HACK'}, format='json')
+        self.store.refresh_from_db()
+        self.assertEqual(self.store.singpay_disbursement_id, 'DISB-001')
+        dashboard = api.get('/api/v1/dashboard/store/').json()['data']['store']
+        self.assertTrue(dashboard['payouts_ready'])
+        self.assertNotIn('DISB-001', str(dashboard))
+
+    def test_payout_details_stay_private(self):
+        self.store.payout_phone = '+24177123456'
+        self.store.save(update_fields=['payout_phone'])
+        content = APIClient().get(f'/api/v1/stores/{self.store.id}/').content.decode()
+        for private in ('77123456', 'DISB-001'):
+            self.assertNotIn(private, content)
+
+    def test_admin_sets_the_singpay_disbursement(self):
+        admin_user = User.objects.create_user(phone='+24107000009', password='x', user_type='admin', is_staff=True, is_superuser=True)
+        api = APIClient()
+        api.force_authenticate(admin_user)
+        listed = next(s for s in api.get('/api/v1/admin/stores/list/').json()['data'] if s['id'] == self.store.id)
+        self.assertEqual(listed['agent_code'], 'AGENT-001')
+        url = f'/api/v1/admin/stores/{self.store.id}/update/'
+        self.assertEqual(api.patch(url, {'singpay_disbursement_id': ' DISB-777 '}, format='json').status_code, 200)
+        self.store.refresh_from_db()
+        self.assertEqual(self.store.singpay_disbursement_id, 'DISB-777')
+        self.assertEqual(api.patch(url, {'singpay_disbursement_id': 'avec espaces'}, format='json').status_code, 400)

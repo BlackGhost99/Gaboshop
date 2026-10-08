@@ -64,23 +64,25 @@ def release_store_payment(order_id):
                 return payout
 
             products, commission, delivery, amount = compute_store_share(order)
-            agent_code = (order.store.agent_code or '').strip()
+            # SingPay verse vers un décaissement enregistré dans l'espace marchand de Gaboshop
+            # (le code agent ou le numéro Mobile Money indiqué par le commerce), jamais vers un simple numéro.
+            disbursement_id = (order.store.singpay_disbursement_id or '').strip()
             if payout is None:
                 payout = StorePayout.objects.create(
                     order=order, store=order.store, amount=amount, products_amount=products,
                     commission_amount=commission, delivery_amount=delivery,
-                    includes_delivery=delivery > 0, agent_code=agent_code,
+                    includes_delivery=delivery > 0, agent_code=disbursement_id,
                     reference=f'STOREPAY_{order.pk}',
                 )
             else:
-                payout.agent_code = agent_code
+                payout.agent_code = disbursement_id
 
             if amount <= 0:
                 payout.status, payout.note = 'skipped', 'Montant nul'
                 payout.save()
                 return payout
-            if not agent_code:
-                payout.status, payout.note = 'pending', 'Code agent du commerce manquant'
+            if not disbursement_id:
+                payout.status, payout.note = 'pending', 'Identifiant de décaissement SingPay du commerce manquant'
                 payout.save()
                 return payout
             if not getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False):
@@ -91,7 +93,8 @@ def release_store_payment(order_id):
             payout.status, payout.note = 'processing', ''
             payout.attempts += 1
             payout.save()
-            reference, amount_to_send = payout.reference, _provider_amount(payout.amount)
+            # SingPay retrouve l'encaissement à reverser par sa référence marchande.
+            reference, amount_to_send = f'GABOSHOP_{order.order_number}', _provider_amount(payout.amount)
     except Exception:
         logger.exception('Versement commerce : préparation impossible (commande %s)', order_id)
         return None
@@ -100,7 +103,7 @@ def release_store_payment(order_id):
     try:
         response = call_singpay_transfer(
             reference=reference,
-            disbursement=agent_code,
+            disbursement=disbursement_id,
             amount=amount_to_send,
             portefeuille=getattr(settings, 'SINGPAY_WALLET_ID', ''),
         )
