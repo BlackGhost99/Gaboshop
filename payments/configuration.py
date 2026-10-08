@@ -117,7 +117,7 @@ def available_payment_options(store, delivery_requested=True):
         for method in policy['enabled_methods']:
             if flow == 'courier_cash' and (method != 'cash' or not delivery_requested):
                 continue
-            if flow == 'platform_online' and (method == 'cash' or not platform_online_ready()):
+            if flow == 'platform_online' and (method not in ('airtel_money', 'moov_money') or not platform_online_ready()):
                 continue
             instructions = policy.get('instructions', {}).get(method, '')
             if flow != 'platform_online' and method != 'cash' and not instructions:

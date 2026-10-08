@@ -6,10 +6,18 @@ import { formatCurrency, formatDateTime } from '../../utils/helpers';
 import useVisibleInterval from '../../hooks/useVisibleInterval';
 import OrderPaymentPanel from '../../components/payments/OrderPaymentPanel';
 
-// Paiement direct (Mobile Money au code marchand) que le client doit encore faire ou déclarer.
+// Paiement en ligne Gaboshop (SingPay) pas encore confirmé.
+const needsOnlinePayment = (order) => {
+  const online = order.payment_arrangement?.online_payment;
+  return Boolean(online?.i_am_client && online.status !== 'success'
+    && !['cancelled', 'refunded'].includes(order.status));
+};
+
+// Paiement que le client doit encore faire : en ligne, ou direct (Mobile Money au code marchand) à déclarer.
 const needsPayment = (order) => {
   const arrangement = order.payment_arrangement;
-  if (!arrangement || arrangement.flow === 'platform_online' || arrangement.method === 'cash') return false;
+  if (arrangement?.flow === 'platform_online') return needsOnlinePayment(order);
+  if (!arrangement || arrangement.method === 'cash') return false;
   return (arrangement.obligations || []).some((o) => o.i_am_payer && o.kind !== 'commission'
     && ['unpaid', 'partially_paid', 'overdue'].includes(o.status)
     && !(o.receipts || []).some((r) => r.status === 'pending'));
@@ -276,7 +284,7 @@ const ClientOrders = () => {
                     onClick={() => openDetail(order.id)}
                     className="mt-3 w-full px-3 py-2 rounded-md bg-amber-500 text-white text-sm font-semibold"
                   >
-                    💳 Payer et déclarer mon paiement
+                    {needsOnlinePayment(order) ? '💳 Payer en ligne' : '💳 Payer et déclarer mon paiement'}
                   </button>
                 ) : (
                   <button

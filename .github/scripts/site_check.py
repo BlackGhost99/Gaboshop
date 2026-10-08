@@ -17,13 +17,19 @@ SITES = [
     },
     {
         'name': 'Test (staging)',
-        'api': 'https://gaboshop-api-staging.onrender.com',
-        'web': 'https://gaboshop-web-staging.onrender.com',
+        'api': 'https://gaboshop-api-staging-uvn1.onrender.com',
+        'web': 'https://gaboshop-web-staging-uvn1.onrender.com',
     },
 ]
 
 
-def fetch(url, origin=None, attempts=2):
+# Textes présents dans le site web une fois une correction déployée (le site est un seul gros fichier JS).
+MARKERS = {
+    'Correction « commandes qui clignotent » (8 oct.)': 'Le serveur ne répond pas pour le moment',
+}
+
+
+def fetch(url, origin=None, attempts=2, max_bytes=400_000):
     """GET avec réveil des services gratuits Render (jusqu'à ~2 min la première fois)."""
     headers = {'User-Agent': 'gaboshop-site-check'}
     if origin:
@@ -33,7 +39,7 @@ def fetch(url, origin=None, attempts=2):
         start = time.time()
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=150) as res:
-                body = res.read(400_000)
+                body = res.read(max_bytes)
                 return {'status': res.status, 'seconds': round(time.time() - start, 1), 'headers': dict(res.headers), 'body': body}
         except urllib.error.HTTPError as err:
             last = {'status': err.code, 'seconds': round(time.time() - start, 1), 'headers': dict(err.headers or {}), 'body': err.read(2000)}
@@ -86,7 +92,11 @@ def check(site):
     if res['status'] == 200:
         scripts = re.findall(rb'src="(/assets/[^"]+\.js)"', res['body'])
         if scripts:
-            js = fetch(web + scripts[0].decode(), attempts=1)
+            js = fetch(web + scripts[0].decode(), attempts=1, max_bytes=20_000_000)
+            lines.append(f"- Fichier du site : `{scripts[0].decode()}`")
+            for label, text in MARKERS.items():
+                present = text.encode() in (js['body'] or b'')
+                lines.append(f"- {label} : {'présente' if present else 'ABSENTE'}")
             apis = sorted(set(re.findall(rb'https://[a-z0-9.-]*onrender\.com', js['body'] or b'')))
             found = ', '.join(a.decode() for a in apis) or 'aucune adresse onrender.com trouvée'
             verdict = 'OK' if api.encode() in apis else 'ATTENTION : ce site ne vise pas cette API'

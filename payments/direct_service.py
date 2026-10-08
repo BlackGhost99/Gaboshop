@@ -172,12 +172,31 @@ def payment_summary(value, user=None):
     order = arrangement.order
     live = ((arrangement.store.payment_preferences or {}).get('instructions') or {}).get(arrangement.method, '')
     instructions = live or (arrangement.policy_snapshot.get('instructions') or {}).get(arrangement.method, '')
-    return {
+    summary = {
         'id': arrangement.id, 'flow': arrangement.flow, 'method': arrangement.method,
         'order_id': order.id, 'order_number': order.order_number, 'is_b2b': getattr(order, 'is_b2b', False),
         'store_name': arrangement.store.name, 'store_phone': arrangement.store.phone,
         'instructions': instructions,
         'products_amount': str(arrangement.products_amount), 'delivery_amount': str(arrangement.delivery_amount), 'commission_rate': str(arrangement.commission_rate), 'commission_amount': str(arrangement.commission_amount), 'obligations': obligations,
+    }
+    if arrangement.flow == 'platform_online':
+        summary['online_payment'] = _online_payment_summary(order, user)
+    return summary
+
+
+def _online_payment_summary(order, user):
+    """État du paiement en ligne (SingPay) de la commande, pour le client et le commerce."""
+    from .models import Payment
+
+    payment = Payment.objects.filter(order=order).first()
+    is_client = user is not None and user.id == order.client_id
+    return {
+        'status': payment.status if payment else 'not_started',
+        'method': payment.payment_method if payment else '',
+        'amount': str(payment.amount) if payment else str(order.total_amount),
+        'phone': payment.client_phone if payment and is_client else '',
+        'order_status': order.status,
+        'i_am_client': is_client,
     }
 
 

@@ -138,8 +138,9 @@ def handle_payment_success(sender, instance, created, **kwargs):
 	"""
 	payment = instance
 	
-	# Quand le paiement passe en SUCCESS
-	if payment.status == 'success' and payment.order.status != 'paid':
+	# Quand le paiement passe en SUCCESS, pour une commande qui attendait ce paiement
+	# (jamais pour une commande annulée, déjà confirmée ou livrée).
+	if payment.status == 'success' and payment.order.status in ('created', 'pending_payment'):
 		# 1. Marquer la date de complétion
 		if not payment.completed_at:
 			payment.completed_at = timezone.now()

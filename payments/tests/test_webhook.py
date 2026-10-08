@@ -75,10 +75,12 @@ class PaymentWebhookTests(TestCase):
             'amount': amount,
         }
 
-    def test_rejects_missing_signature(self):
+    def test_unsigned_notification_does_not_confirm(self):
+        # Sans signature, le contenu de la notification n'est pas cru : seul SingPay fait foi
+        # (ici aucun identifiant SingPay n'est connu, donc rien n'est demandé ni changé).
         response = self.post_webhook(self.success_payload(), signature=False)
 
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 200)
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.status, 'pending')
 
