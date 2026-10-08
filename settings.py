@@ -587,7 +587,7 @@ MOOV_API_URL = "https://api.moov.ga/v1/payment/request"
 MOOV_CHECK_URL = "https://api.moov.ga/v1/payment/status"
 
 # SingPay Configuration
-SINGPAY_BASE_URL = env('SINGPAY_BASE_URL', default='')
+SINGPAY_BASE_URL = env('SINGPAY_BASE_URL', default='https://gateway.singpay.ga/v1')
 SINGPAY_CLIENT_ID = env('SINGPAY_CLIENT_ID', default='')
 SINGPAY_CLIENT_SECRET = env('SINGPAY_CLIENT_SECRET', default='')
 SINGPAY_WALLET_ID = env('SINGPAY_WALLET_ID', default='')

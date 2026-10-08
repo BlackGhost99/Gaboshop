@@ -26,6 +26,7 @@ SITES = [
 # Textes présents dans le site web une fois une correction déployée (le site est un seul gros fichier JS).
 MARKERS = {
     'Correction « commandes qui clignotent » (8 oct.)': 'Le serveur ne répond pas pour le moment',
+    'Paiement en ligne SingPay (carte de suivi client)': "J'ai validé, vérifier",
 }
 
 

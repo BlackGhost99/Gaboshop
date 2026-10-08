@@ -43,13 +43,13 @@ services:
       # 512 Mo de memoire : un seul processus gunicorn
       - key: GUNICORN_WORKERS
         value: "1"
-      # Paiements simules tant que SingPay n'est pas configure ni valide.
+      # Paiements réels SingPay (8 oct. 2026) : plus de simulation si SingPay ne répond pas.
       - key: PAYMENT_SIMULATION_MODE
-        value: "1"
+        value: "0"
       - key: SINGPAY_ENABLE_TRANSFER
         value: "False"
       - key: SINGPAY_BASE_URL
-        sync: false
+        value: https://gateway.singpay.ga/v1
       - key: SINGPAY_CLIENT_ID
         sync: false
       - key: SINGPAY_CLIENT_SECRET
