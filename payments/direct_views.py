@@ -114,8 +114,15 @@ class ReceiptCreateView(APIView):
         if not reference:
             raise ValidationError({'reference': 'Indiquez l’ID de transaction reçu par SMS.'})
         if method != 'cash':
-            # Un même ID de transaction Mobile Money ne sert qu'une fois, sur toute la plateforme.
             normalized = reference.replace(' ', '').upper()
+            # Le numéro de commande (CMD…) est le motif à écrire, pas l'ID de transaction du SMS.
+            order_number = (obligation.arrangement.order.order_number or '').replace(' ', '').upper()
+            if normalized.startswith('CMD') or (order_number and order_number in normalized):
+                raise ValidationError({'reference': (
+                    'Ceci est le numéro de la commande. Indiquez l’ID de transaction du SMS de confirmation '
+                    'Airtel Money ou Moov Money.'
+                )})
+            # Un même ID de transaction Mobile Money ne sert qu'une fois, sur toute la plateforme.
             used = PaymentReceipt.objects.filter(method=method).exclude(status='rejected').values_list('reference', flat=True)
             if any(r.replace(' ', '').upper() == normalized for r in used):
                 raise ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'})

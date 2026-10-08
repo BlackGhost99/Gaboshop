@@ -155,7 +155,7 @@ function PayerSteps({ arrangement, obligation, pending, onDone }) {
           )}.
         </li>
         <li>Dans le motif, écrivez <strong>{arrangement.order_number}</strong>.</li>
-        <li>Recopiez ci-dessous l'ID de transaction du SMS de confirmation.</li>
+        <li>Recopiez ci-dessous l'ID de transaction du SMS de confirmation Airtel ou Moov (pas le numéro de commande).</li>
       </ol>
       <input
         value={reference}
