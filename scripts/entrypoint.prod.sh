@@ -14,6 +14,12 @@ PY
 python manage.py migrate --noinput --verbosity 2 2>&1 || echo "MIGRATE ECHEC (code $?)"
 python manage.py collectstatic --noinput 2>&1 || echo "COLLECTSTATIC ECHEC (code $?)"
 
+# Site de test uniquement : copie (lecture seule) de la vraie base, une fois par demande
+# (variables STAGING_COPY_FROM_DATABASE_URL et STAGING_COPY_REQUEST, voir la commande).
+if [ "${STAGING_TEST_SHOP:-0}" = "1" ]; then
+  python manage.py copy_prod_to_staging || echo "COPIE DE LA PRODUCTION ECHEC"
+fi
+
 # Premier compte admin d'une base vide (environnement de test) : seulement si les deux variables
 # DJANGO_SUPERUSER_PHONE et DJANGO_SUPERUSER_PASSWORD existent, et jamais pour modifier un compte existant.
 python - <<'PY' || echo "CREATION ADMIN ECHEC"

@@ -210,6 +210,24 @@ elif env("DATABASE_HOST", ""):
         }
     }
 
+# Site de test uniquement : base de production à recopier dans la base de test, en lecture seule.
+# Voir core/management/commands/copy_prod_to_staging.py. Jamais posé sur le vrai site.
+_copy_source_url = env("STAGING_COPY_FROM_DATABASE_URL", "")
+if _copy_source_url and DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    from urllib.parse import urlparse, unquote
+    _src = urlparse(_copy_source_url)
+    DATABASES['source'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': _src.path.lstrip('/'),
+        'USER': unquote(_src.username or ''),
+        'PASSWORD': unquote(_src.password or ''),
+        'HOST': _src.hostname,
+        'PORT': _src.port or 5432,
+        'CONN_MAX_AGE': 0,
+        'OPTIONS': {'sslmode': env('STAGING_COPY_SSLMODE', 'require')},
+        'DISABLE_SERVER_SIDE_CURSORS': True,
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
