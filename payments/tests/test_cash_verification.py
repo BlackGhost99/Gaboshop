@@ -74,6 +74,14 @@ class CashVerificationTests(TestCase):
         self.assertEqual(self.api.post(f"/api/v1/payments/receipts/{pending[0]['id']}/confirm/").status_code, 200)
         self.assertTrue(can_dispatch(order))
 
+    def test_order_number_is_not_accepted_as_transaction_id(self):
+        order = self.order()
+        for i, reference in enumerate([order.order_number, f' {order.order_number.lower()} ', 'CMD12345678']):
+            res = self.declare(self.client_user, self.products_obligation(order), reference=reference, key=f'cmd{i}')
+            self.assertEqual(res.status_code, 400, reference)
+            self.assertIn('numéro de la commande', res.content.decode())
+        self.assertFalse(self.products_obligation(order).receipts.exists())
+
     def test_client_cannot_confirm_own_payment(self):
         order = self.order()
         receipt_id = self.declare(self.client_user, self.products_obligation(order)).json()['data']['id']
