@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 def _build_singpay_error_message(response):
     """Build a user-facing SingPay error with actionable context."""
+    logger.error("Reponse SingPay refusee : %s", str(response)[:2000])
     if not isinstance(response, dict):
         return "Erreur SingPay"
 
@@ -62,11 +63,15 @@ def _build_singpay_error_message(response):
             "Action requise: activer/valider le wallet chez SingPay "
             "(wallet en Pending) puis reutiliser le meme CLIENT_ID/SECRET/WALLET_ID."
         )
+    if "passworderror" in lowered:
+        return "Paiement refuse: code secret Mobile Money incorrect."
+    if "balanceerror" in lowered:
+        return "Paiement refuse: le solde du client semble insuffisant."
     if "something went wrong" in lowered:
+        # Message brut de SingPay gardé : sans lui, impossible de savoir ce qui bloque.
         return (
-            "SingPay a retourne une erreur generique. Verifiez dans le tableau SingPay "
-            "le champ result; si result=TimeOutError, le client doit relancer et valider "
-            "le prompt Mobile Money."
+            f"SingPay a refuse la demande ({message}). Si le portefeuille SingPay est en production, "
+            "il faut aussi l'identifiant de decaissement (SINGPAY_DISBURSEMENT_ID)."
         )
     return message
 
@@ -179,7 +184,7 @@ class PaymentService:
             tx = response.get("transaction") if isinstance(response.get("transaction"), dict) else {}
             status_payload = response.get("status") if isinstance(response.get("status"), dict) else {}
             result_payload = str(response.get("result") or tx.get("result") or "").lower()
-            if result_payload in ("timeouterror", "failed", "error", "ko"):
+            if result_payload in ("timeouterror", "passworderror", "balanceerror", "failed", "error", "ko"):
                 raise Exception(_build_singpay_error_message(response))
             if status_payload.get("success") is False:
                 raise Exception(_build_singpay_error_message(response))
@@ -242,7 +247,7 @@ class PaymentService:
             tx = response.get("transaction") if isinstance(response.get("transaction"), dict) else {}
             status_payload = response.get("status") if isinstance(response.get("status"), dict) else {}
             result_payload = str(response.get("result") or tx.get("result") or "").lower()
-            if result_payload in ("timeouterror", "failed", "error", "ko"):
+            if result_payload in ("timeouterror", "passworderror", "balanceerror", "failed", "error", "ko"):
                 raise Exception(_build_singpay_error_message(response))
             if status_payload.get("success") is False:
                 raise Exception(_build_singpay_error_message(response))
@@ -330,6 +335,18 @@ class PaymentService:
         # Format attendu: +241 suivi de 8 chiffres (Gabon)
         if not re.match(r'^\+241\d{8}$', clean_phone):
             raise ValueError("Numéro de téléphone Gabon invalide. Doit avoir 8 chiffres après +241")
+
+        # Un numéro Moov (06…) ne reçoit pas de demande Airtel, et inversement : SingPay crée la
+        # transaction mais le client n'a jamais la demande de code (TimeOutError).
+        local = '0' + clean_phone[4:]
+        if operator == 'airtel' and local.startswith('06'):
+            raise ValueError(
+                f"Le {local} est un numéro Moov : choisissez Moov Money, ou un numéro Airtel (074, 076, 077)."
+            )
+        if operator == 'moov' and local.startswith('07'):
+            raise ValueError(
+                f"Le {local} est un numéro Airtel : choisissez Airtel Money, ou un numéro Moov (062, 065, 066)."
+            )
 
         return clean_phone
 

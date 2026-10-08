@@ -387,6 +387,19 @@ const ClientDashboard = () => {
       setToast({ type: 'error', message: 'Renseignez un numéro Mobile Money valide.' });
       return;
     }
+    if (payment_flow === 'platform_online') {
+      // Airtel ne peut pas envoyer sa demande de code à un numéro Moov (06…), et inversement.
+      const digits = payment_phone.replace(/\D/g, '').replace(/^241(?=\d{8}$)/, '');
+      const local = digits.length === 8 ? `0${digits}` : digits;
+      if (payment_method === 'airtel_money' && local.startsWith('06')) {
+        setToast({ type: 'error', message: `Le ${local} est un numéro Moov : choisissez Moov Money, ou un numéro Airtel (074, 076, 077).` });
+        return;
+      }
+      if (payment_method === 'moov_money' && local.startsWith('07')) {
+        setToast({ type: 'error', message: `Le ${local} est un numéro Airtel : choisissez Airtel Money, ou un numéro Moov (062, 065, 066).` });
+        return;
+      }
+    }
     if (!delivery_zone) {
       setToast({ type: 'error', message: 'Renseignez une zone/quartier.' });
       return;

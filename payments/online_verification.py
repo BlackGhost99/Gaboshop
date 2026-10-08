@@ -21,11 +21,13 @@ logger = logging.getLogger(__name__)
 SUCCESS_WORDS = {'SUCCESS', 'SUCCESSFUL', 'SUCCEEDED', 'COMPLETED', 'APPROVED'}
 FAILED_WORDS = {
     'FAILED', 'FAILURE', 'ERROR', 'KO', 'TIMEOUT', 'TIMEOUTERROR', 'CANCELLED', 'CANCELED',
-    'REFUSED', 'REJECTED', 'EXPIRED',
+    'REFUSED', 'REJECTED', 'EXPIRED', 'PASSWORDERROR', 'BALANCEERROR',
 }
 SUCCESS_CODES = {'00', 'TS'}
 FAILED_CODES = {'TF'}
-PENDING_STEPS = {'START', 'PARTENAIRE', 'PENDING', 'PROCESSING', 'INITIATED'}
+PENDING_STEPS = {'START', 'PARTENAIRE', 'DISBURSEMENT', 'PENDING', 'PROCESSING', 'INITIATED'}
+# Étape SingPay « Refund » : l'argent est rendu au client, le paiement n'a pas abouti.
+FAILED_STEPS = {'REFUND'}
 FINAL_PAYMENT_STATUSES = ('success', 'refunded')
 # Identifiants internes jamais envoyés à SingPay (lancement échoué, mode simulation).
 LOCAL_ID_PREFIXES = ('PAY-', 'AIRTEL_', 'MOOV_')
@@ -59,7 +61,7 @@ def read_singpay_status(response):
 
     if result in SUCCESS_WORDS or code in SUCCESS_CODES or top in SUCCESS_WORDS:
         return 'success', amount, reference
-    if result in FAILED_WORDS or code in FAILED_CODES or top in FAILED_WORDS:
+    if result in FAILED_WORDS or code in FAILED_CODES or top in FAILED_WORDS or step in FAILED_STEPS:
         return 'failed', amount, reference
     if step in PENDING_STEPS or top in PENDING_STEPS:
         return 'pending', amount, reference

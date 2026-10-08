@@ -3,9 +3,13 @@ import hashlib
 import hmac
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
+import logging
+
 import requests
 from django.conf import settings
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 def call_cinetpay_init(payload):
@@ -84,9 +88,11 @@ def _normalize_msisdn(phone):
     )
     if normalized.startswith("+"):
         normalized = normalized[1:]
-    # SingPay examples use local Gabon format (8 digits) for client_msisdn.
-    if normalized.startswith("241") and len(normalized) >= 11:
-        normalized = normalized[-8:]
+    # SingPay attend le numéro au format local gabonais : 9 chiffres avec le 0 (ex. 074000000).
+    if normalized.startswith("241") and len(normalized) == 11:
+        normalized = normalized[3:]
+    if len(normalized) == 8 and normalized.isdigit():
+        normalized = "0" + normalized
     return normalized
 
 
@@ -112,6 +118,8 @@ def _singpay_request(method, path, payload=None, params=None, wallet_id=None, re
         except Exception:
             data = {"raw": resp.text}
         if resp.status_code >= 400:
+            # Réponse complète de SingPay dans les journaux Render (jamais nos clés).
+            logger.error("SingPay %s %s -> HTTP %s : %s", method, path, resp.status_code, str(data)[:2000])
             return {
                 "error": f"SingPay HTTP {resp.status_code}",
                 "response": data,
@@ -119,6 +127,7 @@ def _singpay_request(method, path, payload=None, params=None, wallet_id=None, re
             }
         return data
     except Exception as exc:
+        logger.error("SingPay %s %s -> echec de l'appel : %s", method, path, exc)
         return {"error": f"SingPay request failed: {exc}"}
 
 

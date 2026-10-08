@@ -30,6 +30,14 @@ class ReadSingpayStatusTests(TestCase):
         self.assertEqual(read_singpay_status(singpay_answer('Failed'))[0], 'failed')
         self.assertEqual(read_singpay_status(singpay_answer(step='Start'))[0], 'pending')
 
+    def test_reads_singpay_failure_words_and_steps(self):
+        # Vocabulaire SingPay : PasswordError, BalanceError, TimeOutError ; étapes Disbursement, Refund.
+        self.assertEqual(read_singpay_status(singpay_answer('PasswordError'))[0], 'failed')
+        self.assertEqual(read_singpay_status(singpay_answer('BalanceError'))[0], 'failed')
+        self.assertEqual(read_singpay_status(singpay_answer('TimeOutError'))[0], 'failed')
+        self.assertEqual(read_singpay_status(singpay_answer(step='Disbursement'))[0], 'pending')
+        self.assertEqual(read_singpay_status(singpay_answer(step='Refund'))[0], 'failed')
+
     def test_successful_api_call_is_not_a_successful_payment(self):
         # « status.success = true » veut dire que l'appel a abouti, pas que le client a payé.
         answer = {'transaction': {'id': 'SP-TX-1', 'status': 'Start'}, 'status': {'success': True, 'code': '201'}}
@@ -201,3 +209,50 @@ class SubscriptionIntentVerificationTests(TestCase):
         )
         response = ProviderCallbackAPIView.as_view()(request, provider='cinetpay')
         self.assertEqual(response.status_code, 401)
+
+
+class SingpayRequestFormatTests(TestCase):
+    def test_phone_is_sent_in_local_nine_digit_format(self):
+        from payments.utils import _normalize_msisdn
+        for raw in ('+24177391199', '24177391199', '077391199', '77391199', '+241 77 39 11 99'):
+            self.assertEqual(_normalize_msisdn(raw), '077391199', raw)
+
+    @override_settings(SINGPAY_CLIENT_ID='id', SINGPAY_CLIENT_SECRET='secret', SINGPAY_WALLET_ID='wallet',
+                       SINGPAY_BASE_URL='https://gateway.example.test/v1')
+    def test_airtel_payment_payload(self):
+        from payments.utils import call_singpay_payment
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {'transaction': {'id': 'SP-1', 'status': 'Start'}}
+
+        with patch('payments.utils.requests.request', return_value=FakeResponse()) as request:
+            call_singpay_payment('airtel', amount='10150.00', reference='GABOSHOP_CMD1', phone='+24177391199',
+                                 portefeuille='wallet', disbursement='disb-1')
+        kwargs = request.call_args.kwargs
+        self.assertTrue(request.call_args.args[1].endswith('/74/paiement'))
+        self.assertEqual(kwargs['json'], {
+            'amount': 10150, 'reference': 'GABOSHOP_CMD1', 'client_msisdn': '077391199',
+            'portefeuille': 'wallet', 'disbursement': 'disb-1',
+        })
+
+    def test_generic_singpay_error_keeps_singpay_message(self):
+        from payments.services import _build_singpay_error_message
+        message = _build_singpay_error_message({
+            'error': 'SingPay HTTP 500', 'response': {'message': 'Something went wrong'},
+        })
+        self.assertIn('Something went wrong', message)
+        self.assertIn('HTTP 500', message)
+        self.assertIn('SINGPAY_DISBURSEMENT_ID', message)
+
+    def test_operator_must_match_the_number(self):
+        from payments.services import PaymentService
+        self.assertEqual(PaymentService._format_gabon_phone('077391199', 'airtel'), '+24177391199')
+        self.assertEqual(PaymentService._format_gabon_phone('062308363', 'moov'), '+24162308363')
+        with self.assertRaisesRegex(ValueError, 'numéro Moov'):
+            PaymentService._format_gabon_phone('62308363', 'airtel')
+        with self.assertRaisesRegex(ValueError, 'numéro Airtel'):
+            PaymentService._format_gabon_phone('+241 77 39 11 99', 'moov')
+
