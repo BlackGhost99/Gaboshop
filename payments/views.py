@@ -476,12 +476,103 @@ class SubscriptionPaymentIntentAPIView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+def process_intent_outcome(intent, provider_tx_id, outcome, raw):
+    """Applique le résultat d'un paiement d'abonnement (ou de commande liée à un intent).
+
+    outcome : 'success', 'failed', 'pending' ou 'mismatch' (montant/référence incohérents).
+    Idempotent : une transaction déjà traitée n'est jamais rejouée.
+    """
+    status_label = {'success': 'SUCCESS', 'pending': 'PENDING'}.get(outcome, 'FAILED')
+    tx, _ = PaymentTransaction.objects.get_or_create(
+        intent=intent,
+        provider_tx_id=provider_tx_id,
+        defaults={"status": status_label, "raw_response": raw}
+    )
+
+    if tx.processed:
+        logger.warning(f"⚠️ Transaction déjà traitée (idempotence): {provider_tx_id}")
+        return Response({"detail": "Already processed"}, status=status.HTTP_200_OK)
+
+    if outcome == 'mismatch':
+        logger.error(f"❌ Montant ou référence incohérents pour {intent.reference}")
+        tx.status, tx.raw_response, tx.processed = "FAILED", raw, True
+        tx.save()
+        intent.status = "FAILED"
+        intent.save()
+        return Response({"detail": "Amount mismatch"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if outcome == 'success':
+        logger.info(f"✅ Paiement confirmé: {intent.reference}")
+        intent.status = "SUCCESS"
+        intent.save()
+        tx.status, tx.processed, tx.raw_response = "SUCCESS", True, raw
+        tx.save()
+
+        _activate_subscription_from_intent(intent)
+
+        # Business logic: marquer la commande comme payée
+        order = intent.order
+        if order:
+            try:
+                if hasattr(order, 'reserve_stock'):
+                    order.reserve_stock()
+                if hasattr(order, 'mark_as_paid'):
+                    order.mark_as_paid(provider_tx_id, intent.amount)
+                logger.info(f"✅ Commande #{order.id} marquée comme payée")
+            except Exception as e:
+                logger.error(f"❌ Erreur reserve stock: {e}")
+                intent.status = "RESERVE_FAILED"
+                intent.save()
+                tx.status, tx.processed = "FAILED", True
+                tx.save()
+                return Response({"detail": "Stock reserve failed"}, status=status.HTTP_200_OK)
+
+        return Response({"detail": "Payment confirmed"}, status=status.HTTP_200_OK)
+
+    if outcome == 'pending':
+        tx.status, tx.raw_response = "PENDING", raw
+        tx.save()
+        return Response({"detail": "Payment pending"}, status=status.HTTP_200_OK)
+
+    logger.warning(f"❌ Paiement échoué: {intent.reference}")
+    tx.status, tx.raw_response, tx.processed = "FAILED", raw, True
+    tx.save()
+    intent.status = "FAILED"
+    intent.save()
+    return Response({"detail": "Payment failed"}, status=status.HTTP_200_OK)
+
+
+def verify_singpay_notification(payload):
+    """Notification SingPay non signée : on ne croit que l'API SingPay, interrogée par nous.
+
+    Sert aux paiements d'abonnement (PaymentIntent) ; une notification de paiement de commande
+    est traitée par /api/v1/payments/webhook/.
+    """
+    from .online_verification import check_allowed, find_intent, verify_intent
+
+    singpay_payload = payload.get('paymentResult') or payload.get('paiementResult') or payload
+    transaction = singpay_payload.get('transaction') if isinstance(singpay_payload.get('transaction'), dict) else {}
+    reference = transaction.get('reference') or payload.get('reference')
+    intent = find_intent(reference)
+    if intent is None:
+        return Response({"detail": "Unknown reference"}, status=status.HTTP_404_NOT_FOUND)
+    if intent.provider != 'singpay':
+        return Response({"detail": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
+    if not check_allowed(f'intent:{intent.pk}'):
+        return Response({"detail": "Check already in progress"}, status=status.HTTP_202_ACCEPTED)
+    outcome, provider_tx_id, raw = verify_intent(intent)
+    if outcome == 'unknown' or not provider_tx_id:
+        return Response({"detail": "Status not confirmed by SingPay"}, status=status.HTTP_202_ACCEPTED)
+    return process_intent_outcome(intent, provider_tx_id, outcome, raw)
+
+
 class ProviderCallbackAPIView(APIView):
     """
     Endpoint de callback pour les notifications des providers
     POST/GET /api/v1/payments/<provider>/notify/
-    
-    Public endpoint sécurisé par signature HMAC si disponible
+
+    Notification signée (HMAC) : son contenu fait foi.
+    Notification SingPay non signée (SingPay ne signe pas) : le statut est redemandé à SingPay.
     """
     permission_classes = []  # Public endpoint
 
@@ -496,10 +587,10 @@ class ProviderCallbackAPIView(APIView):
             transaction = payload.get('transaction') or {}
             status_payload = payload.get('status') or {}
 
-        logger.info(f"📨 Callback reçu: {provider} | Payload: {payload}")
+        logger.info(f"📨 Callback reçu: {provider}")
 
-        # Signature obligatoire pour tous les fournisseurs : sans elle, n'importe qui pourrait
-        # déclarer un paiement réussi. Sans secret configuré, l'endpoint refuse tout.
+        # Une notification n'est crue que si elle est signée. Sinon, pour SingPay, on redemande
+        # le statut à SingPay ; pour les autres fournisseurs, on refuse.
         secret = getattr(settings, "CINETPAY_SECRET", "") if provider == "cinetpay" else getattr(settings, "PAYMENT_WEBHOOK_SECRET", "")
         header_sig = (
             request.headers.get("X-Webhook-Signature")
@@ -507,6 +598,8 @@ class ProviderCallbackAPIView(APIView):
             or request.headers.get("X-SingPay-Signature")
         )
         if not secret or not header_sig or not verify_hmac_signature(request.body, header_sig, secret):
+            if provider == "singpay" and isinstance(payload, dict):
+                return verify_singpay_notification(payload)
             logger.warning(f"❌ Callback {provider} refusé : signature absente ou invalide")
             return Response({"detail": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -563,38 +656,7 @@ class ProviderCallbackAPIView(APIView):
             .upper()
         )
 
-        # Créer ou récupérer la transaction (idempotence)
-        tx, created = PaymentTransaction.objects.get_or_create(
-            intent=intent,
-            provider_tx_id=provider_tx_id,
-            defaults={
-                "status": status_str or "PENDING",
-                "raw_response": payload
-            }
-        )
-
-        if tx.processed:
-            logger.warning(f"⚠️ Transaction déjà traitée (idempotence): {provider_tx_id}")
-            return Response(
-                {"detail": "Already processed"},
-                status=status.HTTP_200_OK
-            )
-
-        # Vérifier le montant
-        if amount and amount != intent.amount:
-            logger.error(f"❌ Montant mismatch: expected {intent.amount}, got {amount}")
-            tx.status = "FAILED"
-            tx.raw_response = payload
-            tx.processed = True
-            tx.save()
-            intent.status = "FAILED"
-            intent.save()
-            return Response(
-                {"detail": "Amount mismatch"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Vérifier le statut de succès
+        # Vérifier le statut de succès (notification signée : son contenu fait foi)
         accepted_statuses = ("ACCEPTED", "APPROVED", "SUCCESS", "OK", "00", "TS")
         normalized_result = str(transaction.get('result') or '').upper()
         status_step = str(transaction.get('status') or '').upper()
@@ -606,67 +668,15 @@ class ProviderCallbackAPIView(APIView):
             or status_payload.get('success') is True
             or (payload.get('message') and "CREATED" in str(payload.get('message')).upper())
         )
-
-        if is_success:
-            logger.info(f"✅ Paiement confirmé: {intent.reference}")
-            intent.status = "SUCCESS"
-            intent.save()
-            tx.status = "SUCCESS"
-            tx.processed = True
-            tx.raw_response = payload
-            tx.save()
-
-            _activate_subscription_from_intent(intent)
-
-            # Business logic: marquer la commande comme payée
-            order = intent.order
-            if order:
-                try:
-                    # Réserver le stock
-                    if hasattr(order, 'reserve_stock'):
-                        order.reserve_stock()
-                    
-                    # Marquer comme payé
-                    if hasattr(order, 'mark_as_paid'):
-                        order.mark_as_paid(provider_tx_id, intent.amount)
-                    
-                    logger.info(f"✅ Commande #{order.id} marquée comme payée")
-                except Exception as e:
-                    logger.error(f"❌ Erreur reserve stock: {e}")
-                    intent.status = "RESERVE_FAILED"
-                    intent.save()
-                    tx.status = "FAILED"
-                    tx.processed = True
-                    tx.save()
-                    return Response(
-                        {"detail": "Stock reserve failed"},
-                        status=status.HTTP_200_OK
-                    )
-
-            return Response(
-                {"detail": "Payment confirmed"},
-                status=status.HTTP_200_OK
-            )
+        if amount and amount != intent.amount:
+            outcome = 'mismatch'
+        elif is_success:
+            outcome = 'success'
+        elif status_step in ("START", "PARTENAIRE"):
+            outcome = 'pending'
         else:
-            if status_step in ("START", "PARTENAIRE"):
-                tx.status = "PENDING"
-                tx.raw_response = payload
-                tx.save()
-                return Response(
-                    {"detail": "Payment pending"},
-                    status=status.HTTP_200_OK
-                )
-            logger.warning(f"❌ Paiement échoué: {intent.reference} | Status: {status_str}")
-            tx.status = "FAILED"
-            tx.raw_response = payload
-            tx.processed = True
-            tx.save()
-            intent.status = "FAILED"
-            intent.save()
-            return Response(
-                {"detail": "Payment failed"},
-                status=status.HTTP_200_OK
-            )
+            outcome = 'failed'
+        return process_intent_outcome(intent, provider_tx_id, outcome, payload)
 
     def get(self, request, provider="cinetpay"):
         """Tester l'accessibilité du endpoint"""

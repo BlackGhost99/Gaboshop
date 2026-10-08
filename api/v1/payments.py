@@ -17,6 +17,9 @@ from orders.models import Order
 from core.models import AuditLog
 from api.models import SystemSettings
 from payments.utils import verify_hmac_signature
+from payments.online_verification import (
+    check_allowed, find_order_payment, mark_order_payment_success, verify_order_payment,
+)
 
 
 def _webhook_amount(payload, transaction_payload, status_payload):
@@ -97,7 +100,13 @@ class PaymentInitView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
                 # Normaliser le numÃ©ro payeur et appliquer les frais rÃ©els selon l'opÃ©rateur
-                formatted_phone = PaymentService._format_gabon_phone(phone_number, operator)
+                try:
+                    formatted_phone = PaymentService._format_gabon_phone(phone_number, operator)
+                except ValueError as exc:
+                    return Response({
+                        'success': False,
+                        'error': {'code': status.HTTP_400_BAD_REQUEST, 'message': str(exc)},
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 real_fee_rate = self._get_mobile_money_fee_rate(payment_method)
                 order.payment_fees = Decimal('0.00')
                 order.calculate_totals(operator=operator, payment_method='mobile_money')
@@ -259,8 +268,10 @@ class PaymentWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        # Webhook pour recevoir les confirmations de paiement
-        # des operateurs Mobile Money ou processeurs de carte
+        # Webhook pour recevoir les confirmations de paiement.
+        # - Notification signée (HMAC, PAYMENT_WEBHOOK_SECRET) : son contenu fait foi.
+        # - Notification non signée (SingPay ne signe pas) : simple signal, le statut est
+        #   redemandé à SingPay par notre serveur et seule sa réponse compte.
 
         webhook_secret = getattr(settings, 'PAYMENT_WEBHOOK_SECRET', '')
         signature = (
@@ -271,20 +282,13 @@ class PaymentWebhookView(APIView):
         signature_required = getattr(
             settings, 'PAYMENT_WEBHOOK_SIGNATURE_REQUIRED', not settings.DEBUG
         )
-        if signature_required and not webhook_secret:
-            return Response(
-                {'success': False, 'error': 'Webhook de paiement non configure'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-        if webhook_secret and (
-            not signature or not verify_hmac_signature(request.body, signature, webhook_secret)
-        ):
-            return Response(
-                {'success': False, 'error': 'Signature webhook invalide'},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+        signed = bool(
+            webhook_secret and signature and verify_hmac_signature(request.body, signature, webhook_secret)
+        )
+        # En développement sans secret, les notifications de test restent acceptées telles quelles.
+        trusted = signed or (not signature_required and not webhook_secret)
 
-        payload = request.data
+        payload = request.data if isinstance(request.data, dict) else {}
         singpay_payload = payload.get('paymentResult') or payload.get('paiementResult')
         if singpay_payload:
             transaction = singpay_payload.get('transaction') or {}
@@ -293,6 +297,8 @@ class PaymentWebhookView(APIView):
             transaction = payload.get('transaction') or {}
             raw_status_payload = payload.get('status')
             status_payload = raw_status_payload if isinstance(raw_status_payload, dict) else {}
+        if not isinstance(transaction, dict):
+            transaction = {}
 
         transaction_id = (
             payload.get('transaction_id')
@@ -301,6 +307,11 @@ class PaymentWebhookView(APIView):
             or transaction.get('_id')
             or transaction.get('transaction_id')
         )
+        reference = transaction.get('reference') or payload.get('reference')
+
+        if not trusted:
+            return self._verify_with_singpay(request, payload, transaction, reference)
+
         payment_status = (
             payload.get('status')
             or status_payload.get('code')
@@ -312,7 +323,6 @@ class PaymentWebhookView(APIView):
         status_payload = status_payload or payload.get('status_payload') or {}
         if not isinstance(status_payload, dict):
             status_payload = {}
-        reference = transaction.get('reference') or payload.get('reference')
 
         if not transaction_id:
             if reference and str(reference).startswith("GABOSHOP_"):
@@ -368,24 +378,11 @@ class PaymentWebhookView(APIView):
                 payment.save(update_fields=['webhook_data', 'updated_at'])
 
                 if is_success:
-                    payment.status = 'success'
-                    payment.completed_at = timezone.now()
-                    payment.save(update_fields=['status', 'completed_at', 'updated_at'])
-
-                    payment.order.status = 'confirmed'
-                    payment.order.confirmed_at = timezone.now()
-                    payment.order.save(update_fields=['status', 'updated_at', 'confirmed_at'])
-
-                    AuditLog.log_action(
-                        action_type='payment_completed',
-                        user=payment.order.client,
-                        object_type='payment',
-                        object_id=payment.id,
-                        old_value='pending',
-                        new_value='success',
+                    mark_order_payment_success(
+                        payment,
+                        f'Webhook confirmation: {transaction_id}',
                         ip_address=request.META.get('REMOTE_ADDR'),
                         user_agent=request.META.get('HTTP_USER_AGENT', ''),
-                        reason=f'Webhook confirmation: {transaction_id}'
                     )
                     return Response({'success': True, 'message': 'Paiement confirme.'})
 
@@ -415,6 +412,64 @@ class PaymentWebhookView(APIView):
                 'success': False,
                 'error': 'Paiement non trouve'
             }, status=status.HTTP_404_NOT_FOUND)
+
+    def _verify_with_singpay(self, request, payload, transaction, reference):
+        """Notification non signée : on retrouve le paiement puis on interroge SingPay."""
+        transaction_ids = [
+            payload.get('transaction_id'),
+            transaction.get('airtel_money_id'),
+            transaction.get('id'),
+            transaction.get('_id'),
+            transaction.get('transaction_id'),
+        ]
+        payment = find_order_payment(transaction_ids, reference)
+        if payment is None:
+            # Paiement d'abonnement : même vérification auprès de SingPay.
+            from payments.views import verify_singpay_notification
+            return verify_singpay_notification(payload)
+        if not check_allowed(f'payment:{payment.pk}'):
+            return Response(
+                {'success': True, 'message': 'Verification deja en cours.'},
+                status=status.HTTP_202_ACCEPTED,
+            )
+        new_status = verify_order_payment(
+            payment, 'notification', ip_address=request.META.get('REMOTE_ADDR')
+        )
+        return Response({'success': True, 'data': {'status': new_status}})
+
+
+class PaymentVerifyView(APIView):
+    """POST /orders/<order_id>/payments/verify/ : redemande à SingPay où en est le paiement en ligne.
+
+    Utile quand la notification de SingPay tarde ou se perd : le client (ou le commerce, ou un admin)
+    déclenche lui-même la vérification. Seule la réponse de SingPay peut confirmer le paiement.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, order_id):
+        user = request.user
+        order = Order.objects.select_related('store').filter(pk=order_id).first()
+        allowed = order is not None and (
+            order.client_id == user.id
+            or user.is_staff
+            or getattr(order.store, 'manager_id', None) == user.id
+        )
+        payment = Payment.objects.filter(order=order).first() if allowed else None
+        if payment is None:
+            return Response({
+                'success': False,
+                'error': {'code': status.HTTP_404_NOT_FOUND, 'message': 'Aucun paiement en ligne pour cette commande.'},
+            }, status=status.HTTP_404_NOT_FOUND)
+        if check_allowed(f'payment:{payment.pk}'):
+            verify_order_payment(payment, 'verification manuelle', user=user, ip_address=request.META.get('REMOTE_ADDR'))
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        return Response({
+            'success': True,
+            'data': {'payment_status': payment.status, 'order_status': order.status},
+        })
+
+
 class PaymentDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     

@@ -54,10 +54,18 @@ services:
         value: "1"
       - key: GUNICORN_WORKERS
         value: "1"
+      # Pas de simulation : avec les clés SingPay, on veut voir les vraies erreurs.
       - key: PAYMENT_SIMULATION_MODE
-        value: "1"
+        value: "0"
       - key: SINGPAY_ENABLE_TRANSFER
         value: "False"
+      # Adresse publique de l'API SingPay (pas un secret). Les clés SINGPAY_CLIENT_ID,
+      # SINGPAY_CLIENT_SECRET et SINGPAY_WALLET_ID se saisissent dans Render > Environment.
+      - key: SINGPAY_BASE_URL
+        value: https://gateway.singpay.ga/v1
+      # Boutique de test avec un article à 100 F (voir stores/management/commands/seed_test_shop.py).
+      - key: STAGING_TEST_SHOP
+        value: "1"
       # Facultatif : la même clé Groq gratuite que la production pour tester l'assistant.
       - key: GROQ_API_KEY
         sync: false

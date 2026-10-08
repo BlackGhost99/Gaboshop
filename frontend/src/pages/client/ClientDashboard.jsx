@@ -458,9 +458,9 @@ const ClientDashboard = () => {
         }
 
         setToast({ type: toastType, message: toastMessage });
-        // Paiement direct au commerce par Mobile Money : on montre tout de suite le code marchand
-        // et le formulaire pour déclarer l'ID de transaction.
-        if (orderId && payment_flow !== 'platform_online' && payment_method !== 'cash') {
+        // Mobile Money : on ouvre tout de suite le suivi du paiement (en ligne : validation et
+        // vérification automatique ; direct : code marchand et déclaration de l'ID de transaction).
+        if (orderId && payment_method !== 'cash') {
           navigate(`/client/orders?pay=${orderId}`);
         }
       } else {

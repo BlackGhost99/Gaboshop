@@ -129,7 +129,11 @@ class SecurityFixesTests(TestCase):
 
     def test_unsigned_payment_callbacks_are_refused(self):
         self.assertEqual(self.api.post('/api/v1/payments/webhooks/airtel/', {'transaction_id': 'x', 'status_code': 'TS'}, format='json').status_code, 404)
+        # SingPay ne signe pas : une notification non signée n'est crue qu'après vérification
+        # auprès de SingPay (voir test_online_verification) ; une référence inconnue est refusée.
         res = self.api.post('/api/v1/payments/provider/singpay/notify/', {'reference': 'R', 'status': 'SUCCESS'}, format='json')
+        self.assertEqual(res.status_code, 404)
+        res = self.api.post('/api/v1/payments/provider/cinetpay/notify/', {'reference': 'R', 'status': 'SUCCESS'}, format='json')
         self.assertEqual(res.status_code, 401)
 
     def test_client_cannot_edit_someone_elses_product(self):

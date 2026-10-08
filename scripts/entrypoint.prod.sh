@@ -37,6 +37,11 @@ if phone and password:
         User.objects.create_superuser(phone=phone, password=password, email="")
         print("Admin cree pour", phone[:7] + "...", flush=True)
 PY
+# Site de test uniquement (STAGING_TEST_SHOP=1 dans render-staging.yaml) : boutique de test à 100 F.
+if [ "${STAGING_TEST_SHOP:-0}" = "1" ]; then
+  python manage.py seed_test_shop || echo "BOUTIQUE DE TEST ECHEC"
+fi
+
 echo "Demarrage de gunicorn sur le port ${PORT:-8000}"
 
 exec gunicorn wsgi:application \

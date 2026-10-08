@@ -25,7 +25,7 @@ from .orders import (
     ClientConfirmDeliveryView, OrderSelectVehicleView
 )
 from .payments import (
-    PaymentInitView, PaymentDetailView, PaymentWebhookView,
+    PaymentInitView, PaymentDetailView, PaymentWebhookView, PaymentVerifyView,
     ClientForfaitListView, ClientForfaitUpdateView, ForfaitListView,
     PayoutListView
 )
@@ -306,6 +306,7 @@ urlpatterns = [
 
     # Payments
     path('orders/<int:order_id>/payments/init/', PaymentInitView.as_view(), name='payment-init'),
+    path('orders/<int:order_id>/payments/verify/', PaymentVerifyView.as_view(), name='payment-verify'),
     path('orders/<int:order_id>/payments/', PaymentDetailView.as_view(), name='payment-detail'),
     path('payments/webhook/', PaymentWebhookView.as_view(), name='payment-webhook'),
     
