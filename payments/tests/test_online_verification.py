@@ -375,3 +375,15 @@ class SingpayRequestFormatTests(TestCase):
         with self.assertRaisesRegex(ValueError, 'numéro Airtel'):
             PaymentService._format_gabon_phone('+241 77 39 11 99', 'moov')
 
+    def test_no_simulated_payment_with_a_real_singpay_account(self):
+        from types import SimpleNamespace
+        from payments.services import PaymentService
+        order = SimpleNamespace(id=1, order_number='CMD-SIM')
+        failure = patch('payments.services.PaymentService._call_airtel_money_api', side_effect=Exception('SingPay HTTP 500'))
+        with failure, override_settings(PAYMENT_SIMULATION_MODE=True, SINGPAY_CLIENT_ID='id', SINGPAY_CLIENT_SECRET='s', SINGPAY_WALLET_ID='w'):
+            with self.assertRaisesRegex(Exception, 'SingPay HTTP 500'):
+                PaymentService._call_operator_api('airtel', '+24177391199', 100, order)
+        with failure, override_settings(PAYMENT_SIMULATION_MODE=True, SINGPAY_CLIENT_ID='', SINGPAY_CLIENT_SECRET='', SINGPAY_WALLET_ID=''):
+            result = PaymentService._call_operator_api('airtel', '+24177391199', 100, order)
+        self.assertIn('simulation', result['next_steps']['message'])
+

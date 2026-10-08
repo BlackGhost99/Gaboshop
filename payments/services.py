@@ -10,6 +10,7 @@ from orders.models import Order
 # Persisted notifications service (DB + multi-canal)
 from notifications.service import NotificationService
 from payments.utils import call_singpay_payment, call_singpay_transfer
+from payments.configuration import platform_online_ready
 
 logger = logging.getLogger(__name__)
 
@@ -158,8 +159,9 @@ class PaymentService:
                 
         except Exception as e:
             logger.error(f"Erreur API {operator}: {e}")
-            if getattr(settings, 'PAYMENT_SIMULATION_MODE', False):
-                # Mode simulation explicite uniquement (dev/tests)
+            # Mode simulation explicite, et seulement sans compte SingPay : avec de vraies clés,
+            # un échec SingPay est un vrai échec, jamais un faux « paiement initialisé ».
+            if getattr(settings, 'PAYMENT_SIMULATION_MODE', False) and not platform_online_ready():
                 return PaymentService._get_fallback_response(operator, phone, amount, order)
             raise
     @staticmethod

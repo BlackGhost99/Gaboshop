@@ -50,6 +50,19 @@ const isStoreClosedMessage = (message) => {
   return normalized.includes('magasin') && normalized.includes('ferm');
 };
 
+// Explication sous le choix du paiement : elle suit l'option choisie.
+const paymentHint = (flow, method) => {
+  if (flow === 'platform_online') {
+    return 'Paiement en ligne : après la commande, vous recevez une demande sur votre téléphone. Validez-la avec votre code secret Airtel Money ou Moov Money.';
+  }
+  if (method === 'cash') {
+    if (flow === 'courier_cash') return 'Vous payez en espèces au livreur à la livraison.';
+    if (flow === 'store_collects_all') return 'Vous payez tout en espèces au commerce.';
+    return 'Vous payez les articles en espèces au commerce, et la livraison au livreur.';
+  }
+  return "Mobile Money direct : vous payez le commerce à son code marchand, puis vous déclarez l'ID de transaction reçu par SMS. Le commerce confirme avant de préparer.";
+};
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -823,7 +836,7 @@ const ClientDashboard = () => {
                       ))}
                     </select>
                     <div className="md:col-span-2 text-xs text-gray-500 -mt-1">
-                      Mobile Money : vous payez le commerce à son code marchand, puis vous déclarez l'ID de transaction reçu par SMS. Le commerce confirme avant de préparer.
+                      {paymentHint(storeForms[storeName]?.payment_flow, storeForms[storeName]?.payment_method)}
                     </div>
                     <textarea
                       className="md:col-span-2 w-full border border-gray-200 rounded-md px-3 py-2"
