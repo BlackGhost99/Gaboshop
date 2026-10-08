@@ -15,6 +15,7 @@ from stores.models import Store, StoreCategory
 from users.models import User
 
 STATUS_CALL = 'payments.online_verification.call_singpay_status'
+SEARCH_CALL = 'payments.online_verification.call_singpay_transaction_by_reference'
 
 
 def singpay_answer(result=None, step='Terminate', amount=12500, reference='GABOSHOP_CMD-TEST'):
@@ -165,6 +166,124 @@ class OrderPaymentVerificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['data']['payment_status'], 'success')
         self.assertEqual(response.data['data']['order_status'], 'confirmed')
+
+
+class LostSingpayTransactionTests(TestCase):
+    """SingPay répond par une erreur au lancement mais crée quand même la transaction, que le client valide."""
+
+    def setUp(self):
+        cache.clear()
+        self.client_user = User.objects.create_user(phone='+24107100011', password='password', user_type='client')
+        manager = User.objects.create_user(phone='+24107100012', password='password', user_type='store_manager')
+        category = StoreCategory.objects.create(name='Test')
+        store = Store.objects.create(
+            name='Boutique', category=category, manager=manager, phone='+24107100014',
+            address='Libreville', zone='Centre',
+        )
+        self.order = Order.objects.create(
+            client=self.client_user, store=store, status='pending_payment', order_number='CMD-TEST',
+            total_amount=Decimal('12500.00'), items_total=Decimal('10500.00'), delivery_fee=Decimal('2000.00'),
+            delivery_address='Libreville', delivery_phone='+24107100011', delivery_zone='Centre',
+        )
+        # Lancement en erreur : seul notre identifiant interne a été enregistré.
+        self.payment = Payment.objects.create(
+            order=self.order, payment_method='airtel_money', amount=Decimal('12500.00'),
+            status='failed', transaction_id='PAY-CMD-TEST-20261008120000', operator_reference='AIRTEL',
+        )
+        self.api = APIClient()
+        self.api.force_authenticate(self.client_user)
+
+    def statuses(self, answers):
+        return lambda tx_id: answers[tx_id]
+
+    def verify(self):
+        with patch('orders.signals.NotificationService.notify_order_status_update'), \
+             patch('delivery.tasks.assign_nearest_delivery_agent.delay'):
+            return self.api.post(f'/api/v1/orders/{self.order.pk}/payments/verify/')
+
+    def test_validated_payment_is_found_by_reference(self):
+        search = {'transactions': [{'_id': 'SP-TX-9', 'reference': 'GABOSHOP_CMD-TEST', 'amount': 12500}]}
+        answers = {'SP-TX-9': singpay_answer('Success')}
+        with patch(SEARCH_CALL, return_value=search) as search_call, \
+             patch(STATUS_CALL, side_effect=self.statuses(answers)) as status_call:
+            response = self.verify()
+
+        search_call.assert_called_once_with('GABOSHOP_CMD-TEST')
+        status_call.assert_called_once_with('SP-TX-9')
+        self.assertEqual(response.data['data']['payment_status'], 'success')
+        self.assertEqual(response.data['data']['order_status'], 'confirmed')
+
+    def test_one_successful_attempt_among_several_is_enough(self):
+        Payment.objects.filter(pk=self.payment.pk).update(transaction_id='SP-TX-1')
+        search = [
+            {'id': 'SP-TX-1', 'reference': 'GABOSHOP_CMD-TEST'},
+            {'id': 'SP-TX-2', 'reference': 'GABOSHOP_CMD-TEST'},
+        ]
+        answers = {'SP-TX-1': singpay_answer('TimeOutError'), 'SP-TX-2': singpay_answer('Success')}
+        with patch(SEARCH_CALL, return_value=search), \
+             patch(STATUS_CALL, side_effect=self.statuses(answers)) as status_call:
+            response = self.verify()
+
+        self.assertEqual([c.args[0] for c in status_call.call_args_list], ['SP-TX-1', 'SP-TX-2'])
+        self.assertEqual(response.data['data']['payment_status'], 'success')
+
+    def test_search_only_trusts_our_exact_reference_and_the_status_api(self):
+        # Autre commande dont le numéro commence pareil : ignorée.
+        search = {'data': [{'id': 'SP-TX-7', 'reference': 'GABOSHOP_CMD-TEST2'}]}
+        with patch(SEARCH_CALL, return_value=search), patch(STATUS_CALL) as status_call:
+            response = self.verify()
+        status_call.assert_not_called()
+        self.assertEqual(response.data['data']['payment_status'], 'failed')
+
+        # La recherche annonce un succès, mais l'API de statut dit « en cours » : pas confirmé.
+        cache.clear()
+        search = {'data': [{'id': 'SP-TX-8', 'reference': 'GABOSHOP_CMD-TEST', 'result': 'Success'}]}
+        with patch(SEARCH_CALL, return_value=search), \
+             patch(STATUS_CALL, return_value=singpay_answer(step='Start')):
+            response = self.verify()
+        self.assertEqual(response.data['data']['payment_status'], 'processing')
+        self.assertEqual(response.data['data']['order_status'], 'pending_payment')
+
+    def test_search_error_changes_nothing(self):
+        with patch(SEARCH_CALL, return_value={'error': 'SingPay HTTP 500'}), patch(STATUS_CALL) as status_call:
+            response = self.verify()
+        status_call.assert_not_called()
+        self.assertEqual(response.data['data']['payment_status'], 'failed')
+
+    def test_new_attempt_is_not_sent_when_the_previous_one_was_paid(self):
+        search = {'transactions': [{'_id': 'SP-TX-9', 'reference': 'GABOSHOP_CMD-TEST'}]}
+        with patch(SEARCH_CALL, return_value=search), \
+             patch(STATUS_CALL, return_value=singpay_answer('Success')), \
+             patch('payments.services.PaymentService._call_operator_api') as launch, \
+             patch('orders.signals.NotificationService.notify_order_status_update'), \
+             patch('delivery.tasks.assign_nearest_delivery_agent.delay'):
+            response = self.api.post(
+                f'/api/v1/orders/{self.order.pk}/payments/init/',
+                {'payment_method': 'airtel_money', 'phone_number': '077391199'}, format='json',
+            )
+
+        launch.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['message'], 'Paiement déjà confirmé.')
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'confirmed')
+
+    def test_new_attempt_is_sent_when_nothing_was_paid(self):
+        launch_result = {'transaction_id': 'SP-TX-NEW', 'operator_reference': 'AIRTEL'}
+        with patch(SEARCH_CALL, return_value={'transactions': []}), \
+             patch(STATUS_CALL) as status_call, \
+             patch('payments.services.PaymentService._call_operator_api', return_value=launch_result) as launch:
+            response = self.api.post(
+                f'/api/v1/orders/{self.order.pk}/payments/init/',
+                {'payment_method': 'airtel_money', 'phone_number': '077391199'}, format='json',
+            )
+
+        status_call.assert_not_called()
+        launch.assert_called_once()
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.payment.transaction_id, 'SP-TX-NEW')
 
 
 @override_settings(PAYMENT_WEBHOOK_SECRET='webhook-test-secret')

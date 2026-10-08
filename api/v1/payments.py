@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.db import transaction as db_transaction
 from decimal import Decimal
+import logging
 
 from payments.models import Payment
 from payments.services import PaymentService
@@ -20,6 +21,8 @@ from payments.utils import verify_hmac_signature
 from payments.online_verification import (
     check_allowed, find_order_payment, mark_order_payment_success, verify_order_payment,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _webhook_amount(payload, transaction_payload, status_payload):
@@ -107,6 +110,25 @@ class PaymentInitView(APIView):
                         'success': False,
                         'error': {'code': status.HTTP_400_BAD_REQUEST, 'message': str(exc)},
                     }, status=status.HTTP_400_BAD_REQUEST)
+                # Un essai précédent a pu aboutir (le client a validé malgré une erreur affichée) :
+                # SingPay est interrogé avant toute nouvelle demande, pour ne jamais faire payer deux fois.
+                previous = Payment.objects.filter(order=order).first()
+                if previous and previous.status not in ('success', 'refunded'):
+                    try:
+                        verify_order_payment(
+                            previous, 'avant un nouvel essai', user=request.user,
+                            ip_address=request.META.get('REMOTE_ADDR'),
+                        )
+                    except Exception:
+                        logger.exception('Verification SingPay avant nouvel essai impossible (%s)', order.order_number)
+                    previous.refresh_from_db()
+                    if previous.status == 'success':
+                        return Response({
+                            'success': True,
+                            'message': 'Paiement déjà confirmé.',
+                            'data': {'payment': PaymentSerializer(previous).data},
+                        })
+
                 real_fee_rate = self._get_mobile_money_fee_rate(payment_method)
                 order.payment_fees = Decimal('0.00')
                 order.calculate_totals(operator=operator, payment_method='mobile_money')

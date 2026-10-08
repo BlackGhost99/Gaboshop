@@ -122,6 +122,12 @@ function OnlinePaymentCard({ orderId, arrangement, online, onDone }) {
     return () => clearInterval(timer);
   }, [waiting, online.i_am_client, verify]);
 
+  // Échec affiché alors que le client a peut-être validé sur son téléphone : on redemande une fois à SingPay.
+  const failed = online.status === 'failed';
+  useEffect(() => {
+    if (failed && online.i_am_client) verify(true);
+  }, [failed, online.i_am_client, verify]);
+
   if (online.status === 'success') {
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">

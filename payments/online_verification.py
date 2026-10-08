@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from core.models import AuditLog
 from .models import Payment, PaymentIntent
-from .utils import call_singpay_status
+from .utils import call_singpay_status, call_singpay_transaction_by_reference
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,55 @@ def _ask_singpay(transaction_ids):
     return outcome, amount, reference, raw if isinstance(raw, dict) else {}
 
 
+OUTCOME_RANK = {'success': 3, 'pending': 2, 'failed': 1, 'unknown': 0}
+
+
+def _transactions_in(value, depth=0):
+    """Transactions (dictionnaires) contenues dans une réponse de recherche SingPay, quelle que soit sa forme."""
+    if depth > 3:
+        return []
+    if isinstance(value, list):
+        return [tx for item in value for tx in _transactions_in(item, depth + 1)]
+    if not isinstance(value, dict):
+        return []
+    if value.get('reference') and (value.get('id') or value.get('_id')):
+        return [value]
+    found = []
+    for key in ('transaction', 'transactions', 'data', 'results', 'items'):
+        found += _transactions_in(value.get(key), depth + 1)
+    return found
+
+
+def singpay_ids_for_reference(reference):
+    """Identifiants SingPay des transactions portant exactement notre référence (GABOSHOP_<commande>).
+
+    Sert quand SingPay a répondu par une erreur au lancement mais a quand même créé la transaction.
+    La recherche ne décide de rien : chaque identifiant est ensuite vérifié sur l'API de statut.
+    """
+    raw = call_singpay_transaction_by_reference(reference)
+    if not isinstance(raw, (dict, list)) or (isinstance(raw, dict) and raw.get('error')):
+        return []
+    ids = []
+    for tx in _transactions_in(raw):
+        tx_id = str(tx.get('id') or tx.get('_id') or '').strip()
+        if str(tx.get('reference')) == reference and tx_id and tx_id not in ids:
+            ids.append(tx_id)
+    return ids
+
+
+def _best_singpay_answer(transaction_ids):
+    """Plusieurs essais pour une même commande : un seul réussi suffit (succès > en cours > échec)."""
+    best = ('unknown', None, None, {})
+    for tx_id in transaction_ids:
+        raw = call_singpay_status(tx_id)
+        outcome, amount, reference = read_singpay_status(raw)
+        if OUTCOME_RANK[outcome] > OUTCOME_RANK[best[0]]:
+            best = (outcome, amount, reference, raw if isinstance(raw, dict) else {})
+        if outcome == 'success':
+            break
+    return best
+
+
 def check_allowed(key):
     """Au plus une interrogation de SingPay toutes les quelques secondes par paiement."""
     try:
@@ -147,9 +196,17 @@ def verify_order_payment(payment, source, user=None, ip_address=None):
     if payment.status in FINAL_PAYMENT_STATUSES:
         return payment.status
     ids = order_transaction_ids(payment)
-    if not ids:
+    outcome, amount, reference, raw = _ask_singpay(ids) if ids else ('unknown', None, None, {})
+    if outcome in ('unknown', 'failed'):
+        # Lancement en erreur (aucun identifiant) ou essai échoué : SingPay a pu créer une autre
+        # transaction pour cette commande, que le client a validée. On la cherche par la référence.
+        others = [i for i in singpay_ids_for_reference(f'GABOSHOP_{payment.order.order_number}') if i not in ids]
+        if others:
+            found = _best_singpay_answer(others)
+            if OUTCOME_RANK[found[0]] > OUTCOME_RANK[outcome]:
+                outcome, amount, reference, raw = found
+    if not ids and outcome == 'unknown':
         return payment.status
-    outcome, amount, reference, raw = _ask_singpay(ids)
 
     with db_transaction.atomic():
         payment = Payment.objects.select_for_update().select_related('order').get(pk=payment.pk)
