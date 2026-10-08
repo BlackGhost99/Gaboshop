@@ -241,7 +241,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         if any(item['product'].store_id != store.id for item in items):
             raise serializers.ValidationError({'items': _('Tous les produits doivent venir du magasin de la commande.')})
         from payments.configuration import available_payment_options
-        _, options = available_payment_options(store, attrs.get('delivery_requested', True))
+        _policy, options = available_payment_options(store, attrs.get("delivery_requested", True))
         if not any(option['flow'] == attrs.get('payment_flow') and option['method'] == attrs.get('payment_method') for option in options):
             raise serializers.ValidationError({'payment_method': _('Ce circuit ou moyen de paiement n’est pas autorisé.')})
 
