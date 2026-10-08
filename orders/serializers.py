@@ -44,6 +44,22 @@ class OrderItemCreateSerializer(serializers.Serializer):
         
         return attrs
 
+def with_order_display_relations(queryset):
+    """Charge en quelques requêtes tout ce qu'OrderSerializer affiche.
+
+    Sans cela, chaque commande d'une liste déclenchait des dizaines de requêtes (articles, livraison,
+    paiement, reçus...), ce qui faisait tomber le serveur gratuit pendant le rafraîchissement auto.
+    """
+    return queryset.select_related(
+        'store', 'client', 'delivery', 'delivery__proof',
+        'payment_arrangement', 'payment_arrangement__store',
+    ).prefetch_related(
+        'items__product',
+        'payment_arrangement__obligations__receipts',
+        'payment_arrangement__obligations__adjustments',
+    )
+
+
 class OrderSerializer(serializers.ModelSerializer):
     """Serializer pour les commandes"""
     items = OrderItemSerializer(many=True, read_only=True)

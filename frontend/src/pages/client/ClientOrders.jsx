@@ -36,8 +36,22 @@ const FILTERS = {
   all: { label: 'Toutes', statuses: [] },
 };
 
+// Serveur injoignable ou trop lent (axios « Network Error ») : un message compréhensible.
+const NETWORK_MESSAGE = 'Le serveur ne répond pas pour le moment. Réessayez dans un instant.';
+const errorText = (err) => {
+  if (err && !err.response && (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED' || err.message === 'Network Error')) {
+    return NETWORK_MESSAGE;
+  }
+  const detail = err?.error?.details || err?.details;
+  const msg = detail ? Object.values(detail).flat().join(' | ') : err?.error?.message || err?.message || err;
+  return `Erreur : ${msg}`;
+};
+
 const ClientOrders = () => {
+  // Uniquement le premier chargement : les rafraîchissements se font sans cacher la page
+  // (sinon la fenêtre de la commande et le formulaire de paiement disparaissaient à chaque fois).
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('active');
@@ -50,7 +64,6 @@ const ClientOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      setLoading(true);
       const res = await getOrders();
       if (res.success) {
         setOrders(res.data || []);
@@ -61,12 +74,16 @@ const ClientOrders = () => {
         setError(msg || 'Impossible de charger vos commandes');
       }
     } catch (err) {
-      const detail = err?.error?.details || err?.details;
-      const msg = detail ? Object.values(detail).flat().join(' | ') : err?.error?.message || err?.message || err;
-      setError(`Erreur: ${msg}`);
+      setError(errorText(err));
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshNow = async () => {
+    setRefreshing(true);
+    await fetchOrders();
+    setRefreshing(false);
   };
 
   useEffect(() => {
@@ -75,8 +92,8 @@ const ClientOrders = () => {
     if (payId) openDetail(payId);
   }, []);
 
-  // Polling automatique pour mettre à jour les commandes toutes les 5 secondes
-  useVisibleInterval(fetchOrders, 5000);
+  // Mise à jour automatique de la liste toutes les 15 secondes
+  useVisibleInterval(fetchOrders, 15000);
 
   // Auto-afficher la popup d'acceptation avec PIN quand la livraison est acceptée
   useEffect(() => {
@@ -88,7 +105,7 @@ const ClientOrders = () => {
     }
   }, [detail?.status, detail?.client_confirmation_pending, detail?.id, showPinModal]);
 
-  // Polling du détail de la commande ouverte toutes les 2 secondes
+  // Mise à jour du détail de la commande ouverte toutes les 5 secondes
   useVisibleInterval(async () => {
     try {
       const res = await getOrderDetail(detail.id);
@@ -98,7 +115,7 @@ const ClientOrders = () => {
     } catch {
       // Silencieux : c'est juste un refresh
     }
-  }, 2000, Boolean(detail?.id));
+  }, 5000, Boolean(detail?.id));
 
   const counts = useMemo(() => {
     const base = { active: 0, delivered: 0, cancelled: 0, all: orders.length };
@@ -132,9 +149,7 @@ const ClientOrders = () => {
         setError(msg || 'Impossible de charger le détail');
       }
     } catch (err) {
-      const detail = err?.error?.details || err?.details;
-      const msg = detail ? Object.values(detail).flat().join(' | ') : err?.error?.message || err?.message || err;
-      setError(`Erreur: ${msg}`);
+      setError(errorText(err));
     } finally {
       /* no-op */
     }
@@ -203,10 +218,11 @@ const ClientOrders = () => {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Historique et suivi</h3>
           <button
-            onClick={fetchOrders}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+            onClick={refreshNow}
+            disabled={refreshing}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-md text-sm font-medium"
           >
-            Rafraîchir
+            {refreshing ? 'Actualisation…' : 'Rafraîchir'}
           </button>
         </div>
 

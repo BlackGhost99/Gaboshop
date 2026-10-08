@@ -17,6 +17,7 @@ def _refresh_status(obligation):
     paid = obligation.received_amount
     if obligation.status in ('cancelled', 'waived', 'refunded'):
         return obligation.status
+    previous = obligation.status
     if paid >= obligation.amount:
         obligation.status = 'paid'
     elif paid > 0:
@@ -25,7 +26,9 @@ def _refresh_status(obligation):
         obligation.status = 'overdue'
     elif obligation.status != 'not_due':
         obligation.status = 'unpaid'
-    obligation.save(update_fields=['status', 'updated_at'])
+    # Appelé à chaque affichage : on n'écrit en base que si le statut change.
+    if obligation.status != previous:
+        obligation.save(update_fields=['status', 'updated_at'])
     return obligation.status
 
 
