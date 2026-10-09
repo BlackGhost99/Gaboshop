@@ -285,6 +285,54 @@ class LostSingpayTransactionTests(TestCase):
         self.assertEqual(self.payment.status, 'pending')
         self.assertEqual(self.payment.transaction_id, 'SP-TX-NEW')
 
+    def test_each_new_attempt_gets_its_own_singpay_reference(self):
+        # SingPay refuse une référence déjà utilisée : relancer la même commande doit en envoyer une neuve.
+        sent = []
+
+        def launch(operator, phone, amount, order, reference=None):
+            sent.append(reference)
+            return {'transaction_id': f'SP-TX-{len(sent) + 10}', 'operator_reference': 'AIRTEL'}
+
+        for _ in range(2):
+            cache.clear()
+            with patch(SEARCH_CALL, return_value={'transactions': []}), \
+                 patch(STATUS_CALL, return_value=singpay_answer('TimeOutError')), \
+                 patch('payments.services.PaymentService._call_operator_api', side_effect=launch):
+                response = self.api.post(
+                    f'/api/v1/orders/{self.order.pk}/payments/init/',
+                    {'payment_method': 'airtel_money', 'phone_number': '077391199'}, format='json',
+                )
+            self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(sent, ['GABOSHOP_CMD-TEST_2', 'GABOSHOP_CMD-TEST_3'])
+        self.payment.refresh_from_db()
+        self.assertEqual(
+            self.payment.webhook_data['singpay_references'],
+            ['GABOSHOP_CMD-TEST', 'GABOSHOP_CMD-TEST_2', 'GABOSHOP_CMD-TEST_3'],
+        )
+
+    def test_an_older_attempt_validated_late_is_found_by_its_reference(self):
+        self.payment.status = 'failed'
+        self.payment.transaction_id = 'SP-TX-3'
+        self.payment.webhook_data = {'singpay_references': ['GABOSHOP_CMD-TEST', 'GABOSHOP_CMD-TEST_2']}
+        self.payment.save()
+
+        def search(reference):
+            if reference == 'GABOSHOP_CMD-TEST':
+                return {'transactions': [{'_id': 'SP-TX-1', 'reference': reference}]}
+            return {'transactions': [{'_id': 'SP-TX-3', 'reference': reference}]}
+
+        def status_of(tx_id):
+            if tx_id == 'SP-TX-1':
+                return singpay_answer('Success', reference='GABOSHOP_CMD-TEST')
+            return singpay_answer('TimeOutError', reference='GABOSHOP_CMD-TEST_2')
+
+        with patch(SEARCH_CALL, side_effect=search), patch(STATUS_CALL, side_effect=status_of):
+            response = self.verify()
+        self.assertEqual(response.data['data']['payment_status'], 'success')
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.webhook_data['singpay_paid_reference'], 'GABOSHOP_CMD-TEST')
+
 
 @override_settings(PAYMENT_WEBHOOK_SECRET='webhook-test-secret')
 class SubscriptionIntentVerificationTests(TestCase):

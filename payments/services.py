@@ -11,6 +11,7 @@ from orders.models import Order
 from notifications.service import NotificationService
 from payments.utils import call_singpay_payment, call_singpay_transfer
 from payments.configuration import platform_online_ready
+from payments.references import base_reference
 
 logger = logging.getLogger(__name__)
 
@@ -147,15 +148,16 @@ class PaymentService:
             raise
 
     @staticmethod
-    def _call_operator_api(operator, phone, amount, order):
+    def _call_operator_api(operator, phone, amount, order, reference=None):
         """
-        Appeler l'API de l'opérateur Mobile Money
+        Appeler l'API de l'opérateur Mobile Money.
+        ``reference`` : référence SingPay de cet essai (unique par essai), GABOSHOP_<commande> par défaut.
         """
         try:
             if operator == 'airtel':
-                return PaymentService._call_airtel_money_api(phone, amount, order)
+                return PaymentService._call_airtel_money_api(phone, amount, order, reference)
             elif operator == 'moov':
-                return PaymentService._call_moov_money_api(phone, amount, order)
+                return PaymentService._call_moov_money_api(phone, amount, order, reference)
                 
         except Exception as e:
             logger.error(f"Erreur API {operator}: {e}")
@@ -165,7 +167,7 @@ class PaymentService:
                 return PaymentService._get_fallback_response(operator, phone, amount, order)
             raise
     @staticmethod
-    def _call_airtel_money_api(phone, amount, order):
+    def _call_airtel_money_api(phone, amount, order, reference=None):
         """
         Integration avec SingPay (Airtel Money)
         """
@@ -173,7 +175,7 @@ class PaymentService:
             response = call_singpay_payment(
                 "airtel",
                 amount=amount,
-                reference=f"GABOSHOP_{order.order_number}",
+                reference=reference or base_reference(order.order_number),
                 phone=phone,
                 portefeuille=getattr(settings, "SINGPAY_WALLET_ID", ""),
                 disbursement=getattr(settings, "SINGPAY_DISBURSEMENT_ID", ""),
@@ -228,7 +230,7 @@ class PaymentService:
 
 
     @staticmethod
-    def _call_moov_money_api(phone, amount, order):
+    def _call_moov_money_api(phone, amount, order, reference=None):
         """
         Integration avec SingPay (Moov Money)
         """
@@ -236,7 +238,7 @@ class PaymentService:
             response = call_singpay_payment(
                 "moov",
                 amount=amount,
-                reference=f"GABOSHOP_{order.order_number}",
+                reference=reference or base_reference(order.order_number),
                 phone=phone,
                 portefeuille=getattr(settings, "SINGPAY_WALLET_ID", ""),
                 disbursement=getattr(settings, "SINGPAY_DISBURSEMENT_ID", ""),

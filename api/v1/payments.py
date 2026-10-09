@@ -18,6 +18,7 @@ from orders.models import Order
 from core.models import AuditLog
 from api.models import SystemSettings
 from payments.utils import verify_hmac_signature
+from payments.references import next_reference, order_number_from_reference
 from payments.online_verification import (
     check_allowed, find_order_payment, mark_order_payment_success, verify_order_payment,
 )
@@ -147,6 +148,7 @@ class PaymentInitView(APIView):
 
                 existing_payment = Payment.objects.filter(order=order).first()
 
+                created = False
                 if existing_payment and existing_payment.status == 'success':
                     payment = existing_payment
                     order.status = 'confirmed'
@@ -199,9 +201,12 @@ class PaymentInitView(APIView):
 
                 # Init Mobile Money via SingPay
                 if payment_method in ['airtel_money', 'moov_money']:
+                    # Une référence neuve par essai : SingPay refuse une référence déjà utilisée.
+                    reference = next_reference(payment, first_attempt=created)
+                    payment.save(update_fields=['webhook_data', 'updated_at'])
                     try:
                         api_result = PaymentService._call_operator_api(
-                            operator, formatted_phone, order.total_amount, order
+                            operator, formatted_phone, order.total_amount, order, reference=reference
                         )
                         payment.transaction_id = api_result.get('transaction_id', payment.transaction_id)
                         payment.operator_reference = api_result.get('operator_reference', payment.operator_reference)
@@ -214,6 +219,7 @@ class PaymentInitView(APIView):
                             **(payment.webhook_data or {}),
                             'singpay_init_error': {
                                 'message': details,
+                                'reference': reference,
                                 'at': timezone.now().isoformat(),
                             },
                         }
@@ -347,8 +353,8 @@ class PaymentWebhookView(APIView):
             status_payload = {}
 
         if not transaction_id:
-            if reference and str(reference).startswith("GABOSHOP_"):
-                order_number = str(reference).replace("GABOSHOP_", "").strip()
+            order_number = order_number_from_reference(reference)
+            if order_number:
                 order = Order.objects.filter(order_number=order_number).first()
                 if order and hasattr(order, "payment"):
                     transaction_id = order.payment.transaction_id
@@ -396,7 +402,10 @@ class PaymentWebhookView(APIView):
                 if payment.status == 'success':
                     return Response({'success': True, 'message': 'Paiement deja confirme.'})
 
-                payment.webhook_data = payload
+                # Les références des essais restent notées à côté de la notification.
+                payment.webhook_data = {**(payment.webhook_data or {}), 'last_webhook': payload}
+                if is_success and reference:
+                    payment.webhook_data['singpay_paid_reference'] = str(reference)
                 payment.save(update_fields=['webhook_data', 'updated_at'])
 
                 if is_success:

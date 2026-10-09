@@ -82,6 +82,8 @@ function OnlinePaymentCard({ orderId, arrangement, online, onDone }) {
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState('');
   const [retry, setRetry] = useState(false);
+  // Chaque nouvelle demande relance la vérification automatique.
+  const [round, setRound] = useState(0);
   const onDoneRef = useRef(onDone);
   const waiting = ONLINE_WAITING.includes(online.status);
   const orderClosed = ['cancelled', 'refunded'].includes(online.order_status);
@@ -120,7 +122,7 @@ function OnlinePaymentCard({ orderId, arrangement, online, onDone }) {
       verify(true);
     }, AUTO_CHECK_EVERY_MS);
     return () => clearInterval(timer);
-  }, [waiting, online.i_am_client, verify]);
+  }, [waiting, online.i_am_client, verify, round]);
 
   // Échec affiché alors que le client a peut-être validé sur son téléphone : on redemande une fois à SingPay.
   const failed = online.status === 'failed';
@@ -160,8 +162,12 @@ function OnlinePaymentCard({ orderId, arrangement, online, onDone }) {
           {checking ? 'Vérification…' : "J'ai validé, vérifier"}
         </button>
         {message && <p className="text-gray-700">{message}</p>}
-        <button type="button" onClick={() => setRetry(true)} className="w-full text-xs text-indigo-700 underline">
-          Pas reçu la demande ? La renvoyer
+        <button
+          type="button"
+          onClick={() => { setMessage(''); setRetry(true); }}
+          className="w-full rounded border border-indigo-300 bg-white py-2 font-semibold text-indigo-700"
+        >
+          Demande expirée ou pas reçue ? La renvoyer
         </button>
       </div>
     );
@@ -173,15 +179,17 @@ function OnlinePaymentCard({ orderId, arrangement, online, onDone }) {
       online={online}
       defaultMethod={ONLINE_METHODS.includes(arrangement.method) ? arrangement.method : 'airtel_money'}
       failed={online.status === 'failed' || online.status === 'cancelled'}
+      onCancel={waiting ? () => setRetry(false) : null}
       onDone={() => {
         setRetry(false);
+        setRound((n) => n + 1);
         onDone();
       }}
     />
   );
 }
 
-function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone }) {
+function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone, onCancel }) {
   const [method, setMethod] = useState(defaultMethod);
   const [phone, setPhone] = useState(online.phone || '');
   const [sending, setSending] = useState(false);
@@ -203,7 +211,12 @@ function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone }) {
 
   return (
     <form onSubmit={submit} className="space-y-2 rounded-lg border border-gray-200 p-3 text-sm">
-      {failed && <p className="text-red-700">Le paiement n'a pas abouti. Vous pouvez réessayer.</p>}
+      {failed && (
+        <p className="text-red-700">
+          Le paiement n'a pas abouti (demande expirée, refusée ou code erroné). Renvoyez la demande ci-dessous, puis
+          validez-la vite sur votre téléphone.
+        </p>
+      )}
       <p className="text-gray-700">
         Payez <strong>{formatCurrency(online.amount)}</strong> par Mobile Money : vous recevrez une demande à valider sur
         votre téléphone.
@@ -223,6 +236,11 @@ function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone }) {
       <button type="submit" disabled={sending || !phone.trim()} className="w-full rounded bg-indigo-600 py-2 font-semibold text-white disabled:opacity-50">
         {sending ? 'Envoi…' : 'Recevoir la demande de paiement'}
       </button>
+      {onCancel && (
+        <button type="button" onClick={onCancel} className="w-full text-xs text-gray-600 underline">
+          Retour
+        </button>
+      )}
       <p className="text-xs text-gray-500">Gaboshop ne vous demandera jamais votre code secret Mobile Money.</p>
     </form>
   );

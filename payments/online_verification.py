@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from core.models import AuditLog
 from .models import Payment, PaymentIntent
+from .references import PAID_REFERENCE_KEY, order_number_from_reference, payment_references
 from .utils import call_singpay_status, call_singpay_transaction_by_reference
 
 logger = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ def _transactions_in(value, depth=0):
 
 
 def singpay_ids_for_reference(reference):
-    """Identifiants SingPay des transactions portant exactement notre référence (GABOSHOP_<commande>).
+    """Identifiants SingPay des transactions portant exactement notre référence (GABOSHOP_<commande>[_<essai>]).
 
     Sert quand SingPay a répondu par une erreur au lancement mais a quand même créé la transaction.
     La recherche ne décide de rien : chaque identifiant est ensuite vérifié sur l'API de statut.
@@ -200,7 +201,9 @@ def verify_order_payment(payment, source, user=None, ip_address=None):
     if outcome in ('unknown', 'failed'):
         # Lancement en erreur (aucun identifiant) ou essai échoué : SingPay a pu créer une autre
         # transaction pour cette commande, que le client a validée. On la cherche par la référence.
-        others = [i for i in singpay_ids_for_reference(f'GABOSHOP_{payment.order.order_number}') if i not in ids]
+        others = []
+        for ref in payment_references(payment):
+            others += [i for i in singpay_ids_for_reference(ref) if i not in ids and i not in others]
         if others:
             found = _best_singpay_answer(others)
             if OUTCOME_RANK[found[0]] > OUTCOME_RANK[outcome]:
@@ -231,6 +234,8 @@ def verify_order_payment(payment, source, user=None, ip_address=None):
                     reason=f'SingPay : montant {amount} ou référence {reference} incohérents', is_suspicious=True,
                 )
                 return payment.status
+            if reference:
+                payment.webhook_data[PAID_REFERENCE_KEY] = str(reference)
             mark_order_payment_success(payment, f'Paiement vérifié auprès de SingPay ({source})', user, ip_address)
         elif outcome == 'failed':
             payment.status = 'failed'
@@ -250,8 +255,8 @@ def find_order_payment(transaction_ids, reference):
         payment = Payment.objects.select_related('order').filter(transaction_id__in=ids).first()
         if payment:
             return payment
-    if reference and str(reference).startswith('GABOSHOP_'):
-        order_number = str(reference).replace('GABOSHOP_', '', 1).strip()
+    order_number = order_number_from_reference(reference)
+    if order_number:
         return Payment.objects.select_related('order').filter(order__order_number=order_number).first()
     return None
 

@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from orders.models import Order
 from .models import Payment, StorePayout
+from .references import base_reference, paid_reference
 from .utils import call_singpay_transfer
 
 logger = logging.getLogger(__name__)
@@ -93,8 +94,10 @@ def release_store_payment(order_id):
             payout.status, payout.note = 'processing', ''
             payout.attempts += 1
             payout.save()
-            # SingPay retrouve l'encaissement à reverser par sa référence marchande.
-            reference, amount_to_send = f'GABOSHOP_{order.order_number}', _provider_amount(payout.amount)
+            # SingPay retrouve l'encaissement à reverser par sa référence marchande (celle de l'essai réussi).
+            paid = Payment.objects.filter(order=order, status__in=ONLINE_SUCCESS).first()
+            reference = paid_reference(paid) if paid else base_reference(order.order_number)
+            amount_to_send = _provider_amount(payout.amount)
     except Exception:
         logger.exception('Versement commerce : préparation impossible (commande %s)', order_id)
         return None
