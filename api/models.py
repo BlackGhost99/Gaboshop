@@ -93,6 +93,18 @@ class SystemSettings(models.Model):
         help_text="Nombre max de livraisons en cours par livreur avant de lui en proposer une autre"
     )
     
+    default_delivery_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=2000.00, validators=[MinValueValidator(0)],
+        help_text="Frais de livraison standard d'un nouveau commerce, utilisés quand aucune zone ne correspond (FCFA)"
+    )
+    default_express_delivery_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=3500.00, validators=[MinValueValidator(0)],
+        help_text="Frais de livraison express d'un nouveau commerce (FCFA)"
+    )
+    default_intercity_surcharge = models.DecimalField(
+        max_digits=8, decimal_places=2, default=1000.00, validators=[MinValueValidator(0)],
+        help_text="Supplément quand le client est dans une autre ville que le commerce et qu'aucune zone ne le précise (FCFA)"
+    )
     assignment_timeout_minutes = models.IntegerField(
         default=10, validators=[MinValueValidator(1)],
         help_text="Temps laissé à un livreur pour accepter une course avant de la proposer au suivant (minutes)"

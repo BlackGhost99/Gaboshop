@@ -37,6 +37,7 @@ from .notifications import (
     NotificationListView, NotificationMarkAllReadView, NotificationMarkReadView,
     NotificationDeleteView
 )
+from . import delivery_admin
 from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
@@ -165,6 +166,17 @@ urlpatterns = [
     path('admin/users/', AdminUsersView.as_view(), name='admin-users'),
     path('admin/orders/', AdminOrdersView.as_view(), name='admin-orders'),
     path('admin/delivery/tariff-analytics/', DeliveryTariffAnalyticsView.as_view(), name='delivery-tariff-analytics'),
+    path('admin/delivery/tariffs/', delivery_admin.DeliveryTariffsView.as_view(), name='admin-delivery-tariffs'),
+    path('admin/delivery/defaults/', delivery_admin.DeliveryDefaultsView.as_view(), name='admin-delivery-defaults'),
+    path('admin/delivery/zones/', delivery_admin.DeliveryZonesAdminView.as_view(), name='admin-delivery-zones'),
+    path('admin/delivery/zones/<int:zone_id>/', delivery_admin.DeliveryZonesAdminView.as_view(), name='admin-delivery-zone'),
+    path('admin/delivery/vehicles/<int:vehicle_id>/', delivery_admin.VehicleTypeAdminView.as_view(), name='admin-delivery-vehicle'),
+    path('admin/delivery/distances/', delivery_admin.CityDistanceAdminView.as_view(), name='admin-delivery-distances'),
+    path('admin/delivery/distances/<int:distance_id>/', delivery_admin.CityDistanceAdminView.as_view(), name='admin-delivery-distance'),
+    path('admin/delivery/simulate/', delivery_admin.DeliveryPriceSimulatorView.as_view(), name='admin-delivery-simulate'),
+    path('admin/delivery/operations/', delivery_admin.DeliveryOperationsView.as_view(), name='admin-delivery-operations'),
+    path('admin/delivery/stats/', delivery_admin.DeliveryStatsView.as_view(), name='admin-delivery-stats'),
+    path('admin/delivery/incidents/', delivery_admin.DeliveryIncidentsView.as_view(), name='admin-delivery-incidents'),
     path('admin/delivery/zone-health/', DeliveryZoneHealthCheckView.as_view(), name='delivery-zone-health'),
     path('admin/financials/', AdminFinancialsView.as_view(), name='admin-financials'),
     path('admin/store-categories/', AdminStoreCategoriesView.as_view(), name='admin-store-categories'),

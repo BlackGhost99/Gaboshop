@@ -845,3 +845,21 @@ export const bulkCreateB2BProductPricing = async (payload) => {
   return res.data;
 };
 
+
+// Livraison : tarifs, attribution, suivi (espace admin > Livraison)
+export const getDeliveryTariffs = async () => (await api.get('/admin/delivery/tariffs/')).data;
+export const updateDeliveryDefaults = async (payload) => (await api.patch('/admin/delivery/defaults/', payload)).data;
+export const saveDeliveryZone = async (zone) => (zone.id
+  ? (await api.patch(`/admin/delivery/zones/${zone.id}/`, zone)).data
+  : (await api.post('/admin/delivery/zones/', zone)).data);
+export const deleteDeliveryZone = async (id) => (await api.delete(`/admin/delivery/zones/${id}/`)).data;
+export const updateVehicleType = async (id, payload) => (await api.patch(`/admin/delivery/vehicles/${id}/`, payload)).data;
+export const saveCityDistance = async (row) => (row.id
+  ? (await api.patch(`/admin/delivery/distances/${row.id}/`, row)).data
+  : (await api.post('/admin/delivery/distances/', row)).data);
+export const deleteCityDistance = async (id) => (await api.delete(`/admin/delivery/distances/${id}/`)).data;
+export const simulateDeliveryPrice = async (payload) => (await api.post('/admin/delivery/simulate/', payload)).data;
+export const getDeliveryOperations = async () => (await api.get('/admin/delivery/operations/')).data;
+export const getAdminDeliveryStats = async (days) => (await api.get("/admin/delivery/stats/", { params: { days } })).data;
+export const getDeliveryIncidents = async () => (await api.get('/admin/delivery/incidents/')).data;
+export const assignDeliveryAgent = async (orderId, agentId) => (await api.post(`/admin/orders/${orderId}/assign-delivery/`, { delivery_agent_id: agentId })).data;

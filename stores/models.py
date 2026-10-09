@@ -14,6 +14,18 @@ def default_commission_rate():
 	return Decimal(str(SystemSettings.current('commission_global', Decimal('8.00'))))
 
 
+def default_delivery_fee():
+	from decimal import Decimal
+	from api.models import SystemSettings
+	return Decimal(str(SystemSettings.current('default_delivery_fee', Decimal('2000.00'))))
+
+
+def default_express_delivery_fee():
+	from decimal import Decimal
+	from api.models import SystemSettings
+	return Decimal(str(SystemSettings.current('default_express_delivery_fee', Decimal('3500.00'))))
+
+
 def default_opening_time():
 	from api.models import SystemSettings
 	return _as_time(SystemSettings.current('default_store_opening', time(8, 0)))
@@ -95,7 +107,7 @@ class Store(models.Model):
 	delivery_fee = models.DecimalField(
 		max_digits=8, 
 		decimal_places=2, 
-		default=2000.00,
+		default=default_delivery_fee,
 		help_text="Frais de livraison standard en FCFA"
 	)
 	# Indique si le magasin gère les livraisons lui-même (optionnel)
@@ -126,7 +138,7 @@ class Store(models.Model):
 	delivery_fee_express = models.DecimalField(
 		max_digits=8, 
 		decimal_places=2, 
-		default=3500.00,
+		default=default_express_delivery_fee,
 		help_text="Frais de livraison express en FCFA"
 	)
 	service_fee = models.DecimalField(

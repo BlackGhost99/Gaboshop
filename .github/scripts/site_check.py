@@ -34,6 +34,7 @@ MARKERS = {
     'Messages clairs et aide de l IA (9 oct.)': 'comment régler ça',
     'Paiement unique Airtel/Moov, livreur payé à la confirmation (9 oct.)': 'Ajoutez votre numéro Mobile Money',
     'Réglages admin, étape 1 (9 oct.)': 'Villes où Gaboshop est ouvert',
+    'Livraison : tarifs et onglets admin (9 oct.)': 'Comment le prix est calculé',
 }
 
 

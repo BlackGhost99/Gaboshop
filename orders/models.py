@@ -145,6 +145,10 @@ class Order(models.Model):
 		def to_decimal(value):
 			return Decimal(str(value or 0))
 
+		def intercity_surcharge_default():
+			from api.models import SystemSettings
+			return to_decimal(SystemSettings.current('default_intercity_surcharge', Decimal('1000.00')))
+
 		def store_delivery_fee():
 			fee = self.store.delivery_fee if self.delivery_type == 'standard' else self.store.delivery_fee_express
 			return to_decimal(fee)
@@ -196,13 +200,13 @@ class Order(models.Model):
 				base_fee = store_delivery_fee()
 				cost = base_fee * multiplier
 				if (not (hasattr(self, 'city') and self.city and self.store and self.store.city and self.store.city == self.city)):
-					cost += Decimal('1000.00')
+					cost += intercity_surcharge_default()
 		else:
 			# Pas de zone trouvÃ©e, utiliser tarif store avec surcharge fixe
 			base_fee = store_delivery_fee()
 			cost = base_fee * multiplier
 			if (not (hasattr(self, 'city') and self.city and self.store and self.store.city and self.store.city == self.city)):
-				cost += Decimal('1000.00')
+				cost += intercity_surcharge_default()
 		
 		# Arrondir Ã  0.01
 		cost = cost.quantize(Decimal('0.01'))

@@ -155,3 +155,55 @@ class BusinessRulesTests(TestCase):
         self.settings.assignment_timeout_minutes = 7
         self.settings.save()
         self.assertEqual(assignment_timeout_minutes(), 7)
+
+
+class DeliveryAdminTests(TestCase):
+    def setUp(self):
+        from decimal import Decimal
+        from delivery.models import VehicleType
+        self.admin = User.objects.create_user(phone='+24107200030', password='x', user_type='admin')
+        self.api = APIClient()
+        self.api.force_authenticate(self.admin)
+        self.moto = VehicleType.objects.create(name='MOTO', max_weight_kg=Decimal('20'), max_items=10, max_distance_km=Decimal('30'))
+        self.car = VehicleType.objects.create(name='CAR', max_weight_kg=Decimal('200'), max_items=0, max_distance_km=Decimal('300'))
+
+    def test_zone_with_prices_and_simulated_price(self):
+        response = self.api.post('/api/v1/admin/delivery/zones/', {
+            'name': 'Akanda', 'city': 'Akanda', 'inter_city_surcharge': 1500,
+            'rates': [{'vehicle_id': self.moto.id, 'price': 2500}, {'vehicle_id': self.car.id, 'price': ''}],
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+        zone = response.json()['data']
+        prices = {r['vehicle_id']: r['price'] for r in zone['rates']}
+        self.assertEqual(prices, {self.moto.id: 2500.0, self.car.id: None})
+
+        simulated = self.api.post('/api/v1/admin/delivery/simulate/', {
+            'zone_id': zone['id'], 'vehicle_id': self.moto.id, 'store_city': 'Libreville',
+        }, format='json').json()['data']
+        self.assertEqual(simulated['price'], 4000.0)  # 2500 + 1500 autre ville
+        self.assertEqual(simulated['courier_share'], 3200.0)  # 80 %
+
+        # Même nom dans la même ville : refusé avec une explication.
+        duplicate = self.api.post('/api/v1/admin/delivery/zones/', {'name': 'Akanda', 'city': 'Akanda'}, format='json')
+        self.assertEqual(duplicate.status_code, 409)
+
+    def test_defaults_can_be_applied_to_every_store(self):
+        manager = User.objects.create_user(phone='+24107200031', password='x', user_type='store_manager')
+        store = Store.objects.create(name='C', category=StoreCategory.objects.create(name='K'), manager=manager,
+                                     phone='+24107200131', address='Libreville', zone='Centre')
+        response = self.api.patch('/api/v1/admin/delivery/defaults/', {
+            'default_delivery_fee': 1500, 'default_express_delivery_fee': 3000, 'apply_to_all_stores': True,
+        }, format='json')
+        self.assertEqual(response.json()['data']['stores_updated'], 1)
+        store.refresh_from_db()
+        self.assertEqual((int(store.delivery_fee), int(store.delivery_fee_express)), (1500, 3000))
+
+    def test_monitoring_screens_load(self):
+        for url in ('tariffs', 'operations', 'stats', 'incidents'):
+            response = self.api.get(f'/api/v1/admin/delivery/{url}/')
+            self.assertEqual(response.status_code, 200, (url, response.content))
+
+    def test_only_admins_can_change_tariffs(self):
+        client = User.objects.create_user(phone='+24107200032', password='x', user_type='client')
+        self.api.force_authenticate(client)
+        self.assertEqual(self.api.post('/api/v1/admin/delivery/zones/', {'name': 'X', 'city': 'Y'}, format='json').status_code, 403)

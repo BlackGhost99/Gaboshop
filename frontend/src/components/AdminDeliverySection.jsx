@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { notifyError, notifySuccess, notifyWarning, notifyInfo } from '../utils/feedback';
 import useEnabledCities from '../hooks/useEnabledCities';
+import DeliveryTariffs from './admin/delivery/DeliveryTariffs';
+import { DeliveryActive, DeliveryDispatch, DeliveryIncidents, DeliveryStats } from './admin/delivery/DeliveryOperations';
 import { getDeliveryAgents, createDeliveryAgent, updateDeliveryAgent, toggleDeliveryAgentStatus } from '../services/adminService';
 
 const AdminDeliverySection = () => {
@@ -235,7 +237,7 @@ const AdminDeliverySection = () => {
             {tab === 'agents' && 'Livreurs'}
             {tab === 'attribution' && 'Attribution'}
             {tab === 'active_orders' && 'Commandes en cours'}
-            {tab === 'settings' && 'Paramètres'}
+            {tab === 'settings' && 'Tarifs'}
             {tab === 'stats' && 'Statistiques'}
             {tab === 'incidents' && 'Incidents'}
           </button>
@@ -333,11 +335,11 @@ const AdminDeliverySection = () => {
         </div>
       )}
       
-      {activeTab !== 'agents' && (
-        <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-          Section "{activeTab}" en cours de développement...
-        </div>
-      )}
+      {activeTab === 'attribution' && <DeliveryDispatch />}
+      {activeTab === 'active_orders' && <DeliveryActive />}
+      {activeTab === 'settings' && <DeliveryTariffs />}
+      {activeTab === 'stats' && <DeliveryStats />}
+      {activeTab === 'incidents' && <DeliveryIncidents />}
 
       {/* Add Agent Modal */}
       {showAddModal && (
