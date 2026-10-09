@@ -274,6 +274,9 @@ const StoreProfile = () => {
                                 className="mt-1 block w-full border rounded-md shadow-sm p-2" 
                             />
                         </div>
+                        <p className="md:col-span-2 -mt-3 text-xs text-gray-500">
+                            Heure de Libreville. Même heure d'ouverture et de fermeture (ex. 00:00 et 00:00) : ouvert 24 h/24. Fermeture avant l'ouverture (ex. 18:00 et 02:00) : ouvert la nuit.
+                        </p>
                         <div className="md:col-span-2 flex items-center space-x-3">
                             <input
                                 id="offers_delivery"

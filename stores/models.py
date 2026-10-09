@@ -1,5 +1,17 @@
+from datetime import datetime, time, timedelta, timezone as dt_timezone
+
 from django.db import models
 from users.models import User
+
+# Heure du Gabon (WAT) : UTC+1 toute l'année. Le serveur, lui, compte en UTC.
+LIBREVILLE_TZ = dt_timezone(timedelta(hours=1))
+
+
+def _as_time(value):
+	"""Heure d'ouverture lue en base (time) ou pas encore enregistrée (texte « 08:00 »)."""
+	if isinstance(value, time):
+		return value.replace(tzinfo=None)
+	return time.fromisoformat(str(value))
 
 
 class StoreCategory(models.Model):
@@ -202,9 +214,20 @@ class Store(models.Model):
 			self.store_type = 'retail'
     
 	def is_open(self):
-		from django.utils import timezone
-		now = timezone.now().time()
-		return self.opening_time <= now <= self.closing_time and self.is_active
+		"""Ouvert à l'heure de Libreville (UTC+1, sans heure d'été).
+
+		Même heure d'ouverture et de fermeture = ouvert 24 h/24. Fermeture avant l'ouverture
+		(ex. 18:00 → 02:00) = ouvert pendant la nuit.
+		"""
+		if not self.is_active:
+			return False
+		opening, closing = _as_time(self.opening_time), _as_time(self.closing_time)
+		now = datetime.now(LIBREVILLE_TZ).time().replace(tzinfo=None)
+		if opening == closing:
+			return True
+		if opening < closing:
+			return opening <= now <= closing
+		return now >= opening or now <= closing
     
 	def total_products(self):
 		return self.products.filter(is_available=True).count()

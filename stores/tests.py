@@ -442,3 +442,50 @@ class AssistantTests(TestCase):
 		self.assertEqual(res.status_code, 200, res.content)
 		order.refresh_from_db()
 		self.assertEqual(order.status, 'preparing')
+
+
+class StoreOpeningHoursTests(TestCase):
+	"""Horaires à l'heure de Libreville, 24 h/24 et ouverture de nuit."""
+
+	def setUp(self):
+		manager = User.objects.create_user(phone='077000090', password='secret123', user_type='store_manager')
+		category = StoreCategory.objects.create(name='Horaires')
+		self.store = Store.objects.create(
+			name='Horaires', category=category, manager=manager, phone='077000091', address='Libreville', zone='Centre',
+		)
+
+	def open_at(self, utc_hour, utc_minute, opening, closing):
+		from datetime import datetime, time, timezone
+		from unittest import mock
+		self.store.opening_time, self.store.closing_time = time.fromisoformat(opening), time.fromisoformat(closing)
+		utc_now = datetime(2026, 10, 8, utc_hour, utc_minute, tzinfo=timezone.utc)
+
+		class FrozenDatetime(datetime):
+			@classmethod
+			def now(cls, tz=None):
+				return utc_now.astimezone(tz) if tz else utc_now.replace(tzinfo=None)
+
+		with mock.patch('stores.models.datetime', FrozenDatetime):
+			return self.store.is_open()
+
+	def test_hours_are_libreville_time(self):
+		# 07:30 UTC = 08:30 à Libreville.
+		self.assertTrue(self.open_at(7, 30, '08:00', '20:00'))
+		# 19:30 UTC = 20:30 à Libreville : fermé.
+		self.assertFalse(self.open_at(19, 30, '08:00', '20:00'))
+
+	def test_same_opening_and_closing_means_always_open(self):
+		for hour in (0, 6, 12, 23):
+			self.assertTrue(self.open_at(hour, 55, '00:00', '00:00'))
+
+	def test_overnight_hours(self):
+		self.assertTrue(self.open_at(23, 55, '18:00', '02:00'))   # 00:55 à Libreville
+		self.assertFalse(self.open_at(11, 0, '18:00', '02:00'))   # midi à Libreville
+
+	def test_inactive_store_is_closed(self):
+		self.store.is_active = False
+		self.assertFalse(self.open_at(12, 0, '00:00', '00:00'))
+
+	def test_unsaved_text_hours_do_not_crash(self):
+		self.store.opening_time, self.store.closing_time = '00:00', '23:59'
+		self.assertIsInstance(self.store.is_open(), bool)
