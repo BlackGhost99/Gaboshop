@@ -5,6 +5,7 @@ from .sms import SMSService
 from .email import EmailService
 from .templates import NotificationTemplates
 from .models import Notification
+from . import messages
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,24 @@ class NotificationService:
     # Priorité des canaux de notification
     CHANNEL_PRIORITY = ['whatsapp', 'sms', 'email']
     
+    # ===== Notifications métier (textes dans notifications/messages.py) =====
+
+    @staticmethod
+    def notify_user(user, message, notif_type='info', order=None, delivery=None, metadata=None):
+        """Enregistre une notification détaillée : niveau, cause et étape suivante vont dans les métadonnées."""
+        if not user or not message:
+            return None
+        meta = {
+            'level': message.get('level', 'info'),
+            'reason': message.get('reason', ''),
+            'next_step': message.get('next_step', ''),
+            **(metadata or {}),
+        }
+        return NotificationService._save_notification(
+            user=user, title=message['title'][:200], body=message['body'],
+            notif_type=notif_type, order=order, delivery=delivery, metadata=meta,
+        )
+
     @staticmethod
     def notify_new_order(order):
         """
@@ -25,77 +44,56 @@ class NotificationService:
         """
         try:
             store = getattr(order, 'store', None)
-            if store and hasattr(store, 'is_open') and not store.is_open():
-                # Magasin fermé : on enregistre quand même la notification pour historique
-                NotificationService._save_notification(
-                    user=store.manager,
-                    title=f"Nouvelle commande #{order.order_number}",
-                    body="Magasin fermé : notification non envoyée",
-                    notif_type='warning',
-                    order=order,
-                    metadata={'reason': 'store_closed'},
-                )
-                logger.warning("?? Magasin fermé, notification non envoyée")
+            if store is None:
+                return False
+            closed = hasattr(store, 'is_open') and not store.is_open()
+            message = messages.new_order_for_store(order, store_closed=closed)
+            NotificationService.notify_user(
+                store.manager, message, notif_type='warning' if closed else 'order', order=order,
+                metadata={'reason_code': 'store_closed'} if closed else None,
+            )
+            if closed:
+                logger.warning("Commerce fermé : SMS de nouvelle commande non envoyé (%s)", order.order_number)
                 return False
 
             template = NotificationTemplates.new_order_store(order)
-            NotificationService._save_notification(
-                user=order.store.manager,
-                title=f"Nouvelle commande #{order.order_number}",
-                body=NotificationService._body_from_template(template, 'Nouvelle commande'),
-                notif_type='order',
-                order=order,
-            )
-            success = NotificationService._send_to_store(
-                order.store.phone,
-                template,
-                f"Nouvelle commande #{order.order_number}"
-            )
-            
-            if success:
-                logger.info(f"?? Notification nouvelle commande envoyée à {order.store.name}")
-            else:
-                logger.error(f"? Échec notification nouvelle commande à {order.store.name}")
-            
+            template['sms'] = message['sms']
+            success = NotificationService._send_to_store(store.phone, template, message['title'])
+            if not success:
+                logger.error("Échec de l'envoi de la nouvelle commande à %s", store.name)
             return success
-            
+
         except Exception as e:
-            logger.error(f"? Erreur notification nouvelle commande: {e}")
+            logger.error(f"Erreur notification nouvelle commande: {e}")
             return False
-    
+
     @staticmethod
     def notify_order_status_update(order, old_status, new_status):
         """
-        Notifier le client du changement de statut
+        Notifier le client (et le commerce quand ça le concerne) du changement de statut
         """
         try:
-            template = NotificationTemplates.order_status_client(order, old_status, new_status)
-            NotificationService._save_notification(
-                user=order.client,
-                title=f"Commande #{order.order_number}",
-                body=NotificationService._body_from_template(template, f"Statut mis à jour: {old_status} ? {new_status}"),
-                notif_type='order',
-                order=order,
+            message = messages.order_update_for_client(order, old_status, new_status)
+            NotificationService.notify_user(
+                order.client, message, notif_type='order', order=order,
                 metadata={'from': old_status, 'to': new_status},
             )
-            success = NotificationService._send_to_client(
-                order.client.phone,
-                order.client.email,
-                template,
-                f"Statut commande #{order.order_number}"
+            store_message = messages.order_update_for_store(order, new_status)
+            if store_message and getattr(order, 'store', None):
+                NotificationService.notify_user(
+                    order.store.manager, store_message, notif_type='order', order=order,
+                    metadata={'from': old_status, 'to': new_status},
+                )
+            template = NotificationTemplates.order_status_client(order, old_status, new_status)
+            template['sms'] = message['sms']
+            return NotificationService._send_to_client(
+                order.client.phone, order.client.email, template, message['title'],
             )
-            
-            if success:
-                logger.info(f"?? Notification statut envoyée à {order.client.phone}")
-            else:
-                logger.warning(f"?? Échec notification statut à {order.client.phone}")
-            
-            return success
-            
+
         except Exception as e:
-            logger.error(f"? Erreur notification statut: {e}")
+            logger.error(f"Erreur notification statut: {e}")
             return False
-    
+
     @staticmethod
     def notify_delivery_assigned(delivery):
         """
@@ -103,126 +101,124 @@ class NotificationService:
         """
         try:
             if not delivery.delivery_agent:
-                logger.warning("?? Aucun livreur assigné pour notification")
+                logger.warning("Aucun livreur assigné pour notification")
                 return False
-            
+
+            order = delivery.order
             template = NotificationTemplates.delivery_assigned_agent(delivery)
-            NotificationService._save_notification(
-                user=delivery.delivery_agent,
-                title=f"Livraison #{delivery.tracking_number}",
-                body=NotificationService._body_from_template(template, 'Livraison assignée'),
-                notif_type='delivery',
-                delivery=delivery,
+            NotificationService.notify_user(
+                delivery.delivery_agent,
+                {
+                    'title': f"Nouvelle livraison #{delivery.tracking_number}",
+                    'body': (
+                        f"Récupérez la commande #{order.order_number} chez {order.store.name} "
+                        f"({delivery.pickup_address}) et livrez-la à : {delivery.delivery_address}. "
+                        f"Votre gain : {messages.money(delivery.agent_commission)}."
+                    ),
+                    'level': 'info',
+                    'next_step': "Ouvrez « Mes livraisons » pour accepter la course et voir le contact du client.",
+                },
+                notif_type='delivery', delivery=delivery, order=order,
             )
             success = NotificationService._send_to_agent(
                 delivery.delivery_agent.phone,
                 template,
                 f"Nouvelle livraison #{delivery.tracking_number}"
             )
-            
-            if success:
-                logger.info(f"?? Notification livraison envoyée à {delivery.delivery_agent.phone}")
-            else:
-                logger.error(f"? Échec notification livraison à {delivery.delivery_agent.phone}")
-            
+            if not success:
+                logger.error("Échec de l'envoi de la livraison au livreur %s", delivery.delivery_agent.phone)
             return success
-            
+
         except Exception as e:
-            logger.error(f"? Erreur notification livraison: {e}")
+            logger.error(f"Erreur notification livraison: {e}")
             return False
-    
+
     @staticmethod
     def notify_payment_success(order, payment):
         """
-        Notifier le client d'un paiement réussi
+        Paiement en ligne confirmé : le client et le commerce reçoivent le détail.
         """
         try:
+            message = messages.payment_success_for_client(order, payment)
+            NotificationService.notify_user(
+                order.client, message, notif_type='payment', order=order, metadata={'payment_id': payment.id},
+            )
+            if getattr(order, 'store', None):
+                NotificationService.notify_user(
+                    order.store.manager, messages.payment_success_for_store(order, payment),
+                    notif_type='payment', order=order, metadata={'payment_id': payment.id},
+                )
             template = NotificationTemplates.payment_success_client(order, payment)
-            NotificationService._save_notification(
-                user=order.client,
-                title=f"Paiement confirmé #{order.order_number}",
-                body=NotificationService._body_from_template(template, 'Paiement confirmé'),
-                notif_type='payment',
-                order=order,
-                metadata={'payment_id': payment.id},
+            template['sms'] = message['sms']
+            return NotificationService._send_to_client(
+                order.client.phone, order.client.email, template, message['title'],
             )
-            success = NotificationService._send_to_client(
-                order.client.phone,
-                order.client.email,
-                template,
-                f"Paiement confirmé #{order.order_number}"
-            )
-            
-            if success:
-                logger.info(f"?? Notification paiement réussi à {order.client.phone}")
-            
-            return success
-            
+
         except Exception as e:
-            logger.error(f"? Erreur notification paiement réussi: {e}")
+            logger.error(f"Erreur notification paiement réussi: {e}")
             return False
-    
+
     @staticmethod
-    def notify_payment_failed(order):
+    def notify_payment_failed(order, payment=None, details=None):
         """
-        Notifier le client d'un paiement échoué
+        Paiement non abouti : le client reçoit la cause (code erroné, solde, demande expirée...) et quoi faire.
         """
         try:
+            if payment is None:
+                payment = getattr(order, 'payment', None)
+            if payment is None:
+                return False
+            message = messages.payment_failed_for_client(order, payment, details)
+            NotificationService.notify_user(
+                order.client, message, notif_type='payment', order=order,
+                metadata={'payment_id': payment.id, 'reason_code': message['failure_code']},
+            )
             template = NotificationTemplates.payment_failed_client(order)
-            NotificationService._save_notification(
-                user=order.client,
-                title=f"Paiement échoué #{order.order_number}",
-                body=NotificationService._body_from_template(template, 'Paiement échoué'),
-                notif_type='payment',
-                order=order,
+            template['sms'] = message['sms']
+            return NotificationService._send_to_client(
+                order.client.phone, order.client.email, template, message['title'],
             )
-            success = NotificationService._send_to_client(
-                order.client.phone,
-                order.client.email,
-                template,
-                f"Paiement échoué #{order.order_number}"
-            )
-            
-            if success:
-                logger.info(f"?? Notification paiement échoué à {order.client.phone}")
-            
-            return success
-            
+
         except Exception as e:
-            logger.error(f"? Erreur notification paiement échoué: {e}")
+            logger.error(f"Erreur notification paiement échoué: {e}")
             return False
-    
+
+    @staticmethod
+    def notify_store_payout(payout):
+        """Versement au commerce : envoyé, en attente (et pourquoi) ou échoué."""
+        try:
+            message = messages.store_payout_message(payout)
+            if not message:
+                return None
+            return NotificationService.notify_user(
+                payout.store.manager, message, notif_type='payment', order=payout.order,
+                metadata={'payout_id': payout.id, 'payout_status': payout.status},
+            )
+        except Exception as e:
+            logger.error(f"Erreur notification versement commerce: {e}")
+            return None
+
     @staticmethod
     def notify_delivery_in_transit(delivery):
         """
         Notifier le client que sa livraison est en route
         """
         try:
+            order = delivery.order
+            message = messages.order_update_for_client(order, order.status, 'in_transit')
+            NotificationService.notify_user(
+                order.client, message, notif_type='delivery', delivery=delivery, order=order,
+            )
             template = NotificationTemplates.delivery_in_transit_client(delivery)
-            NotificationService._save_notification(
-                user=delivery.order.client,
-                title=f"Livraison en route #{delivery.tracking_number}",
-                body=NotificationService._body_from_template(template, 'Livraison en route'),
-                notif_type='delivery',
-                delivery=delivery,
-                order=delivery.order,
+            template['sms'] = message['sms']
+            return NotificationService._send_to_client(
+                order.client.phone, order.client.email, template, message['title'],
             )
-            success = NotificationService._send_to_client(
-                delivery.order.client.phone,
-                delivery.order.client.email,
-                template,
-                f"Livraison en route #{delivery.tracking_number}"
-            )
-            
-            if success:
-                logger.info(f"?? Notification livraison en route à {delivery.order.client.phone}")
-            
-            return success
-            
+
         except Exception as e:
-            logger.error(f"? Erreur notification livraison en route: {e}")
+            logger.error(f"Erreur notification livraison en route: {e}")
             return False
-    
+
     # ===== MÉTHODES D'ENVOI SPÉCIALISÉES =====
     
     @staticmethod
@@ -310,13 +306,13 @@ class NotificationService:
         Notifier le livreur qu'il a reçu son paiement Airtel Money
         """
         try:
-            title = f"?? Paiement reçu - Livraison #{delivery.id}"
+            title = f"Gain reçu : {messages.money(delivery.agent_commission)}"
             body = (
-                f"? Vous avez reçu {delivery.agent_commission} FCFA "
-                f"pour la livraison #{delivery.id} (Commande {delivery.order.order_number})\n"
-                f"{message}"
+                f"Vous avez reçu {messages.money(delivery.agent_commission)} pour la livraison de la commande "
+                f"#{delivery.order.order_number}. Vérifiez le SMS de votre opérateur Mobile Money."
+                + (f"\n{message}" if message else '')
             )
-            
+
             transaction_id = getattr(payment, 'transaction_id', None)
             if not transaction_id:
                 transaction_id = getattr(payment, 'transaction_reference', None)
@@ -328,6 +324,7 @@ class NotificationService:
                 notif_type='payment',
                 delivery=delivery,
                 metadata={
+                    'level': 'success',
                     'amount': float(delivery.agent_commission),
                     'payment_id': payment.id,
                     'transaction_id': transaction_id,
@@ -337,11 +334,7 @@ class NotificationService:
             )
             
             # Envoyer via SMS/WhatsApp
-            success = NotificationService._send_to_agent(
-                agent.phone,
-                body,
-                title
-            )
+            success = NotificationService._send_to_agent(agent.phone, {'sms': f"GABOSHOP - {body}"}, title)
             
             if success:
                 logger.info(f"?? Notification paiement livreur envoyée à {agent.username}: {delivery.agent_commission}F")

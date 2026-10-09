@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifySuccess } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import WholesalerList from '../../components/b2b/WholesalerList';
 import WholesalerDetail from '../../components/b2b/WholesalerDetail';
@@ -150,7 +151,7 @@ const B2BProcurement = () => {
 			const response = await createB2BOrder(orderData);
 			if (response.success) {
 				// Succès - rediriger ou afficher un message
-				alert('Commande B2B créée avec succès !');
+				notifySuccess('Commande fournisseur envoyée', 'Le fournisseur est prévenu ; suivez-la dans vos commandes B2B.');
 				setCart([]);
 				setView('list');
 				// On pourrait rafraîchir la liste ici si nécessaire

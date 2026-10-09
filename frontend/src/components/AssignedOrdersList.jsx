@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifyError } from '../utils/feedback';
 import { getAssignedOrders, acceptDelivery, rejectDelivery } from '../services/deliveryService';
 import { formatCurrency } from '../utils/helpers';
 
@@ -60,10 +61,10 @@ const AssignedOrdersList = () => {
         // Rafraîchir la liste
         fetchAssignedOrders();
       } else {
-        alert(response.error || 'Erreur lors de l\'acceptation');
+        notifyError(response.error || 'La livraison n’a pas pu être acceptée.', { action: 'Accepter la livraison' });
       }
     } catch (err) {
-      alert('Erreur: ' + err.message);
+      notifyError(err);
     } finally {
       setActionLoading(prev => ({ ...prev, [deliveryId]: false }));
     }
@@ -79,10 +80,10 @@ const AssignedOrdersList = () => {
         // Rafraîchir la liste
         fetchAssignedOrders();
       } else {
-        alert(response.error || 'Erreur lors du refus');
+        notifyError(response.error || 'Le refus n’a pas été enregistré.', { action: 'Refuser la livraison' });
       }
     } catch (err) {
-      alert('Erreur: ' + err.message);
+      notifyError(err);
     } finally {
       setActionLoading(prev => ({ ...prev, [deliveryId]: false }));
     }

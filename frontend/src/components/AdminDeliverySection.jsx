@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { notifyError, notifySuccess, notifyWarning, notifyInfo } from '../utils/feedback';
 import { getDeliveryAgents, createDeliveryAgent, updateDeliveryAgent, toggleDeliveryAgentStatus } from '../services/adminService';
 
 const AdminDeliverySection = () => {
@@ -133,10 +134,10 @@ const AdminDeliverySection = () => {
       await updateDeliveryAgent(selectedAgent.id, editForm);
       setShowEditModal(false);
       loadAgents();
-      alert('Livreur mis à jour avec succès !');
+      notifySuccess('Livreur mis à jour', `Les informations de ${selectedAgent.name || 'ce livreur'} sont enregistrées.`);
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
-      alert('Erreur lors de la mise à jour du livreur.');
+      notifyError(error, { action: 'Mettre à jour le livreur' });
     }
   };
 
@@ -146,10 +147,10 @@ const AdminDeliverySection = () => {
       try {
         await toggleDeliveryAgentStatus(agent.id, agent.is_active);
         loadAgents();
-        alert(`${agent.name} a été ${action.toLowerCase()} avec succès.`);
+        notifySuccess(`${agent.name} : ${action.toLowerCase()} fait`, agent.is_active ? 'Il ne recevra plus de livraisons.' : 'Il peut de nouveau recevoir des livraisons.');
       } catch (error) {
         console.error('Erreur lors du changement de statut:', error);
-        alert('Erreur lors du changement de statut.');
+        notifyError(error, { action: `${action} le livreur` });
       }
     }
   };
@@ -158,7 +159,7 @@ const AdminDeliverySection = () => {
     e.preventDefault();
     
     if (newAgent.password !== newAgent.confirm_password) {
-      alert("Les mots de passe ne correspondent pas.");
+      notifyWarning('Les deux mots de passe sont différents', 'Retapez le même mot de passe dans les deux champs.');
       return;
     }
 
@@ -193,14 +194,14 @@ const AdminDeliverySection = () => {
         }
       });
       loadAgents();
-      alert('Livreur ajouté avec succès !');
+      notifySuccess('Livreur ajouté', 'Il peut se connecter avec son numéro et le mot de passe choisi.');
     } catch (error) {
       console.error("Error creating agent:", error);
       let errorMsg = 'Erreur lors de la création du livreur.';
       if (error.response && error.response.data) {
          errorMsg += ' ' + JSON.stringify(error.response.data);
       }
-      alert(errorMsg);
+      notifyError(error, { action: 'Ajouter le livreur', fallback: errorMsg });
     }
   };
 
@@ -252,13 +253,13 @@ const AdminDeliverySection = () => {
                 ➕ Ajouter un livreur
               </button>
               <button 
-                onClick={() => alert('Fonctionnalité Carte à venir')}
+                onClick={() => notifyInfo('Carte bientôt disponible', 'La carte des livreurs n’est pas encore prête.')}
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
               >
                 📍 Carte
               </button>
               <button 
-                onClick={() => alert('Export non disponible')}
+                onClick={() => notifyInfo('Export bientôt disponible', 'L’export de la liste des livreurs n’est pas encore prêt.')}
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
               >
                 🧾 Exporter

@@ -31,6 +31,7 @@ MARKERS = {
     'Versements : numéro Mobile Money du commerce': 'Recevoir vos ventes payées en ligne',
     'Texte du choix de paiement selon le mode (8 oct. soir)': 'après la commande, vous recevez une demande',
     'Relancer un paiement sur la même commande (9 oct.)': 'Demande expirée ou pas reçue',
+    'Messages clairs et aide de l IA (9 oct.)': 'comment régler ça',
 }
 
 

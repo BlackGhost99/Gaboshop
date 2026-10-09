@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifyError } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -171,7 +172,7 @@ const StoreProducts = () => {
             const message = error.error?.details 
                 ? Object.values(error.error.details).flat().join('\n')
                 : (error.error?.message || "Erreur lors de l'enregistrement du produit");
-            alert(message);
+            notifyError(error, { action: 'Enregistrer le produit', fallback: message });
         }
     };
     
@@ -198,7 +199,7 @@ const StoreProducts = () => {
                 setConfirmDeleteProduct(null);
             } else {
                 const errorMsg = response?.error?.message || response?.error || 'Erreur lors de la suppression du produit';
-                alert(errorMsg);
+                notifyError(response?.error || errorMsg, { action: 'Supprimer le produit' });
                 setConfirmDeleteProduct(null);
             }
         } catch (error) {
@@ -208,7 +209,7 @@ const StoreProducts = () => {
                 || error?.response?.data?.message 
                 || error?.message 
                 || 'Erreur lors de la suppression du produit';
-            alert(errorMessage);
+            notifyError(error, { action: 'Supprimer le produit', fallback: errorMessage });
             setConfirmDeleteProduct(null);
         } finally {
             setDeletingProductId(null);

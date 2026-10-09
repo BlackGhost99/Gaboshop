@@ -83,12 +83,18 @@ def release_store_payment(order_id):
                 payout.save()
                 return payout
             if not disbursement_id:
+                changed = payout.status != 'pending' or payout.note != 'Identifiant de décaissement SingPay du commerce manquant'
                 payout.status, payout.note = 'pending', 'Identifiant de décaissement SingPay du commerce manquant'
                 payout.save()
+                if changed:
+                    transaction.on_commit(lambda p=payout: _notify_store(p))
                 return payout
             if not getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False):
+                changed = payout.status != 'pending' or payout.note != 'Transferts automatiques désactivés : versement manuel'
                 payout.status, payout.note = 'pending', 'Transferts automatiques désactivés : versement manuel'
                 payout.save()
+                if changed:
+                    transaction.on_commit(lambda p=payout: _notify_store(p))
                 return payout
 
             payout.status, payout.note = 'processing', ''
@@ -123,7 +129,16 @@ def release_store_payment(order_id):
         else:
             payout.status, payout.note, payout.paid_at = 'paid', '', timezone.now()
         payout.save()
+    _notify_store(payout)
     return payout
+
+
+def _notify_store(payout):
+    try:
+        from notifications.service import NotificationService
+        NotificationService.notify_store_payout(payout)
+    except Exception:
+        logger.exception('Notification du versement %s impossible', payout.pk)
 
 
 def schedule_store_payment(order_id):

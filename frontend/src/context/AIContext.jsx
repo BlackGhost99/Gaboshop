@@ -101,7 +101,8 @@ export const AIContextProvider = ({ children }) => {
   }, [navigate]);
 
   // Envoyer un message à l'assistant (adapté au rôle de l'utilisateur côté serveur)
-  const sendMessage = useCallback(async (message) => {
+  // `extra.problem` : le problème que l'application vient d'afficher, pour que l'IA l'explique.
+  const sendMessage = useCallback(async (message, extra = {}) => {
     if (!message.trim()) return;
 
     setMessages(prev => [...prev, {
@@ -119,6 +120,7 @@ export const AIContextProvider = ({ children }) => {
         history,
         cart: readCart(),
         page: location.pathname,
+        ...(extra.problem ? { problem: extra.problem } : {}),
       });
       const data = response.data?.data || {};
       const needsLogin = runActions(data.actions);

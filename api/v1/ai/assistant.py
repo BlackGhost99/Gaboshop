@@ -103,6 +103,17 @@ def _order_payload(o):
     }
 
 
+PROBLEM_FIELDS = ('action', 'message', 'reason', 'next_step', 'status', 'page')
+
+
+def _clean_problem(raw):
+    """Problème que l'application vient d'afficher à l'utilisateur (envoyé par l'application, texte court)."""
+    if not isinstance(raw, dict):
+        return None
+    problem = {k: str(raw.get(k) or '').strip()[:400] for k in PROBLEM_FIELDS}
+    return problem if problem['message'] or problem['reason'] else None
+
+
 class Ctx:
     """Ce que les outils accumulent pendant un tour : produits à afficher, actions, confirmations."""
 
@@ -114,6 +125,7 @@ class Ctx:
         self.products = {}
         self.actions = []
         self.confirmations = []
+        self.problem = _clean_problem(request.data.get('problem') if hasattr(request, 'data') else None)
 
     def show(self, products):
         for p in products:
@@ -493,6 +505,32 @@ def t_recent_orders(ctx, status_filter=''):
     return {'orders': [_order_payload(o) for o in qs[:8]]}
 
 
+PROBLEM_LEVELS = ('error', 'warning')
+
+
+def t_my_problems(ctx):
+    """Derniers échecs et alertes de l'utilisateur, avec leur cause et quoi faire."""
+    problems = []
+    if ctx.problem:
+        problems.append({'source': "message affiché à l'instant dans l'application", **ctx.problem})
+    if ctx.user is not None:
+        from notifications.models import Notification
+        since = timezone.now() - timedelta(days=3)
+        for n in Notification.objects.filter(user=ctx.user, created_at__gte=since).order_by('-created_at')[:30]:
+            meta = n.metadata or {}
+            if meta.get('level') not in PROBLEM_LEVELS:
+                continue
+            problems.append({
+                'source': 'notification', 'date': timezone.localtime(n.created_at).strftime('%d/%m %H:%M'),
+                'title': n.title, 'detail': n.body, 'reason': meta.get('reason', ''),
+                'next_step': meta.get('next_step', ''),
+                'order_number': n.order.order_number if n.order_id else None,
+            })
+            if len(problems) >= 6:
+                break
+    return {'problems': problems} if problems else {'problems': [], 'note': 'Aucun échec récent enregistré.'}
+
+
 def _schema(name, description, properties=None, required=None):
     return {'type': 'function', 'function': {
         'name': name, 'description': description,
@@ -524,6 +562,10 @@ TOOLS = {
     'view_cart': (SHOPPER, t_view_cart, _schema('view_cart', 'Voir le contenu et le total du panier.')),
     'my_orders': (('client',), t_my_orders, _schema(
         'my_orders', 'Voir les dernières commandes du client et leur statut.', {'active_only': _BOOL})),
+    'my_problems': (EVERYONE, t_my_problems, _schema(
+        'my_problems', "Ce qui n'a pas marché récemment pour l'utilisateur (paiement refusé, erreur affichée, "
+                       "commande annulée...) avec la cause et l'étape conseillée. À appeler dès que l'utilisateur "
+                       "parle d'un problème, d'une erreur ou demande pourquoi quelque chose ne marche pas.")),
     'info': (EVERYONE, t_info, _schema(
         'info', 'Informations Gaboshop : livraison, paiement, suivi, compte, retours, horaires.',
         {'topic': _STR}, ['topic'])),
@@ -632,7 +674,20 @@ Règles :
 - Si la demande est ambiguë (plusieurs produits possibles, taille manquante pour un vêtement), pose UNE question courte.
 - Quand le client veut un produit précis, ajoute-le au panier avec add_to_cart (quantité et taille demandées).
 - Les modifications de prix/stock attendent la confirmation de l'utilisateur : dis-le.
-- Montants en FCFA."""
+- Montants en FCFA.
+- Tu es le vrai maître de l'application. Quand quelque chose n'a pas marché (erreur affichée, paiement refusé,
+  action bloquée), appelle my_problems puis réponds en trois temps : ce qui s'est passé, pourquoi (la vraie cause,
+  en mots simples), et les étapes exactes pour régler le problème. Si un de tes outils peut le régler, propose de
+  le faire. N'accuse jamais l'utilisateur ; ne demande jamais un code secret ou un mot de passe.{_problem_hint(ctx)}"""
+
+
+def _problem_hint(ctx):
+    if not ctx.problem:
+        return ''
+    p = ctx.problem
+    parts = [f"action « {p['action']} »" if p['action'] else '', f"message : {p['message']}" if p['message'] else '',
+             f"cause connue : {p['reason']}" if p['reason'] else '', f"code HTTP {p['status']}" if p['status'] else '']
+    return "\nL'utilisateur vient de voir ce problème dans l'application (" + ', '.join(x for x in parts if x) + ")."
 
 
 def _client(config):
@@ -811,8 +866,48 @@ def _size(text):
     return m.group(1).upper() if m else None
 
 
+PROBLEM_RE = re.compile(
+    r"\b(probleme|erreur|echec|echoue|marche pas|fonctionne pas|bloque|refuse|pourquoi|pas abouti|"
+    r"rien ne (se )?passe|bug|impossible|que faire|comment (faire|regler|resoudre))\b"
+)
+
+
+def _local_problem(ctx):
+    found = t_my_problems(ctx).get('problems') or []
+    if not found:
+        return None
+    p = found[0]
+    what = p.get('message') or p.get('title') or ''
+    lines = [f"Ce qui s'est passé : {what.rstrip('.')}."]
+    if p.get('detail'):
+        lines.append(p['detail'])
+    if p.get('reason'):
+        lines.append(f"Pourquoi : {p['reason']}")
+    lines.append(f"Que faire : {p.get('next_step') or _generic_next_step(p.get('status'))}")
+    return '\n'.join(lines)
+
+
+def _generic_next_step(status_code):
+    code = str(status_code or '')
+    if code in ('401',):
+        return "reconnectez-vous (menu > Se connecter), puis refaites l'action."
+    if code in ('403',):
+        return "cette action est réservée à un autre type de compte ; dites-moi ce que vous vouliez faire et je vous guide."
+    if code in ('404',):
+        return "l'élément n'existe plus : rechargez la page."
+    if code in ('429',):
+        return "patientez une minute puis réessayez."
+    if code.startswith('5') or code in ('0', 'network'):
+        return "le serveur se réveille ou est occupé : patientez une minute et réessayez."
+    return "rechargez la page et réessayez ; si ça recommence, décrivez-moi ce que vous faisiez."
+
+
 def local_engine(ctx, message):
     text = _plain(message)
+    if ctx.problem or PROBLEM_RE.search(text):
+        answer = _local_problem(ctx)
+        if answer:
+            return answer
     for pattern, answer in SMALL_TALK:
         if re.search(pattern, text):
             return answer

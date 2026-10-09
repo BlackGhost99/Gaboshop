@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { notifyError } from '../utils/feedback';
+import NotificationHelp from './NotificationHelp';
+import { statusLabel, typeLabel } from '../utils/notificationLabels';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { fetchNotifications, markNotificationRead, deleteNotification } from '../services/notificationService';
 import { formatDateTime } from '../utils/helpers';
@@ -124,7 +127,7 @@ const HomeNavbar = ({
       setSelectedNotification(null);
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la suppression');
+      notifyError(error, { action: 'Supprimer la notification' });
     }
   };
 
@@ -514,7 +517,7 @@ const HomeNavbar = ({
                                   notif.notif_type
                                 )}`}
                               >
-                                {notif.notif_type}
+                                {typeLabel(notif)}
                               </span>
                             </div>
                           </button>
@@ -771,6 +774,7 @@ const HomeNavbar = ({
                     {selectedNotification.body}
                   </p>
                 </div>
+                    <NotificationHelp notification={selectedNotification} onAsk={() => setShowNotificationModal(false)} />
 
                 {/* Metadata */}
                 {(selectedNotification.order || selectedNotification.metadata) && (
@@ -786,17 +790,17 @@ const HomeNavbar = ({
                     )}
                     {selectedNotification.metadata?.from && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-gray-600">Départ:</span>
+                        <span className="font-medium text-gray-600">Ancien statut :</span>
                         <span className="text-gray-900">
-                          {selectedNotification.metadata.from}
+                          {statusLabel(selectedNotification.metadata.from)}
                         </span>
                       </div>
                     )}
                     {selectedNotification.metadata?.to && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-gray-600">Arrivée:</span>
+                        <span className="font-medium text-gray-600">Nouveau statut :</span>
                         <span className="text-gray-900">
-                          {selectedNotification.metadata.to}
+                          {statusLabel(selectedNotification.metadata.to)}
                         </span>
                       </div>
                     )}

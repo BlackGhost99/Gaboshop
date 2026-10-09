@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { notifyError, notifySuccess } from '../utils/feedback';
 
 export default function SubscriptionPlans() {
   const [plans, setPlans] = useState([])
@@ -32,10 +33,10 @@ export default function SubscriptionPlans() {
         body: JSON.stringify({ plan_id: plan.id })
       })
       const data = await resp.json()
-      if (data.success) alert(`Payment intent created. Redirect to: ${data.payment_intent.payment_url}`)
-      else alert(`Erreur: ${data.error}`)
+      if (data.success) notifySuccess('Demande de paiement créée', 'Suivez la page de paiement qui s’ouvre pour activer votre abonnement.')
+      else notifyError(data.error || 'La demande de paiement a été refusée.', { action: 'Payer l’abonnement' })
     } catch (e) {
-      alert(e.message)
+      notifyError(e, { action: 'Payer l’abonnement' })
     }
   }
 

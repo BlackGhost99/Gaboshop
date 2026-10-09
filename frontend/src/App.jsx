@@ -10,6 +10,7 @@ import StoreDetail from './pages/StoreDetail';
 import ProductsRedirect from './pages/ProductsRedirect';
 import DashboardRedirect from './components/DashboardRedirect';
 import GaboshopAI from './components/GaboshopAI';
+import FeedbackCenter from './components/FeedbackCenter';
 import AIAlertBanner from './components/AIAlertBanner';
 import { AIContextProvider } from './context/AIContext';
 import ClientDashboard from './pages/client/ClientDashboard';
@@ -176,6 +177,7 @@ function App() {
         </Routes>
         <AIAlertBanner />
         <GaboshopAI />
+        <FeedbackCenter />
       </AIContextProvider>
     </Router>
   );

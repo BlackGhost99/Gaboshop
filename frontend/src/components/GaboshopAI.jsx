@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ASK_AI_EVENT } from '../utils/feedback';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAIContext } from '../context/AIContext';
 import { formatCurrency } from '../utils/helpers';
@@ -41,6 +42,18 @@ const GaboshopAI = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isOpen]);
+
+    // « Demander à l'IA » depuis un message d'échec : la conversation s'ouvre avec le problème en contexte.
+    useEffect(() => {
+        const onAsk = (event) => {
+            const { question, problem } = event.detail || {};
+            if (!question) return;
+            setIsOpen(true);
+            sendMessage(question, { problem });
+        };
+        window.addEventListener(ASK_AI_EVENT, onAsk);
+        return () => window.removeEventListener(ASK_AI_EVENT, onAsk);
+    }, [sendMessage]);
 
     const toggleReadAloud = () => {
         const next = !readAloud;

@@ -19,6 +19,8 @@ from core.models import AuditLog
 from api.models import SystemSettings
 from payments.utils import verify_hmac_signature
 from payments.references import next_reference, order_number_from_reference
+from notifications.messages import payment_failed_for_client
+from notifications.service import NotificationService
 from payments.online_verification import (
     check_allowed, find_order_payment, mark_order_payment_success, verify_order_payment,
 )
@@ -65,10 +67,10 @@ class PaymentInitView(APIView):
             'singpay_wallet_id',
         )
         if any(marker in lowered for marker in config_markers):
-            return 'Echec d initialisation du paiement mobile. Verifiez la configuration SingPay puis reessayez.'
+            return "La demande de paiement n'a pas pu partir : le paiement en ligne de Gaboshop est mal réglé."
         if 'timeout' in lowered or 'expire' in lowered or 'prompt' in lowered:
-            return 'Paiement mobile expire. Verifiez le telephone du client, le solde et la validation du prompt, puis relancez.'
-        return 'Paiement mobile non confirme par l operateur. Consultez le detail puis reessayez.'
+            return "La demande de paiement a expiré avant d'être validée."
+        return "L'opérateur Mobile Money n'a pas accepté la demande de paiement."
     
     def post(self, request, order_id):
         try:
@@ -224,12 +226,16 @@ class PaymentInitView(APIView):
                             },
                         }
                         payment.save(update_fields=['status', 'webhook_data', 'updated_at'])
+                        failure = payment_failed_for_client(order, payment, details)
+                        NotificationService.notify_payment_failed(order, payment, details)
                         return Response({
                             'success': False,
                             'error': {
                                 'code': status.HTTP_502_BAD_GATEWAY,
                                 'message': self._build_payment_init_failure_message(details),
                                 'details': details,
+                                'reason': failure['reason'],
+                                'next_step': failure['next_step'],
                             }
                         }, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -422,8 +428,14 @@ class PaymentWebhookView(APIView):
                     payment.save(update_fields=['status', 'updated_at'])
                     return Response({'success': True, 'message': 'Paiement en cours.'})
 
+                newly_failed = payment.status != 'failed'
                 payment.status = 'failed'
                 payment.save(update_fields=['status', 'updated_at'])
+                if newly_failed:
+                    failed_payment = payment
+                    db_transaction.on_commit(lambda: NotificationService.notify_payment_failed(
+                        failed_payment.order, failed_payment, transaction or payload,
+                    ))
                 AuditLog.log_action(
                     action_type='payment_failed',
                     user=payment.order.client,

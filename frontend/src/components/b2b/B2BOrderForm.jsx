@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifyWarning } from '../../utils/feedback';
 import { formatCurrency } from '../../utils/helpers';
 
 /**
@@ -51,21 +52,21 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 		const subtotal = calculateSubtotal();
 		const minAmount = getMinOrderAmount();
 		if (minAmount > 0 && subtotal < minAmount) {
-			alert(`Le montant minimum de commande est de ${formatCurrency(minAmount)}. Votre panier est de ${formatCurrency(subtotal)}.`);
+			notifyWarning(`Commande minimum : ${formatCurrency(minAmount)}`, `Votre panier fait ${formatCurrency(subtotal)} : ajoutez ${formatCurrency(minAmount - subtotal)} d’articles.`);
 			return;
 		}
 
 		// Validation des champs requis
 		if (!formData.delivery_address?.trim()) {
-			alert('Veuillez renseigner une adresse de livraison');
+			notifyWarning('Adresse de livraison manquante', 'Indiquez où livrer la commande.');
 			return;
 		}
 		if (!formData.delivery_phone?.trim()) {
-			alert('Veuillez renseigner un numéro de téléphone');
+			notifyWarning('Téléphone manquant', 'Indiquez un numéro pour joindre la personne qui reçoit la livraison.');
 			return;
 		}
 		if (!formData.delivery_zone?.trim()) {
-			alert('Veuillez renseigner une zone');
+			notifyWarning('Zone de livraison manquante', 'Choisissez le quartier ou la zone de livraison.');
 			return;
 		}
 		

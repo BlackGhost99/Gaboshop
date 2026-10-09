@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { notifyError } from '../utils/feedback';
+import NotificationHelp from './NotificationHelp';
+import { statusLabel, typeLabel } from '../utils/notificationLabels';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from '../services/notificationService';
 import { formatDateTime } from '../utils/helpers';
 import { logout } from '../utils/session';
@@ -93,7 +96,7 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
       setSelectedNotification(null);
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert('Erreur lors de la suppression de la notification');
+      notifyError(error, { action: 'Supprimer la notification' });
     }
   };
 
@@ -202,7 +205,7 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             <span className={`text-[10px] px-2 py-1 rounded-full ${getBadgeColor(notif.notif_type)}`}>
-                              {notif.notif_type}
+                              {typeLabel(notif)}
                             </span>
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -297,6 +300,7 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
                                   {selectedNotification.body}
                               </p>
                           </div>
+                    <NotificationHelp notification={selectedNotification} onAsk={() => setShowNotificationModal(false)} />
 
                           {/* Metadata */}
                           {(selectedNotification.order || selectedNotification.metadata) && (
@@ -312,15 +316,15 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
                                   
                                   {selectedNotification.metadata?.from && (
                                       <div className="flex items-center gap-2 text-sm">
-                                          <span className="font-medium text-gray-600">Départ:</span>
-                                          <span className="text-gray-900">{selectedNotification.metadata.from}</span>
+                                          <span className="font-medium text-gray-600">Ancien statut :</span>
+                                          <span className="text-gray-900">{statusLabel(selectedNotification.metadata.from)}</span>
                                       </div>
                                   )}
                                   
                                   {selectedNotification.metadata?.to && (
                                       <div className="flex items-center gap-2 text-sm">
-                                          <span className="font-medium text-gray-600">Arrivée:</span>
-                                          <span className="text-gray-900">{selectedNotification.metadata.to}</span>
+                                          <span className="font-medium text-gray-600">Nouveau statut :</span>
+                                          <span className="text-gray-900">{statusLabel(selectedNotification.metadata.to)}</span>
                                       </div>
                                   )}
 

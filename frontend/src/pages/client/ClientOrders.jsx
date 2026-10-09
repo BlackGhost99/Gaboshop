@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { notifySuccess } from '../../utils/feedback';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { getOrders, getOrderDetail, confirmDelivery } from '../../services/dashboardService';
@@ -189,7 +190,7 @@ const ClientOrders = () => {
 
       const res = await confirmDelivery(orderId, payload);
       if (res.success) {
-        alert('✓ Réception confirmée avec succès !');
+        notifySuccess('Réception confirmée', 'Merci ! La commande est terminée et le commerce est prévenu.');
         setDetail(null);
         setShowPinModal(false);
         setPinInput('');

@@ -161,6 +161,15 @@ def order_transaction_ids(payment):
     return ids
 
 
+def _notify(method, *args):
+    """Notification après validation en base ; un échec d'envoi ne touche jamais au paiement."""
+    try:
+        from notifications.service import NotificationService
+        getattr(NotificationService, method)(*args)
+    except Exception:
+        logger.exception('Notification %s impossible', method)
+
+
 def mark_order_payment_success(payment, reason, user=None, ip_address=None, user_agent=''):
     """Paiement réussi -> commande confirmée. À appeler dans une transaction, paiement verrouillé."""
     payment.status = 'success'
@@ -168,6 +177,7 @@ def mark_order_payment_success(payment, reason, user=None, ip_address=None, user
     payment.save(update_fields=['status', 'completed_at', 'webhook_data', 'updated_at'])
 
     order = payment.order
+    db_transaction.on_commit(lambda: _notify('notify_payment_success', order, payment))
     if order.status in ('created', 'pending_payment', 'paid'):
         order.status = 'confirmed'
         order.confirmed_at = timezone.now()
@@ -238,8 +248,11 @@ def verify_order_payment(payment, source, user=None, ip_address=None):
                 payment.webhook_data[PAID_REFERENCE_KEY] = str(reference)
             mark_order_payment_success(payment, f'Paiement vérifié auprès de SingPay ({source})', user, ip_address)
         elif outcome == 'failed':
+            newly_failed = payment.status != 'failed'
             payment.status = 'failed'
             payment.save(update_fields=['status', 'webhook_data', 'updated_at'])
+            if newly_failed:
+                db_transaction.on_commit(lambda: _notify('notify_payment_failed', order, payment, raw))
         elif outcome == 'pending':
             payment.status = 'processing'
             payment.save(update_fields=['status', 'webhook_data', 'updated_at'])

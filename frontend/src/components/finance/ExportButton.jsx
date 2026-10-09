@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { notifyError } from '../../utils/feedback';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { downloadFile } from '../../services/financeService';
 
@@ -51,10 +52,10 @@ const ExportButton = ({
       
       // Show permission error if 403
       if (err.response?.status === 403) {
-        alert(err.response?.data?.detail || "Cette fonctionnalité nécessite un plan supérieur.");
+        notifyError(err, { action: 'Exporter', fallback: 'Cette fonctionnalité nécessite un plan supérieur.' });
       } else {
         // Show error message
-        alert(err.message || "Erreur lors de l'export. Veuillez réessayer.");
+        notifyError(err, { action: 'Exporter' });
       }
     } finally {
       setLoading(false);

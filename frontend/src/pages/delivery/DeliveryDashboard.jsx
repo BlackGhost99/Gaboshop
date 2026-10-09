@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
+import NotificationHelp from '../../components/NotificationHelp';
+import { statusLabel } from '../../utils/notificationLabels';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -211,7 +214,7 @@ const DeliveryDashboard = () => {
     const response = await updateAvailability(nextValue);
     if (!response?.success) {
       setIsAvailable(!nextValue);
-      alert(response?.error || 'Erreur mise a jour disponibilite');
+      notifyError(response?.error || 'Votre disponibilité n’a pas été enregistrée.', { action: 'Changer ma disponibilité' });
     }
   };
 
@@ -223,10 +226,10 @@ const DeliveryDashboard = () => {
         // Rafraîchir le dashboard
         fetchDashboard();
       } else {
-        alert(response.error || 'Erreur lors du démarrage');
+        notifyError(response.error || 'La livraison n’a pas pu démarrer.', { action: 'Démarrer la livraison' });
       }
     } catch (err) {
-      alert('Erreur: ' + err.message);
+      notifyError(err);
     } finally {
       setActionLoading(prev => ({ ...prev, [deliveryId]: false }));
     }
@@ -237,13 +240,13 @@ const DeliveryDashboard = () => {
       setActionLoading(prev => ({ ...prev, [deliveryId]: true }));
       const res = await acceptDelivery(deliveryId);
       if (res.success) {
-        alert('✓ Livraison acceptée avec succès !');
+        notifySuccess('Livraison acceptée', 'Elle est dans « Mes livraisons » : allez chercher la commande au commerce.');
         fetchDashboard();
       } else {
-        alert(`❌ ${res.error?.message || res.error || 'Erreur lors de l\'acceptation'}`);
+        notifyError(res.error || 'La livraison n’a pas pu être acceptée.', { action: 'Accepter la livraison' });
       }
     } catch (err) {
-      alert('Erreur: ' + err.message);
+      notifyError(err);
     } finally {
       setActionLoading(prev => ({ ...prev, [deliveryId]: false }));
     }
@@ -258,10 +261,10 @@ const DeliveryDashboard = () => {
         fetchDashboard();
         fetchAvailableDeliveries(true);
       } else {
-        alert(res.error || 'Erreur lors du refus');
+        notifyError(res.error || 'Le refus n’a pas été enregistré.', { action: 'Refuser la livraison' });
       }
     } catch (err) {
-      alert('Erreur: ' + err.message);
+      notifyError(err);
     } finally {
       setActionLoading(prev => ({ ...prev, [deliveryId]: false }));
     }
@@ -269,7 +272,7 @@ const DeliveryDashboard = () => {
 
   const handleClaimDelivery = async (deliveryId) => {
     if (!isAvailable) {
-      alert("Vous n'etes pas disponible");
+      notifyWarning('Vous êtes indiqué comme indisponible', 'Activez « Disponible » en haut de l’écran pour prendre cette livraison.');
       return;
     }
     try {
@@ -279,10 +282,10 @@ const DeliveryDashboard = () => {
         fetchDashboard();
         fetchAvailableDeliveries(true);
       } else {
-        alert(res.error || 'Erreur lors de la reclamation');
+        notifyError(res.error || 'La livraison a peut-être déjà été prise par un autre livreur.', { action: 'Prendre la livraison' });
       }
     } catch (err) {
-      alert('Erreur: ' + err.message);
+      notifyError(err);
     } finally {
       setActionLoading(prev => ({ ...prev, [`claim-${deliveryId}`]: false }));
     }
@@ -298,7 +301,7 @@ const DeliveryDashboard = () => {
       setSelectedDelivery(delivery);
       setShowProofModal(true);
     } else {
-      alert('Livraison non trouvée');
+      notifyError('Cette livraison n’est plus dans votre liste.', { action: 'Envoyer la preuve de livraison' });
     }
   };
 
@@ -348,7 +351,7 @@ const DeliveryDashboard = () => {
       setSelectedNotification(null);
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert('Erreur lors de la suppression de la notification');
+      notifyError(error, { action: 'Supprimer la notification' });
     }
   };
 
@@ -386,11 +389,11 @@ const DeliveryDashboard = () => {
           }
         }));
         setShowProfileModal(false);
-        alert("Profil mis à jour !");
+        notifySuccess('Profil enregistré', 'Vos nouvelles informations sont visibles par Gaboshop.');
       }
     } catch (error) {
       console.error("Error updating profile", error);
-      alert("Erreur lors de la mise à jour du profil");
+      notifyError(error, { action: 'Enregistrer mon profil' });
     }
   };
 
@@ -585,7 +588,7 @@ const DeliveryDashboard = () => {
                         <p className="text-sm text-gray-700 mt-1 line-clamp-2">{n.body}</p>
                         <div className="flex items-center gap-3 mt-2">
                           {n.metadata?.from && n.metadata?.to && (
-                            <p className="text-xs text-gray-500">{n.metadata.from} → {n.metadata.to}</p>
+                            <p className="text-xs text-gray-500">{statusLabel(n.metadata.from)} → {statusLabel(n.metadata.to)}</p>
                           )}
                           {n.order && (
                             <p className="text-xs text-gray-500">Commande #{n.order}</p>
@@ -1042,6 +1045,7 @@ const DeliveryDashboard = () => {
                     {selectedNotification.body}
                   </p>
                 </div>
+                    <NotificationHelp notification={selectedNotification} onAsk={() => setShowNotificationModal(false)} />
 
                 {/* Metadata */}
                 {(selectedNotification.order || selectedNotification.metadata) && (
@@ -1057,15 +1061,15 @@ const DeliveryDashboard = () => {
 
                     {selectedNotification.metadata?.from && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-gray-600">Départ:</span>
-                        <span className="text-gray-900">{selectedNotification.metadata.from}</span>
+                        <span className="font-medium text-gray-600">Ancien statut :</span>
+                        <span className="text-gray-900">{statusLabel(selectedNotification.metadata.from)}</span>
                       </div>
                     )}
 
                     {selectedNotification.metadata?.to && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-gray-600">Arrivée:</span>
-                        <span className="text-gray-900">{selectedNotification.metadata.to}</span>
+                        <span className="font-medium text-gray-600">Nouveau statut :</span>
+                        <span className="text-gray-900">{statusLabel(selectedNotification.metadata.to)}</span>
                       </div>
                     )}
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { notifyError } from '../../utils/feedback';
 import { 
   getExpenses, 
   createExpense, 
@@ -136,7 +137,7 @@ const DepensesTab = ({ planFeatures, dateFilters, onDateFilterChange }) => {
       fetchExpenses();
     } catch (err) {
       console.error('Erreur lors de l\'enregistrement:', err);
-      alert(err.message || "Erreur lors de l'enregistrement");
+      notifyError(err, { action: 'Enregistrer la dépense' });
     }
   };
 
@@ -148,7 +149,7 @@ const DepensesTab = ({ planFeatures, dateFilters, onDateFilterChange }) => {
       fetchExpenses();
     } catch (err) {
       console.error('Erreur lors de la suppression:', err);
-      alert(err.message || "Erreur lors de la suppression");
+      notifyError(err, { action: 'Supprimer la dépense' });
     }
   };
 

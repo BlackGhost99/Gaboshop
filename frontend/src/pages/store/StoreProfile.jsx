@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifyError, notifySuccess } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import { getStoreDashboard } from '../../services/dashboardService';
 import { getStoreDetails, updateStore } from '../../services/storeService';
@@ -131,7 +132,7 @@ const StoreProfile = () => {
         try {
             const res = await updateStore(store.id, data);
             if (res.success) {
-                alert("Profil mis à jour avec succès !");
+                notifySuccess('Profil du commerce enregistré', 'Vos clients voient déjà les nouvelles informations.');
                 setStore(res.data);
                 setInitialDescription(res.data?.description ?? formData.description);
             }
@@ -142,7 +143,7 @@ const StoreProfile = () => {
             const message = apiError?.details
                 ? Object.values(apiError.details).flat().join('\n')
                 : apiError?.message || "Erreur lors de la mise à jour.";
-            alert(message);
+            notifyError(error, { action: 'Enregistrer le profil', fallback: message });
         }
     };
 

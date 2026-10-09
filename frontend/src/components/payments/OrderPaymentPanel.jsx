@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../services/api';
+import { askAI, describeError } from '../../utils/feedback';
 import { formatCurrency } from '../../utils/helpers';
 import {
   METHOD_LABELS, ROLE_LABELS, KIND_LABELS, RECEIPT_STATUS, newIdempotencyKey, apiErrorMessage,
@@ -203,7 +204,7 @@ function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone, onCance
       await api.post(`/orders/${orderId}/payments/init/`, { payment_method: method, phone_number: phone.trim() });
       onDone();
     } catch (err) {
-      setError(apiErrorMessage(err, "La demande de paiement n'a pas pu être envoyée, réessayez."));
+      setError(describeError(err, "La demande de paiement n'a pas pu être envoyée."));
     } finally {
       setSending(false);
     }
@@ -232,7 +233,7 @@ function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone, onCance
         required
         className="w-full rounded border border-gray-300 px-3 py-2"
       />
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <InlineError error={error} action="Recevoir la demande de paiement" />}
       <button type="submit" disabled={sending || !phone.trim()} className="w-full rounded bg-indigo-600 py-2 font-semibold text-white disabled:opacity-50">
         {sending ? 'Envoi…' : 'Recevoir la demande de paiement'}
       </button>
@@ -243,6 +244,20 @@ function PayOnlineForm({ orderId, online, defaultMethod, failed, onDone, onCance
       )}
       <p className="text-xs text-gray-500">Gaboshop ne vous demandera jamais votre code secret Mobile Money.</p>
     </form>
+  );
+}
+
+// Échec affiché sur place : ce qui s'est passé, pourquoi, quoi faire, et l'aide de l'IA.
+function InlineError({ error, action }) {
+  return (
+    <div className="space-y-1 rounded border border-red-200 bg-red-50 p-2 text-red-800">
+      <p className="font-semibold">{error.message}</p>
+      {error.reason && <p><span className="font-semibold">Pourquoi : </span>{error.reason}</p>}
+      {error.nextStep && <p><span className="font-semibold">Que faire : </span>{error.nextStep}</p>}
+      <button type="button" onClick={() => askAI({ ...error, action })} className="text-xs font-semibold underline">
+        🤖 Demander à l'IA comment régler ça
+      </button>
+    </div>
   );
 }
 
