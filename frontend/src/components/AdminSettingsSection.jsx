@@ -31,6 +31,15 @@ function NumberField({ label, help, value, onChange, min, max, step = 1, suffix 
   );
 }
 
+function TextField({ label, value, onChange, type = 'text', placeholder }) {
+  return (
+    <label className="block text-sm font-medium text-gray-700">
+      {label}
+      <input type={type} className={inputClass} value={value || ''} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
+
 function TimeField({ label, value, onChange, disabled }) {
   return (
     <label className="block text-sm font-medium text-gray-700">
@@ -253,6 +262,44 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
           <Toggle label="SMS" checked={form.enable_sms} onChange={set('enable_sms')} />
           <Toggle label="E-mail" checked={form.enable_email} onChange={set('enable_email')} />
         </div>
+      </Card>
+
+      <Card title="Entreprise et support" description="Affiché dans le pied de page et les pages légales (CGU, mentions légales, confidentialité).">
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextField label="Raison sociale" value={form.company_name} onChange={set('company_name')} />
+          <TextField label="Forme juridique" placeholder="SARL, SA…" value={form.company_legal_form} onChange={set('company_legal_form')} />
+          <TextField label="Numéro RCCM" value={form.company_rccm} onChange={set('company_rccm')} />
+          <TextField label="NIF" value={form.company_nif} onChange={set('company_nif')} />
+          <TextField label="Adresse du siège" value={form.company_address} onChange={set('company_address')} />
+          <TextField label="Ville" value={form.company_city} onChange={set('company_city')} />
+          <TextField label="Directeur de la publication" value={form.publication_director} onChange={set('publication_director')} />
+          <TextField label="E-mail du support" type="email" value={form.support_email} onChange={set('support_email')} />
+          <TextField label="Téléphone du support" type="tel" placeholder="+241 77 12 34 56" value={form.support_phone} onChange={set('support_phone')} />
+          <TextField label="WhatsApp du support" type="tel" placeholder="+241 77 12 34 56" value={form.support_whatsapp} onChange={set('support_whatsapp')} />
+        </div>
+      </Card>
+
+      <Card title="Assistant IA" description="Les clés des fournisseurs restent dans Render. Ici, vous choisissez lequel utiliser et ce que l’assistant doit savoir.">
+        <Toggle label="Utiliser l’IA en ligne" help="Désactivée, l’assistant répond quand même avec son moteur intégré, plus simple."
+          checked={form.ai_enabled} onChange={set('ai_enabled')} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Fournisseur
+            <select className={inputClass} value={form.ai_provider || ''} onChange={(e) => set('ai_provider')(e.target.value)}>
+              <option value="">Celui de Render{status ? ` (${status.ai_provider})` : ''}</option>
+              {(status?.ai_providers_available || []).map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-gray-500">Seuls les fournisseurs dont la clé est dans Render sont proposés.</span>
+          </label>
+          <TextField label="Modèle (facultatif)" placeholder="Vide = modèle par défaut" value={form.ai_model} onChange={set('ai_model')} />
+        </div>
+        <label className="block text-sm font-medium text-gray-700">
+          Consignes pour l’assistant
+          <textarea rows={4} maxLength={2000} className={inputClass} value={form.ai_instructions || ''} onChange={(e) => set('ai_instructions')(e.target.value)}
+            placeholder="Ex. : Mettez en avant la livraison gratuite ce week-end à Akanda. Ne parlez jamais de concurrents." />
+          <span className="mt-1 block text-xs font-normal text-gray-500">Ajoutées à chaque conversation : ton, promotions du moment, sujets à éviter…</span>
+        </label>
+        {status && <p className="text-xs text-gray-500">IA utilisée en ce moment : <b>{status.ai_active}</b></p>}
       </Card>
 
       {dirty && (

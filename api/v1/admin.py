@@ -1,4 +1,5 @@
 """Admin API views for platform-wide management and KPIs."""
+import re
 
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
@@ -951,6 +952,20 @@ class SystemSettingsView(APIView):
         'enable_whatsapp': ('bool', None, None),
         'enable_sms': ('bool', None, None),
         'enable_email': ('bool', None, None),
+        'company_name': ('text_optional', None, 150),
+        'company_legal_form': ('text_optional', None, 100),
+        'company_rccm': ('text_optional', None, 100),
+        'company_nif': ('text_optional', None, 100),
+        'company_address': ('text_optional', None, 255),
+        'company_city': ('text_optional', None, 100),
+        'publication_director': ('text_optional', None, 150),
+        'support_email': ('email', None, None),
+        'support_phone': ('phone', None, None),
+        'support_whatsapp': ('phone', None, None),
+        'ai_enabled': ('bool', None, None),
+        'ai_provider': ('ai_provider', None, None),
+        'ai_model': ('text_optional', None, 100),
+        'ai_instructions': ('text_optional', None, 2000),
     }
 
     def get_permissions(self):
@@ -979,11 +994,14 @@ class SystemSettingsView(APIView):
         """Interrupteurs gardés dans Render pour la sécurité : affichés ici, jamais modifiables depuis l'app."""
         from django.conf import settings as django_settings
         from payments.configuration import platform_online_ready
+        from api.v1.ai.providers import AIProvider
         return {
             'singpay_ready': platform_online_ready(),
             'singpay_transfers_enabled': bool(getattr(django_settings, 'SINGPAY_ENABLE_TRANSFER', False)),
             'payment_simulation_mode': bool(getattr(django_settings, 'PAYMENT_SIMULATION_MODE', False)),
             'ai_provider': getattr(django_settings, 'AI_PROVIDER', '') or 'local',
+            'ai_providers_available': AIProvider.configured_providers(),
+            'ai_active': AIProvider.get_provider_config().get('name'),
             'sms_provider': getattr(django_settings, 'SMS_PROVIDER', '') or '',
         }
 
@@ -1015,6 +1033,24 @@ class SystemSettingsView(APIView):
                 return datetime.strptime(text, '%H:%M').time()
             except ValueError:
                 raise ValueError('heure au format HH:MM attendue')
+        if kind == 'text_optional':
+            return str(raw or '').strip()[:hi]
+        if kind == 'email':
+            text = str(raw or '').strip()
+            if text and not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', text):
+                raise ValueError('adresse e-mail invalide')
+            return text
+        if kind == 'phone':
+            text = str(raw or '').strip()
+            if text and not re.fullmatch(r'\+?[\d\s.-]{8,20}', text):
+                raise ValueError('numéro invalide (ex. +241 77 12 34 56)')
+            return text
+        if kind == 'ai_provider':
+            from api.v1.ai.providers import AIProvider
+            text = str(raw or '').strip().lower()
+            if text and text not in AIProvider.configured_providers():
+                raise ValueError("ce fournisseur n'a pas de clé dans Render")
+            return text
         if kind == 'keywords':
             items = raw if isinstance(raw, list) else str(raw).split(',')
             return ','.join(dict.fromkeys(str(k).strip().upper() for k in items if str(k).strip()))[:255]

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { COMPANY, LEGAL_PAGES } from './legalInfo';
+import { LEGAL_PAGES, useCompany } from './legalInfo';
 
 /** Section titrée d'une page légale. */
 export function Section({ id, title, children }) {
@@ -27,10 +27,12 @@ export function List({ items }) {
  * Mise en page commune des pages légales publiques (mobile d'abord).
  */
 export default function LegalLayout({ title, intro, children }) {
+  const COMPANY = useCompany();
+  const brand = COMPANY.brand;
   useEffect(() => {
-    document.title = `${title} | ${COMPANY.brand}`;
+    document.title = `${title} | ${brand}`;
     window.scrollTo(0, 0);
-  }, [title]);
+  }, [title, brand]);
 
   return (
     <div className="min-h-screen bg-gray-100">

@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import LegalLayout, { Section, List } from '../../legal/LegalLayout';
-import { COMPANY } from '../../legal/legalInfo';
+import { useCompany } from '../../legal/legalInfo';
 
 const linkClass = 'text-indigo-600 underline hover:text-indigo-500';
 
 export default function SuppressionCompte() {
+  const COMPANY = useCompany();
   return (
     <LegalLayout
       title="Supprimer votre compte et vos données"

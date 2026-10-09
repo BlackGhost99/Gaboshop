@@ -253,7 +253,8 @@ def ai_reply(message, history, products, faq, config):
         + f"Produits trouvés dans le catalogue pour cette question :\n{listing}\n\n"
         + f"Question du client : {message}"
     )
-    return AIProvider.call_ai(SYSTEM_PROMPT, user_message, config)
+    from .assistant import admin_instructions
+    return AIProvider.call_ai(SYSTEM_PROMPT + admin_instructions(), user_message, config)
 
 
 class _SafeThrottleMixin:

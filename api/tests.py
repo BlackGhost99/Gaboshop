@@ -207,3 +207,36 @@ class DeliveryAdminTests(TestCase):
         client = User.objects.create_user(phone='+24107200032', password='x', user_type='client')
         self.api.force_authenticate(client)
         self.assertEqual(self.api.post('/api/v1/admin/delivery/zones/', {'name': 'X', 'city': 'Y'}, format='json').status_code, 403)
+
+
+class CompanyAndAiSettingsTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(phone='+24107200040', password='x', user_type='admin')
+        self.api = APIClient()
+        self.api.force_authenticate(self.admin)
+
+    def test_company_info_is_public_and_validated(self):
+        ok = self.api.patch('/api/v1/settings/', {'company_name': 'Gaboshop SARL', 'support_phone': '+241 77 12 34 56'}, format='json')
+        self.assertEqual(ok.status_code, 200, ok.content)
+        public = APIClient().get('/api/v1/settings/').json()['data']
+        self.assertEqual(public['company_name'], 'Gaboshop SARL')
+        bad = self.api.patch('/api/v1/settings/', {'support_email': 'pas-un-email', 'support_phone': 'abc'}, format='json')
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(set(bad.json()['error']['details']), {'support_email', 'support_phone'})
+
+    def test_ai_provider_must_have_a_key(self):
+        with mock.patch('api.v1.ai.providers.AIProvider.configured_providers', return_value=['groq']):
+            refused = self.api.patch('/api/v1/settings/', {'ai_provider': 'openai'}, format='json')
+            accepted = self.api.patch('/api/v1/settings/', {'ai_provider': 'groq', 'ai_model': 'llama-3.3-70b-versatile'}, format='json')
+        self.assertEqual(refused.status_code, 400)
+        self.assertEqual(accepted.status_code, 200, accepted.content)
+
+    def test_disabled_ai_uses_builtin_engine_and_instructions_reach_prompt(self):
+        from api.v1.ai.assistant import admin_instructions
+        from api.v1.ai.providers import AIProvider
+        settings = SystemSettings.get_settings()
+        settings.ai_enabled = False
+        settings.ai_instructions = 'Livraison offerte ce week-end.'
+        settings.save()
+        self.assertEqual(AIProvider.get_provider_config()['name'], 'local')
+        self.assertIn('Livraison offerte ce week-end.', admin_instructions())

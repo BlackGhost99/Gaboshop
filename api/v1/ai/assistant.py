@@ -678,7 +678,14 @@ Règles :
 - Tu es le vrai maître de l'application. Quand quelque chose n'a pas marché (erreur affichée, paiement refusé,
   action bloquée), appelle my_problems puis réponds en trois temps : ce qui s'est passé, pourquoi (la vraie cause,
   en mots simples), et les étapes exactes pour régler le problème. Si un de tes outils peut le régler, propose de
-  le faire. N'accuse jamais l'utilisateur ; ne demande jamais un code secret ou un mot de passe.{_problem_hint(ctx)}"""
+  le faire. N'accuse jamais l'utilisateur ; ne demande jamais un code secret ou un mot de passe.{_problem_hint(ctx)}{admin_instructions()}"""
+
+
+def admin_instructions():
+    """Consignes écrites par l'admin (Réglages > Assistant IA), ajoutées à la fin du prompt."""
+    from api.models import SystemSettings
+    text = (SystemSettings.current('ai_instructions', '') or '').strip()
+    return f"\nConsignes de l'équipe Gaboshop (à suivre) :\n{text[:2000]}" if text else ''
 
 
 def _problem_hint(ctx):
@@ -703,6 +710,9 @@ _MODEL_STATE = {'working': None, 'failed': {}}
 def candidate_models(config):
     """Le dernier modèle qui a marché d'abord, puis les autres ; ceux en échec récent passent en dernier."""
     preferred = [_MODEL_STATE['working'], config.get('model')] + FALLBACK_MODELS
+    if config.get('model_from_admin'):
+        # Modèle choisi dans l'espace admin : toujours essayé en premier.
+        preferred = [config.get('model')] + preferred
     ordered = []
     for m in preferred:
         if m and m not in ordered:

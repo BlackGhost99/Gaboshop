@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import LegalLayout, { Section, List } from '../../legal/LegalLayout';
-import { COMPANY } from '../../legal/legalInfo';
+import { useCompany } from '../../legal/legalInfo';
 
 const linkClass = 'text-indigo-600 underline hover:text-indigo-500';
 
 export default function CGU() {
+  const COMPANY = useCompany();
   return (
     <LegalLayout
       title="Conditions générales d'utilisation et de vente"

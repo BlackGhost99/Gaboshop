@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useCompany } from '../legal/legalInfo';
 
 /**
  * Footer moderne mobile-first
  * Design minimaliste avec sections claires
  */
 const Footer = () => {
+  const company = useCompany();
   const year = new Date().getFullYear();
 
   return (
@@ -178,9 +180,9 @@ const Footer = () => {
           <div className="flex gap-4 mt-4 md:mt-0">
             <span>🇬🇦 Libreville, Gabon</span>
             <span>•</span>
-            <span>+241 XXX XXXX</span>
-            <span>•</span>
-            <span>support@gaboshop.ga</span>
+            {company.phone && !company.phone.startsWith('[') && (<><a href={`tel:${company.phone.replace(/\s/g, '')}`} className="hover:text-white">{company.phone}</a><span>•</span></>)}
+            {company.whatsapp && (<><a href={`https://wa.me/${company.whatsapp.replace(/\D/g, '')}`} className="hover:text-white">WhatsApp</a><span>•</span></>)}
+            {!company.email.startsWith('[') && <a href={`mailto:${company.email}`} className="hover:text-white">{company.email}</a>}
           </div>
         </div>
 

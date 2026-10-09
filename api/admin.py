@@ -36,7 +36,14 @@ class SystemSettingsAdmin(admin.ModelAdmin):
         }),
         ('? 7. NOTIFICATIONS', {
             'fields': ('enable_whatsapp', 'enable_sms', 'enable_email'),
-            'description': 'Configuration des notifications système'
+        }),
+        ('Entreprise et support', {
+            'fields': ('company_name', 'company_legal_form', 'company_rccm', 'company_nif', 'company_address', 'company_city',
+                       'publication_director', 'support_email', 'support_phone', 'support_whatsapp'),
+        }),
+        ('Assistant IA', {
+            'fields': ('ai_enabled', 'ai_provider', 'ai_model', 'ai_instructions'),
+            'description': 'Les clés restent dans Render ; ici, le choix du fournisseur et les consignes.'
         }),
         ('?? Métadonnées', {
             'fields': ('created_at', 'updated_at'),

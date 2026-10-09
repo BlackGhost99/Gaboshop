@@ -17,7 +17,26 @@ class AIProvider:
         """
         Retourne la configuration du provider actif
         """
-        provider = getattr(settings, 'AI_PROVIDER', 'local').lower()
+        # Réglages de l'espace admin : IA activée ou non, fournisseur et modèle (les clés restent dans Render).
+        from api.models import SystemSettings
+        if not SystemSettings.current('ai_enabled', True):
+            return {'name': 'local', 'api_key': None, 'available': True}
+        provider = (SystemSettings.current('ai_provider', '') or getattr(settings, 'AI_PROVIDER', 'local') or 'local').lower()
+        config = AIProvider._provider_config(provider)
+        model = (SystemSettings.current('ai_model', '') or '').strip()
+        if model and config.get('name') != 'local':
+            config['model'] = model
+            config['model_from_admin'] = True
+        return config
+
+    @staticmethod
+    def configured_providers():
+        """Fournisseurs dont la clé est présente dans Render (sans jamais exposer la clé)."""
+        return [name for name in ('groq', 'anthropic', 'openai', 'deepseek', 'gemini')
+                if AIProvider._provider_config(name).get('available')]
+
+    @staticmethod
+    def _provider_config(provider):
         api_key = None
         
         if provider == 'anthropic' or provider == 'claude':

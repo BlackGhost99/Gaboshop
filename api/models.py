@@ -198,6 +198,32 @@ class SystemSettings(models.Model):
         help_text="Activer les notifications Email"
     )
     
+    # === 8. ENTREPRISE ET SUPPORT (pages légales, pied de page) ===
+    company_name = models.CharField(max_length=150, blank=True, help_text="Raison sociale")
+    company_legal_form = models.CharField(max_length=100, blank=True, help_text="Forme juridique (SARL, SA…)")
+    company_rccm = models.CharField(max_length=100, blank=True, help_text="Numéro RCCM")
+    company_nif = models.CharField(max_length=100, blank=True, help_text="NIF")
+    company_address = models.CharField(max_length=255, blank=True, help_text="Adresse du siège")
+    company_city = models.CharField(max_length=100, default="Libreville, Gabon", help_text="Ville du siège")
+    publication_director = models.CharField(max_length=150, blank=True, help_text="Directeur de la publication")
+    support_email = models.EmailField(blank=True, default="support@gaboshop.ga", help_text="E-mail du support")
+    support_phone = models.CharField(max_length=30, blank=True, help_text="Téléphone du support")
+    support_whatsapp = models.CharField(max_length=30, blank=True, help_text="WhatsApp du support")
+
+    # === 9. ASSISTANT IA ===
+    ai_enabled = models.BooleanField(
+        default=True, help_text="Utiliser l'IA en ligne ; désactivée, l'assistant répond avec son moteur intégré"
+    )
+    ai_provider = models.CharField(
+        max_length=20, blank=True,
+        help_text="Fournisseur d'IA (vide = celui de Render). Sa clé doit être dans Render."
+    )
+    ai_model = models.CharField(max_length=100, blank=True, help_text="Modèle (vide = modèle par défaut du fournisseur)")
+    ai_instructions = models.TextField(
+        blank=True, max_length=2000,
+        help_text="Consignes ajoutées à l'assistant (ton, promotions du moment, sujets à éviter…)"
+    )
+
     # Métadonnées
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
