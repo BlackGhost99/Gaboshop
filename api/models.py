@@ -2,6 +2,9 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
+GABON_CITIES = "Libreville,Akanda,Owendo,Ntoum,Port-Gentil,Franceville,Moanda,Oyem,Lambaréné,Mouila"
+
+
 class SystemSettings(models.Model):
     """
     Modèle singleton pour tous les paramètres système du e-commerce.
@@ -15,13 +18,6 @@ class SystemSettings(models.Model):
         default=10.00,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Commission globale par défaut (%)"
-    )
-    commission_event = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=5.00,
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Commission exceptionnelle pour événements/promos (%)"
     )
     
     # === 2. PAIEMENTS ===
@@ -39,47 +35,25 @@ class SystemSettings(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Frais Airtel Money (%)"
     )
-    payment_before_order = models.BooleanField(
-        default=True,
-        help_text="Paiement requis avant validation de commande"
-    )
     unpaid_order_expiry_minutes = models.IntegerField(
         default=30,
         validators=[MinValueValidator(1)],
-        help_text="Délai max avant expiration d'une commande impayée (minutes)"
+        help_text="Durée de validité d'une demande de paiement en ligne (minutes)"
     )
     payment_policy = models.JSONField(default=dict, blank=True, help_text="Circuits et plafonds de paiement actifs")
     
     # === 3. VILLES & GÉOLOCALISATION ===
-    auto_detect_cities = models.BooleanField(
-        default=True,
-        help_text="Détection automatique des villes"
-    )
     default_city = models.CharField(
         max_length=100,
-        default="Abidjan",
+        default="Libreville",
         help_text="Ville par défaut"
     )
     enabled_cities = models.TextField(
-        default="Abidjan,Bouaké,Yamoussoukro,San-Pedro,Korhogo",
+        default=GABON_CITIES,
         help_text="Liste des villes activées (séparées par des virgules)"
-    )
-    max_delivery_distance_km = models.DecimalField(
-        max_digits=6, 
-        decimal_places=2, 
-        default=50.00,
-        validators=[MinValueValidator(0)],
-        help_text="Distance max de livraison (km)"
     )
     
     # === 4. LIVRAISON ===
-    price_per_km = models.DecimalField(
-        max_digits=8, 
-        decimal_places=2, 
-        default=200.00,
-        validators=[MinValueValidator(0)],
-        help_text="Prix par km (FCFA)"
-    )
     auto_assign_delivery = models.BooleanField(
         default=False,
         help_text="Attribution automatique des livreurs"
@@ -87,14 +61,18 @@ class SystemSettings(models.Model):
     max_orders_per_delivery = models.IntegerField(
         default=3,
         validators=[MinValueValidator(1)],
-        help_text="Max commandes simultanées par livreur"
+        help_text="Nombre max de livraisons en cours par livreur avant de lui en proposer une autre"
     )
     
     # === 5. COMMANDES ===
     cart_validity_hours = models.IntegerField(
         default=24,
         validators=[MinValueValidator(1)],
-        help_text="Durée de validité d'un panier (heures)"
+        help_text="Une commande toujours en attente est annulée après ce délai (heures)"
+    )
+    order_hours_enabled = models.BooleanField(
+        default=False,
+        help_text="Limiter les commandes à une plage horaire commune à toute l'app"
     )
     order_opening_time = models.TimeField(
         default="08:00:00",
@@ -115,18 +93,15 @@ class SystemSettings(models.Model):
         help_text="Heure de fermeture par défaut des magasins"
     )
     store_verification_required = models.BooleanField(
-        default=True,
-        help_text="Vérification requise pour les nouveaux magasins"
-    )
-    pro_mode_monthly_fee = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=50000.00,
-        validators=[MinValueValidator(0)],
-        help_text="Tarif mensuel Mode Pro (FCFA)"
+        default=False,
+        help_text="Un nouveau commerce reste désactivé tant que l'admin ne l'a pas activé"
     )
     
     # === 7. NOTIFICATIONS ===
+    enable_whatsapp = models.BooleanField(
+        default=True,
+        help_text="Activer les notifications WhatsApp"
+    )
     enable_sms = models.BooleanField(
         default=True,
         help_text="Activer les notifications SMS"
@@ -134,11 +109,6 @@ class SystemSettings(models.Model):
     enable_email = models.BooleanField(
         default=True,
         help_text="Activer les notifications Email"
-    )
-    notification_templates = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Templates de notifications personnalisés"
     )
     
     # Métadonnées
@@ -165,6 +135,14 @@ class SystemSettings(models.Model):
         settings, created = cls.objects.get_or_create(pk=1)
         return settings
     
+    @classmethod
+    def current(cls, name, default=None):
+        """Valeur d'un réglage, ou ``default`` si la base n'est pas joignable (tests, migrations)."""
+        try:
+            return getattr(cls.get_settings(), name)
+        except Exception:
+            return default
+
     def get_enabled_cities_list(self):
         """Retourne la liste des villes activées"""
         return [city.strip() for city in self.enabled_cities.split(',') if city.strip()]

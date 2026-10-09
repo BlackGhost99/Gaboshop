@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import PermissionDenied
 from .models import Order, OrderItem
+from stores.models import within_hours
 from products.models import Product
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -245,6 +246,16 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         store = attrs['store']
+        # Plage horaire commune réglée dans l'admin (désactivée par défaut)
+        from api.models import SystemSettings
+        app_settings = SystemSettings.get_settings()
+        if app_settings.order_hours_enabled and not within_hours(app_settings.order_opening_time, app_settings.order_closing_time):
+            opening = app_settings.order_opening_time.strftime('%H:%M')
+            closing = app_settings.order_closing_time.strftime('%H:%M')
+            raise serializers.ValidationError({
+                'store': _('Les commandes sont ouvertes de %(o)s à %(c)s. Réessayez pendant cette plage.') % {'o': opening, 'c': closing}
+            })
+
         items = attrs['items']
         if any(item['product'].store_id != store.id for item in items):
             raise serializers.ValidationError({'items': _('Tous les produits doivent venir du magasin de la commande.')})

@@ -56,14 +56,16 @@ def assigner_livreurs_automatique(self):
 @shared_task
 def nettoyer_paniers_abandonnes():
     """
-    Nettoyer les paniers abandonnés (créés il y a plus de 24h)
+    Annuler les commandes restées en attente au-delà du délai réglé dans l'admin (24 h par défaut)
     Exécutée toutes les heures
     """
     try:
         from orders.models import Order
         from datetime import timedelta
         
-        delai_abandon = timezone.now() - timedelta(hours=24)
+        from api.models import SystemSettings
+        heures = int(SystemSettings.current('cart_validity_hours', 24) or 24)
+        delai_abandon = timezone.now() - timedelta(hours=heures)
         
         # Commandes en attente de paiement depuis plus de 24h
         paniers_abandonnes = Order.objects.filter(

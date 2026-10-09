@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from celery import current_app
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 
 from delivery.models import Delivery
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 ASSIGNMENT_TIMEOUT_MINUTES = 10
 BROADCAST_AFTER_MINUTES = 40
 RETRY_DELAY_MINUTES = 5
+
+# Livraisons en cours (comptées pour la limite par livreur réglée dans l'admin)
+BUSY_STATUSES = ('assigned', 'accepted_by_driver', 'accepted', 'picked_up', 'in_delivery', 'in_transit')
 
 ACCEPTED_STATUSES = {
     'accepted',
@@ -339,6 +343,16 @@ def _rank_candidates(order, exclude_ids, same_city_only=True):
 
     if exclude_ids:
         qs = qs.exclude(user_id__in=exclude_ids)
+
+    # Réglage admin : un livreur déjà chargé de N livraisons en cours n'en reçoit pas d'autre.
+    from api.models import SystemSettings
+    max_active = int(SystemSettings.current('max_orders_per_delivery', 3) or 3)
+    busy = (
+        Delivery.objects.filter(status__in=BUSY_STATUSES, delivery_agent__isnull=False)
+        .values('delivery_agent').annotate(n=Count('id')).filter(n__gte=max_active)
+        .values_list('delivery_agent', flat=True)
+    )
+    qs = qs.exclude(user_id__in=list(busy))
 
     qs = qs.order_by('-documents_verifies', 'last_position_update', 'id')
     profiles = list(qs)

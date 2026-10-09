@@ -6,6 +6,7 @@ Vues pour l'intégration CinetPay / Airtel Money / Moov Money
 """
 
 import logging
+from payments.utils import payment_request_minutes
 from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -180,7 +181,7 @@ class CreatePaymentAPIView(APIView):
             amount=int(order.total_amount),
             currency="XAF",
             provider=provider,
-            expires_at=timezone.now() + timedelta(minutes=30),
+            expires_at=timezone.now() + timedelta(minutes=payment_request_minutes()),
             metadata=metadata
         )
 
@@ -372,7 +373,7 @@ class SubscriptionPaymentIntentAPIView(APIView):
             amount=amount,
             currency="XAF",
             provider=provider,
-            expires_at=timezone.now() + timedelta(minutes=30),
+            expires_at=timezone.now() + timedelta(minutes=payment_request_minutes()),
             metadata=metadata
         )
 

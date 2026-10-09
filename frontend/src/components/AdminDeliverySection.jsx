@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { notifyError, notifySuccess, notifyWarning, notifyInfo } from '../utils/feedback';
+import useEnabledCities from '../hooks/useEnabledCities';
 import { getDeliveryAgents, createDeliveryAgent, updateDeliveryAgent, toggleDeliveryAgentStatus } from '../services/adminService';
 
 const AdminDeliverySection = () => {
+  const cities = useEnabledCities();
   const [activeTab, setActiveTab] = useState('agents');
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -417,9 +419,7 @@ const AdminDeliverySection = () => {
                   value={newAgent.city}
                   onChange={(e) => setNewAgent({...newAgent, city: e.target.value})}
                 >
-                  <option value="Libreville">Libreville</option>
-                  <option value="Port-Gentil">Port-Gentil</option>
-                  <option value="Franceville">Franceville</option>
+                  {cities.map((city) => <option key={city} value={city}>{city}</option>)}
                 </select>
               </div>
 
@@ -549,9 +549,7 @@ const AdminDeliverySection = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Ville</label>
                 <select value={editForm.city} onChange={(e) => setEditForm({...editForm, city: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                  <option value="Libreville">Libreville</option>
-                  <option value="Port-Gentil">Port-Gentil</option>
-                  <option value="Franceville">Franceville</option>
+                  {cities.map((city) => <option key={city} value={city}>{city}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">

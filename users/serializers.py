@@ -222,6 +222,8 @@ class RegisterSerializer(serializers.ModelSerializer):
                 except Exception as e:
                     raise
 
+                from api.models import SystemSettings
+                app_settings = SystemSettings.get_settings()
                 try:
                     store = Store.objects.create(
                         name=store_payload['name'],
@@ -238,8 +240,8 @@ class RegisterSerializer(serializers.ModelSerializer):
                 except Exception as e:
                     raise
                 GerantProfile.objects.get_or_create(user=user)
-                # Option: marquer store actif mais non vérifié
-                store.is_active = True
+                # Réglage admin : un nouveau commerce peut attendre l'activation par l'admin.
+                store.is_active = not app_settings.store_verification_required
                 store.is_verified = False
                 store.save(update_fields=['is_active', 'is_verified'])
 

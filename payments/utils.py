@@ -267,6 +267,12 @@ def verify_hmac_signature(raw_body: bytes, signature: str, secret: str = "secret
     return hmac.compare_digest(computed, signature)
 
 
+def payment_request_minutes():
+    """Durée de validité d'une demande de paiement, réglée dans l'espace admin."""
+    from api.models import SystemSettings
+    return int(SystemSettings.current('unpaid_order_expiry_minutes', 30) or 30)
+
+
 def build_cinetpay_payload(intent, channels, lang):
     return {
         "reference": intent.reference,
@@ -274,7 +280,7 @@ def build_cinetpay_payload(intent, channels, lang):
         "currency": intent.currency,
         "channels": channels,
         "lang": lang,
-        "expires_at": (intent.expires_at or (timezone.now() + timedelta(minutes=30))).isoformat(),
+        "expires_at": (intent.expires_at or (timezone.now() + timedelta(minutes=payment_request_minutes()))).isoformat(),
     }
 
 

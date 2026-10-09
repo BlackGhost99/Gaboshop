@@ -7,6 +7,28 @@ from users.models import User
 LIBREVILLE_TZ = dt_timezone(timedelta(hours=1))
 
 
+def default_opening_time():
+	from api.models import SystemSettings
+	return _as_time(SystemSettings.current('default_store_opening', time(8, 0)))
+
+
+def default_closing_time():
+	from api.models import SystemSettings
+	return _as_time(SystemSettings.current('default_store_closing', time(20, 0)))
+
+
+def within_hours(opening, closing):
+	"""Vrai si l'heure de Libreville est dans la plage. Même heure des deux côtés = 24 h/24 ;
+	fermeture avant l'ouverture (ex. 18:00 → 02:00) = plage de nuit."""
+	opening, closing = _as_time(opening), _as_time(closing)
+	now = datetime.now(LIBREVILLE_TZ).time().replace(tzinfo=None)
+	if opening == closing:
+		return True
+	if opening < closing:
+		return opening <= now <= closing
+	return now >= opening or now <= closing
+
+
 def _as_time(value):
 	"""Heure d'ouverture lue en base (time) ou pas encore enregistrée (texte « 08:00 »)."""
 	if isinstance(value, time):
@@ -160,8 +182,9 @@ class Store(models.Model):
 		default='starter',
 		help_text="Plan d'abonnement du magasin"
 	)
-	opening_time = models.TimeField(default='08:00')
-	closing_time = models.TimeField(default='20:00')
+	# Horaires par défaut d'un nouveau commerce : réglés dans l'espace admin.
+	opening_time = models.TimeField(default=default_opening_time)
+	closing_time = models.TimeField(default=default_closing_time)
     
 	# Images
 	logo = models.ImageField(upload_to='stores/logos/', blank=True, null=True)
@@ -221,13 +244,7 @@ class Store(models.Model):
 		"""
 		if not self.is_active:
 			return False
-		opening, closing = _as_time(self.opening_time), _as_time(self.closing_time)
-		now = datetime.now(LIBREVILLE_TZ).time().replace(tzinfo=None)
-		if opening == closing:
-			return True
-		if opening < closing:
-			return opening <= now <= closing
-		return now >= opening or now <= closing
+		return within_hours(self.opening_time, self.closing_time)
     
 	def total_products(self):
 		return self.products.filter(is_available=True).count()

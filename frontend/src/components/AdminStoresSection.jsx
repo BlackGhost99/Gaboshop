@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import StoreMarketModeModal from './StoreMarketModeModal';
+import useEnabledCities from '../hooks/useEnabledCities';
 
 const AdminStoresSection = ({
   storesListAdmin,
@@ -18,6 +19,7 @@ const AdminStoresSection = ({
   b2bLoading = {},
   storeCategories,
 }) => {
+  const cities = useEnabledCities();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStores, setSelectedStores] = useState([]);
   const [selectedStoreForB2B, setSelectedStoreForB2B] = useState(null);
@@ -110,9 +112,7 @@ const AdminStoresSection = ({
             className="px-3 py-2 border border-gray-300 rounded text-sm"
           >
             <option value="">Toutes villes</option>
-            <option value="Libreville">Libreville</option>
-            <option value="Port-Gentil">Port-Gentil</option>
-            <option value="Franceville">Franceville</option>
+            {cities.map((city) => <option key={city} value={city}>{city}</option>)}
           </select>
 
           <select

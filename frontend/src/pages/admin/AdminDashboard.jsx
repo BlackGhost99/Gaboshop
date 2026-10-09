@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import B2CCategoryModal from '../../components/B2CCategoryModal';
 import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
-import PaymentPolicySettings from '../../components/PaymentPolicySettings';
+import AdminSettingsSection from '../../components/AdminSettingsSection';
 import { 
 	activateStoreB2B, 
 	deactivateStoreB2B, 
@@ -55,7 +55,6 @@ import {
   getOrdersByStore,
   getDeliveryAgentStats,
   getSystemSettings,
-  updateSystemSettings,
   getFinanceDashboard,
   getTransactions,
   getCommissionsByStore,
@@ -161,8 +160,6 @@ const AdminDashboard = () => {
 
   // System Settings
   const [systemSettings, setSystemSettings] = useState(null);
-  const [editingSettings, setEditingSettings] = useState(false);
-  const [settingsForm, setSettingsForm] = useState({});
 
   // Finance Data
   const [financeDashboard, setFinanceDashboard] = useState(null);
@@ -222,7 +219,6 @@ const AdminDashboard = () => {
       // setProducts(pr?.data || []);  // Using productsListAdmin instead
       if (settings?.success) {
         setSystemSettings(settings.data);
-        setSettingsForm(settings.data);
       }
       if (finDash?.success) {
         console.log('Finance Dashboard Data:', finDash.data);
@@ -557,25 +553,6 @@ const AdminDashboard = () => {
         message: err?.message || 'Erreur annulation',
         type: 'error',
       });
-    }
-  };
-
-  const handleUpdateSettings = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await updateSystemSettings(settingsForm);
-      if (res?.success) {
-        setSystemSettings(res.data);
-        setEditingSettings(false);
-        setAlertModal({
-          isOpen: true,
-          title: 'Succès',
-          message: 'Paramètres mis à jour avec succès!',
-          type: 'success',
-        });
-      }
-    } catch (err) {
-      setActionError(err?.message || 'Erreur mise à jour paramètres');
     }
   };
 
@@ -2152,337 +2129,7 @@ const AdminDashboard = () => {
 
   const deliverySection = <AdminDeliverySection />;
 
-  const settingsSection = (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-center gap-3">
-        <h2 className="text-2xl font-bold text-gray-900">⚙️ Configuration Globale</h2>
-        {!editingSettings ? (
-          <button
-            onClick={() => setEditingSettings(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"
-          >
-            Modifier les paramètres
-          </button>
-        ) : (
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setEditingSettings(false);
-                setSettingsForm(systemSettings);
-              }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={handleUpdateSettings}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium"
-            >
-              Enregistrer
-            </button>
-          </div>
-        )}
-      </div>
-
-      {systemSettings && (
-        <form onSubmit={handleUpdateSettings} className="space-y-6">
-          {/* 🟦 1. COMMISSIONS */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟦 Commissions</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Commission globale par défaut (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.commission_global : systemSettings.commission_global}
-                  onChange={(e) => setSettingsForm({...settingsForm, commission_global: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Commission événements/promos (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.commission_event : systemSettings.commission_event}
-                  onChange={(e) => setSettingsForm({...settingsForm, commission_event: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 🟧 2. PAIEMENTS */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟧 Paiements</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Frais Moov Money (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.moov_money_fee : systemSettings.moov_money_fee}
-                  onChange={(e) => setSettingsForm({...settingsForm, moov_money_fee: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Frais Airtel Money (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.airtel_money_fee : systemSettings.airtel_money_fee}
-                  onChange={(e) => setSettingsForm({...settingsForm, airtel_money_fee: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingSettings ? settingsForm.payment_before_order : systemSettings.payment_before_order}
-                    onChange={(e) => setSettingsForm({...settingsForm, payment_before_order: e.target.checked})}
-                    disabled={!editingSettings}
-                    className="rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Paiement requis avant validation de commande</span>
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Délai expiration commande impayée (minutes)</label>
-                <input
-                  type="number"
-                  value={editingSettings ? settingsForm.unpaid_order_expiry_minutes : systemSettings.unpaid_order_expiry_minutes}
-                  onChange={(e) => setSettingsForm({...settingsForm, unpaid_order_expiry_minutes: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          <PaymentPolicySettings
-            value={editingSettings ? settingsForm.payment_policy : systemSettings.payment_policy}
-            onChange={(paymentPolicy) => setSettingsForm({...settingsForm, payment_policy: paymentPolicy})}
-            disabled={!editingSettings}
-          />
-
-          {/* 🟥 3. VILLES & GÉOLOCALISATION */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟥 Villes & Géolocalisation</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="flex items-center gap-2 mb-4">
-                  <input
-                    type="checkbox"
-                    checked={editingSettings ? settingsForm.auto_detect_cities : systemSettings.auto_detect_cities}
-                    onChange={(e) => setSettingsForm({...settingsForm, auto_detect_cities: e.target.checked})}
-                    disabled={!editingSettings}
-                    className="rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Détection automatique des villes</span>
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ville par défaut</label>
-                <input
-                  type="text"
-                  value={editingSettings ? settingsForm.default_city : systemSettings.default_city}
-                  onChange={(e) => setSettingsForm({...settingsForm, default_city: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Villes activées (séparées par virgules)</label>
-                <input
-                  type="text"
-                  value={editingSettings ? (settingsForm.enabled_cities?.join ? settingsForm.enabled_cities.join(',') : settingsForm.enabled_cities) : (systemSettings.enabled_cities?.join ? systemSettings.enabled_cities.join(',') : systemSettings.enabled_cities)}
-                  onChange={(e) => setSettingsForm({...settingsForm, enabled_cities: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Distance max livraison (km)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.max_delivery_distance_km : systemSettings.max_delivery_distance_km}
-                  onChange={(e) => setSettingsForm({...settingsForm, max_delivery_distance_km: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 🟩 4. LIVRAISON */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟩 Livraison</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prix par km (FCFA)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.price_per_km : systemSettings.price_per_km}
-                  onChange={(e) => setSettingsForm({...settingsForm, price_per_km: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max commandes simultanées par livreur</label>
-                <input
-                  type="number"
-                  value={editingSettings ? settingsForm.max_orders_per_delivery : systemSettings.max_orders_per_delivery}
-                  onChange={(e) => setSettingsForm({...settingsForm, max_orders_per_delivery: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingSettings ? settingsForm.auto_assign_delivery : systemSettings.auto_assign_delivery}
-                    onChange={(e) => setSettingsForm({...settingsForm, auto_assign_delivery: e.target.checked})}
-                    disabled={!editingSettings}
-                    className="rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Attribution automatique des livreurs</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* 🟨 5. COMMANDES */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟨 Commandes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Validité panier (heures)</label>
-                <input
-                  type="number"
-                  value={editingSettings ? settingsForm.cart_validity_hours : systemSettings.cart_validity_hours}
-                  onChange={(e) => setSettingsForm({...settingsForm, cart_validity_hours: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Heure ouverture</label>
-                <input
-                  type="time"
-                  value={editingSettings ? settingsForm.order_opening_time : systemSettings.order_opening_time}
-                  onChange={(e) => setSettingsForm({...settingsForm, order_opening_time: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Heure fermeture</label>
-                <input
-                  type="time"
-                  value={editingSettings ? settingsForm.order_closing_time : systemSettings.order_closing_time}
-                  onChange={(e) => setSettingsForm({...settingsForm, order_closing_time: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 🟪 6. MAGASINS */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🟪 Magasins</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Heure ouverture par défaut</label>
-                <input
-                  type="time"
-                  value={editingSettings ? settingsForm.default_store_opening : systemSettings.default_store_opening}
-                  onChange={(e) => setSettingsForm({...settingsForm, default_store_opening: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Heure fermeture par défaut</label>
-                <input
-                  type="time"
-                  value={editingSettings ? settingsForm.default_store_closing : systemSettings.default_store_closing}
-                  onChange={(e) => setSettingsForm({...settingsForm, default_store_closing: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingSettings ? settingsForm.store_verification_required : systemSettings.store_verification_required}
-                    onChange={(e) => setSettingsForm({...settingsForm, store_verification_required: e.target.checked})}
-                    disabled={!editingSettings}
-                    className="rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Vérification requise pour nouveaux magasins</span>
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tarif Mode Pro (FCFA/mois)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingSettings ? settingsForm.pro_mode_monthly_fee : systemSettings.pro_mode_monthly_fee}
-                  onChange={(e) => setSettingsForm({...settingsForm, pro_mode_monthly_fee: e.target.value})}
-                  disabled={!editingSettings}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ⚫ 7. NOTIFICATIONS */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">⚫ Notifications</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingSettings ? settingsForm.enable_sms : systemSettings.enable_sms}
-                    onChange={(e) => setSettingsForm({...settingsForm, enable_sms: e.target.checked})}
-                    disabled={!editingSettings}
-                    className="rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Activer notifications SMS</span>
-                </label>
-              </div>
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editingSettings ? settingsForm.enable_email : systemSettings.enable_email}
-                    onChange={(e) => setSettingsForm({...settingsForm, enable_email: e.target.checked})}
-                    disabled={!editingSettings}
-                    className="rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Activer notifications Email</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-    </div>
-  );
+  const settingsSection = <AdminSettingsSection initial={systemSettings} onSaved={setSystemSettings} />;
 
   if (loading) return <div className="p-6">Chargement...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;

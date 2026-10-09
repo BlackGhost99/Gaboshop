@@ -909,127 +909,135 @@ class AdminDeliveriesView(APIView):
 
 class SystemSettingsView(APIView):
     """
-    API pour récupérer et mettre à jour les paramètres système.
-    GET: Retourne tous les paramètres système actifs.
-    PATCH: Met à jour les paramètres système (admin uniquement).
+    Réglages de l'application, modifiables depuis l'espace admin.
+    GET : public (l'app lit les villes, les frais…) ; les admins reçoivent aussi l'état technique.
+    PATCH : admin uniquement. Chaque valeur est contrôlée avant d'être enregistrée.
     """
-    
+
+    # champ -> (type, minimum, maximum)
+    FIELDS = {
+        'commission_global': ('decimal', 0, 100),
+        'moov_money_fee': ('decimal', 0, 100),
+        'airtel_money_fee': ('decimal', 0, 100),
+        'unpaid_order_expiry_minutes': ('int', 5, 1440),
+        'default_city': ('text', None, None),
+        'enabled_cities': ('cities', None, None),
+        'auto_assign_delivery': ('bool', None, None),
+        'max_orders_per_delivery': ('int', 1, 20),
+        'cart_validity_hours': ('int', 1, 720),
+        'order_hours_enabled': ('bool', None, None),
+        'order_opening_time': ('time', None, None),
+        'order_closing_time': ('time', None, None),
+        'default_store_opening': ('time', None, None),
+        'default_store_closing': ('time', None, None),
+        'store_verification_required': ('bool', None, None),
+        'enable_whatsapp': ('bool', None, None),
+        'enable_sms': ('bool', None, None),
+        'enable_email': ('bool', None, None),
+    }
+
     def get_permissions(self):
         if self.request.method == 'PATCH':
             return [IsPlatformAdmin()]
         return [permissions.AllowAny()]
-    
-    def get(self, request):
-        settings = SystemSettings.get_settings()
+
+    @staticmethod
+    def _serialize(settings):
         from payments.configuration import get_payment_policy
-        
-        data = {
-            # Commissions
-            "commission_global": float(settings.commission_global),
-            "commission_event": float(settings.commission_event),
-            
-            # Paiements
-            "moov_money_fee": float(settings.moov_money_fee),
-            "airtel_money_fee": float(settings.airtel_money_fee),
-            "payment_before_order": settings.payment_before_order,
-            "unpaid_order_expiry_minutes": settings.unpaid_order_expiry_minutes,
-            "payment_policy": get_payment_policy(),
-            
-            # Villes & Géolocalisation
-            "auto_detect_cities": settings.auto_detect_cities,
-            "default_city": settings.default_city,
-            "enabled_cities": settings.get_enabled_cities_list(),
-            "max_delivery_distance_km": float(settings.max_delivery_distance_km),
-            
-            # Livraison
-            "price_per_km": float(settings.price_per_km),
-            "auto_assign_delivery": settings.auto_assign_delivery,
-            "max_orders_per_delivery": settings.max_orders_per_delivery,
-            
-            # Commandes
-            "cart_validity_hours": settings.cart_validity_hours,
-            "order_opening_time": settings.order_opening_time.strftime('%H:%M:%S'),
-            "order_closing_time": settings.order_closing_time.strftime('%H:%M:%S'),
-            
-            # Magasins
-            "default_store_opening": settings.default_store_opening.strftime('%H:%M:%S'),
-            "default_store_closing": settings.default_store_closing.strftime('%H:%M:%S'),
-            "store_verification_required": settings.store_verification_required,
-            "pro_mode_monthly_fee": float(settings.pro_mode_monthly_fee),
-            
-            # Notifications
-            "enable_sms": settings.enable_sms,
-            "enable_email": settings.enable_email,
+        data = {}
+        for name, (kind, _lo, _hi) in SystemSettingsView.FIELDS.items():
+            value = getattr(settings, name)
+            if kind == 'decimal':
+                value = float(value)
+            elif kind == 'time':
+                value = value.strftime('%H:%M') if hasattr(value, 'strftime') else str(value)[:5]
+            elif kind == 'cities':
+                value = settings.get_enabled_cities_list()
+            data[name] = value
+        data['payment_policy'] = get_payment_policy()
+        return data
+
+    @staticmethod
+    def _technical_status():
+        """Interrupteurs gardés dans Render pour la sécurité : affichés ici, jamais modifiables depuis l'app."""
+        from django.conf import settings as django_settings
+        from payments.configuration import platform_online_ready
+        return {
+            'singpay_ready': platform_online_ready(),
+            'singpay_transfers_enabled': bool(getattr(django_settings, 'SINGPAY_ENABLE_TRANSFER', False)),
+            'payment_simulation_mode': bool(getattr(django_settings, 'PAYMENT_SIMULATION_MODE', False)),
+            'ai_provider': getattr(django_settings, 'AI_PROVIDER', '') or 'local',
+            'sms_provider': getattr(django_settings, 'SMS_PROVIDER', '') or '',
         }
-        
+
+    def get(self, request):
+        data = self._serialize(SystemSettings.get_settings())
+        if IsPlatformAdmin().has_permission(request, self):
+            data['technical_status'] = self._technical_status()
         return Response({"success": True, "data": data})
-    
+
+    def _clean(self, name, raw):
+        from decimal import Decimal, InvalidOperation
+        from datetime import datetime
+        kind, lo, hi = self.FIELDS[name]
+        if kind == 'bool':
+            if isinstance(raw, bool):
+                return raw
+            return str(raw).strip().lower() in ('true', '1', 'yes', 'on', 'oui')
+        if kind in ('decimal', 'int'):
+            try:
+                value = Decimal(str(raw)) if kind == 'decimal' else int(str(raw).strip())
+            except (InvalidOperation, ValueError, TypeError):
+                raise ValueError('nombre attendu')
+            if lo is not None and value < lo or hi is not None and value > hi:
+                raise ValueError(f'entre {lo} et {hi}')
+            return value
+        if kind == 'time':
+            text = str(raw).strip()[:5]
+            try:
+                return datetime.strptime(text, '%H:%M').time()
+            except ValueError:
+                raise ValueError('heure au format HH:MM attendue')
+        if kind == 'cities':
+            items = raw if isinstance(raw, list) else str(raw).split(',')
+            cities = list(dict.fromkeys(c.strip() for c in items if str(c).strip()))
+            if not cities:
+                raise ValueError('au moins une ville')
+            return ','.join(cities)
+        text = str(raw or '').strip()
+        if not text:
+            raise ValueError('valeur obligatoire')
+        return text[:100]
+
     def patch(self, request):
-        """Mettre à jour les paramètres système"""
         settings = SystemSettings.get_settings()
         from payments.configuration import validate_payment_policy
-        
-        # Mise à jour des champs fournis
-        if 'commission_global' in request.data:
-            settings.commission_global = request.data['commission_global']
-        if 'commission_event' in request.data:
-            settings.commission_event = request.data['commission_event']
-        
-        if 'moov_money_fee' in request.data:
-            settings.moov_money_fee = request.data['moov_money_fee']
-        if 'airtel_money_fee' in request.data:
-            settings.airtel_money_fee = request.data['airtel_money_fee']
-        if 'payment_before_order' in request.data:
-            settings.payment_before_order = request.data['payment_before_order']
-        if 'unpaid_order_expiry_minutes' in request.data:
-            settings.unpaid_order_expiry_minutes = request.data['unpaid_order_expiry_minutes']
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        errors = {}
+        for name in self.FIELDS:
+            if name in request.data:
+                try:
+                    setattr(settings, name, self._clean(name, request.data[name]))
+                except ValueError as exc:
+                    errors[name] = [str(exc)]
         if 'payment_policy' in request.data:
-            settings.payment_policy = validate_payment_policy(request.data['payment_policy'])
-        
-        if 'auto_detect_cities' in request.data:
-            settings.auto_detect_cities = request.data['auto_detect_cities']
-        if 'default_city' in request.data:
-            settings.default_city = request.data['default_city']
-        if 'enabled_cities' in request.data:
-            # Gérer à la fois string et array
-            cities = request.data['enabled_cities']
-            if isinstance(cities, str):
-                settings.enabled_cities = cities
-            elif isinstance(cities, list):
-                settings.enabled_cities = ','.join(cities)
-        if 'max_delivery_distance_km' in request.data:
-            settings.max_delivery_distance_km = request.data['max_delivery_distance_km']
-        
-        if 'price_per_km' in request.data:
-            settings.price_per_km = request.data['price_per_km']
-        if 'auto_assign_delivery' in request.data:
-            settings.auto_assign_delivery = request.data['auto_assign_delivery']
-        if 'max_orders_per_delivery' in request.data:
-            settings.max_orders_per_delivery = request.data['max_orders_per_delivery']
-        
-        if 'cart_validity_hours' in request.data:
-            settings.cart_validity_hours = request.data['cart_validity_hours']
-        if 'order_opening_time' in request.data:
-            settings.order_opening_time = request.data['order_opening_time']
-        if 'order_closing_time' in request.data:
-            settings.order_closing_time = request.data['order_closing_time']
-        
-        if 'default_store_opening' in request.data:
-            settings.default_store_opening = request.data['default_store_opening']
-        if 'default_store_closing' in request.data:
-            settings.default_store_closing = request.data['default_store_closing']
-        if 'store_verification_required' in request.data:
-            settings.store_verification_required = request.data['store_verification_required']
-        if 'pro_mode_monthly_fee' in request.data:
-            settings.pro_mode_monthly_fee = request.data['pro_mode_monthly_fee']
-        
-        if 'enable_sms' in request.data:
-            settings.enable_sms = request.data['enable_sms']
-        if 'enable_email' in request.data:
-            settings.enable_email = request.data['enable_email']
-        
+            try:
+                settings.payment_policy = validate_payment_policy(request.data['payment_policy'])
+            except DRFValidationError as exc:
+                errors['payment_policy'] = exc.detail
+        if not errors and settings.default_city not in settings.get_enabled_cities_list():
+            errors['default_city'] = ['La ville par défaut doit faire partie des villes actives.']
+        if errors:
+            return Response({
+                'success': False,
+                'error': {
+                    'message': 'Réglages non enregistrés.',
+                    'reason': 'Certaines valeurs ne sont pas valides.',
+                    'next_step': 'Corrigez les champs indiqués, puis enregistrez à nouveau.',
+                    'details': errors,
+                },
+            }, status=status.HTTP_400_BAD_REQUEST)
         settings.save()
-        
-        # Retourner les données mises à jour
         return self.get(request)
 

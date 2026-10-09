@@ -266,12 +266,24 @@ class NotificationService:
         return NotificationService._send_notification(agent_phone, None, template, channels)
     
     @staticmethod
+    def _enabled_channels(channels):
+        """Canaux autorisés dans l'espace admin (WhatsApp, SMS, e-mail). Les codes de connexion ne passent pas par ici."""
+        from api.models import SystemSettings
+        flags = {
+            'whatsapp': SystemSettings.current('enable_whatsapp', True),
+            'sms': SystemSettings.current('enable_sms', True),
+            'email': SystemSettings.current('enable_email', True),
+        }
+        return [channel for channel in channels if flags.get(channel, True)]
+
+    @staticmethod
     def _send_notification(phone, email, template, channels):
         """
         Envoyer une notification via multiple canaux avec fallback
         """
         success = False
-        
+        channels = NotificationService._enabled_channels(channels)
+
         for channel in channels:
             try:
                 if channel == 'whatsapp' and 'whatsapp' in template:

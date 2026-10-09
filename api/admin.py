@@ -11,31 +11,31 @@ class SystemSettingsAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('?? 1. COMMISSIONS', {
-            'fields': ('commission_global', 'commission_event'),
+            'fields': ('commission_global',),
             'description': 'Gestion des commissions sur les ventes'
         }),
         ('?? 2. PAIEMENTS', {
-            'fields': ('moov_money_fee', 'airtel_money_fee', 'payment_before_order', 'unpaid_order_expiry_minutes'),
+            'fields': ('moov_money_fee', 'airtel_money_fee', 'unpaid_order_expiry_minutes', 'payment_policy'),
             'description': 'Configuration des méthodes de paiement mobile'
         }),
         ('?? 3. VILLES & GÉOLOCALISATION', {
-            'fields': ('auto_detect_cities', 'default_city', 'enabled_cities', 'max_delivery_distance_km'),
+            'fields': ('default_city', 'enabled_cities'),
             'description': 'Paramètres de localisation et zones de service'
         }),
         ('?? 4. LIVRAISON', {
-            'fields': ('price_per_km', 'auto_assign_delivery', 'max_orders_per_delivery'),
+            'fields': ('auto_assign_delivery', 'max_orders_per_delivery'),
             'description': 'Configuration du système de livraison'
         }),
         ('?? 5. COMMANDES', {
-            'fields': ('cart_validity_hours', 'order_opening_time', 'order_closing_time'),
+            'fields': ('cart_validity_hours', 'order_hours_enabled', 'order_opening_time', 'order_closing_time'),
             'description': 'Gestion des paniers et horaires de commande'
         }),
         ('?? 6. MAGASINS', {
-            'fields': ('default_store_opening', 'default_store_closing', 'store_verification_required', 'pro_mode_monthly_fee'),
+            'fields': ('default_store_opening', 'default_store_closing', 'store_verification_required'),
             'description': 'Paramètres globaux des magasins'
         }),
         ('? 7. NOTIFICATIONS', {
-            'fields': ('enable_sms', 'enable_email', 'notification_templates'),
+            'fields': ('enable_whatsapp', 'enable_sms', 'enable_email'),
             'description': 'Configuration des notifications système'
         }),
         ('?? Métadonnées', {
