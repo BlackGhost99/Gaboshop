@@ -3,6 +3,7 @@ API endpoints pour la gestion des forfaits d'abonnement
 Affiche le statut, les fonctionnalités, les limites en temps réel
 """
 
+from payments.utils import subscription_days
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -273,7 +274,7 @@ def purchase_plan(request):
             'monthly_fee': float(plan.price),
             'status': 'pending_payment',
             'start_date': str(today),
-            'end_date': str(today + timedelta(days=30))
+            'end_date': str(today + timedelta(days=subscription_days()))
         }
 
         return Response({

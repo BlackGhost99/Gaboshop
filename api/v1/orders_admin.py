@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from orders.models import Order
 from delivery.models import Delivery
-from delivery.assignment_flow import ASSIGNMENT_TIMEOUT_MINUTES, enqueue_assignment_tasks
+from delivery.assignment_flow import assignment_timeout_minutes, enqueue_assignment_tasks
 from stores.models import Store
 from users.models import User
 from core.validators import is_valid_order_transition, can_user_change_order_status, is_valid_delivery_transition
@@ -248,10 +248,8 @@ class DeliveryAssignmentView(APIView):
             now = timezone.now()
             if not delivery.assignment_started_at:
                 delivery.assignment_started_at = now
-            timeout_minutes = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
-            if timeout_minutes < ASSIGNMENT_TIMEOUT_MINUTES:
-                timeout_minutes = ASSIGNMENT_TIMEOUT_MINUTES
-                delivery.assignment_timeout_minutes = timeout_minutes
+            timeout_minutes = assignment_timeout_minutes()
+            delivery.assignment_timeout_minutes = timeout_minutes
             delivery.assignment_round = (delivery.assignment_round or 0) + 1
             delivery.save()
             enqueue_assignment_tasks(

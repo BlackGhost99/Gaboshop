@@ -11,12 +11,26 @@ from delivery.models import Delivery
 from delivery.utils import haversine_distance
 from notifications.service import NotificationService
 from users.models import LivreurProfile
+from api.models import SystemSettings
 
 logger = logging.getLogger(__name__)
 
+# Valeurs par défaut ; les vraies valeurs se règlent dans l'espace admin (Réglages > Livraison).
 ASSIGNMENT_TIMEOUT_MINUTES = 10
 BROADCAST_AFTER_MINUTES = 40
 RETRY_DELAY_MINUTES = 5
+
+
+def _setting(name, default):
+    from api.models import SystemSettings
+    try:
+        return int(SystemSettings.current(name, default) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def assignment_timeout_minutes():
+    return _setting('assignment_timeout_minutes', ASSIGNMENT_TIMEOUT_MINUTES)
 
 # Livraisons en cours (comptées pour la limite par livreur réglée dans l'admin)
 BUSY_STATUSES = ('assigned', 'accepted_by_driver', 'accepted', 'picked_up', 'in_delivery', 'in_transit')
@@ -169,7 +183,7 @@ def assign_next_driver(delivery_id, reason='timeout', force=False):
 
             if delivery.order and delivery.order.delivery_fee:
                 from payments.direct_service import is_manual_order
-                delivery.agent_commission = delivery.order.delivery_fee if is_manual_order(delivery.order) else delivery.order.delivery_fee * Decimal('0.8')
+                delivery.agent_commission = delivery.order.delivery_fee if is_manual_order(delivery.order) else SystemSettings.courier_share(delivery.order.delivery_fee)
 
             delivery.save()
 
@@ -311,10 +325,8 @@ def _append_attempt(attempts, user_id):
 
 
 def _effective_timeout_minutes(delivery):
-    timeout = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
-    if timeout < ASSIGNMENT_TIMEOUT_MINUTES:
-        timeout = ASSIGNMENT_TIMEOUT_MINUTES
-        delivery.assignment_timeout_minutes = timeout
+    timeout = assignment_timeout_minutes()
+    delivery.assignment_timeout_minutes = timeout
     return timeout
 
 
@@ -401,11 +413,11 @@ def _has_any_candidates(order):
 def _should_broadcast(started_at, now):
     if not started_at:
         return False
-    return now - started_at >= timedelta(minutes=BROADCAST_AFTER_MINUTES)
+    return now - started_at >= timedelta(minutes=_setting('broadcast_after_minutes', BROADCAST_AFTER_MINUTES))
 
 
 def _broadcast_delay_seconds(started_at, now):
-    delay = (started_at + timedelta(minutes=BROADCAST_AFTER_MINUTES) - now).total_seconds()
+    delay = (started_at + timedelta(minutes=_setting('broadcast_after_minutes', BROADCAST_AFTER_MINUTES)) - now).total_seconds()
     return max(0, int(delay))
 
 
@@ -429,7 +441,7 @@ def _enqueue_retry_task(delivery_id):
     current_app.send_task(
         'delivery.tasks.retry_delivery_assignment',
         args=[delivery_id],
-        countdown=int(RETRY_DELAY_MINUTES * 60),
+        countdown=int(_setting('assignment_retry_minutes', RETRY_DELAY_MINUTES) * 60),
     )
 
 

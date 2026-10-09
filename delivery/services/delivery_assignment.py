@@ -163,8 +163,9 @@ class DeliveryAssignmentService:
 				delivery.assigned_at = timezone.now()
 				delivery.is_auto_assigned = True
 				
-				# Calculer commission (80% des frais de livraison)
-				delivery.agent_commission = order.delivery_fee * Decimal('0.8')
+				# Part du livreur réglée dans l'admin
+				from api.models import SystemSettings
+				delivery.agent_commission = SystemSettings.courier_share(order.delivery_fee)
 				
 				delivery.save()
 				

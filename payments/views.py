@@ -6,7 +6,7 @@ Vues pour l'intégration CinetPay / Airtel Money / Moov Money
 """
 
 import logging
-from payments.utils import payment_request_minutes
+from payments.utils import payment_request_minutes, subscription_days
 from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -71,7 +71,7 @@ def _activate_subscription_from_intent(intent):
         return None
 
     start_date = timezone.now().date()
-    end_date = start_date + timedelta(days=30)
+    end_date = start_date + timedelta(days=subscription_days())
 
     if subscription_kind == 'b2b':
         from b2b.models import B2BSubscriptionPlan, B2BStoreSubscription
@@ -1043,7 +1043,7 @@ class SubscribeToPlanView(APIView):
                 monthly_fee=subscription_price,
                 status='pending_payment',
                 start_date=timezone.now().date(),
-                end_date=timezone.now().date() + timedelta(days=30),
+                end_date=timezone.now().date() + timedelta(days=subscription_days()),
                 auto_renew=False
             )
             
@@ -1162,7 +1162,7 @@ class UpgradeForfaitView(APIView):
             defaults={
                 'forfait': forfait,
                 'start_date': timezone.now(),
-                'expiration_date': timezone.now() + timedelta(days=30),
+                'expiration_date': timezone.now() + timedelta(days=subscription_days()),
                 'status': 'active',
                 'auto_renew': auto_renew
             }

@@ -313,7 +313,9 @@ def send_subscription_expiry_reminder(self):
         from django.core.mail import send_mail
         
         now = timezone.now().date()
-        expiry_date_in_7_days = now + timedelta(days=7)
+        from api.models import SystemSettings
+        reminder_days = int(SystemSettings.current('subscription_reminder_days', 7) or 7)
+        expiry_date_in_7_days = now + timedelta(days=reminder_days)
         
         # Chercher les abonnements qui expirent dans 7 jours
         expiring_soon = StoreSubscription.objects.filter(
@@ -331,11 +333,11 @@ def send_subscription_expiry_reminder(self):
             
             plan_name = subscription.plan.name if subscription.plan else subscription.plan_name
             
-            subject = f"? Rappel : Votre abonnement {plan_name} expire dans 7 jours"
+            subject = f"? Rappel : Votre abonnement {plan_name} expire dans {reminder_days} jours"
             message = f"""
 Bonjour {manager.first_name or 'Commerçant'},
 
-Votre abonnement au forfait {plan_name} expirera le {subscription.end_date} (dans 7 jours).
+Votre abonnement au forfait {plan_name} expirera le {subscription.end_date} (dans {reminder_days} jours).
 
 Pour continuer à bénéficier de toutes les fonctionnalités, veuillez renouveler votre forfait:
 https://gaboshop.app/dashboard/billing

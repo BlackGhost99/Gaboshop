@@ -11,7 +11,7 @@ class SystemSettingsAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('?? 1. COMMISSIONS', {
-            'fields': ('commission_global',),
+            'fields': ('commission_global', 'b2b_commission_rate', 'business_b2b_commission_rate', 'business_food_commission_rate', 'business_other_commission_rate', 'food_category_keywords', 'courier_share_percent'),
             'description': 'Gestion des commissions sur les ventes'
         }),
         ('?? 2. PAIEMENTS', {
@@ -23,15 +23,15 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             'description': 'Paramètres de localisation et zones de service'
         }),
         ('?? 4. LIVRAISON', {
-            'fields': ('auto_assign_delivery', 'max_orders_per_delivery'),
+            'fields': ('auto_assign_delivery', 'max_orders_per_delivery', 'assignment_timeout_minutes', 'broadcast_after_minutes', 'assignment_retry_minutes', 'pin_max_attempts', 'pin_lock_minutes', 'late_delivery_hours'),
             'description': 'Configuration du système de livraison'
         }),
         ('?? 5. COMMANDES', {
-            'fields': ('cart_validity_hours', 'order_hours_enabled', 'order_opening_time', 'order_closing_time'),
+            'fields': ('cart_validity_hours', 'pending_reminder_hours', 'max_rejected_declarations', 'rejected_window_days', 'order_hours_enabled', 'order_opening_time', 'order_closing_time'),
             'description': 'Gestion des paniers et horaires de commande'
         }),
         ('?? 6. MAGASINS', {
-            'fields': ('default_store_opening', 'default_store_closing', 'store_verification_required'),
+            'fields': ('default_store_opening', 'default_store_closing', 'store_verification_required', 'subscription_days', 'subscription_reminder_days'),
             'description': 'Paramètres globaux des magasins'
         }),
         ('? 7. NOTIFICATIONS', {

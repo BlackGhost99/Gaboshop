@@ -74,7 +74,8 @@ def envoyer_rappel_commandes_en_attente():
     Commandes en 'pending' depuis plus de 1 heure
     """
     try:
-        delai_rappel = timezone.now() - timedelta(hours=1)
+        from api.models import SystemSettings
+        delai_rappel = timezone.now() - timedelta(hours=int(SystemSettings.current('pending_reminder_hours', 1) or 1))
         
         commandes_en_attente = Order.objects.filter(
             status='pending',

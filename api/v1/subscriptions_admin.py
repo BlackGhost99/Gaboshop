@@ -1,6 +1,7 @@
 """
 Admin API views for subscription plans management (B2C and B2B)
 """
+from payments.utils import subscription_days
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -374,7 +375,7 @@ class StoreSubscriptionCreateView(APIView):
         
         # Calculer end_date si non fourni (30 jours par défaut)
         if not end_date:
-            end_date = (timezone.now().date() + timedelta(days=30)).isoformat()
+            end_date = (timezone.now().date() + timedelta(days=subscription_days())).isoformat()
         
         subscription_data = {
             'store': store.id,
@@ -533,7 +534,7 @@ class B2BStoreSubscriptionCreateView(APIView):
         
         # Calculer end_date si non fourni (30 jours par défaut)
         if not end_date:
-            end_date = (timezone.now().date() + timedelta(days=30)).isoformat()
+            end_date = (timezone.now().date() + timedelta(days=subscription_days())).isoformat()
         
         subscription_data = {
             'store': store.id,

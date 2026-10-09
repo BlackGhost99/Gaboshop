@@ -273,6 +273,12 @@ def payment_request_minutes():
     return int(SystemSettings.current('unpaid_order_expiry_minutes', 30) or 30)
 
 
+def subscription_days():
+    """Durée d'un abonnement payé, réglée dans l'espace admin."""
+    from api.models import SystemSettings
+    return int(SystemSettings.current('subscription_days', 30) or 30)
+
+
 def build_cinetpay_payload(intent, channels, lang):
     return {
         "reference": intent.reference,

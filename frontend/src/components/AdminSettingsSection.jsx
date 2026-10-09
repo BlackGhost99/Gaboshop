@@ -164,6 +164,26 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
         </Card>
       )}
 
+      <Card title="Commissions Gaboshop" description="Les nouveaux taux s’appliquent aux nouvelles commandes ; les commandes passées gardent leur montant.">
+        <div className="grid gap-4 md:grid-cols-2">
+          <NumberField label="Commission d’un nouveau commerce ou d’une nouvelle catégorie" suffix="%" step="0.1" min={0} max={100}
+            value={form.commission_global} onChange={set('commission_global')} help="Chaque catégorie de produits peut ensuite avoir son propre taux." />
+          <NumberField label="Commission sur les commandes entre commerces (B2B)" suffix="%" step="0.1" min={0} max={100}
+            value={form.b2b_commission_rate} onChange={set('b2b_commission_rate')} help="Avant la réduction du plan B2B du grossiste." />
+        </div>
+        <p className="text-sm font-medium text-gray-800">Plan Business</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          <NumberField label="Commandes B2B" suffix="%" step="0.1" min={0} max={100} value={form.business_b2b_commission_rate} onChange={set('business_b2b_commission_rate')} />
+          <NumberField label="Alimentaire vendu aux clients" suffix="%" step="0.1" min={0} max={100} value={form.business_food_commission_rate} onChange={set('business_food_commission_rate')} />
+          <NumberField label="Autres produits vendus aux clients" suffix="%" step="0.1" min={0} max={100} value={form.business_other_commission_rate} onChange={set('business_other_commission_rate')} />
+        </div>
+        <label className="block text-sm font-medium text-gray-700">
+          Catégories comptées comme alimentaires
+          <input className={inputClass} value={form.food_category_keywords || ''} onChange={(e) => set('food_category_keywords')(e.target.value)} />
+          <span className="mt-1 block text-xs font-normal text-gray-500">Mots séparés par des virgules, cherchés dans le nom de la catégorie du commerce.</span>
+        </label>
+      </Card>
+
       <Card title="Paiements">
         <div className="grid gap-4 md:grid-cols-3">
           <NumberField label="Frais Airtel Money" suffix="%" step="0.1" min={0} max={100} value={form.airtel_money_fee} onChange={set('airtel_money_fee')} />
@@ -181,13 +201,31 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
       <Card title="Livraison">
         <Toggle label="Attribuer automatiquement un livreur" help="Quand une commande est prête, Gaboshop propose la course au livreur disponible le plus proche."
           checked={form.auto_assign_delivery} onChange={set('auto_assign_delivery')} />
-        <NumberField label="Livraisons en cours maximum par livreur" min={1} max={20} value={form.max_orders_per_delivery} onChange={set('max_orders_per_delivery')}
-          help="Au-delà, Gaboshop ne lui propose plus de nouvelle course tant qu’il n’a pas livré." />
+        <div className="grid gap-4 md:grid-cols-2">
+          <NumberField label="Part des frais de livraison pour le livreur" suffix="%" step="1" min={0} max={100} value={form.courier_share_percent}
+            onChange={set('courier_share_percent')} help="Le reste revient à Gaboshop. Non appliqué quand le commerce livre lui-même." />
+          <NumberField label="Livraisons en cours maximum par livreur" min={1} max={20} value={form.max_orders_per_delivery} onChange={set('max_orders_per_delivery')}
+            help="Au-delà, Gaboshop ne lui propose plus de nouvelle course tant qu’il n’a pas livré." />
+          <NumberField label="Temps pour accepter une course" suffix="min" min={1} max={120} value={form.assignment_timeout_minutes}
+            onChange={set('assignment_timeout_minutes')} help="Ensuite la course passe au livreur suivant." />
+          <NumberField label="Proposer à tous les livreurs après" suffix="min" min={1} max={1440} value={form.broadcast_after_minutes}
+            onChange={set('broadcast_after_minutes')} help="Si personne n’a accepté la course." />
+          <NumberField label="Nouvel essai quand aucun livreur n’est libre" suffix="min" min={1} max={120} value={form.assignment_retry_minutes} onChange={set('assignment_retry_minutes')} />
+          <NumberField label="Livraison signalée en retard après" suffix="heures" min={1} max={72} value={form.late_delivery_hours} onChange={set('late_delivery_hours')} />
+          <NumberField label="Codes PIN faux avant blocage" min={1} max={20} value={form.pin_max_attempts} onChange={set('pin_max_attempts')} />
+          <NumberField label="Durée du blocage PIN" suffix="min" min={1} max={1440} value={form.pin_lock_minutes} onChange={set('pin_lock_minutes')} />
+        </div>
       </Card>
 
       <Card title="Commandes">
         <NumberField label="Annuler une commande toujours en attente après" suffix="heures" min={1} max={720} value={form.cart_validity_hours}
           onChange={set('cart_validity_hours')} help="Une commande que personne n’a traitée est annulée automatiquement." />
+        <NumberField label="Rappeler au client une commande en attente après" suffix="heures" min={1} max={72} value={form.pending_reminder_hours} onChange={set('pending_reminder_hours')} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <NumberField label="Déclarations de paiement refusées avant blocage" min={1} max={20} value={form.max_rejected_declarations}
+            onChange={set('max_rejected_declarations')} help="Évite les fausses déclarations répétées." />
+          <NumberField label="Comptées sur" suffix="jours" min={1} max={365} value={form.rejected_window_days} onChange={set('rejected_window_days')} />
+        </div>
         <Toggle label="Limiter les commandes à une plage horaire" help="Désactivé : chaque commerce suit seulement ses propres horaires."
           checked={form.order_hours_enabled} onChange={set('order_hours_enabled')} />
         <div className="grid gap-4 md:grid-cols-2">
@@ -200,6 +238,10 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
         <div className="grid gap-4 md:grid-cols-2">
           <TimeField label="Ouverture par défaut d’un nouveau commerce" value={form.default_store_opening} onChange={set('default_store_opening')} />
           <TimeField label="Fermeture par défaut" value={form.default_store_closing} onChange={set('default_store_closing')} />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <NumberField label="Durée d’un abonnement payé" suffix="jours" min={1} max={366} value={form.subscription_days} onChange={set('subscription_days')} />
+          <NumberField label="Rappel avant la fin de l’abonnement" suffix="jours" min={1} max={60} value={form.subscription_reminder_days} onChange={set('subscription_reminder_days')} />
         </div>
         <Toggle label="Un nouveau commerce attend l’activation par l’admin" help="Désactivé : un commerce inscrit peut vendre tout de suite."
           checked={form.store_verification_required} onChange={set('store_verification_required')} />

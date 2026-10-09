@@ -130,8 +130,10 @@ class ReceiptCreateView(APIView):
         if PaymentReceipt.objects.filter(obligation=obligation, reference=reference).exists():
             raise ValidationError({'reference': 'Cet ID a déjà été déclaré pour ce paiement.'})
         if not is_payee and not _is_admin(user):
-            since = timezone.now() - timedelta(days=self.REJECTED_WINDOW_DAYS)
-            if PaymentReceipt.objects.filter(actor=user, status='rejected', rejected_at__gte=since).count() >= self.MAX_REJECTED:
+            from api.models import SystemSettings
+            rules = SystemSettings.get_settings()
+            since = timezone.now() - timedelta(days=rules.rejected_window_days or self.REJECTED_WINDOW_DAYS)
+            if PaymentReceipt.objects.filter(actor=user, status='rejected', rejected_at__gte=since).count() >= (rules.max_rejected_declarations or self.MAX_REJECTED):
                 return Response({'success': False, 'error': {'code': 403, 'message': 'Trop de paiements déclarés ont été refusés. Contactez le support Gaboshop.'}}, status=status.HTTP_403_FORBIDDEN)
             if obligation.receipts.filter(status='pending').exists():
                 raise ValidationError('Un paiement déclaré attend déjà la confirmation du bénéficiaire.')

@@ -155,7 +155,7 @@ class CommissionsByStoreView(APIView):
 				"store_id": store.id,
 				"store_name": store.name,
 				"total_sales": float(commissions['total_sales'] or 0),
-				"commission_rate": 5.0,  # À mettre à jour depuis SystemSettings
+				"commission_rate": float(store.commission_rate or 0),
 				"commission_amount": float(commissions['total_commission'] or 0),
 				"status": "pending",
 			})

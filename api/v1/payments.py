@@ -1,3 +1,4 @@
+from payments.utils import subscription_days
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -621,7 +622,7 @@ class ClientForfaitUpdateView(APIView):
 				user=request.user,
 				forfait=forfait,
 				start_date=timezone.now().date(),
-				expiry_date=timezone.now().date() + timedelta(days=30),
+				expiry_date=timezone.now().date() + timedelta(days=subscription_days()),
 				status='active'
 			)
 			

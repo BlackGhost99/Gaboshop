@@ -13,11 +13,40 @@ class SystemSettings(models.Model):
     
     # === 1. COMMISSIONS ===
     commission_global = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=10.00,
+        max_digits=5,
+        decimal_places=2,
+        default=8.00,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Commission globale par défaut (%)"
+        help_text="Commission par défaut d'un nouveau commerce ou d'une nouvelle catégorie (%)"
+    )
+    b2b_commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=8.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Commission de base sur une commande entre commerces (B2B), avant réduction du plan (%)"
+    )
+    business_b2b_commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=2.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Plan Business : commission sur les commandes B2B (%)"
+    )
+    business_food_commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Plan Business : commission sur l'alimentaire vendu aux clients (%)"
+    )
+    business_other_commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=2.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Plan Business : commission sur le reste vendu aux clients (%)"
+    )
+    food_category_keywords = models.CharField(
+        max_length=255, default="ALIMENTATION,BOISSONS",
+        help_text="Mots qui font compter une catégorie de commerce comme alimentaire (séparés par des virgules)"
+    )
+    courier_share_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=80.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Part des frais de livraison versée au livreur ; le reste revient à Gaboshop (%)"
     )
     
     # === 2. PAIEMENTS ===
@@ -64,11 +93,48 @@ class SystemSettings(models.Model):
         help_text="Nombre max de livraisons en cours par livreur avant de lui en proposer une autre"
     )
     
+    assignment_timeout_minutes = models.IntegerField(
+        default=10, validators=[MinValueValidator(1)],
+        help_text="Temps laissé à un livreur pour accepter une course avant de la proposer au suivant (minutes)"
+    )
+    broadcast_after_minutes = models.IntegerField(
+        default=40, validators=[MinValueValidator(1)],
+        help_text="Sans livreur après ce délai, la course est proposée à tous les livreurs (minutes)"
+    )
+    assignment_retry_minutes = models.IntegerField(
+        default=5, validators=[MinValueValidator(1)],
+        help_text="Quand aucun livreur n'est libre, nouvel essai après (minutes)"
+    )
+    pin_max_attempts = models.IntegerField(
+        default=5, validators=[MinValueValidator(1)],
+        help_text="Codes PIN de livraison erronés avant blocage"
+    )
+    pin_lock_minutes = models.IntegerField(
+        default=30, validators=[MinValueValidator(1)],
+        help_text="Durée du blocage après trop de codes PIN erronés (minutes)"
+    )
+    late_delivery_hours = models.IntegerField(
+        default=2, validators=[MinValueValidator(1)],
+        help_text="Une livraison en route depuis plus longtemps est signalée en retard (heures)"
+    )
+
     # === 5. COMMANDES ===
     cart_validity_hours = models.IntegerField(
         default=24,
         validators=[MinValueValidator(1)],
         help_text="Une commande toujours en attente est annulée après ce délai (heures)"
+    )
+    pending_reminder_hours = models.IntegerField(
+        default=1, validators=[MinValueValidator(1)],
+        help_text="Rappel au client pour une commande toujours en attente après (heures)"
+    )
+    max_rejected_declarations = models.IntegerField(
+        default=3, validators=[MinValueValidator(1)],
+        help_text="Déclarations de paiement refusées avant blocage des nouvelles déclarations"
+    )
+    rejected_window_days = models.IntegerField(
+        default=30, validators=[MinValueValidator(1)],
+        help_text="Période sur laquelle les déclarations refusées sont comptées (jours)"
     )
     order_hours_enabled = models.BooleanField(
         default=False,
@@ -97,6 +163,15 @@ class SystemSettings(models.Model):
         help_text="Un nouveau commerce reste désactivé tant que l'admin ne l'a pas activé"
     )
     
+    subscription_days = models.IntegerField(
+        default=30, validators=[MinValueValidator(1)],
+        help_text="Durée d'un abonnement payé (jours)"
+    )
+    subscription_reminder_days = models.IntegerField(
+        default=7, validators=[MinValueValidator(1)],
+        help_text="Rappel avant la fin d'un abonnement (jours)"
+    )
+
     # === 7. NOTIFICATIONS ===
     enable_whatsapp = models.BooleanField(
         default=True,
@@ -142,6 +217,16 @@ class SystemSettings(models.Model):
             return getattr(cls.get_settings(), name)
         except Exception:
             return default
+
+    @classmethod
+    def courier_share(cls, delivery_fee):
+        """Part du livreur sur des frais de livraison, selon le pourcentage réglé dans l'admin."""
+        from decimal import Decimal
+        percent = Decimal(str(cls.current('courier_share_percent', 80) or 0))
+        return (Decimal(str(delivery_fee or 0)) * percent / Decimal('100')).quantize(Decimal('0.01'))
+
+    def food_keywords(self):
+        return [k.strip().upper() for k in (self.food_category_keywords or '').split(',') if k.strip()]
 
     def get_enabled_cities_list(self):
         """Retourne la liste des villes activées"""

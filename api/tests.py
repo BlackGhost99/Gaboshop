@@ -113,3 +113,45 @@ class SettingsAreAppliedTests(TestCase):
         with mock.patch('orders.serializers.within_hours', return_value=False):
             with self.assertRaisesMessage(ValidationError, 'Les commandes sont ouvertes'):
                 OrderCreateSerializer().validate({'store': self.make_store(), 'items': []})
+
+
+class BusinessRulesTests(TestCase):
+    def setUp(self):
+        self.settings = SystemSettings.get_settings()
+
+    def test_courier_share_follows_admin_percent(self):
+        from decimal import Decimal
+        self.assertEqual(SystemSettings.courier_share(Decimal('2000')), Decimal('1600.00'))
+        self.settings.courier_share_percent = Decimal('70')
+        self.settings.save()
+        self.assertEqual(SystemSettings.courier_share(Decimal('2000')), Decimal('1400.00'))
+
+    def test_new_store_gets_default_commission_from_admin(self):
+        from decimal import Decimal
+        self.settings.commission_global = Decimal('6.5')
+        self.settings.save()
+        manager = User.objects.create_user(phone='+24107200020', password='x', user_type='store_manager')
+        store = Store.objects.create(name='C', category=StoreCategory.objects.create(name='K'), manager=manager,
+                                     phone='+24107200120', address='Libreville', zone='Centre')
+        store.refresh_from_db()
+        self.assertEqual(store.commission_rate, Decimal('6.50'))
+
+    def test_pin_lock_follows_admin_values(self):
+        from delivery import pin_guard
+        self.settings.pin_max_attempts = 2
+        self.settings.pin_lock_minutes = 15
+        self.settings.save()
+        delivery = mock.Mock(pk=987654)
+        pin_guard.reset(delivery)
+        pin_guard.record_failure(delivery)
+        self.assertFalse(pin_guard.is_locked(delivery))
+        pin_guard.record_failure(delivery)
+        self.assertTrue(pin_guard.is_locked(delivery))
+        self.assertIn('15 minutes', pin_guard.locked_message())
+        pin_guard.reset(delivery)
+
+    def test_assignment_timeout_follows_admin_value(self):
+        from delivery.assignment_flow import assignment_timeout_minutes
+        self.settings.assignment_timeout_minutes = 7
+        self.settings.save()
+        self.assertEqual(assignment_timeout_minutes(), 7)

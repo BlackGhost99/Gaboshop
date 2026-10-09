@@ -23,7 +23,7 @@ from delivery.services import (
 	DeliveryRulesService, DeliveryPricingService, DeliveryAssignmentService
 )
 from delivery.assignment_flow import (
-	ASSIGNMENT_TIMEOUT_MINUTES,
+	assignment_timeout_minutes,
 	assign_next_driver,
 	enqueue_assignment_tasks,
 )
@@ -197,10 +197,8 @@ class DeliveryAssignView(APIView):
 				now = timezone.now()
 				if not delivery.assignment_started_at:
 					delivery.assignment_started_at = now
-				timeout_minutes = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
-				if timeout_minutes < ASSIGNMENT_TIMEOUT_MINUTES:
-					timeout_minutes = ASSIGNMENT_TIMEOUT_MINUTES
-					delivery.assignment_timeout_minutes = timeout_minutes
+				timeout_minutes = assignment_timeout_minutes()
+				delivery.assignment_timeout_minutes = timeout_minutes
 				delivery.assignment_round = (delivery.assignment_round or 0) + 1
 				delivery.save()
 				enqueue_assignment_tasks(
@@ -433,10 +431,8 @@ class DeliveryClaimView(APIView):
 				now = timezone.now()
 				if not delivery.assignment_started_at:
 					delivery.assignment_started_at = now
-				timeout_minutes = delivery.assignment_timeout_minutes or ASSIGNMENT_TIMEOUT_MINUTES
-				if timeout_minutes < ASSIGNMENT_TIMEOUT_MINUTES:
-					timeout_minutes = ASSIGNMENT_TIMEOUT_MINUTES
-					delivery.assignment_timeout_minutes = timeout_minutes
+				timeout_minutes = assignment_timeout_minutes()
+				delivery.assignment_timeout_minutes = timeout_minutes
 				delivery.assignment_round = (delivery.assignment_round or 0) + 1
 				# Compute agent commission if not set
 				try:
@@ -845,7 +841,7 @@ class DeliveryProofUploadView(APIView):
 			if pin_code:
 				from delivery import pin_guard
 				if pin_guard.is_locked(delivery):
-					return Response({'success': False, 'error': {'code': 'pin_locked', 'message': pin_guard.LOCKED_MESSAGE}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+					return Response({'success': False, 'error': {'code': 'pin_locked', 'message': pin_guard.locked_message()}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 				if pin_code.strip() == delivery.delivery_code.strip():
 					pin_guard.reset(delivery)
 					delivery.code_verified = True
@@ -988,7 +984,7 @@ class DeliveryVerifyPINView(APIView):
 			# Vérifier le PIN (essais limités)
 			from delivery import pin_guard
 			if pin_guard.is_locked(delivery):
-				return Response({'success': False, 'error': pin_guard.LOCKED_MESSAGE}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+				return Response({'success': False, 'error': pin_guard.locked_message()}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 			if pin_code == delivery.delivery_code.strip():
 				pin_guard.reset(delivery)
 				delivery.code_verified = True

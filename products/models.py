@@ -1,5 +1,6 @@
 from django.db import models
 from stores.models import Store, StoreCategory
+from stores.models import default_commission_rate
 
 
 class ProductCategory(models.Model):
@@ -15,7 +16,7 @@ class ProductCategory(models.Model):
 	commission_rate = models.DecimalField(
 		max_digits=5, 
 		decimal_places=2, 
-		default=8.00,
+		default=default_commission_rate,
 		help_text="Taux de commission en % pour les produits de cette catégorie"
 	)
 

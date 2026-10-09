@@ -4,19 +4,31 @@ import {
   createB2CCategory,
   updateB2CCategory
 } from '../services/adminService';
-import { getStoreCategories } from '../services/adminService';
+import { getStoreCategories, getSystemSettings } from '../services/adminService';
 
 /**
  * Modal pour créer/modifier une catégorie de produit (ProductCategory).
  * La catégorie est rattachée à un type de magasin : tous les magasins de ce type
  * peuvent l'attribuer à leurs produits.
  */
+// Taux proposé pour une nouvelle catégorie : la commission par défaut réglée dans Réglages.
+function useSystemDefaultCommission() {
+  const [rate, setRate] = useState('8.00');
+  useEffect(() => {
+    getSystemSettings().then((res) => {
+      if (res?.data?.commission_global != null) setRate(Number(res.data.commission_global).toFixed(2));
+    }).catch(() => {});
+  }, []);
+  return rate;
+}
+
 const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [storeCategories, setStoreCategories] = useState([]);
 
-  const emptyForm = { name: '', description: '', store_category_id: '', order: 0, commission_rate: '8.00' };
+  const defaultRate = String(useSystemDefaultCommission());
+  const emptyForm = { name: '', description: '', store_category_id: '', order: 0, commission_rate: defaultRate };
   const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
@@ -32,7 +44,7 @@ const B2CCategoryModal = ({ isOpen, onClose, category = null, onSuccess }) => {
           description: category.description || '',
           store_category_id: category.store_category_id || '',
           order: category.order || 0,
-          commission_rate: category.commission_rate || '8.00'
+          commission_rate: category.commission_rate ?? defaultRate
         });
       } else {
         setFormData(emptyForm);

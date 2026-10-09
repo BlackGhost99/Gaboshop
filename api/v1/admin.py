@@ -917,6 +917,23 @@ class SystemSettingsView(APIView):
     # champ -> (type, minimum, maximum)
     FIELDS = {
         'commission_global': ('decimal', 0, 100),
+        'b2b_commission_rate': ('decimal', 0, 100),
+        'business_b2b_commission_rate': ('decimal', 0, 100),
+        'business_food_commission_rate': ('decimal', 0, 100),
+        'business_other_commission_rate': ('decimal', 0, 100),
+        'food_category_keywords': ('keywords', None, None),
+        'courier_share_percent': ('decimal', 0, 100),
+        'assignment_timeout_minutes': ('int', 1, 120),
+        'broadcast_after_minutes': ('int', 1, 1440),
+        'assignment_retry_minutes': ('int', 1, 120),
+        'pin_max_attempts': ('int', 1, 20),
+        'pin_lock_minutes': ('int', 1, 1440),
+        'late_delivery_hours': ('int', 1, 72),
+        'pending_reminder_hours': ('int', 1, 72),
+        'max_rejected_declarations': ('int', 1, 20),
+        'rejected_window_days': ('int', 1, 365),
+        'subscription_days': ('int', 1, 366),
+        'subscription_reminder_days': ('int', 1, 60),
         'moov_money_fee': ('decimal', 0, 100),
         'airtel_money_fee': ('decimal', 0, 100),
         'unpaid_order_expiry_minutes': ('int', 5, 1440),
@@ -998,6 +1015,9 @@ class SystemSettingsView(APIView):
                 return datetime.strptime(text, '%H:%M').time()
             except ValueError:
                 raise ValueError('heure au format HH:MM attendue')
+        if kind == 'keywords':
+            items = raw if isinstance(raw, list) else str(raw).split(',')
+            return ','.join(dict.fromkeys(str(k).strip().upper() for k in items if str(k).strip()))[:255]
         if kind == 'cities':
             items = raw if isinstance(raw, list) else str(raw).split(',')
             cities = list(dict.fromkeys(c.strip() for c in items if str(c).strip()))

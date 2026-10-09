@@ -7,6 +7,13 @@ from users.models import User
 LIBREVILLE_TZ = dt_timezone(timedelta(hours=1))
 
 
+def default_commission_rate():
+	"""Commission d'un nouveau commerce ou d'une nouvelle catégorie : réglée dans l'espace admin."""
+	from decimal import Decimal
+	from api.models import SystemSettings
+	return Decimal(str(SystemSettings.current('commission_global', Decimal('8.00'))))
+
+
 def default_opening_time():
 	from api.models import SystemSettings
 	return _as_time(SystemSettings.current('default_store_opening', time(8, 0)))
@@ -82,7 +89,7 @@ class Store(models.Model):
 	commission_rate = models.DecimalField(
 		max_digits=5, 
 		decimal_places=2, 
-		default=8.00,
+		default=default_commission_rate,
 		help_text="Commission de GABOSHOP en % (défaut 8%)"
 	)
 	delivery_fee = models.DecimalField(

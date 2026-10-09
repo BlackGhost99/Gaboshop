@@ -221,22 +221,23 @@ class Order(models.Model):
 			# Determine current plan
 			plan = self.store.get_current_plan()
 			plan_type = plan.plan_type if plan else 'free'
+			# Taux réglés dans l'espace admin (Réglages > Commissions)
+			from api.models import SystemSettings
+			rules = SystemSettings.get_settings()
 			
 			# Pour les commandes B2B d'un grossiste, utiliser B2BSubscriptionPlan
 			if self.is_b2b and self.store.is_b2b:
 				# C'est une commande B2B reÃ§ue par un grossiste
 				# Utiliser le plan B2B du grossiste
 				b2b_plan = self.store.get_current_b2b_plan()
+				base_rate_b2b = Decimal(str(rules.b2b_commission_rate))
 				if b2b_plan:
-					# Commission de base B2B = 8%
-					base_rate_b2b = Decimal('8.00')
 					# Appliquer la rÃ©duction du plan B2B
 					reduction_percent = Decimal(getattr(b2b_plan, 'commission_reduction_percent', 0))
 					multiplier = (Decimal('100') - reduction_percent) / Decimal('100')
 					effective_rate = base_rate_b2b * multiplier
 				else:
-					# Fallback: 8% si pas de plan B2B
-					effective_rate = Decimal('8.00')
+					effective_rate = base_rate_b2b
 				
 				# Calculer la commission totale pour la commande B2B
 				total_commission = (self.items_total * effective_rate) / Decimal('100')
@@ -275,19 +276,19 @@ class Order(models.Model):
 				if plan_type == 'business':
 					# Business B2B: 2% sur tout
 					if self.is_b2b:
-						effective_rate = Decimal('2.00')
+						effective_rate = Decimal(str(rules.business_b2b_commission_rate))
 					# Business B2C: 0% alimentaire, 2% reste
 					else:
 						# VÃ©rifier si c'est alimentaire
 						is_food = False
 						if product and product.category and product.category.store_category:
 							category_name = product.category.store_category.name.upper()
-							is_food = 'ALIMENTATION' in category_name or 'BOISSONS' in category_name
+							is_food = any(word in category_name for word in rules.food_keywords())
 						
 						if is_food:
-							effective_rate = Decimal('0.00')  # 0% pour alimentaire B2C Business
+							effective_rate = Decimal(str(rules.business_food_commission_rate))
 						else:
-							effective_rate = Decimal('2.00')  # 2% pour reste B2C Business
+							effective_rate = Decimal(str(rules.business_other_commission_rate))
 				else:
 					# Plans Free et Pro: utiliser base_rate * multiplier
 					# Effective rate after plan multiplier

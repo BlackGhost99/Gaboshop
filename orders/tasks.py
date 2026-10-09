@@ -108,7 +108,8 @@ def notifier_retard_livraison():
     Commandes 'in_transit' depuis plus de 2 heures
     """
     try:
-        delai_retard = timezone.now() - timedelta(hours=2)
+        from api.models import SystemSettings
+        delai_retard = timezone.now() - timedelta(hours=int(SystemSettings.current('late_delivery_hours', 2) or 2))
         
         commandes_en_retard = Order.objects.filter(
             status='in_transit',
