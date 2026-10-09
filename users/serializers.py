@@ -235,15 +235,18 @@ class RegisterSerializer(serializers.ModelSerializer):
             if user.user_type == 'delivery_agent':
                 # Create LivreurProfile with provided GPS
                 from django.utils import timezone
-                LivreurProfile.objects.create(
+                # Le profil vide existe déjà (signal users.signals) : on le complète.
+                LivreurProfile.objects.update_or_create(
                     user=user,
-                    type_vehicule=vehicle_type,
-                    immatriculation=vehicle_plate,
-                    disponible=True,
-                    documents_verifies=False,
-                    position_lat=validated_data.get('position_lat'),
-                    position_lng=validated_data.get('position_lng'),
-                    last_position_update=timezone.now()
+                    defaults=dict(
+                        type_vehicule=vehicle_type,
+                        immatriculation=vehicle_plate,
+                        disponible=True,
+                        documents_verifies=False,
+                        position_lat=validated_data.get('position_lat'),
+                        position_lng=validated_data.get('position_lng'),
+                        last_position_update=timezone.now(),
+                    ),
                 )
                 # Create an API key for the delivery agent so mobile client can authenticate
                 try:

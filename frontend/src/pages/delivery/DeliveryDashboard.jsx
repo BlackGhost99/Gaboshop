@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
+import { askAI, describeError, notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
 import NotificationHelp from '../../components/NotificationHelp';
 import { statusLabel } from '../../utils/notificationLabels';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -143,7 +143,7 @@ const DeliveryDashboard = () => {
         setError('Impossible de charger les données');
       }
     } catch (err) {
-      setError('Erreur lors du chargement des données');
+      setError(describeError(err, 'Votre tableau de bord ne s’est pas chargé.'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -410,8 +410,22 @@ const DeliveryDashboard = () => {
   if (error && !dashboardData) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
+        <div className="mx-4 max-w-md space-y-2 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p className="font-semibold">{error.message || error}</p>
+          {error.reason && <p><span className="font-semibold">Pourquoi : </span>{error.reason}</p>}
+          {error.nextStep && <p><span className="font-semibold">Que faire : </span>{error.nextStep}</p>}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button type="button" onClick={fetchDashboard} className="rounded bg-red-600 px-3 py-1.5 font-semibold text-white">
+              Réessayer
+            </button>
+            <button
+              type="button"
+              onClick={() => askAI({ action: 'Ouvrir mon tableau de bord livreur', ...(typeof error === 'object' ? error : { message: error }) })}
+              className="rounded bg-slate-900 px-3 py-1.5 font-semibold text-white"
+            >
+              🤖 Demander à l'IA
+            </button>
+          </div>
         </div>
       </div>
     );

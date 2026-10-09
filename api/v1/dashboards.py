@@ -368,10 +368,9 @@ class DeliveryDashboardView(APIView):
             return Response({'error': 'Accès réservé aux livreurs'}, status=status.HTTP_403_FORBIDDEN)
 
         # Profil livreur
-        try:
-            profile = user.livreur_profile
-        except Exception:
-            return Response({'error': 'Profil livreur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        # Compte livreur créé sans profil (ajout par l'admin) : le profil est créé à la volée.
+        from users.models import LivreurProfile
+        profile, _ = LivreurProfile.objects.get_or_create(user=user)
 
         # Livraison active
         active_delivery = Delivery.objects.filter(

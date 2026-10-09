@@ -108,10 +108,9 @@ class DeliveryAvailabilityView(APIView):
 		else:
 			is_available = str(raw_value).strip().lower() in ['true', '1', 'yes', 'y', 'on']
 
-		try:
-			profile = user.livreur_profile
-		except Exception:
-			return Response({'error': 'Profil livreur non trouve'}, status=status.HTTP_404_NOT_FOUND)
+		# Compte livreur créé sans profil (ajout par l'admin) : le profil est créé à la volée.
+		from users.models import LivreurProfile
+		profile, _ = LivreurProfile.objects.get_or_create(user=user)
 
 		user.is_available = is_available
 		user.save(update_fields=['is_available'])
