@@ -74,6 +74,7 @@ class OrderSerializer(serializers.ModelSerializer):
     client_can_confirm = serializers.SerializerMethodField()
     invoice_breakdown = serializers.SerializerMethodField()
     payment_arrangement = serializers.SerializerMethodField()
+    delivered_by_store = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -83,13 +84,13 @@ class OrderSerializer(serializers.ModelSerializer):
             'total_amount', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
             'notes', 'items', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
-            'invoice_breakdown', 'payment_arrangement'
+            'invoice_breakdown', 'payment_arrangement', 'delivered_by_store'
         ]
         read_only_fields = [
             'id', 'order_number', 'client', 'items_total', 'total_amount', 'operator_fee', 'payment_fees',
             'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
-            'invoice_breakdown', 'payment_arrangement', 'delivery_cost', 'vehicle_type'
+            'invoice_breakdown', 'payment_arrangement', 'delivery_cost', 'vehicle_type', 'delivered_by_store'
         ]
 
     def _get_delivery(self, obj):
@@ -115,7 +116,14 @@ class OrderSerializer(serializers.ModelSerializer):
             return delivery.proof.client_confirmation_pending
         return False
 
+    def get_delivered_by_store(self, obj):
+        """Option « tout au commerce » : le commerce livre lui-même cette commande."""
+        arrangement = getattr(obj, 'payment_arrangement', None)
+        return bool(arrangement is not None and arrangement.flow == 'platform_online' and arrangement.delivery_method == 'store')
+
     def get_client_can_confirm(self, obj):
+        if self.get_delivered_by_store(obj):
+            return obj.status == 'in_transit'
         delivery = self._get_delivery(obj)
         if not delivery or not hasattr(delivery, 'proof'):
             return False
@@ -240,9 +248,10 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         items = attrs['items']
         if any(item['product'].store_id != store.id for item in items):
             raise serializers.ValidationError({'items': _('Tous les produits doivent venir du magasin de la commande.')})
-        from payments.configuration import available_payment_options
+        from payments.configuration import available_payment_options, matching_option
         _policy, options = available_payment_options(store, attrs.get("delivery_requested", True))
-        if not any(option['flow'] == attrs.get('payment_flow') and option['method'] == attrs.get('payment_method') for option in options):
+        if not matching_option(options, attrs.get('payment_flow'), attrs.get('payment_method'),
+                               attrs.get('delivery_payment_method') or ''):
             raise serializers.ValidationError({'payment_method': _('Ce circuit ou moyen de paiement n’est pas autorisé.')})
 
         from payments.subscription_check import SubscriptionChecker
@@ -339,7 +348,7 @@ class OrderStatusUpdateSerializer(serializers.ModelSerializer):
             'paid': ['confirmed', 'cancelled'],
             'confirmed': ['preparing', 'cancelled'],
             'preparing': ['ready', 'cancelled'],
-            'ready': ['assigned', 'cancelled'],
+            'ready': ['assigned', 'in_transit', 'cancelled'],
             'assigned': ['in_transit', 'cancelled'],
             'in_transit': ['delivered', 'cancelled'],
             'delivered': [],

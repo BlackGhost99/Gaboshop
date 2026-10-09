@@ -250,6 +250,8 @@ class LivreurProfile(models.Model):
 	
 	# Informations véhicule
 	type_vehicule = models.CharField(max_length=20, choices=VEHICULE_CHOICES, default='moto')
+	# Numéro Airtel Money / Moov Money où le livreur reçoit ses gains (obligatoire pour être payé).
+	mobile_money_phone = models.CharField(max_length=20, blank=True, help_text="Numéro Mobile Money du livreur (+241...)")
 	immatriculation = models.CharField(max_length=50, blank=True)
 	
 	# Documents

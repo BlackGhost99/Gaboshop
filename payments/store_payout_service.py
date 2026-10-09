@@ -44,7 +44,8 @@ def compute_store_share(order):
     """Part du commerce : produits - commission figée, + livraison si le commerce livre lui-même."""
     products = Decimal(order.items_total)
     commission = Decimal(order.commission_amount)
-    delivery = Decimal(order.delivery_fee) if order.store.offers_delivery else Decimal('0')
+    from .direct_service import store_delivers
+    delivery = Decimal(order.delivery_fee) if store_delivers(order) else Decimal('0')
     amount = max(Decimal('0'), products - commission) + delivery
     return products, commission, delivery, amount.quantize(Decimal('0.01'))
 

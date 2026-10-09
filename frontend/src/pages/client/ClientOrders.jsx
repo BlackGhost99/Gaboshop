@@ -167,7 +167,7 @@ const ClientOrders = () => {
   const handleConfirmDelivery = async (orderId) => {
     // Pour les ordres en statut 'delivered', afficher la popup PIN
     const order = detail;
-    if (order?.status === 'delivered' && order?.client_confirmation_pending) {
+    if (!order?.delivered_by_store && order?.status === 'delivered' && order?.client_confirmation_pending) {
       // Montrer modale PIN
       setPendingOrderId(orderId);
       setShowPinModal(true);
@@ -404,7 +404,7 @@ const ClientOrders = () => {
 
             <div className="px-5 py-3 border-t bg-gray-50 flex justify-between items-center text-sm">
               <div>
-                {detail.status === 'delivered' && !showPinModal && (
+                {(detail.status === 'delivered' || (detail.delivered_by_store && detail.status === 'in_transit')) && !showPinModal && (
                   <button
                     onClick={() => handleConfirmDelivery(detail.id)}
                     disabled={confirming}

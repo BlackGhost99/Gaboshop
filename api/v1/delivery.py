@@ -57,6 +57,8 @@ from core.validators import (
 from core.models import AuditLog
 from django.db import transaction
 from notifications.service import NotificationService
+from users.models import LivreurProfile
+from users.mobile_money import normalize_mobile_money
 
 class DeliveryProfileUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -75,7 +77,32 @@ class DeliveryProfileUpdateView(APIView):
             user.email = request.data['email']
         if 'profile_picture' in request.FILES:
             user.profile_picture = request.FILES['profile_picture']
-        
+
+        profile, _created = LivreurProfile.objects.get_or_create(user=user)
+        if 'mobile_money_phone' in request.data:
+            try:
+                mobile_money_phone = normalize_mobile_money(request.data.get('mobile_money_phone'))
+            except ValueError as exc:
+                return Response({
+                    'error': {
+                        'message': 'Numéro Mobile Money refusé.',
+                        'reason': str(exc),
+                        'next_step': 'Saisissez votre numéro Airtel Money ou Moov Money, par exemple 077 12 34 56.',
+                        'details': {'mobile_money_phone': [str(exc)]},
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            if not mobile_money_phone:
+                return Response({
+                    'error': {
+                        'message': 'Numéro Mobile Money obligatoire.',
+                        'reason': 'Vos gains de livraison sont envoyés sur ce numéro.',
+                        'next_step': 'Saisissez votre numéro Airtel Money ou Moov Money.',
+                        'details': {'mobile_money_phone': ['Champ obligatoire.']},
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            profile.mobile_money_phone = mobile_money_phone
+            profile.save(update_fields=['mobile_money_phone'])
+
         user.save()
 
         return Response({
@@ -86,6 +113,7 @@ class DeliveryProfileUpdateView(APIView):
                 'last_name': user.last_name,
                 'email': user.email,
                 'phone': user.phone,
+                'mobile_money_phone': profile.mobile_money_phone,
                 'profile_picture': request.build_absolute_uri(user.profile_picture.url) if user.profile_picture else None,
             }
         })
@@ -1271,16 +1299,14 @@ class DeliveryCompleteView(APIView):
 				reason='Order status updated when delivery completed'
 			)
 			
-			# Les circuits manuels sont acquittés par reçu; aucun transfert automatique.
+			# Le gain du livreur part quand le client confirme la réception (voir ClientConfirmDeliveryView).
 			from payments.direct_service import is_manual_order
 			if is_manual_order(delivery.order):
-				payout_result = {'success': False, 'message': 'Paiement manuel à confirmer par reçu.', 'transaction_id': None}
+				payment_message = 'Paiement manuel à confirmer par reçu.'
 			else:
-				from payments.services import PaymentService
-				payout_result = PaymentService.payout_delivery_agent(delivery)
-			
-			payment_status = 'success' if payout_result.get('success') else 'pending'
-			payment_message = payout_result.get('message', payout_result.get('error', ''))
+				payment_message = 'Votre gain est envoyé dès que le client confirme la réception.'
+			payment_status = 'pending'
+			payout_result = {'transaction_id': None}
 			
 			return Response({
 				'success': True,

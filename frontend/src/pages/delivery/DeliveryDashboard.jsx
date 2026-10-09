@@ -72,6 +72,7 @@ const DeliveryDashboard = () => {
     first_name: '',
     last_name: '',
     email: '',
+    mobile_money_phone: '',
     profile_picture: null
   });
   const [previewImage, setPreviewImage] = useState(null);
@@ -135,6 +136,7 @@ const DeliveryDashboard = () => {
             first_name: response.data.profile.first_name || '',
             last_name: response.data.profile.last_name || '',
             email: response.data.profile.email || '',
+            mobile_money_phone: response.data.profile.mobile_money_phone || '',
             profile_picture: null // File input is separate
           });
           setPreviewImage(response.data.profile.profile_picture);
@@ -374,6 +376,7 @@ const DeliveryDashboard = () => {
     formData.append('first_name', profileForm.first_name);
     formData.append('last_name', profileForm.last_name);
     formData.append('email', profileForm.email);
+    formData.append('mobile_money_phone', profileForm.mobile_money_phone);
     if (profileForm.profile_picture) {
       formData.append('profile_picture', profileForm.profile_picture);
     }
@@ -389,7 +392,7 @@ const DeliveryDashboard = () => {
           }
         }));
         setShowProfileModal(false);
-        notifySuccess('Profil enregistré', 'Vos nouvelles informations sont visibles par Gaboshop.');
+        notifySuccess('Profil enregistré', `Vos gains seront envoyés au ${res.data.mobile_money_phone}.`);
       }
     } catch (error) {
       console.error("Error updating profile", error);
@@ -460,6 +463,19 @@ const DeliveryDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PendingPayments title="Paiements à confirmer" />
+        {dashboardData && !profile.mobile_money_phone && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Ajoutez votre numéro Mobile Money</p>
+            <p className="mt-1">Vos gains de livraison sont envoyés sur ce numéro dès que le client confirme la réception. Sans lui, Gaboshop ne peut pas vous payer.</p>
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(true)}
+              className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Ajouter mon numéro
+            </button>
+          </div>
+        )}
         {/* En-tête avec disponibilité */}
         <div className="mb-8 flex flex-wrap justify-between items-center gap-4">
           <div>
@@ -978,6 +994,20 @@ const DeliveryDashboard = () => {
                   onChange={handleProfileChange}
                   className="mt-1 block w-full border rounded-md shadow-sm p-2"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Numéro Mobile Money (Airtel ou Moov)</label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  name="mobile_money_phone"
+                  placeholder="077 12 34 56"
+                  value={profileForm.mobile_money_phone}
+                  onChange={handleProfileChange}
+                  required
+                  className="mt-1 block w-full border rounded-md shadow-sm p-2"
+                />
+                <p className="mt-1 text-xs text-gray-500">Vos gains y sont envoyés quand le client confirme la réception.</p>
               </div>
 
               <div className="pt-4">

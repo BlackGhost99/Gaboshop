@@ -101,26 +101,66 @@ def get_payment_policy(store=None):
     return merged
 
 
-def available_payment_options(store, delivery_requested=True):
+ONLINE_METHODS = ('airtel_money', 'moov_money')
+
+
+def available_payment_options(store, delivery_requested=True, b2b=False):
+    """Choix de paiement proposés au client pour ce commerce.
+
+    Dès que le paiement en ligne Gaboshop (SingPay) est prêt et autorisé, seuls Airtel Money et Moov Money
+    sont proposés : le client paie tout en une fois à Gaboshop, qui reverse ensuite la part du commerce et
+    celle du livreur. Si le commerce livre lui-même, une option « tout au commerce » s'ajoute : le commerce
+    livre et reçoit aussi les frais de livraison (``delivery_by='store'``).
+    Sans paiement en ligne, les circuits manuels (espèces, code marchand) restent proposés.
+    Commandes entre commerces (B2B) : tous les circuits autorisés restent proposés.
+    """
     policy = get_payment_policy(store)
+    if not b2b and 'platform_online' in policy['enabled_flows'] and platform_online_ready():
+        methods = [m for m in ONLINE_METHODS if m in policy['enabled_methods']] or list(ONLINE_METHODS)
+        options = [
+            {'flow': 'platform_online', 'method': method, 'delivery_by': 'gaboshop',
+             'label': 'Paiement en ligne Gaboshop', 'instructions': ''}
+            for method in methods
+        ]
+        if delivery_requested and getattr(store, 'offers_delivery', False):
+            options += [
+                {'flow': 'platform_online', 'method': method, 'delivery_by': 'store',
+                 'label': 'Tout au commerce (il livre lui-même)', 'instructions': ''}
+                for method in methods
+            ]
+        return policy, options
+
     labels = {
         'direct_split': 'Payer le commerce directement', 'store_collects_all': 'Tout payer au commerce',
-        'courier_cash': 'Espèces au livreur à la livraison', 'platform_online': 'Paiement en ligne Gaboshop (Mobile Money)',
+        'courier_cash': 'Espèces au livreur à la livraison',
     }
     options = []
     ordered_flows = [policy['default_flow']] + [flow for flow in policy['enabled_flows'] if flow != policy['default_flow']]
-    # Le paiement en ligne (Mobile Money via Gaboshop) est proposé en premier quand il est disponible.
-    if 'platform_online' in ordered_flows:
-        ordered_flows.remove('platform_online')
-        ordered_flows.insert(0, 'platform_online')
     for flow in ordered_flows:
+        if flow == 'platform_online' and not (b2b and platform_online_ready()):
+            continue
         for method in policy['enabled_methods']:
+            if flow == 'platform_online':
+                if method in ONLINE_METHODS:
+                    options.append({'flow': flow, 'method': method, 'delivery_by': 'gaboshop',
+                                    'label': 'Paiement en ligne Gaboshop', 'instructions': ''})
+                continue
             if flow == 'courier_cash' and (method != 'cash' or not delivery_requested):
                 continue
-            if flow == 'platform_online' and (method not in ('airtel_money', 'moov_money') or not platform_online_ready()):
-                continue
             instructions = policy.get('instructions', {}).get(method, '')
-            if flow != 'platform_online' and method != 'cash' and not instructions:
+            if method != 'cash' and not instructions:
                 continue
             options.append({'flow': flow, 'method': method, 'label': labels[flow], 'instructions': instructions})
     return policy, options
+
+
+def matching_option(options, flow, method, delivery_by=''):
+    """L'option choisie par le client, ou None. Pour le paiement en ligne, ``delivery_by`` distingue
+    « livreur Gaboshop » (par défaut) et « le commerce livre lui-même »."""
+    for option in options:
+        if option['flow'] != flow or option['method'] != method:
+            continue
+        if flow == 'platform_online' and option.get('delivery_by') != (delivery_by or 'gaboshop'):
+            continue
+        return option
+    return None

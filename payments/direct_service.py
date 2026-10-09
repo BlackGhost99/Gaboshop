@@ -5,12 +5,28 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from .configuration import available_payment_options, get_payment_policy
+from .configuration import available_payment_options, get_payment_policy, matching_option
 from .direct_models import PaymentArrangement, PaymentObligation, PaymentReceipt, PaymentAdjustment, CommissionSettlement, SettlementAllocation
 
 
 def is_manual_order(order):
     return hasattr(order, 'payment_arrangement') and order.payment_arrangement.flow != 'platform_online'
+
+
+STORE_DELIVERY = 'store'
+GABOSHOP_DELIVERY = 'gaboshop'
+
+
+def store_delivers(order):
+    """Le commerce livre lui-même cette commande payée en ligne (option « tout au commerce »).
+
+    Les anciennes commandes, faites avant ce choix, suivent le réglage du commerce (« il livre lui-même »)."""
+    arrangement = getattr(order, 'payment_arrangement', None)
+    if arrangement is not None and arrangement.flow == 'platform_online':
+        if arrangement.delivery_method in (STORE_DELIVERY, GABOSHOP_DELIVERY):
+            return arrangement.delivery_method == STORE_DELIVERY
+    store = getattr(order, 'store', None)
+    return bool(getattr(store, 'offers_delivery', False))
 
 
 def _refresh_status(obligation):
@@ -46,8 +62,10 @@ def ensure_credit_limit(store, additional_commission=Decimal('0')):
 def create_arrangement(order, flow, method, delivery_method=None, user=None):
     if hasattr(order, 'payment_arrangement'):
         return order.payment_arrangement
-    policy, options = available_payment_options(order.store, order.delivery_requested)
-    if not any(x['flow'] == flow and x['method'] == method for x in options):
+    policy, options = available_payment_options(order.store, order.delivery_requested, b2b=getattr(order, 'is_b2b', False))
+    if flow == 'platform_online':
+        delivery_method = STORE_DELIVERY if delivery_method == STORE_DELIVERY else GABOSHOP_DELIVERY
+    if not matching_option(options, flow, method, delivery_method if flow == 'platform_online' else ''):
         raise ValidationError('Ce circuit ou moyen de paiement n’est pas autorisé pour ce commerce.')
     if flow != 'platform_online':
         ensure_credit_limit(order.store, order.commission_amount)
@@ -66,7 +84,9 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
     elif flow == 'courier_cash':
         specs = [('products', 'client', 'courier', order.items_total), ('delivery', 'client', 'courier', order.delivery_fee), ('courier_remittance', 'courier', 'store', order.items_total)]
     else:
-        specs = [('products', 'client', 'platform', order.items_total), ('delivery_collection', 'client', 'platform', order.delivery_fee), ('delivery', 'platform', 'courier', order.delivery_fee)]
+        # Paiement en ligne : Gaboshop encaisse tout, puis reverse la livraison au livreur, ou au commerce s'il livre.
+        delivery_payee = 'store' if delivery_method == STORE_DELIVERY else 'courier'
+        specs = [('products', 'client', 'platform', order.items_total), ('delivery_collection', 'client', 'platform', order.delivery_fee), ('delivery', 'platform', delivery_payee, order.delivery_fee)]
     for kind, payer, payee, amount in specs:
         if amount:
             PaymentObligation.objects.create(arrangement=arrangement, kind=kind, payer=payer, payee=payee, amount=amount, status='unpaid', requires_delivery_proof=(kind == 'delivery'))

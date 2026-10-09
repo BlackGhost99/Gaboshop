@@ -248,7 +248,7 @@ class B2BOrderCreateSerializer(serializers.Serializer):
 			})
 
 		from payments.configuration import available_payment_options
-		_, options = available_payment_options(wholesaler, True)
+		_, options = available_payment_options(wholesaler, True, b2b=True)
 		if not any(option['flow'] == attrs.get('payment_flow') and option['method'] == attrs.get('payment_method') for option in options):
 			raise serializers.ValidationError({'payment_method': 'Circuit ou moyen de paiement non autorisé pour ce grossiste.'})
 		

@@ -475,101 +475,92 @@ class PaymentService:
     @transaction.atomic
     def payout_delivery_agent(delivery):
         """
-        Payer le livreur via SingPay /transfer apres confirmation de livraison.
+        Verse au livreur sa part (SingPay /transfer) quand le client a confirmé la réception.
+
+        Le client a tout payé en une seule fois à Gaboshop (articles + livraison) ; la part du livreur
+        part de ce paiement. Idempotent : un versement déjà lancé ou terminé n'est jamais relancé.
+        Quand le versement ne peut pas partir (numéro Mobile Money pas encore activé, transferts
+        automatiques coupés), il reste « en attente » avec la raison, et le livreur est prévenu.
         """
-        try:
-            if delivery.status != 'delivered' or delivery.order.status in ('cancelled', 'refunded'):
-                return {'success': False, 'error': 'La livraison doit être livrée et non annulée'}
-            if delivery.order.store.offers_delivery:
-                # Le commerce gère sa livraison : la part livraison est incluse dans son versement.
-                return {
-                    'success': True,
-                    'skipped': True,
-                    'message': 'Livraison assurée par le commerce : rémunération incluse dans son versement',
-                    'transaction_id': None,
-                }
-            if not hasattr(delivery, 'proof'):
-                return {'success': False, 'error': 'Preuve de livraison requise'}
-            if not delivery.agent_commission or delivery.agent_commission <= 0:
-                logger.warning("Pas de commission pour livraison %s", delivery.id)
-                return {'success': False, 'error': 'Aucune commission a payer'}
+        from payments.direct_service import store_delivers
+        from payments.references import paid_reference
 
-            agent = delivery.delivery_agent
-            if not agent:
-                return {'success': False, 'error': 'Livreur non assigne'}
-            if not agent.phone:
-                return {'success': False, 'error': 'Livreur: numero de telephone manquant'}
+        order = delivery.order
+        if delivery.status != 'delivered' or order.status in ('cancelled', 'refunded'):
+            return {'success': False, 'error': 'La livraison doit être livrée et non annulée'}
+        if store_delivers(order):
+            # Le commerce gère sa livraison : la part livraison est incluse dans son versement.
+            return {'success': True, 'skipped': True, 'transaction_id': None,
+                    'message': 'Livraison assurée par le commerce : rémunération incluse dans son versement'}
+        paid = Payment.objects.filter(order=order, status__in=('success', 'completed')).first()
+        if paid is None:
+            return {'success': True, 'skipped': True, 'transaction_id': None,
+                    'message': 'Commande sans paiement en ligne : la livraison se règle directement.'}
+        agent = delivery.delivery_agent
+        if not agent:
+            return {'success': False, 'error': 'Livreur non assigne'}
+        amount = delivery.agent_commission or Decimal('0')
+        if amount <= 0:
+            logger.warning("Pas de commission pour livraison %s", delivery.id)
+            return {'success': False, 'error': 'Aucune commission a payer'}
 
-            disbursement_id = (agent.singpay_disbursement_id or '').strip()
-            if not disbursement_id:
-                return {'success': False, 'error': 'Livreur: disbursement SingPay manquant'}
-
-            existing = DeliveryPayout.objects.select_for_update().filter(
-                order=delivery.order, delivery_agent=agent
-            ).first()
-            if existing and existing.status in ('completed', 'processing'):
-                return {
-                    'success': True,
-                    'payment': existing,
-                    'amount': existing.calculated_payout,
-                    'phone': agent.phone,
-                    'transaction_id': None,
-                    'message': 'Paiement livreur déjà initié ou terminé',
-                    'already_processed': True,
-                }
-
-            payout, _ = DeliveryPayout.objects.get_or_create(
-                order=delivery.order,
-                delivery_agent=agent,
+        disbursement_id = (agent.singpay_disbursement_id or '').strip()
+        with transaction.atomic():
+            payout, created = DeliveryPayout.objects.select_for_update().get_or_create(
+                order=order, delivery_agent=agent,
                 defaults={
-                    'delivery_fee_from_client': delivery.delivery_fee,
-                    'distance_km': Decimal('0.00'),
-                    'price_per_km': Decimal('0.00'),
-                    'calculated_payout': delivery.agent_commission,
-                    'platform_profit': Decimal('0.00'),
-                    'status': 'pending',
-                }
+                    'delivery_fee_from_client': delivery.delivery_fee or Decimal('0'),
+                    'distance_km': Decimal('0.00'), 'price_per_km': Decimal('0.00'),
+                    'calculated_payout': amount, 'platform_profit': Decimal('0.00'), 'status': 'pending',
+                },
             )
+            if payout.status in ('completed', 'processing'):
+                return {'success': True, 'payment': payout, 'amount': payout.calculated_payout,
+                        'transaction_id': None, 'already_processed': True,
+                        'message': 'Paiement livreur déjà initié ou terminé'}
+            if not disbursement_id:
+                note = 'Numéro Mobile Money du livreur pas encore activé pour les versements'
+            elif not getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False):
+                note = 'Transferts automatiques désactivés : versement manuel'
+            else:
+                note = ''
+            if note:
+                changed = created or payout.note != note
+                payout.status, payout.note = 'pending', note
+                payout.save(update_fields=['status', 'note'])
+                if changed:
+                    transaction.on_commit(lambda: NotificationService.notify_delivery_payout(payout, delivery))
+                return {'success': False, 'pending': True, 'payment': payout, 'amount': amount,
+                        'transaction_id': None, 'message': note}
+            payout.status, payout.note = 'processing', ''
+            payout.save(update_fields=['status', 'note'])
 
+        # Appel fournisseur hors transaction : l'état « processing » bloque déjà un second versement.
+        try:
             api_result = PaymentService._call_airtel_payout_api(
-                amount=float(delivery.agent_commission),
-                delivery=delivery,
-                agent=agent,
-                disbursement_id=disbursement_id,
+                amount=float(amount), delivery=delivery, agent=agent,
+                disbursement_id=disbursement_id, reference=paid_reference(paid),
             )
-
-            payout.status = 'completed' if api_result.get('completed') else 'processing'
-            if payout.status == 'completed':
-                payout.paid_at = timezone.now()
-            payout.save(update_fields=['status', 'paid_at'])
-            # Expose transaction id to notification layer (non persisted here).
-            payout.transaction_id = api_result.get('transaction_id')
-
-            NotificationService.notify_delivery_agent_payment(
-                agent, delivery, payout, api_result.get('message', '')
-            )
-
-            return {
-                'success': True,
-                'payment': payout,
-                'amount': delivery.agent_commission,
-                'phone': agent.phone,
-                'transaction_id': api_result.get('transaction_id'),
-                'message': api_result.get('message', 'Payout SingPay initie')
-            }
+            payout.status, payout.note, payout.paid_at = 'completed', '', timezone.now()
+            payout.save(update_fields=['status', 'note', 'paid_at'])
+            NotificationService.notify_delivery_payout(payout, delivery)
+            return {'success': True, 'payment': payout, 'amount': amount, 'phone': agent.phone,
+                    'transaction_id': api_result.get('transaction_id'),
+                    'message': api_result.get('message', 'Payout SingPay initie')}
         except Exception as e:
             logger.error("Erreur payout livreur: %s", e)
+            payout.status, payout.note = 'failed', str(e)[:255]
+            payout.save(update_fields=['status', 'note'])
+            NotificationService.notify_delivery_payout(payout, delivery)
             return {'success': False, 'error': f'Erreur payout: {str(e)}'}
 
     @staticmethod
-    def _call_airtel_payout_api(amount, delivery, agent, disbursement_id):
+    def _call_airtel_payout_api(amount, delivery, agent, disbursement_id, reference=None):
         """
-        Appeler l'API SingPay pour un payout (paiement au livreur)
+        Appeler l'API SingPay pour un payout (paiement au livreur).
+        ``reference`` : référence marchande du paiement client réussi, d'où part le transfert.
         """
         try:
-            reference = None
-            if delivery and getattr(delivery, 'order', None) and getattr(delivery.order, 'payment', None):
-                reference = delivery.order.payment.transaction_id or None
             if not reference:
                 reference = f"PAYOUT_DLV_{delivery.id}_{int(timezone.now().timestamp())}"
 

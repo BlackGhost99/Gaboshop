@@ -421,6 +421,7 @@ class DeliveryDashboardView(APIView):
                     'last_name': user.last_name,
                     'email': user.email,
                     'phone': user.phone,
+                    'mobile_money_phone': profile.mobile_money_phone,
                     'profile_picture': request.build_absolute_uri(user.profile_picture.url) if user.profile_picture else None,
                 },
                 'status': {

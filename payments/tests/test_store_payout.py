@@ -158,7 +158,7 @@ class StorePayoutTests(TestCase):
     def test_independent_courier_flow_is_not_skipped_by_default(self):
         self.assertFalse(self.store.offers_delivery)
         order = self.make_order()
-        delivery = SimpleNamespace(status='delivered', order=order, agent_commission=Decimal('1200'))
+        delivery = SimpleNamespace(status='delivered', order=order, agent_commission=Decimal('1200'), delivery_agent=None)
         result = PaymentService.payout_delivery_agent(delivery)
         self.assertFalse(result.get('skipped', False))
 

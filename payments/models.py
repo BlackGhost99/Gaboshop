@@ -207,6 +207,7 @@ class DeliveryPayout(models.Model):
 	
 	# Statut
 	status = models.CharField(max_length=20, choices=PAYOUT_STATUS_CHOICES, default='pending')
+	note = models.CharField(max_length=255, blank=True, help_text="Pourquoi le versement attend ou a échoué")
 	
 	created_at = models.DateTimeField(auto_now_add=True)
 	paid_at = models.DateTimeField(null=True, blank=True)

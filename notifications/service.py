@@ -199,6 +199,25 @@ class NotificationService:
             return None
 
     @staticmethod
+    def notify_delivery_payout(payout, delivery):
+        """Gain du livreur : envoyé, en attente (et pourquoi) ou échoué."""
+        try:
+            message = messages.delivery_payout_message(payout, delivery)
+            if not message:
+                return None
+            note = NotificationService.notify_user(
+                payout.delivery_agent, message, notif_type='payment', delivery=delivery, order=payout.order,
+                metadata={'payout_id': payout.id, 'payout_status': payout.status,
+                          'amount': float(payout.calculated_payout)},
+            )
+            if payout.status == 'completed':
+                NotificationService._send_to_agent(payout.delivery_agent.phone, {'sms': message['sms']}, message['title'])
+            return note
+        except Exception as e:
+            logger.error(f"Erreur notification gain livreur: {e}")
+            return None
+
+    @staticmethod
     def notify_delivery_in_transit(delivery):
         """
         Notifier le client que sa livraison est en route

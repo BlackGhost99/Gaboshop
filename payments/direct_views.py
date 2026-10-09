@@ -37,7 +37,8 @@ class PaymentOptionsView(APIView):
     def get(self, request):
         store = get_object_or_404(Store, pk=request.query_params.get('store_id'))
         delivery = str(request.query_params.get('delivery_requested', 'true')).lower() != 'false'
-        policy, options = available_payment_options(store, delivery)
+        b2b = str(request.query_params.get('b2b', 'false')).lower() == 'true'
+        policy, options = available_payment_options(store, delivery, b2b=b2b)
         return Response({'success': True, 'data': {'policy': policy, 'options': options}})
 
 

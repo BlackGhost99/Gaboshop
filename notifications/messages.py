@@ -345,3 +345,41 @@ def store_payout_message(payout):
             next_step="Vérifiez votre numéro Mobile Money dans « Profil du commerce ». Gaboshop relancera le versement.",
         )
     return None
+
+
+# --- Versements au livreur ---------------------------------------------------------------
+
+def delivery_payout_message(payout, delivery):
+    order = payout.order
+    amount = money(payout.calculated_payout)
+    if payout.status == 'completed':
+        return _message(
+            f"Gain envoyé : {amount}",
+            f"Le client a confirmé la réception de la commande #{order.order_number}. Votre gain de {amount} "
+            "a été envoyé sur votre compte Mobile Money.",
+            level='success', next_step="Vérifiez le SMS de votre opérateur.",
+            sms=f"GABOSHOP - Gain de {amount} envoyé (commande #{order.order_number}).",
+        )
+    note = (payout.note or '').strip()
+    if payout.status == 'pending':
+        profile = getattr(payout.delivery_agent, 'livreur_profile', None)
+        has_number = bool(getattr(profile, 'mobile_money_phone', ''))
+        if 'activé' in note and not has_number:
+            next_step = "Ajoutez votre numéro Airtel Money ou Moov Money dans « Mon profil » : Gaboshop l'active puis vous verse vos gains."
+        elif 'activé' in note:
+            next_step = "Rien à faire : Gaboshop active votre numéro Mobile Money puis vous verse vos gains en attente."
+        else:
+            next_step = "Rien à faire : Gaboshop vous verse ce montant à la main."
+        return _message(
+            f"Gain en attente : {amount}",
+            f"Livraison de la commande #{order.order_number} confirmée. Votre gain de {amount} n'est pas encore envoyé.",
+            level='warning', reason=note or 'Versement pas encore lancé.', next_step=next_step,
+        )
+    if payout.status == 'failed':
+        return _message(
+            f"Envoi du gain échoué : {amount}",
+            f"L'envoi de votre gain pour la commande #{order.order_number} ({amount}) a échoué.",
+            level='error', reason=note or "L'opérateur a refusé le transfert.",
+            next_step="Vérifiez votre numéro Mobile Money dans « Mon profil ». Gaboshop relancera le versement.",
+        )
+    return None

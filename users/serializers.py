@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from stores.models import Store, StoreCategory
 from .models import User, UserProfile, GerantProfile, LivreurProfile
+from .mobile_money import normalize_mobile_money
 from .models import DeliveryAgentApiKey
 
 # Choices réutilisables pour les véhicules livreur
@@ -66,6 +67,8 @@ class RegisterSerializer(serializers.ModelSerializer):
     # Champs pour livreur
     vehicle_type = serializers.ChoiceField(choices=VEHICLE_CHOICES, write_only=True, required=False)
     vehicle_plate = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # Numéro où le livreur reçoit ses gains (obligatoire pour un livreur)
+    mobile_money_phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
     # GPS requis pour les livreurs
     # max_digits=18 permet jusqu'à 18 chiffres au total (ex: 180.123456789012345 = 18 chiffres)
     # decimal_places=15 permet jusqu'à 15 décimales pour la précision GPS
@@ -78,7 +81,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'phone', 'email', 'first_name', 'last_name', 'user_type',
             'password', 'password_confirm', 'address', 'city', 'zone',
             'store_name', 'store_category_id', 'store_phone', 'store_address', 'store_city', 'store_zone', 'store_min_order_amount',
-            'vehicle_type', 'vehicle_plate', 'position_lat', 'position_lng'
+            'vehicle_type', 'vehicle_plate', 'mobile_money_phone', 'position_lat', 'position_lng'
         ]
     
     def validate(self, attrs):
@@ -138,6 +141,14 @@ class RegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'vehicle_plate': _('Immatriculation du véhicule requise pour le livreur.')
                 })
+            if not (attrs.get('mobile_money_phone') or '').strip():
+                raise serializers.ValidationError({
+                    'mobile_money_phone': _('Numéro Mobile Money requis : vos gains de livraison y sont envoyés.')
+                })
+            try:
+                attrs['mobile_money_phone'] = normalize_mobile_money(attrs['mobile_money_phone'])
+            except ValueError as exc:
+                raise serializers.ValidationError({'mobile_money_phone': str(exc)})
             if not attrs.get('vehicle_type'):
                 attrs['vehicle_type'] = 'moto'
             # GPS activation required at signup for delivery agents
@@ -180,6 +191,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         }
         vehicle_type = validated_data.pop('vehicle_type', 'moto')
         vehicle_plate = validated_data.pop('vehicle_plate', '')
+        mobile_money_phone = validated_data.pop('mobile_money_phone', '')
 
         with transaction.atomic():
             # Créer l'utilisateur
@@ -241,6 +253,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                     defaults=dict(
                         type_vehicule=vehicle_type,
                         immatriculation=vehicle_plate,
+                        mobile_money_phone=mobile_money_phone,
                         disponible=True,
                         documents_verifies=False,
                         position_lat=validated_data.get('position_lat'),

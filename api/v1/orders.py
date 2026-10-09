@@ -2,6 +2,7 @@
 
 import logging
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -174,6 +175,14 @@ class OrderStatusUpdateView(APIView):
 			)
 			
 			if serializer.is_valid():
+				from payments.direct_service import store_delivers
+				if request.data.get('status') == 'in_transit' and order.status == 'ready' and not store_delivers(order):
+					return Response({'success': False, 'error': {
+						'code': 409,
+						'message': 'Un livreur Gaboshop doit d’abord prendre cette commande.',
+						'reason': 'Cette commande est livrée par un livreur Gaboshop, pas par le commerce.',
+						'next_step': 'Attendez qu’un livreur accepte la course : il passera la chercher.',
+					}}, status=status.HTTP_409_CONFLICT)
 				if request.data.get('status') == 'ready':
 					from payments.direct_service import can_dispatch
 					if not can_dispatch(order):
@@ -181,8 +190,8 @@ class OrderStatusUpdateView(APIView):
 				serializer.save()
 				order.refresh_from_db()
 
-				# Auto-assigner dès que le statut passe à "ready"
-				if order.status == 'ready':
+				# Auto-assigner dès que le statut passe à "ready" (sauf si le commerce livre lui-même)
+				if order.status == 'ready' and not getattr(getattr(order, 'payment_arrangement', None), 'delivery_method', '') == 'store':
 					try:
 						auto_assign_delivery(order)
 					except Exception as assign_err:
@@ -238,6 +247,20 @@ class ClientConfirmDeliveryView(APIView):
 			# Vérifier que c'est bien le client de cette commande
 			order = Order.objects.get(id=order_id, client=request.user)
 			
+			# Option « tout au commerce » : le commerce livre lui-même, sans livreur ni preuve Gaboshop.
+			# Le client confirme simplement la réception.
+			arrangement = getattr(order, 'payment_arrangement', None)
+			if arrangement is not None and arrangement.delivery_method == 'store' and order.status in ('ready', 'in_transit', 'delivered'):
+				if order.status != 'delivered':
+					order.status = 'delivered'
+					order.delivered_at = timezone.now()
+					order.save(update_fields=['status', 'delivered_at', 'updated_at'])
+				return Response({
+					'success': True,
+					'message': 'Réception confirmée. Merci !',
+					'data': {'order_id': order.id, 'client_received_status': True, 'already_confirmed': False},
+				})
+
 			# Vérifier le statut
 			if order.status != 'delivered':
 				return Response({
@@ -304,6 +327,12 @@ class ClientConfirmDeliveryView(APIView):
 			proof.client_received_status = True
 			proof.save()
 			proof.refresh_from_db()
+
+			# Le client confirme : le livreur reçoit sa part du paiement en ligne.
+			from payments.direct_service import is_manual_order
+			if not is_manual_order(order) and order.delivery.delivery_agent_id:
+				from payments.services import PaymentService
+				PaymentService.payout_delivery_agent(order.delivery)
 			
 			# Créer une notification pour le livreur
 			Notification.objects.create(

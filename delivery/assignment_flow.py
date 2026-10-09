@@ -30,7 +30,11 @@ def start_delivery_assignment(order):
     """Start or resume the auto-assignment flow for an order."""
     if not order or order.status not in ['ready', 'assigned']:
         return None
-    from payments.direct_service import can_dispatch
+    from payments.direct_service import can_dispatch, store_delivers
+    if store_delivers(order) and getattr(order, 'payment_arrangement', None) is not None \
+            and order.payment_arrangement.delivery_method == 'store':
+        # Option « tout au commerce » : le commerce livre lui-même, aucun livreur Gaboshop n'est appelé.
+        return None
     if not can_dispatch(order):
         logger.warning('Assignment blocked: required payment is not confirmed for order %s', order.pk)
         return None

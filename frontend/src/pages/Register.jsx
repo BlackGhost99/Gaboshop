@@ -26,6 +26,7 @@ const Register = () => {
     // Delivery
     vehicle_type: 'moto',
     vehicle_plate: '',
+    mobile_money_phone: '',
     position_lat: null,
     position_lng: null,
   });
@@ -100,6 +101,7 @@ const Register = () => {
       if (!isDelivery) {
         delete payload.vehicle_type;
         delete payload.vehicle_plate;
+        delete payload.mobile_money_phone;
         delete payload.position_lat;
         delete payload.position_lng;
       }
@@ -318,6 +320,19 @@ const Register = () => {
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                       required={isDelivery}
                     />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Numéro Mobile Money (Airtel ou Moov)</label>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="077 12 34 56"
+                      value={form.mobile_money_phone}
+                      onChange={(e) => updateField('mobile_money_phone', e.target.value)}
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                      required={isDelivery}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Vos gains sont envoyés sur ce numéro dès que le client confirme la réception.</p>
                   </div>
                 </div>
               </div>

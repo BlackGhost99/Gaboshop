@@ -51,9 +51,12 @@ const isStoreClosedMessage = (message) => {
 };
 
 // Explication sous le choix du paiement : elle suit l'option choisie.
-const paymentHint = (flow, method) => {
+const paymentHint = (flow, method, deliveryBy) => {
   if (flow === 'platform_online') {
-    return 'Paiement en ligne : après la commande, vous recevez une demande sur votre téléphone. Validez-la avec votre code secret Airtel Money ou Moov Money.';
+    const who = deliveryBy === 'store'
+      ? 'Le commerce vous livre lui-même et reçoit tout, livraison comprise.'
+      : 'Un livreur Gaboshop vous livre ; il est payé quand vous confirmez la réception.';
+    return `Paiement en ligne : après la commande, vous recevez une seule demande sur votre téléphone (articles + livraison). Validez-la avec votre code secret Airtel Money ou Moov Money. ${who}`;
   }
   if (method === 'cash') {
     if (flow === 'courier_cash') return 'Vous payez en espèces au livreur à la livraison.';
@@ -279,7 +282,7 @@ const ClientDashboard = () => {
         if (!active) return;
         setPaymentOptions((prev) => ({...prev, [storeName]: options}));
         if (options.length && !storeForms[storeName]?.payment_flow) {
-          setStoreForms((prev) => ({...prev, [storeName]: {...prev[storeName], payment_flow: options[0].flow, payment_method: options[0].method}}));
+          setStoreForms((prev) => ({...prev, [storeName]: {...prev[storeName], payment_flow: options[0].flow, payment_method: options[0].method, delivery_by: options[0].delivery_by || ''}}));
         }
       } catch (error) {
         if (active) setPaymentOptions((prev) => ({...prev, [storeName]: []}));
@@ -360,6 +363,7 @@ const ClientDashboard = () => {
         notes: prev[storeName]?.notes ?? '',
         payment_flow: prev[storeName]?.payment_flow ?? '',
         payment_method: prev[storeName]?.payment_method ?? '',
+        delivery_by: prev[storeName]?.delivery_by ?? '',
         delivery_requested: prev[storeName]?.delivery_requested ?? true,
         [field]: value,
       },
@@ -428,6 +432,7 @@ const ClientDashboard = () => {
       notes: form.notes || '',
       payment_flow,
       payment_method,
+      delivery_payment_method: payment_flow === 'platform_online' ? (form.delivery_by || 'gaboshop') : '',
       items: items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
     };
 
@@ -821,22 +826,25 @@ const ClientDashboard = () => {
                     />
                     <select
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
-                      value={`${storeForms[storeName]?.payment_flow || ''}|${storeForms[storeName]?.payment_method || ''}`}
+                      value={`${storeForms[storeName]?.payment_flow || ''}|${storeForms[storeName]?.payment_method || ''}|${storeForms[storeName]?.delivery_by || ''}`}
                       onChange={(e) => {
-                        const [flow, method] = e.target.value.split('|');
+                        const [flow, method, deliveryBy] = e.target.value.split('|');
                         handleChangeForm(storeName, 'payment_flow', flow);
                         handleChangeForm(storeName, 'payment_method', method);
+                        handleChangeForm(storeName, 'delivery_by', deliveryBy || '');
                       }}
                     >
-                      {!paymentOptions[storeName]?.length && <option value="|">Aucune option disponible</option>}
+                      {!paymentOptions[storeName]?.length && <option value="||">Aucune option disponible</option>}
                       {(paymentOptions[storeName] || []).map((option) => (
-                        <option key={`${option.flow}-${option.method}`} value={`${option.flow}|${option.method}`}>
-                          {option.label} — {METHOD_LABELS[option.method] || option.method}
+                        <option key={`${option.flow}-${option.method}-${option.delivery_by || ''}`} value={`${option.flow}|${option.method}|${option.delivery_by || ''}`}>
+                          {option.flow === 'platform_online' && option.delivery_by !== 'store'
+                            ? METHOD_LABELS[option.method] || option.method
+                            : `${option.label} — ${METHOD_LABELS[option.method] || option.method}`}
                         </option>
                       ))}
                     </select>
                     <div className="md:col-span-2 text-xs text-gray-500 -mt-1">
-                      {paymentHint(storeForms[storeName]?.payment_flow, storeForms[storeName]?.payment_method)}
+                      {paymentHint(storeForms[storeName]?.payment_flow, storeForms[storeName]?.payment_method, storeForms[storeName]?.delivery_by)}
                     </div>
                     <textarea
                       className="md:col-span-2 w-full border border-gray-200 rounded-md px-3 py-2"

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { notifyError, notifySuccess } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { getOrders, getOrderDetail } from '../../services/dashboardService';
@@ -32,6 +33,12 @@ const NEXT_STATUS = {
   paid: { label: 'Préparer', to: 'preparing' },
   confirmed: { label: 'Préparer', to: 'preparing' },
   preparing: { label: 'Prête', to: 'ready' },
+};
+
+const ADVANCE_DETAILS = {
+  preparing: 'Le client est prévenu que vous préparez sa commande.',
+  ready: 'Le client est prévenu ; un livreur Gaboshop va venir la chercher.',
+  in_transit: 'Le client est prévenu que vous arrivez. Il confirmera la réception dans son application.',
 };
 
 const StoreOrders = () => {
@@ -113,7 +120,11 @@ const StoreOrders = () => {
 
   const canCancel = (status) => !['delivered', 'cancelled', 'refunded'].includes(status);
 
-  const nextAction = (order) => NEXT_STATUS[order.status] || null;
+  // Option « tout au commerce » : le commerce livre lui-même, puis le client confirme la réception.
+  const nextAction = (order) => {
+    if (order.delivered_by_store && order.status === 'ready') return { label: 'Je pars livrer', to: 'in_transit' };
+    return NEXT_STATUS[order.status] || null;
+  };
 
   const handleAdvance = async (order) => {
     const action = nextAction(order);
@@ -124,15 +135,12 @@ const StoreOrders = () => {
       if (res.success) {
         fetchOrders();
         if (detail?.id === order.id) setDetail({ ...detail, status: action.to });
+        notifySuccess(`Commande #${order.order_number} : ${action.label.toLowerCase()}`, ADVANCE_DETAILS[action.to] || '');
       } else {
-        const detailErr = res.error?.details;
-        const msg = detailErr ? Object.values(detailErr).flat().join(' | ') : res.error?.message;
-        setError(msg || 'Action impossible');
+        notifyError(res, { action: action.label });
       }
     } catch (err) {
-      const detailErr = err?.error?.details || err?.details;
-      const msg = detailErr ? Object.values(detailErr).flat().join(' | ') : err?.error?.message || err?.message || err;
-      setError(`Erreur: ${msg}`);
+      notifyError(err, { action: action.label });
     } finally {
       setActionLoading((prev) => ({ ...prev, [order.id]: false }));
     }
