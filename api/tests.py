@@ -224,6 +224,20 @@ class CompanyAndAiSettingsTests(TestCase):
         self.assertEqual(bad.status_code, 400)
         self.assertEqual(set(bad.json()['error']['details']), {'support_email', 'support_phone'})
 
+    def test_legal_form_comes_from_the_list(self):
+        from api.models import SystemSettings
+        refused = self.api.patch('/api/v1/settings/', {'company_legal_form': 'Gaboshop SARL bidon'}, format='json')
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn('company_legal_form', refused.json()['error']['details'])
+        ok = self.api.patch('/api/v1/settings/', {'company_trade_name': 'Gaboshop', 'company_legal_form': 'Entreprise individuelle (EI)'}, format='json')
+        self.assertEqual(ok.status_code, 200, ok.content)
+        self.assertIn('Entreprise individuelle (EI)', ok.json()['data']['legal_forms'])
+        # Une ancienne valeur libre ne bloque pas l'enregistrement des autres réglages.
+        SystemSettings.objects.update(company_legal_form='Ancienne forme')
+        again = self.api.patch('/api/v1/settings/', {'company_legal_form': 'Ancienne forme', 'support_whatsapp': '+241 77 00 00 00'}, format='json')
+        self.assertEqual(again.status_code, 200, again.content)
+        self.assertNotIn('legal_forms', APIClient().get('/api/v1/settings/').json()['data'])
+
     def test_ai_provider_must_have_a_key(self):
         with mock.patch('api.v1.ai.providers.AIProvider.configured_providers', return_value=['groq']):
             refused = self.api.patch('/api/v1/settings/', {'ai_provider': 'openai'}, format='json')

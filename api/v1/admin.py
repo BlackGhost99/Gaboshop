@@ -952,8 +952,9 @@ class SystemSettingsView(APIView):
         'enable_whatsapp': ('bool', None, None),
         'enable_sms': ('bool', None, None),
         'enable_email': ('bool', None, None),
+        'company_trade_name': ('text_optional', None, 150),
         'company_name': ('text_optional', None, 150),
-        'company_legal_form': ('text_optional', None, 100),
+        'company_legal_form': ('legal_form', None, None),
         'company_rccm': ('text_optional', None, 100),
         'company_nif': ('text_optional', None, 100),
         'company_address': ('text_optional', None, 255),
@@ -1009,6 +1010,7 @@ class SystemSettingsView(APIView):
         data = self._serialize(SystemSettings.get_settings())
         if IsPlatformAdmin().has_permission(request, self):
             data['technical_status'] = self._technical_status()
+            data['legal_forms'] = list(SystemSettings.LEGAL_FORMS)
         return Response({"success": True, "data": data})
 
     def _clean(self, name, raw):
@@ -1035,6 +1037,12 @@ class SystemSettingsView(APIView):
                 raise ValueError('heure au format HH:MM attendue')
         if kind == 'text_optional':
             return str(raw or '').strip()[:hi]
+        if kind == 'legal_form':
+            text = str(raw or '').strip()
+            # Une ancienne valeur libre reste acceptée tant qu'on ne la change pas.
+            if text and text not in SystemSettings.LEGAL_FORMS and text != SystemSettings.current('company_legal_form', ''):
+                raise ValueError('forme juridique inconnue')
+            return text
         if kind == 'email':
             text = str(raw or '').strip()
             if text and not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', text):

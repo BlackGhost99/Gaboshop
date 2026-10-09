@@ -38,7 +38,7 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             'fields': ('enable_whatsapp', 'enable_sms', 'enable_email'),
         }),
         ('Entreprise et support', {
-            'fields': ('company_name', 'company_legal_form', 'company_rccm', 'company_nif', 'company_address', 'company_city',
+            'fields': ('company_trade_name', 'company_name', 'company_legal_form', 'company_rccm', 'company_nif', 'company_address', 'company_city',
                        'publication_director', 'support_email', 'support_phone', 'support_whatsapp'),
         }),
         ('Assistant IA', {

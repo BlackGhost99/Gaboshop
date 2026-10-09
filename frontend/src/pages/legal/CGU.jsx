@@ -14,8 +14,7 @@ export default function CGU() {
     >
       <Section title="1. Qui fait quoi ?">
         <p>
-          {COMPANY.brand} est exploité par {COMPANY.name} ({COMPANY.legalForm}), dont le siège est situé {COMPANY.address},{' '}
-          {COMPANY.city}. Voir les <Link to="/mentions-legales" className={linkClass}>mentions légales</Link>.
+          Le service est exploité par {COMPANY.operator}. Voir les <Link to="/mentions-legales" className={linkClass}>mentions légales</Link>.
         </p>
         <List
           items={[
@@ -107,7 +106,7 @@ export default function CGU() {
           conforme) rapidement, de préférence dès la livraison.
         </p>
         <p>
-          En cas de désaccord, le client ou le commerce peut contacter {COMPANY.brand} à {COMPANY.email}.{' '}
+          En cas de désaccord, le client ou le commerce peut contacter {COMPANY.brand} à {COMPANY.contact}.{' '}
           {COMPANY.brand} joue alors un rôle de médiateur pour trouver une solution amiable, sans être tenu de rembourser
           à la place du commerce.
         </p>
@@ -206,7 +205,7 @@ export default function CGU() {
           d'abord une solution amiable. À défaut, les <strong>tribunaux compétents de Libreville</strong> seront saisis.
         </p>
         <p>
-          Contact : {COMPANY.email} · {COMPANY.phone}
+          Contact : {[COMPANY.email, COMPANY.phone].filter(Boolean).join(' · ') || COMPANY.contact}
         </p>
       </Section>
     </LegalLayout>

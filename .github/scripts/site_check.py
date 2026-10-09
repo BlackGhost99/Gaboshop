@@ -36,6 +36,7 @@ MARKERS = {
     'Réglages admin, étape 1 (9 oct.)': 'Villes où Gaboshop est ouvert',
     'Livraison : tarifs et onglets admin (9 oct.)': 'Comment le prix est calculé',
     'Réglages : entreprise, support et IA (9 oct.)': 'Consignes pour l’assistant',
+    'Entreprise : nom commercial et forme juridique (9 oct.)': 'Nom / identité juridique',
 }
 
 

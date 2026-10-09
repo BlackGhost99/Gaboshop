@@ -14,8 +14,8 @@ export default function Confidentialite() {
     >
       <Section title="1. Responsable du traitement et cadre légal">
         <p>
-          Le responsable du traitement est {COMPANY.name} ({COMPANY.legalForm}), {COMPANY.address}, {COMPANY.city}.
-          Contact : {COMPANY.email}.
+          Le responsable du traitement est {COMPANY.operator}.
+          Contact : {COMPANY.contact}.
         </p>
         <p>
           Nous traitons vos données conformément à la <strong>loi n°001/2011 du 25 septembre 2011 relative à la protection
@@ -132,7 +132,7 @@ export default function Confidentialite() {
           ]}
         />
         <p>
-          Pour exercer ces droits, écrivez à <strong>{COMPANY.email}</strong> en indiquant le numéro de téléphone de votre
+          Pour exercer ces droits, écrivez à <strong>{COMPANY.contact}</strong> en indiquant le numéro de téléphone de votre
           compte. Nous pouvons vous demander de prouver votre identité. Nous répondons dans un délai d'un mois au plus.
           Si vous n'êtes pas satisfait de notre réponse, vous pouvez saisir la CNPDCP.
         </p>

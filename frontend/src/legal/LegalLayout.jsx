@@ -82,7 +82,7 @@ export default function LegalLayout({ title, intro, children }) {
             ))}
           </ul>
           <p className="mt-4 text-xs text-gray-500">
-            © {new Date().getFullYear()} {COMPANY.brand} · {COMPANY.city} · Contact : {COMPANY.email}
+            © {new Date().getFullYear()} {COMPANY.brand} · {COMPANY.city} · Contact : {COMPANY.contact}
           </p>
         </nav>
       </main>

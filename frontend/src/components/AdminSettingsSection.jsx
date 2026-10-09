@@ -31,11 +31,12 @@ function NumberField({ label, help, value, onChange, min, max, step = 1, suffix 
   );
 }
 
-function TextField({ label, value, onChange, type = 'text', placeholder }) {
+function TextField({ label, value, onChange, type = 'text', placeholder, help }) {
   return (
     <label className="block text-sm font-medium text-gray-700">
       {label}
       <input type={type} className={inputClass} value={value || ''} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      {help && <span className="mt-1 block text-xs font-normal text-gray-500">{help}</span>}
     </label>
   );
 }
@@ -135,11 +136,13 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
 
   const set = (key) => (value) => setForm((prev) => ({ ...prev, [key]: value }));
   const status = form.technical_status;
+  const legalForms = [...(form.legal_forms || [])];
+  if (form.company_legal_form && !legalForms.includes(form.company_legal_form)) legalForms.push(form.company_legal_form);
 
   const save = async () => {
     setSaving(true);
     try {
-      const { technical_status: _ignored, ...payload } = form;
+      const { technical_status: _ignored, legal_forms: _forms, ...payload } = form;
       const res = await updateSystemSettings(payload);
       if (res?.success) {
         setSaved(res.data);
@@ -266,16 +269,32 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
 
       <Card title="Entreprise et support" description="Affiché dans le pied de page et les pages légales (CGU, mentions légales, confidentialité).">
         <div className="grid gap-4 md:grid-cols-2">
-          <TextField label="Raison sociale" value={form.company_name} onChange={set('company_name')} />
-          <TextField label="Forme juridique" placeholder="SARL, SA…" value={form.company_legal_form} onChange={set('company_legal_form')} />
-          <TextField label="Numéro RCCM" value={form.company_rccm} onChange={set('company_rccm')} />
-          <TextField label="NIF" value={form.company_nif} onChange={set('company_nif')} />
-          <TextField label="Adresse du siège" value={form.company_address} onChange={set('company_address')} />
+          <TextField label="Nom commercial" placeholder="Gaboshop" value={form.company_trade_name} onChange={set('company_trade_name')}
+            help="Le nom affiché partout dans l’app et sur le site." />
+          <TextField label="Nom / identité juridique" value={form.company_name} onChange={set('company_name')}
+            help="Exactement comme sur le document d’immatriculation. Pour une entreprise individuelle : le nom du titulaire." />
+          <label className="block text-sm font-medium text-gray-700">
+            Forme juridique
+            <select className={inputClass} value={form.company_legal_form || ''} onChange={(e) => set('company_legal_form')(e.target.value)}>
+              <option value="">Pas encore choisie</option>
+              {legalForms.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-gray-500">Celle déposée au GNI. Ne mettez pas SARL ou SAS en attendant.</span>
+          </label>
+          <TextField label="Numéro RCCM" placeholder="GA-LBV-…" value={form.company_rccm} onChange={set('company_rccm')}
+            help="Vide tant que l’entreprise n’est pas immatriculée : le site affiche alors « Entreprise en cours de formalisation au Gabon »." />
+          <TextField label="NIF" value={form.company_nif} onChange={set('company_nif')}
+            help="Vide tant que le numéro fiscal officiel n’est pas attribué. Il n’est pas affiché s’il est vide." />
+          <TextField label="Adresse du siège" value={form.company_address} onChange={set('company_address')}
+            help="L’adresse physique déclarée officiellement pour l’entreprise." />
           <TextField label="Ville" value={form.company_city} onChange={set('company_city')} />
-          <TextField label="Directeur de la publication" value={form.publication_director} onChange={set('publication_director')} />
-          <TextField label="E-mail du support" type="email" value={form.support_email} onChange={set('support_email')} />
+          <TextField label="Directeur de la publication" value={form.publication_director} onChange={set('publication_director')}
+            help="Le nom complet de la personne légalement responsable du site. Pour une entreprise individuelle, en général le titulaire." />
+          <TextField label="E-mail du support" type="email" value={form.support_email} onChange={set('support_email')}
+            help="Uniquement une boîte qui existe et reçoit vraiment les mails." />
           <TextField label="Téléphone du support" type="tel" placeholder="+241 77 12 34 56" value={form.support_phone} onChange={set('support_phone')} />
-          <TextField label="WhatsApp du support" type="tel" placeholder="+241 77 12 34 56" value={form.support_whatsapp} onChange={set('support_whatsapp')} />
+          <TextField label="WhatsApp du support" type="tel" placeholder="+241 77 12 34 56" value={form.support_whatsapp} onChange={set('support_whatsapp')}
+            help="Peut être le même numéro que le téléphone." />
         </div>
       </Card>
 

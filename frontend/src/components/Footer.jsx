@@ -176,13 +176,13 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-gray-400">
-          <p>&copy; {year} GABOSHOP. Tous droits réservés.</p>
+          <p>&copy; {year} {company.brand}. Tous droits réservés.{company.status && <span className="block text-xs text-gray-500">{company.status}</span>}</p>
           <div className="flex gap-4 mt-4 md:mt-0">
             <span>🇬🇦 Libreville, Gabon</span>
             <span>•</span>
-            {company.phone && !company.phone.startsWith('[') && (<><a href={`tel:${company.phone.replace(/\s/g, '')}`} className="hover:text-white">{company.phone}</a><span>•</span></>)}
+            {company.phone && (<><a href={`tel:${company.phone.replace(/\s/g, '')}`} className="hover:text-white">{company.phone}</a><span>•</span></>)}
             {company.whatsapp && (<><a href={`https://wa.me/${company.whatsapp.replace(/\D/g, '')}`} className="hover:text-white">WhatsApp</a><span>•</span></>)}
-            {!company.email.startsWith('[') && <a href={`mailto:${company.email}`} className="hover:text-white">{company.email}</a>}
+            {company.email && <a href={`mailto:${company.email}`} className="hover:text-white">{company.email}</a>}
           </div>
         </div>
 

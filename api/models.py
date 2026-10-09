@@ -199,10 +199,24 @@ class SystemSettings(models.Model):
     )
     
     # === 8. ENTREPRISE ET SUPPORT (pages légales, pied de page) ===
-    company_name = models.CharField(max_length=150, blank=True, help_text="Raison sociale")
-    company_legal_form = models.CharField(max_length=100, blank=True, help_text="Forme juridique (SARL, SA…)")
-    company_rccm = models.CharField(max_length=100, blank=True, help_text="Numéro RCCM")
-    company_nif = models.CharField(max_length=100, blank=True, help_text="NIF")
+    LEGAL_FORMS = (
+        "Entreprise individuelle (EI)",
+        "SARL",
+        "SARL unipersonnelle (SARLU)",
+        "SAS",
+        "SAS unipersonnelle (SASU)",
+        "SA",
+        "Société en nom collectif (SNC)",
+        "Groupement d'intérêt économique (GIE)",
+    )
+    company_trade_name = models.CharField(max_length=150, default="Gaboshop", help_text="Nom commercial (affiché partout)")
+    company_name = models.CharField(
+        max_length=150, blank=True,
+        help_text="Nom / identité juridique, exactement comme sur le document d'immatriculation",
+    )
+    company_legal_form = models.CharField(max_length=100, blank=True, help_text="Forme juridique déposée au GNI")
+    company_rccm = models.CharField(max_length=100, blank=True, help_text="Numéro RCCM (vide tant que non immatriculée)")
+    company_nif = models.CharField(max_length=100, blank=True, help_text="NIF (vide tant qu'il n'est pas attribué)")
     company_address = models.CharField(max_length=255, blank=True, help_text="Adresse du siège")
     company_city = models.CharField(max_length=100, default="Libreville, Gabon", help_text="Ville du siège")
     publication_director = models.CharField(max_length=150, blank=True, help_text="Directeur de la publication")

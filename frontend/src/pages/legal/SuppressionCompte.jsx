@@ -24,7 +24,7 @@ export default function SuppressionCompte() {
         <p>Si l'option n'apparaît pas dans votre application, ou si vous n'avez plus accès à votre compte :</p>
         <List
           items={[
-            <>envoyez un e-mail à <strong>{COMPANY.email}</strong>, de préférence depuis l'adresse e-mail liée à votre compte ;</>,
+            <>envoyez un e-mail à <strong>{COMPANY.contact}</strong>, de préférence depuis l'adresse e-mail liée à votre compte ;</>,
             "objet : « Suppression de compte » ;",
             "indiquez le numéro de téléphone de votre compte et votre nom ;",
             "nous pouvons vous contacter sur ce numéro pour confirmer que la demande vient bien de vous.",

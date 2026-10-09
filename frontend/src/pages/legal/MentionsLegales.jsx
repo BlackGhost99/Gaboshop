@@ -13,15 +13,18 @@ export default function MentionsLegales() {
         <p>Le site et l'application {COMPANY.brand} sont édités par :</p>
         <List
           items={[
-            <>Raison sociale : <strong>{COMPANY.name}</strong></>,
-            <>Forme juridique : {COMPANY.legalForm}</>,
-            <>RCCM : {COMPANY.rccm}</>,
-            <>NIF : {COMPANY.nif}</>,
-            <>Siège social : {COMPANY.address}, {COMPANY.city}</>,
-            <>Directeur de la publication : {COMPANY.publicationDirector}</>,
-            <>E-mail : {COMPANY.email}</>,
-            <>Téléphone : {COMPANY.phone}</>,
-          ]}
+            <>Nom commercial : <strong>{COMPANY.brand}</strong></>,
+            COMPANY.status && <>{COMPANY.status}</>,
+            COMPANY.name && <>Nom / identité juridique : {COMPANY.name}</>,
+            COMPANY.legalForm && <>Forme juridique : {COMPANY.legalForm}</>,
+            COMPANY.rccm && <>RCCM : {COMPANY.rccm}</>,
+            COMPANY.nif && <>NIF : {COMPANY.nif}</>,
+            <>Siège : {[COMPANY.address, COMPANY.city].filter(Boolean).join(', ')}</>,
+            COMPANY.publicationDirector && <>Directeur de la publication : {COMPANY.publicationDirector}</>,
+            COMPANY.email && <>E-mail : {COMPANY.contact}</>,
+            COMPANY.phone && <>Téléphone : {COMPANY.phone}</>,
+            COMPANY.whatsapp && <>WhatsApp : {COMPANY.whatsapp}</>,
+          ].filter(Boolean)}
         />
       </Section>
 
@@ -43,7 +46,7 @@ export default function MentionsLegales() {
       <Section title="3. Propriété intellectuelle">
         <p>
           Le nom {COMPANY.brand}, le logo, le design, les textes et le code de l'application sont la propriété de{' '}
-          {COMPANY.name} ou de ses partenaires. Toute reproduction ou utilisation sans autorisation écrite est interdite.
+          {COMPANY.name || COMPANY.brand} ou de ses partenaires. Toute reproduction ou utilisation sans autorisation écrite est interdite.
         </p>
         <p>
           Les photos, descriptions et marques des produits publiés par les commerces restent la propriété de ces commerces
@@ -54,7 +57,7 @@ export default function MentionsLegales() {
 
       <Section title="4. Contact et informations complémentaires">
         <p>
-          Pour toute question ou pour signaler un contenu illicite : {COMPANY.email}.
+          Pour toute question ou pour signaler un contenu illicite : {COMPANY.contact}.
         </p>
         <p>
           Voir aussi les <Link to="/cgu" className={linkClass}>conditions générales</Link> et la{' '}
