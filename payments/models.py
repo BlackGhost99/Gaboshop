@@ -271,14 +271,20 @@ class SubscriptionPlan(models.Model):
 	)
 	
 	# PRODUITS NON-ALIMENTAIRES
+	max_products_food = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text="Limite de produits alimentaires (null = illimité). Le non alimentaire n'est limité que par max_products."
+	)
+	# Anciens réglages conservés pour l'historique : ils ne bloquent plus rien.
 	can_sell_non_food_products = models.BooleanField(
 		default=True,
-		help_text="Autorise la vente de produits non alimentaires"
+		help_text="Ancien réglage, plus appliqué"
 	)
 	max_products_non_food = models.IntegerField(
 		null=True,
 		blank=True,
-		help_text="Limite de produits non alimentaires (null = illimité si can_sell_non_food_products=True)"
+		help_text="Ancien réglage, plus appliqué"
 	)
 	
 	# LIVRAISON
@@ -422,6 +428,8 @@ class SubscriptionPlan(models.Model):
 				key = 'produits'
 				if 'non' in normalized and 'aliment' in normalized:
 					key = 'produits_non_food'
+				elif 'aliment' in normalized:
+					key = 'produits_food'
 				if match:
 					return f"{key}:{match.group(0)}"
 			if 'commande' in normalized and match:
@@ -442,6 +450,8 @@ class SubscriptionPlan(models.Model):
 			features.append(f"Jusqu'à {self.max_products} produits")
 		else:
 			features.append("Produits illimités")
+		if self.max_products_food is not None:
+			features.append(f"Dont {self.max_products_food} produits alimentaires au plus")
 		if self.max_orders_per_month:
 			features.append(f"Jusqu'à {self.max_orders_per_month} commandes/mois")
 		else:
@@ -470,6 +480,9 @@ class SubscriptionPlan(models.Model):
 			if is_service_fee(item):
 				continue
 			key = feature_key(item)
+			# La limite « non alimentaire » n'existe plus : on ne l'affiche plus.
+			if key.startswith('produits_non_food'):
+				continue
 			if not key or key in seen:
 				continue
 			seen.add(key)

@@ -27,8 +27,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     // Limites
     max_products: null,
     max_orders_per_month: null,
-    can_sell_non_food_products: true,
-    max_products_non_food: 5,
+    max_products_food: null,
     
     // Quotas B2B
     max_b2b_suppliers: null,
@@ -93,8 +92,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         is_active: true,
         max_products: null,
         max_orders_per_month: null,
-        can_sell_non_food_products: true,
-        max_products_non_food: 5,
+        max_products_food: null,
         max_b2b_suppliers: null,
         max_b2b_monthly_orders: null,
         commission_reduction_percent: 0,
@@ -329,28 +327,20 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Max produits alimentaires (vide = illimité)</label>
               <input
-                type="checkbox"
-                id="can_sell_non_food"
-                checked={formData.can_sell_non_food_products}
-                onChange={(e) => updateField('can_sell_non_food_products', e.target.checked)}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                type="number"
+                min="0"
+                value={formData.max_products_food ?? ''}
+                onChange={(e) => updateField('max_products_food', e.target.value !== '' ? parseInt(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="Illimité"
               />
-              <label htmlFor="can_sell_non_food" className="text-sm text-gray-700">Peut vendre des produits non alimentaires</label>
+              <p className="text-xs text-gray-500 mt-1">
+                Le non alimentaire n'est limité que par « Max produits ». Les catégories alimentaires se règlent dans Paramètres (mots « alimentaire »).
+              </p>
             </div>
-            {formData.can_sell_non_food_products && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Max produits non alimentaires</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.max_products_non_food || ''}
-                  onChange={(e) => updateField('max_products_non_food', e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            )}
           </div>
         )}
 

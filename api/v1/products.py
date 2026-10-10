@@ -207,7 +207,7 @@ class ProductCreateView(APIView):
         if serializer.is_valid():
             try:
                 from payments.subscription_check import SubscriptionChecker
-                SubscriptionChecker.check_can_add_non_food_product(
+                SubscriptionChecker.check_can_add_food_product(
                     store,
                     serializer.validated_data.get('category')
                 )
@@ -266,7 +266,7 @@ class ProductUpdateView(APIView):
             try:
                 from payments.subscription_check import SubscriptionChecker
                 new_category = serializer.validated_data.get('category', product.category)
-                SubscriptionChecker.check_can_add_non_food_product(
+                SubscriptionChecker.check_can_add_food_product(
                     product.store,
                     new_category,
                     exclude_product_id=product.id

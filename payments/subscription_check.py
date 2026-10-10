@@ -150,60 +150,68 @@ class SubscriptionChecker:
         return text
 
     @staticmethod
-    def _is_food_category(category):
-        if not category:
-            return False
-        store_category = getattr(category, 'store_category', None)
-        combined = f"{getattr(category, 'name', '')} {getattr(store_category, 'name', '')}"
-        normalized = SubscriptionChecker._normalize_text(combined)
-        food_keywords = [
-            'aliment', 'boisson', 'epicer', 'fruit', 'legume',
-            'viande', 'poisson', 'boulanger', 'patisser',
-            'charcut', 'lait'
+    def _food_keywords():
+        """Mots « alimentaire » réglés dans l'admin (mêmes que pour les commissions)."""
+        from api.models import SystemSettings
+        try:
+            raw = SystemSettings.current('food_category_keywords', 'ALIMENTATION,BOISSONS')
+        except Exception:
+            raw = 'ALIMENTATION,BOISSONS'
+        return [
+            SubscriptionChecker._normalize_text(k) for k in (raw or '').split(',') if k.strip()
         ]
-        return any(keyword in normalized for keyword in food_keywords)
 
     @staticmethod
-    def check_can_add_non_food_product(store, category=None, exclude_product_id=None):
+    def _is_food_category(category, keywords=None):
         """
-        Limite le nombre de produits non alimentaires pour les plans B2C.
+        Un produit est alimentaire quand la catégorie de commerce de sa catégorie
+        contient un des mots réglés dans l'admin. Même règle que la commission.
+        """
+        store_category = getattr(category, 'store_category', None) if category else None
+        if not store_category:
+            return False
+        if keywords is None:
+            keywords = SubscriptionChecker._food_keywords()
+        name = SubscriptionChecker._normalize_text(getattr(store_category, 'name', ''))
+        return any(k and k in name for k in keywords)
+
+    @staticmethod
+    def check_can_add_food_product(store, category=None, exclude_product_id=None):
+        """
+        Limite le nombre de produits alimentaires selon le forfait (max_products_food).
+        Le non alimentaire n'est jamais bloqué ici : seul max_products le limite.
+        Un commerce déjà au-dessus garde ses produits mais ne peut plus en ajouter.
         """
         plan = SubscriptionChecker.get_current_plan(store)
-
         if not plan:
-            raise PermissionDenied("Aucun forfait trouvÇ¸. Veuillez vous abonner.")
+            raise PermissionDenied("Aucun forfait trouvé. Veuillez vous abonner.")
 
-        from b2b.models import B2BSubscriptionPlan
-        if isinstance(plan, B2BSubscriptionPlan):
+        max_food = getattr(plan, 'max_products_food', None)
+        if max_food is None:
             return
 
-        if not getattr(plan, 'can_sell_non_food_products', True):
-            raise PermissionDenied(
-                f"La vente de produits non alimentaires n'est pas autorisÇ¸e avec votre forfait {plan.name}."
-            )
-
-        max_non_food = getattr(plan, 'max_products_non_food', None)
-        if max_non_food is None:
+        keywords = SubscriptionChecker._food_keywords()
+        if not SubscriptionChecker._is_food_category(category, keywords):
             return
 
-        if SubscriptionChecker._is_food_category(category):
-            return
-
-        products_qs = store.products.select_related('category', 'category__store_category')
+        products_qs = store.products.select_related('category__store_category')
         if exclude_product_id:
             products_qs = products_qs.exclude(id=exclude_product_id)
+        food_count = sum(
+            1 for product in products_qs
+            if SubscriptionChecker._is_food_category(product.category, keywords)
+        )
 
-        non_food_count = 0
-        for product in products_qs:
-            if not SubscriptionChecker._is_food_category(product.category):
-                non_food_count += 1
-
-        if non_food_count >= max_non_food:
+        if food_count >= max_food:
             raise PermissionDenied(
-                f"Votre forfait {plan.name} ne permet que {max_non_food} produits non-alimentaires. "
-                f"Vous en avez dÇ¸jÇÿ {non_food_count}. "
-                f"Passez Çÿ un forfait supÇ¸rieur pour ajouter plus de produits."
+                f"Votre forfait {plan.name} permet {max_food} produits alimentaires. "
+                f"Vous en avez déjà {food_count}. "
+                f"Les produits non alimentaires restent possibles, "
+                f"ou passez à un forfait supérieur pour ajouter plus d'alimentaire."
             )
+
+    # Ancien nom, gardé pour les appels existants.
+    check_can_add_non_food_product = check_can_add_food_product
 
     @staticmethod
     def check_can_access_statistics(store):

@@ -1209,7 +1209,7 @@ def ai_assistant_confirm(request):
         cat = ProductCategory.objects.filter(id=f.get('category')).first() if f.get('category') else None
         try:
             SubscriptionChecker.check_can_add_product(store)
-            SubscriptionChecker.check_can_add_non_food_product(store, cat)
+            SubscriptionChecker.check_can_add_food_product(store, cat)
         except PermissionDenied as exc:
             return Response({'success': False, 'error': {'message': str(exc)}}, status=status.HTTP_403_FORBIDDEN)
         used_key = 'ai_confirm_used:' + hashlib.sha256(str(request.data.get('token')).encode()).hexdigest()

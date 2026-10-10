@@ -353,8 +353,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 			'fields': (
 				'max_products',
 				'max_orders_per_month',
-				'can_sell_non_food_products',
-				'max_products_non_food',
+				'max_products_food',
 			)
 		}),
 		('Quotas B2B', {

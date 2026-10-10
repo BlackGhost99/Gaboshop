@@ -192,7 +192,7 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
         <label className="block text-sm font-medium text-gray-700">
           Catégories comptées comme alimentaires
           <input className={inputClass} value={form.food_category_keywords || ''} onChange={(e) => set('food_category_keywords')(e.target.value)} />
-          <span className="mt-1 block text-xs font-normal text-gray-500">Mots séparés par des virgules, cherchés dans le nom de la catégorie du commerce.</span>
+          <span className="mt-1 block text-xs font-normal text-gray-500">Mots séparés par des virgules, cherchés dans le nom de la catégorie du commerce. Sert aussi à la limite de produits alimentaires des forfaits.</span>
         </label>
       </Card>
 
