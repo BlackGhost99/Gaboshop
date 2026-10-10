@@ -1532,3 +1532,48 @@ class DeliveryZonesListView(ListAPIView):
 			queryset = queryset.filter(is_active=False)
 		
 		return queryset.order_by('city', 'name')
+
+
+class DeliveryProofPhotoView(APIView):
+	"""Photo de preuve d'une livraison, servie seulement à l'admin, au livreur de la course et au client.
+
+	Les photos (dont la pièce d'identité du client) ne sont jamais accessibles par un lien public."""
+	permission_classes = [permissions.IsAuthenticated]
+	FIELDS = {'id_card': 'id_card_photo', 'package': 'package_photo', 'signature': 'signature'}
+
+	def get(self, request, delivery_id, kind):
+		from django.http import Http404, HttpResponse
+		delivery = Delivery.objects.select_related('order').filter(id=delivery_id).first()
+		if delivery is None:
+			raise Http404
+		user = request.user
+		is_admin = user.is_staff or user.user_type == 'admin'
+		if not (is_admin or delivery.delivery_agent_id == user.id or delivery.order.client_id == user.id):
+			return Response({'success': False, 'error': {'code': 403, 'message': "Cette photo n'est visible que par l'admin, le livreur et le client de la commande."}}, status=status.HTTP_403_FORBIDDEN)
+		if kind == 'photo':
+			image = delivery.delivery_proof_photo
+		elif kind in self.FIELDS:
+			proof = getattr(delivery, 'proof', None) if hasattr(delivery, 'proof') else None
+			image = getattr(proof, self.FIELDS[kind], None) if proof else None
+		else:
+			raise Http404
+		if not image:
+			raise Http404
+		try:
+			with image.open('rb') as handle:
+				data = handle.read()
+		except Exception:
+			raise Http404
+		import mimetypes
+		content_type = mimetypes.guess_type(image.name)[0] or 'application/octet-stream'
+		if content_type not in ('image/jpeg', 'image/png', 'image/webp', 'image/gif'):
+			content_type = 'application/octet-stream'
+		response = HttpResponse(data, content_type=content_type)
+		response['Cache-Control'] = 'private, no-store'
+		response['X-Content-Type-Options'] = 'nosniff'
+		response['Content-Security-Policy'] = "default-src 'none'; sandbox"
+		AuditLog.log_action(
+			action_type='delivery_proof_viewed', user=user, object_type='delivery', object_id=delivery.id,
+			new_value=kind, ip_address=request.META.get('REMOTE_ADDR'), user_agent=request.META.get('HTTP_USER_AGENT', ''),
+		)
+		return response

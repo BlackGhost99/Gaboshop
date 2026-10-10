@@ -77,3 +77,42 @@ class DatabaseStorage(Storage):
 
     def url(self, name):
         return f"{settings.MEDIA_URL}{name}"
+
+
+PRIVATE_PREFIXES = ('delivery_proofs/', 'delivery_signatures/', 'private/')
+
+
+def private_storage():
+    """Stockage des fichiers sensibles (photos de preuve, pièces d'identité).
+
+    Jamais dans le bucket public ni sous /media/ : en production ils restent dans la base,
+    en local dans media/private/. On les lit seulement via une vue qui vérifie qui demande.
+    """
+    if getattr(settings, 'MEDIA_IN_DATABASE', False) or getattr(settings, 'USE_SUPABASE_STORAGE', False):
+        return DatabaseStorage()
+    from django.core.files.storage import FileSystemStorage
+    return FileSystemStorage(location=settings.MEDIA_ROOT / 'private', base_url='/private-media/')
+
+
+def _private_name(folder, filename):
+    """Nom de fichier imprévisible : on ne peut pas deviner l'adresse d'une photo."""
+    import os
+    import uuid
+    ext = os.path.splitext(filename or '')[1].lower()[:5] or '.jpg'
+    return f"delivery_proofs/{folder}/{uuid.uuid4().hex}{ext}"
+
+
+def delivery_photo_path(instance, filename):
+    return _private_name('photos', filename)
+
+
+def id_card_photo_path(instance, filename):
+    return _private_name('id_cards', filename)
+
+
+def package_photo_path(instance, filename):
+    return _private_name('packages', filename)
+
+
+def signature_path(instance, filename):
+    return _private_name('signatures', filename)

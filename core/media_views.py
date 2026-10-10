@@ -17,7 +17,12 @@ def _harden(response, content_type):
 
 
 def serve_media(request, path):
+    from django.http import Http404
     from core.models import StoredFile
+    from core.storage import PRIVATE_PREFIXES
+    # Photos de preuve et pièces d'identité : jamais par lien public (voir ProofPhotoView).
+    if path.lstrip('/').startswith(PRIVATE_PREFIXES) or '..' in path:
+        raise Http404
     obj = StoredFile.objects.filter(name=path).first()
     if obj is not None:
         content_type = obj.content_type or 'application/octet-stream'

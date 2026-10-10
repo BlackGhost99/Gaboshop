@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { assignDeliveryAgent, getDeliveryIncidents, getDeliveryOperations, getAdminDeliveryStats } from '../../../services/adminService';
+import { assignDeliveryAgent, getDeliveryIncidents, getDeliveryOperations, getAdminDeliveryStats, getDeliveryProofPhoto } from '../../../services/adminService';
 import { notifyError, notifySuccess } from '../../../utils/feedback';
 import useVisibleInterval from '../../../hooks/useVisibleInterval';
 
@@ -28,6 +28,44 @@ function useOperations() {
   }, [tick]);
   useVisibleInterval(load, 30000);
   return [data, load];
+}
+
+const PROOF_LABELS = { id_card: 'Pièce d’identité', package: 'Photo du colis', photo: 'Photo de livraison', signature: 'Signature' };
+
+function ProofPhotos({ row }) {
+  const [shown, setShown] = useState(null);
+  useEffect(() => () => { if (shown) URL.revokeObjectURL(shown.url); }, [shown]);
+  if (!row.proof_photos?.length) return null;
+  const open = async (kind) => {
+    try {
+      const blob = await getDeliveryProofPhoto(row.id, kind);
+      setShown({ kind, url: URL.createObjectURL(blob) });
+    } catch (err) {
+      notifyError(err, { action: 'Afficher la preuve de livraison' });
+    }
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-gray-600">Preuve :</span>
+      {row.proof_photos.map((kind) => (
+        <button key={kind} type="button" onClick={() => open(kind)} className="rounded-md border border-gray-300 bg-white px-2 py-1 text-indigo-700 hover:bg-gray-50">
+          {PROOF_LABELS[kind] || kind}
+        </button>
+      ))}
+      {shown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShown(null)}>
+          <div className="max-h-full max-w-3xl rounded-lg bg-white p-3" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between gap-4">
+              <p className="font-semibold">{PROOF_LABELS[shown.kind]} · #{row.order_number}</p>
+              <button type="button" onClick={() => setShown(null)} className="rounded-md px-2 py-1 text-gray-600 hover:bg-gray-100">Fermer</button>
+            </div>
+            <img src={shown.url} alt={PROOF_LABELS[shown.kind]} className="max-h-[75vh] w-auto rounded" />
+            <p className="mt-2 text-xs text-gray-500">Document privé : ne le partagez pas. Chaque consultation est enregistrée.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DeliveryCard({ row, children }) {
@@ -97,6 +135,7 @@ export function DeliveryActive() {
       {data.active.length === 0 ? <Empty>Aucune livraison en cours.</Empty> : data.active.map((row) => (
         <DeliveryCard key={row.id} row={row}>
           <p className="mt-2 text-sm">Livreur : <b>{row.agent_name}</b> · <a className="text-indigo-600" href={`tel:${row.agent_phone}`}>{row.agent_phone}</a> · depuis {since(row.minutes_waiting)}</p>
+          <ProofPhotos row={row} />
         </DeliveryCard>
       ))}
     </div>
@@ -182,6 +221,7 @@ export function DeliveryIncidents() {
             {item.client_phone && <>Client : <a className="text-indigo-600" href={`tel:${item.client_phone}`}>{item.client_phone}</a></>}
             {item.amount != null && <> · {fcfa(item.amount)}</>}
           </p>
+          <ProofPhotos row={item} />
         </div>
       ))}
     </div>

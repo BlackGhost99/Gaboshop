@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal
 from users.models import User
 from orders.models import Order
+from core.storage import delivery_photo_path, id_card_photo_path, package_photo_path, private_storage, signature_path
 
 
 class DeliveryZone(models.Model):
@@ -251,7 +252,7 @@ class Delivery(models.Model):
     
 	# Preuve de livraison
 	delivery_proof_type = models.CharField(max_length=20, choices=PROOF_TYPE_CHOICES, blank=True)
-	delivery_proof_photo = models.ImageField(upload_to='delivery_proofs/', blank=True, null=True)
+	delivery_proof_photo = models.ImageField(upload_to=delivery_photo_path, storage=private_storage, blank=True, null=True)
 	delivery_code = models.CharField(max_length=6, blank=True, help_text="Code PIN à 4-6 chiffres")
 	code_verified = models.BooleanField(default=False)
 	
@@ -261,7 +262,7 @@ class Delivery(models.Model):
 	proof_address = models.CharField(max_length=255, blank=True, help_text="Adresse capturée au moment de la livraison")
 	
 	# Signature du client
-	client_signature = models.ImageField(upload_to='delivery_signatures/', blank=True, null=True, help_text="Signature digitale du client")
+	client_signature = models.ImageField(upload_to=signature_path, storage=private_storage, blank=True, null=True, help_text="Signature digitale du client")
 	client_name_confirmed = models.CharField(max_length=100, blank=True, help_text="Nom du réceptionnaire")
     
 	# Notes
@@ -379,7 +380,8 @@ class DeliveryProof(models.Model):
 	
 	# Photo pièce d'identité OBLIGATOIRE (car client peut venir chercher le colis)
 	id_card_photo = models.ImageField(
-		upload_to='delivery_proofs/id_cards/%Y/%m/%d/',
+		upload_to=id_card_photo_path,
+		storage=private_storage,
 		blank=True,  # Temporaire pour migration
 		null=True,   # Temporaire pour migration
 		help_text="Photo de la pièce d'identité du client (OBLIGATOIRE)"
@@ -388,7 +390,8 @@ class DeliveryProof(models.Model):
 	
 	# Photo du colis OPTIONNELLE (car toutes les routes ne sont pas accessibles)
 	package_photo = models.ImageField(
-		upload_to='delivery_proofs/packages/%Y/%m/%d/',
+		upload_to=package_photo_path,
+		storage=private_storage,
 		blank=True,
 		null=True,
 		help_text="Photo du colis livré (optionnelle)"
@@ -427,7 +430,8 @@ class DeliveryProof(models.Model):
 	
 	# Signature ou Code PIN (l'un des deux requis)
 	signature = models.ImageField(
-		upload_to='delivery_signatures/%Y/%m/%d/',
+		upload_to=signature_path,
+		storage=private_storage,
 		blank=True,
 		null=True,
 		help_text="Signature digitale du client"

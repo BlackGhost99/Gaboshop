@@ -308,7 +308,23 @@ def _delivery_row(delivery, now):
         'agent_phone': agent.phone if agent else '',
         'created_at': delivery.created_at, 'assigned_at': delivery.assigned_at,
         'minutes_waiting': int((now - started).total_seconds() // 60) if started else None,
+        'proof_photos': _proof_photos(delivery),
     }
+
+
+def _proof_photos(delivery):
+    """Quelles photos de preuve existent ; l'admin les ouvre via la vue protégée."""
+    proof = getattr(delivery, 'proof', None) if hasattr(delivery, 'proof') else None
+    kinds = []
+    if proof is not None and proof.id_card_photo:
+        kinds.append('id_card')
+    if proof is not None and proof.package_photo:
+        kinds.append('package')
+    if proof is not None and proof.signature:
+        kinds.append('signature')
+    if delivery.delivery_proof_photo:
+        kinds.append('photo')
+    return kinds
 
 
 class DeliveryOperationsView(APIView):
@@ -317,7 +333,7 @@ class DeliveryOperationsView(APIView):
 
     def get(self, request):
         now = timezone.now()
-        base = Delivery.objects.select_related('order__store', 'delivery_agent').exclude(order__status='cancelled')
+        base = Delivery.objects.select_related('order__store', 'delivery_agent', 'proof').exclude(order__status='cancelled')
         waiting = base.filter(Q(delivery_agent__isnull=True) | Q(status__in=WAITING_STATUSES)).filter(
             order__status__in=('ready', 'assigned', 'confirmed', 'preparing')).exclude(status__in=('delivered', 'cancelled', 'failed'))
         active = base.filter(status__in=ACTIVE_STATUSES, delivery_agent__isnull=False)
@@ -397,23 +413,23 @@ class DeliveryIncidentsView(APIView):
         recent = now - timedelta(days=30)
 
         late_limit = now - timedelta(hours=rules.late_delivery_hours)
-        for d in Delivery.objects.select_related('order__store', 'delivery_agent').filter(
+        for d in Delivery.objects.select_related('order__store', 'delivery_agent', 'proof').filter(
                 status__in=ACTIVE_STATUSES, assigned_at__lt=late_limit):
             items.append({**_delivery_row(d, now), 'kind': 'late', 'title': 'Livraison en retard',
                           'reason': f'En cours depuis plus de {rules.late_delivery_hours} h.',
                           'next_step': 'Appelez le livreur, puis le client si besoin.'})
         wait_limit = now - timedelta(minutes=rules.broadcast_after_minutes)
-        for d in Delivery.objects.select_related('order__store', 'delivery_agent').filter(
+        for d in Delivery.objects.select_related('order__store', 'delivery_agent', 'proof').filter(
                 delivery_agent__isnull=True, order__status='ready', created_at__lt=wait_limit):
             items.append({**_delivery_row(d, now), 'kind': 'no_courier', 'title': 'Aucun livreur trouvé',
                           'reason': f'Commande prête depuis plus de {rules.broadcast_after_minutes} min sans livreur.',
                           'next_step': 'Attribuez un livreur dans l’onglet Attribution.'})
-        for d in Delivery.objects.select_related('order__store', 'delivery_agent').filter(
+        for d in Delivery.objects.select_related('order__store', 'delivery_agent', 'proof').filter(
                 status='failed', updated_at__gte=recent):
             items.append({**_delivery_row(d, now), 'kind': 'failed', 'title': 'Livraison échouée',
                           'reason': 'Le livreur a déclaré un échec.', 'next_step': 'Contactez le client et le commerce pour relivrer ou rembourser.'})
         confirm_limit = now - timedelta(hours=24)
-        for d in Delivery.objects.select_related('order__store', 'delivery_agent').filter(
+        for d in Delivery.objects.select_related('order__store', 'delivery_agent', 'proof').filter(
                 order__status='delivered', delivered_at__lt=confirm_limit, delivered_at__gte=recent,
                 proof__client_received_status=False):
             items.append({**_delivery_row(d, now), 'kind': 'unconfirmed', 'title': 'Réception pas confirmée',

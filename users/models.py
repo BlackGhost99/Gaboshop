@@ -326,3 +326,21 @@ class UserProfile(models.Model):
 	class Meta:
 		verbose_name = "Profile Utilisateur"
 		verbose_name_plural = "Profiles Utilisateurs"
+
+
+class PasswordResetCode(models.Model):
+	"""Code à 6 chiffres envoyé pour « mot de passe oublié ». Seule son empreinte est gardée."""
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_codes')
+	code_hash = models.CharField(max_length=128)
+	created_at = models.DateTimeField(auto_now_add=True)
+	expires_at = models.DateTimeField()
+	attempts = models.PositiveSmallIntegerField(default=0)
+	used_at = models.DateTimeField(null=True, blank=True)
+
+	class Meta:
+		ordering = ['-created_at']
+		verbose_name = "Code de réinitialisation"
+		verbose_name_plural = "Codes de réinitialisation"
+
+	def __str__(self):
+		return f"Code pour {self.user.phone}"

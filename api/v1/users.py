@@ -309,3 +309,40 @@ class MyApiKeyView(APIView):
 				}
 			}, status=status.HTTP_401_UNAUTHORIZED)
 
+
+
+class PasswordResetRequestView(APIView):
+	"""« Mot de passe oublié », étape 1 : envoie un code au numéro, sans dire si le compte existe."""
+	permission_classes = [permissions.AllowAny]
+	authentication_classes = []
+	throttle_classes = [AuthIPThrottle, LoginPhoneThrottle]
+
+	def get(self, request):
+		from users.password_reset import email_available, sms_available
+		return Response({'success': True, 'data': {'sms_available': sms_available(), 'email_available': email_available()}})
+
+	def post(self, request):
+		from users.password_reset import CODE_MINUTES, request_code
+		if not str(request.data.get('phone') or '').strip():
+			return Response({'success': False, 'error': {'code': 400, 'message': 'Entrez votre numéro de téléphone.'}}, status=status.HTTP_400_BAD_REQUEST)
+		request_code(request.data.get('phone'))
+		return Response({'success': True, 'message': (
+			f"Si ce numéro a un compte, un code vient de lui être envoyé. Il est valable {CODE_MINUTES} minutes."
+		)})
+
+
+class PasswordResetConfirmView(APIView):
+	"""« Mot de passe oublié », étape 2 : le code reçu et le nouveau mot de passe."""
+	permission_classes = [permissions.AllowAny]
+	authentication_classes = []
+	throttle_classes = [AuthIPThrottle, LoginPhoneThrottle]
+
+	def post(self, request):
+		from users.password_reset import reset_password
+		password = str(request.data.get('password') or '')
+		if len(password) < 6:
+			return Response({'success': False, 'error': {'code': 400, 'message': 'Le mot de passe doit faire au moins 6 caractères.'}}, status=status.HTTP_400_BAD_REQUEST)
+		ok, reason = reset_password(request.data.get('phone'), request.data.get('code'), password)
+		if not ok:
+			return Response({'success': False, 'error': {'code': 400, 'message': reason}}, status=status.HTTP_400_BAD_REQUEST)
+		return Response({'success': True, 'message': 'Mot de passe changé. Vous pouvez vous connecter.'})

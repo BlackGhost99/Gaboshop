@@ -862,4 +862,6 @@ export const simulateDeliveryPrice = async (payload) => (await api.post('/admin/
 export const getDeliveryOperations = async () => (await api.get('/admin/delivery/operations/')).data;
 export const getAdminDeliveryStats = async (days) => (await api.get("/admin/delivery/stats/", { params: { days } })).data;
 export const getDeliveryIncidents = async () => (await api.get('/admin/delivery/incidents/')).data;
+// Photo de preuve (protégée) : récupérée avec la session de l'admin, jamais par lien public.
+export const getDeliveryProofPhoto = async (deliveryId, kind) => (await api.get(`/dashboard/delivery/${deliveryId}/proof-photo/${kind}/`, { responseType: 'blob' })).data;
 export const assignDeliveryAgent = async (orderId, agentId) => (await api.post(`/admin/orders/${orderId}/assign-delivery/`, { delivery_agent_id: agentId })).data;

@@ -7,7 +7,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .users import (
-    RegisterView, LoginView, ProfileView, RefreshTokenView, DeleteAccountView
+    RegisterView, LoginView, ProfileView, RefreshTokenView, DeleteAccountView,
+    PasswordResetRequestView, PasswordResetConfirmView
 )
 from .stores import (
     StoreCategoryListView, StoreListView, StoreDetailView, StoreCreateView,
@@ -41,7 +42,7 @@ from . import delivery_admin
 from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
-    DeliveryProofUploadView, DeliveryVerifyPINView,
+    DeliveryProofUploadView, DeliveryVerifyPINView, DeliveryProofPhotoView,
     AvailableDeliveriesView, DeliveryClaimView, DeliveryAvailabilityView,
     VehicleTypeListView, VehicleTypeDetailView, DeliveryCalculatePriceView,
     DeliveryValidateVehicleView, EligibleVehiclesView, DeliveryZonesListView
@@ -124,6 +125,8 @@ urlpatterns = [
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
     path('auth/account/delete/', DeleteAccountView.as_view(), name='auth-account-delete'),
     path('auth/token/refresh/', RefreshTokenView.as_view(), name='token-refresh'),
+    path('auth/password-reset/', PasswordResetRequestView.as_view(), name='auth-password-reset'),
+    path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='auth-password-reset-confirm'),
 
     # Notifications
     path('notifications/', NotificationListView.as_view(), name='notifications'),
@@ -144,6 +147,7 @@ urlpatterns = [
     path('dashboard/delivery/<int:delivery_id>/reject/', DeliveryRejectAssignmentView.as_view(), name='delivery-reject'),
     path('dashboard/delivery/<int:delivery_id>/start/', DeliveryStartView.as_view(), name='delivery-start'),
     path('dashboard/delivery/<int:delivery_id>/upload-proof/', DeliveryProofUploadView.as_view(), name='delivery-proof-upload'),
+    path('dashboard/delivery/<int:delivery_id>/proof-photo/<str:kind>/', DeliveryProofPhotoView.as_view(), name='delivery-proof-photo'),
     path('dashboard/delivery/<int:delivery_id>/verify-pin/', DeliveryVerifyPINView.as_view(), name='delivery-verify-pin'),
     path('dashboard/delivery/<int:delivery_id>/complete/', DeliveryCompleteView.as_view(), name='delivery-complete'),
     
