@@ -40,6 +40,7 @@ MARKERS = {
     'Mot de passe oublié et preuves privées (10 oct.)': 'Recevoir un code',
     'WhatsApp : code et numéro vérifié (11 oct.)': 'Numéro vérifié',
     'Codes par e-mail (11 oct.)': 'adresse e-mail enregistrée sur votre compte',
+    'Codes par SMS Twilio (11 oct.)': 'Vous recevrez un code par SMS ou WhatsApp',
 }
 
 

@@ -30,6 +30,11 @@ class SMSService:
         # Ordre de priorité des providers
         provider_order = ['hub2sms', 'twilio', 'infobip']
         providers = providers + [p for p in provider_order if p not in providers]
+        # Dès qu'un vrai fournisseur a ses clés, on n'essaie que ceux-là : un échec ne doit
+        # jamais être masqué par un envoi simulé (qui répond toujours « envoyé »).
+        configured = [p for p in providers if SMSService._is_configured(p)]
+        if configured:
+            providers = configured
         
         for provider in providers:
             try:
@@ -53,6 +58,14 @@ class SMSService:
         logger.error(f"? Tous les providers SMS ont échoué pour {phone}")
         return False
     
+    @staticmethod
+    def _is_configured(provider):
+        if provider == 'hub2sms':
+            return bool(getattr(settings, 'HUB2SMS_API_KEY', ''))
+        if provider == 'twilio':
+            return bool(getattr(settings, 'TWILIO_ACCOUNT_SID', '') and getattr(settings, 'TWILIO_AUTH_TOKEN', ''))
+        return False
+
     @staticmethod
     def _format_phone(phone):
         """
@@ -135,19 +148,21 @@ class TwilioService:
                 logger.warning("?? Twilio non configuré - Simulation")
                 return TwilioService._simulate_send(phone, message)
             
-            from twilio.rest import Client
-            
-            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-            
             formatted_phone = SMSService._format_phone(phone)
-            
-            message = client.messages.create(
-                body=message,
-                from_=settings.TWILIO_PHONE_NUMBER,
-                to=formatted_phone
+            data = {'To': formatted_phone, 'Body': message}
+            # Un « Messaging Service » Twilio (MG…) choisit lui-même l'expéditeur ; sinon le numéro ou nom d'expéditeur.
+            if getattr(settings, 'TWILIO_MESSAGING_SERVICE_SID', ''):
+                data['MessagingServiceSid'] = settings.TWILIO_MESSAGING_SERVICE_SID
+            else:
+                data['From'] = settings.TWILIO_PHONE_NUMBER
+            response = requests.post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Messages.json",
+                data=data, auth=(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN), timeout=15,
             )
-            
-            logger.info(f"? SMS Twilio envoyé à {formatted_phone} - SID: {message.sid}")
+            if response.status_code not in (200, 201):
+                logger.error(f"? Twilio HTTP {response.status_code}: {response.text[:300]}")
+                return False
+            logger.info(f"? SMS Twilio envoyé à {formatted_phone} - SID: {response.json().get('sid')}")
             return True
             
         except Exception as e:

@@ -132,3 +132,28 @@ class StoreClosedNotificationTests(TestCase):
         self.assertEqual(note.metadata['level'], 'warning')
         self.assertIn('fermé', note.body)
         self.assertIn('horaires', note.metadata['next_step'])
+
+
+@override_settings(
+	SMS_PROVIDER='twilio', HUB2SMS_API_KEY='', TWILIO_ACCOUNT_SID='AC123', TWILIO_AUTH_TOKEN='jeton',
+	TWILIO_PHONE_NUMBER='+15550001111', TWILIO_MESSAGING_SERVICE_SID='',
+)
+class TwilioSmsTests(TestCase):
+	def test_twilio_sends_through_rest_api(self):
+		from notifications.sms import SMSService
+		with patch('notifications.sms.requests.post') as post:
+			post.return_value.status_code = 201
+			post.return_value.json.return_value = {'sid': 'SM1'}
+			self.assertTrue(SMSService.send_sms('077333333', 'Bonjour'))
+		url = post.call_args.args[0]
+		self.assertIn('/Accounts/AC123/Messages.json', url)
+		self.assertEqual(post.call_args.kwargs['auth'], ('AC123', 'jeton'))
+		self.assertEqual(post.call_args.kwargs['data'], {'To': '+24177333333', 'Body': 'Bonjour', 'From': '+15550001111'})
+
+	def test_twilio_failure_is_not_hidden_by_a_simulated_provider(self):
+		from notifications.sms import SMSService
+		with patch('notifications.sms.requests.post') as post:
+			post.return_value.status_code = 400
+			post.return_value.text = 'refusé'
+			self.assertFalse(SMSService.send_sms('077333333', 'Bonjour'))
+		self.assertEqual(post.call_count, 1)

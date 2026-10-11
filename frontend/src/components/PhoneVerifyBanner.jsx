@@ -59,7 +59,7 @@ export default function PhoneVerifyBanner() {
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
         {step === 'idle' && (
           <>
-            <p className="flex-1">Vérifiez votre numéro pour obtenir le badge « Numéro vérifié ». Vous recevrez un code sur WhatsApp.</p>
+            <p className="flex-1">Vérifiez votre numéro pour obtenir le badge « Numéro vérifié ». Vous recevrez un code par SMS ou WhatsApp.</p>
             <button type="button" disabled={busy} onClick={send} className="rounded-md bg-indigo-600 px-3 py-1.5 font-medium text-white disabled:opacity-60">
               {busy ? 'Envoi…' : 'Recevoir le code'}
             </button>
