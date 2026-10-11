@@ -82,7 +82,7 @@ class StoreCreateSerializer(serializers.ModelSerializer):
         # Vérifier que l'utilisateur est un store_manager
         if not getattr(user, 'is_store_manager', lambda: False)():
             raise serializers.ValidationError({
-                'user': _('Seuls les gérants de magasin peuvent créer des magasins.')
+                'user': _('Seuls les commerçants peuvent créer des magasins.')
             })
         
         # Assigner automatiquement le manager

@@ -889,7 +889,7 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="Total utilisateurs" value={(summary?.users?.clients || 0) + (summary?.users?.store_managers || 0) + (summary?.users?.delivery_agents || 0)} />
         <StatCard title="Clients" value={summary?.users?.clients || 0} />
-        <StatCard title="Gérants" value={summary?.users?.store_managers || 0} />
+        <StatCard title="Commerçants" value={summary?.users?.store_managers || 0} />
         <StatCard title="Livreurs" value={summary?.users?.delivery_agents || 0} />
       </div>
       <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
@@ -902,7 +902,7 @@ const AdminDashboard = () => {
             {[
               { id: 'all', label: 'Tous' },
               { id: 'client', label: 'Clients' },
-              { id: 'store_manager', label: 'Gérants' },
+              { id: 'store_manager', label: 'Commerçants' },
               { id: 'delivery_agent', label: 'Livreurs' },
             ].map((opt) => (
               <button
@@ -1930,7 +1930,7 @@ const AdminDashboard = () => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gérant</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commerçant</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Téléphone</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ville</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -2260,7 +2260,7 @@ const AdminDashboard = () => {
                   className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="client">Client</option>
-                  <option value="store_manager">Gérant</option>
+                  <option value="store_manager">Commerçant</option>
                   <option value="delivery_agent">Livreur</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -2452,7 +2452,7 @@ const AdminDashboard = () => {
                   className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="client">Client</option>
-                  <option value="store_manager">Gérant</option>
+                  <option value="store_manager">Commerçant</option>
                   <option value="delivery_agent">Livreur</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -2629,7 +2629,7 @@ const AdminDashboard = () => {
                 </select>
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Gérant</label>
+                <label className="text-sm font-semibold text-gray-700">Commerçant</label>
                 <select value={newStore.manager_id} onChange={(e) => setNewStore({ ...newStore, manager_id: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" required>
                   <option value="">Sélectionner...</option>
                   {users.filter(u => u.user_type === 'store_manager').map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.phone})</option>)}
@@ -2672,7 +2672,7 @@ const AdminDashboard = () => {
                 </select>
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Gérant</label>
+                <label className="text-sm font-semibold text-gray-700">Commerçant</label>
                 <select value={editingStore.manager_id} onChange={(e) => setEditingStore({ ...editingStore, manager_id: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
                   <option value="">Sélectionner...</option>
                   {users.filter(u => u.user_type === 'store_manager').map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.phone})</option>)}

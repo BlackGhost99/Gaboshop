@@ -644,7 +644,7 @@ class AdminStoresView(APIView):
         if not category_id:
             return Response({"success": False, "message": "La catégorie est requise"}, status=status.HTTP_400_BAD_REQUEST)
         if not manager_id:
-            return Response({"success": False, "message": "Le gérant est requis"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "message": "Le commerçant est requis"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Check uniqueness
         if Store.objects.filter(phone=phone).exists():
@@ -660,9 +660,9 @@ class AdminStoresView(APIView):
         try:
             manager = User.objects.get(id=manager_id)
             if manager.user_type != 'store_manager':
-                return Response({"success": False, "message": "L'utilisateur sélectionné n'est pas un gérant de magasin"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"success": False, "message": "L'utilisateur sélectionné n'est pas un commerçant"}, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
-            return Response({"success": False, "message": "Gérant introuvable"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"success": False, "message": "Commerçant introuvable"}, status=status.HTTP_404_NOT_FOUND)
         
         # Check if manager already manages another store
         if Store.objects.filter(manager=manager).exists():
@@ -740,13 +740,13 @@ class AdminStoresView(APIView):
             try:
                 manager = User.objects.get(id=request.data['manager_id'])
                 if manager.user_type != 'store_manager':
-                    return Response({"success": False, "message": "L'utilisateur sélectionné n'est pas un gérant"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"success": False, "message": "L'utilisateur sélectionné n'est pas un commerçant"}, status=status.HTTP_400_BAD_REQUEST)
                 # Check if manager already manages another store
                 if Store.objects.filter(manager=manager).exclude(id=store_id).exists():
                     return Response({"success": False, "message": f"{manager.get_full_name() or manager.phone} gère déjà un autre magasin"}, status=status.HTTP_400_BAD_REQUEST)
                 store.manager = manager
             except User.DoesNotExist:
-                return Response({"success": False, "message": "Gérant introuvable"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"success": False, "message": "Commerçant introuvable"}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             store.save()

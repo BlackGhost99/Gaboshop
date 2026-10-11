@@ -107,7 +107,7 @@ def get_available_plans(request):
         if request.user.user_type != 'store_manager':
             return Response({
                 'success': False,
-                'error': 'Accessible uniquement aux gérants de magasin'
+                'error': 'Accessible uniquement aux commerçants'
             }, status=status.HTTP_403_FORBIDDEN)
 
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
@@ -224,7 +224,7 @@ def purchase_plan(request):
     """
     try:
         if request.user.user_type != 'store_manager':
-            return Response({'success': False, 'error': 'Accessible uniquement aux gérants de magasin'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'success': False, 'error': 'Accessible uniquement aux commerçants'}, status=status.HTTP_403_FORBIDDEN)
 
         # ensure store exists
         try:

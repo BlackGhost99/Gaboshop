@@ -39,7 +39,7 @@ export default function Confidentialite() {
           <strong>Nous ne demandons jamais votre code secret (PIN) Mobile Money.</strong> Seule la référence de la
           transaction est enregistrée. Si quelqu'un vous demande votre PIN au nom de {COMPANY.brand}, c'est une arnaque.
         </p>
-        <p><strong>Pour les commerces :</strong> nom et informations de la boutique, coordonnées du gérant, adresse,
+        <p><strong>Pour les commerces :</strong> nom et informations de la boutique, coordonnées du commerçant, adresse,
           code marchand Mobile Money, produits, prix et photos des produits, ventes et commissions.</p>
         <p><strong>Pour les livreurs :</strong> identité, coordonnées, type de véhicule et immatriculation, zone
           d'activité, livraisons effectuées, preuves de livraison (photos, codes de confirmation) et sommes encaissées

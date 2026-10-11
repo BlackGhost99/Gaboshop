@@ -61,7 +61,7 @@ def get_detailed_b2b_access_error(user):
 	if user.user_type != 'store_manager':
 		return False, {
 			'code': status.HTTP_403_FORBIDDEN,
-			'message': 'Seuls les gérants de magasin peuvent accéder au B2B'
+			'message': 'Seuls les commerçants peuvent accéder au B2B'
 		}
 	
 	store = Store.objects.filter(manager=user, is_active=True).first()

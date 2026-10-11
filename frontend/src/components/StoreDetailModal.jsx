@@ -76,7 +76,7 @@ const StoreDetailModal = ({ isOpen, onClose, storeId }) => {
 								<p className="text-sm text-gray-900">{store.zone || '—'}</p>
 							</div>
 							<div>
-								<label className="block text-sm font-semibold text-gray-700 mb-1">Gérant</label>
+								<label className="block text-sm font-semibold text-gray-700 mb-1">Commerçant</label>
 								<p className="text-sm text-gray-900">{store.manager_name || '—'}</p>
 							</div>
 							<div>

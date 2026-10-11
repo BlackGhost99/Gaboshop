@@ -170,7 +170,7 @@ class Store(models.Model):
 		max_length=20,
 		choices=STORE_TYPE_CHOICES,
 		default='retail',
-		help_text="Type de magasin: Détail (pour clients), Grossiste/Industrie (pour gérants)"
+		help_text="Type de magasin: Détail (pour clients), Grossiste/Industrie (pour commerçants)"
 	)
 	
 	# Capacités B2C/B2B (dérivées de store_type mais gardées pour compatibilité)

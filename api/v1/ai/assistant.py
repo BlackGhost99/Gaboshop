@@ -46,7 +46,7 @@ CONFIRM_MAX_AGE = 15 * 60
 ROLE_LABELS = {
     'visitor': 'visiteur non connecté',
     'client': 'client',
-    'store_manager': 'gérant de commerce',
+    'store_manager': 'commerçant',
     'delivery_agent': 'livreur',
     'admin': 'administrateur de la plateforme',
 }
@@ -343,7 +343,7 @@ def t_update_product(ctx, product_id, price=None, stock=None, visible=None):
     label = f"{p.name} : " + ', '.join(summary)
     ctx.confirmations.append({'token': token, 'label': label})
     return {'pending_confirmation': True, 'summary': label,
-            'message': "La modification attend que le gérant appuie sur « Confirmer »."}
+            'message': "La modification attend que le commerçant appuie sur « Confirmer »."}
 
 
 STORE_ORDER_STEPS = {'confirmed': 'confirmée', 'preparing': 'en préparation', 'ready': 'prête (un livreur sera appelé)',
@@ -395,9 +395,9 @@ def t_create_product(ctx, name, price, stock=1, category=None, brand=None, model
     try:
         price_value = Decimal(str(price))
     except (InvalidOperation, TypeError):
-        return {'error': 'Il faut un prix (en FCFA). Demande-le au gérant.'}
+        return {'error': 'Il faut un prix (en FCFA). Demande-le au commerçant.'}
     if price_value <= 0:
-        return {'error': 'Le prix doit être positif. Demande-le au gérant.'}
+        return {'error': 'Le prix doit être positif. Demande-le au commerçant.'}
     try:
         stock = max(0, int(stock if stock not in (None, '') else 1))
     except (TypeError, ValueError):
@@ -435,7 +435,7 @@ def t_create_product(ctx, name, price, stock=1, category=None, brand=None, model
     return {'pending_confirmation': True, 'summary': label,
             'category_found': bool(cat),
             'available_categories': [c.name for c in _store_categories(store)][:20],
-            'message': "Le produit sera créé quand le gérant appuiera sur « Confirmer ». "
+            'message': "Le produit sera créé quand le commerçant appuiera sur « Confirmer ». "
                        "Il pourra ensuite ajouter une photo dans « Mes produits »."}
 
 
@@ -583,19 +583,19 @@ TOOLS = {
         {'query': _STR, 'low_stock_only': _BOOL})),
     'update_product': (('store_manager',), t_update_product, _schema(
         'update_product', "Préparer une modification de prix, de stock ou de visibilité d'un produit du commerce. "
-                          "Le gérant devra confirmer d'un bouton.",
+                          "Le commerçant devra confirmer d'un bouton.",
         {'product_id': _INT, 'price': _NUM, 'stock': _INT, 'visible': _BOOL}, ['product_id'])),
     'set_order_status': (('store_manager',), t_set_order_status, _schema(
         'set_order_status', "Faire avancer une commande du commerce : confirmed, preparing, ready (appelle un livreur) "
-                            "ou cancelled. Le gérant confirme d'un bouton.",
+                            "ou cancelled. Le commerçant confirme d'un bouton.",
         {'order_number': _STR, 'status_value': {**_STR, 'enum': list(STORE_ORDER_STEPS)}},
         ['order_number', 'status_value'])),
     'store_categories': (('store_manager',), t_store_categories, _schema(
         'store_categories', 'Catégories de produits disponibles pour ce commerce.')),
     'create_product': (('store_manager',), t_create_product, _schema(
-        'create_product', "Créer un NOUVEAU produit dans le commerce du gérant (ex: « ajoute 10 All Star noires à "
+        'create_product', "Créer un NOUVEAU produit dans le commerce du commerçant (ex: « ajoute 10 All Star noires à "
                           "25000 F »). Le prix est obligatoire : s'il manque, demande-le d'abord. Rédige une courte "
-                          "description vendeuse. Le gérant confirme d'un bouton.",
+                          "description vendeuse. Le commerçant confirme d'un bouton.",
         {'name': {**_STR, 'description': 'nom du produit, ex: Converse All Star'}, 'price': _NUM,
          'stock': {**_INT, 'description': 'quantité disponible'}, 'category': _STR, 'brand': _STR, 'model': _STR,
          'color': _STR, 'sizes': {**_STR, 'description': 'tailles ou pointures séparées par des virgules'},
@@ -642,7 +642,7 @@ ROLE_GUIDE = {
     'client': "C'est un client connecté. Accompagne-le jusqu'au panier : comprendre son besoin, chercher, comparer, "
               "conseiller (taille, budget), ajouter au panier, puis l'inviter à valider sa commande. "
               "Tu peux aussi suivre ses commandes.",
-    'store_manager': "C'est le gérant d'un commerce. Aide-le à gérer sa boutique : commandes à préparer, stock faible, "
+    'store_manager': "C'est un commerçant. Aide-le à gérer sa boutique : commandes à préparer, stock faible, "
                      "prix, produits masqués, conseils de vente. Pour AJOUTER un produit à sa boutique, utilise "
                      "create_product (search_products cherche seulement dans tout le marché, ce n'est pas un ajout). "
                      "Pour faire avancer une commande (confirmer, préparer, prête) utilise set_order_status. "

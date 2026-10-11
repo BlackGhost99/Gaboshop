@@ -14,7 +14,7 @@ const StoreLayout = ({ children, title, userName }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar 
             userRole="GERANT" 
-            userName={userName || 'Gérant'} 
+            userName={userName || 'Commerçant'} 
             onMenuClick={() => setMenuOpen(true)}
         />
 

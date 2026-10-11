@@ -183,7 +183,7 @@ const StoreProfile = () => {
 
                     {/* Manager Info */}
                     <div className="border-b pb-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Informations du Gérant</h3>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Informations du commerçant</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Prénom</label>

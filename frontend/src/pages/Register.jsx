@@ -42,7 +42,7 @@ const Register = () => {
   const isManager = form.user_type === 'store_manager';
   const isDelivery = form.user_type === 'delivery_agent';
 
-  // Types de commerce proposés au gérant (gérés dans la console admin)
+  // Types de commerce proposés au commerçant (gérés dans la console admin)
   useEffect(() => {
     if (!isManager || storeCategories.length > 0) return;
     getStoreCategories()
@@ -147,7 +147,7 @@ const Register = () => {
     <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-8 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-2xl">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Créer un compte</h2>
-        <p className="mt-2 text-center text-sm text-gray-600">Client, Gérant ou Livreur</p>
+        <p className="mt-2 text-center text-sm text-gray-600">Client, Commerçant ou Livreur</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
@@ -162,7 +162,7 @@ const Register = () => {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="client">Client</option>
-                  <option value="store_manager">Gérant</option>
+                  <option value="store_manager">Commerçant</option>
                   <option value="delivery_agent">Livreur</option>
                 </select>
               </div>

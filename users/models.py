@@ -60,7 +60,7 @@ class User(AbstractUser):
 	# Types d'utilisateurs dans GABOSHOP
 	USER_TYPE_CHOICES = (
 		('client', 'Client'),
-		('store_manager', 'Gérant de Magasin'),
+		('store_manager', 'Commerçant'),
 		('delivery_agent', 'Livreur'),
 		('admin', 'Administrateur'),
 	)
@@ -220,11 +220,11 @@ class GerantProfile(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 	
 	class Meta:
-		verbose_name = "Profil Gérant"
-		verbose_name_plural = "Profils Gérants"
+		verbose_name = "Profil commerçant"
+		verbose_name_plural = "Profils commerçants"
 	
 	def __str__(self):
-		return f"Gérant: {self.user.phone}"
+		return f"Commerçant: {self.user.phone}"
 
 
 class LivreurProfile(models.Model):

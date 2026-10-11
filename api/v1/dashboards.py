@@ -66,7 +66,7 @@ class StoreDashboardView(APIView):
     def get(self, request):
         user = request.user
         if not user.is_store_manager():
-            return Response({'error': 'Accès réservé aux gérants'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Accès réservé aux commerçants'}, status=status.HTTP_403_FORBIDDEN)
 
         # Récupérer le magasin du gérant
         try:

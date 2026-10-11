@@ -53,7 +53,7 @@ const Sidebar = ({ open = false, onClose }) => {
               {storeData?.store?.name || 'Mon magasin'}
             </p>
             <p className="text-slate-400 text-xs truncate">
-              {storeData?.owner?.email || 'Gérant'}
+              {storeData?.owner?.email || 'Commerçant'}
             </p>
           </div>
         </div>

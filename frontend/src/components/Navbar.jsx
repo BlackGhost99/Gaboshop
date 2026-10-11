@@ -113,7 +113,7 @@ const Navbar = ({ userRole, userName, onMenuClick }) => {
   const getRoleName = (role) => {
     const roleMap = {
       CLIENT: 'Client',
-      GERANT: 'Gérant',
+      GERANT: 'Commerçant',
       LIVREUR: 'Livreur',
       ADMIN: 'Admin',
     };

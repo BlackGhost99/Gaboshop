@@ -122,7 +122,7 @@ class StoreCreateView(APIView):
 				'success': False,
 				'error': {
 					'code': status.HTTP_403_FORBIDDEN,
-					'message': 'Seuls les gérants de magasin peuvent créer des magasins.'
+					'message': 'Seuls les commerçants peuvent créer des magasins.'
 				}
 			}, status=status.HTTP_403_FORBIDDEN)
         
@@ -229,7 +229,7 @@ class StoreUpdateView(APIView):
             
 			return Response({
 				'success': True,
-				'message': 'Magasin et profil gérant mis à jour avec succès.',
+				'message': 'Magasin et profil commerçant mis à jour avec succès.',
 				'data': StoreDetailSerializer(store).data
 			})
         

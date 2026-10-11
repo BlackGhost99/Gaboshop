@@ -286,7 +286,7 @@ class SubscriptionPaymentIntentAPIView(APIView):
     def post(self, request):
         if not request.user.is_store_manager():
             return Response(
-                {"detail": "Seuls les gerants peuvent souscrire"},
+                {"detail": "Seuls les commerçants peuvent souscrire"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -986,7 +986,7 @@ class SubscribeToPlanView(APIView):
         if not request.user.is_store_manager():
             return Response({
                 'success': False,
-                'error': 'Seuls les gérants de magasin peuvent souscrire'
+                'error': 'Seuls les commerçants peuvent souscrire'
             }, status=status.HTTP_403_FORBIDDEN)
         
         # Récupérer le store
