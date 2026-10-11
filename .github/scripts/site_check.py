@@ -100,6 +100,14 @@ def check(site):
     else:
         lines.append(f"- Assistant IA : **{res['status']}**")
 
+    # Canaux d'envoi des codes (oui/non seulement, aucune clé n'est exposée).
+    res = fetch(f'{api}/api/v1/auth/password-reset/')
+    try:
+        data = json.loads(res['body']).get('data', {})
+        lines.append(f"- Envoi des codes : WhatsApp `{data.get('whatsapp_available')}`, SMS `{data.get('sms_available')}`, e-mail `{data.get('email_available')}`")
+    except Exception:
+        lines.append(f"- Envoi des codes : **{res['status']}**")
+
     res = fetch(f'{web}/')
     lines.append(f"- Site web : **{res['status']}** en {res['seconds']} s")
     if res['status'] == 200:
