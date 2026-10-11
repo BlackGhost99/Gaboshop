@@ -128,6 +128,14 @@ class RegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'store': _(f'Champs requis pour le magasin: {", ".join(missing)}')
                 })
+            # Le gérant choisit le type de son commerce ; une catégorie inconnue ou désactivée est refusée.
+            # Sans choix (anciennes versions de l'application), la catégorie par défaut reste appliquée.
+            category_id = str(attrs.get('store_category_id') or '').strip()
+            if category_id:
+                if not category_id.isdigit() or not StoreCategory.objects.filter(id=int(category_id), is_active=True).exists():
+                    raise serializers.ValidationError({
+                        'store_category_id': _('Choisissez un type de commerce dans la liste.')
+                    })
             # Remove GPS fields for non-delivery users
             attrs.pop('position_lat', None)
             attrs.pop('position_lng', None)

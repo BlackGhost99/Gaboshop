@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import HomeNavbar from '../components/HomeNavbar';
 import Footer from '../components/Footer';
 import { getStoreCategories } from '../services/storeService';
@@ -142,9 +143,10 @@ const StoreCategories = () => {
                   : (category.name || '?').charAt(0).toUpperCase();
 
               return (
-                <div
+                <Link
                   key={category.id || `${category.name}-${index}`}
-                  className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
+                  to={`/boutiques?categorie=${category.id}`}
+                  className="block rounded-2xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -170,7 +172,7 @@ const StoreCategories = () => {
                       </span>
                     )}
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
@@ -22,6 +22,32 @@ const formatPlanLabel = (plan) => {
   return labels[normalized] || (normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '');
 };
 
+// Liste de produits : réponse paginée { next, results: { success, data } } ou liste simple
+const extractProductsPage = (response) => {
+  if (!response) return { data: [], next: null };
+  if (response.success) return { data: response.data || [], next: null };
+  const results = response.results;
+  if (results) {
+    const data = Array.isArray(results) ? results : (results.success ? results.data || [] : []);
+    return { data, next: response.next || null };
+  }
+  return { data: Array.isArray(response) ? response : [], next: null };
+};
+
+const shuffle = (items) => {
+  const copy = items.slice();
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+const tagFeed = (items, cycle) => items.map((item) => ({ ...item, _feedKey: `${cycle}-${item.id}` }));
+
+const MOBILE_STORES = 10;
+const SIDEBAR_STORES = 8;
+
 const Home = () => {
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -42,6 +68,11 @@ const Home = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState(null);
   const location = useLocation();
+  // Fil d'actualité sans fin : pages suivantes au défilement, puis on repart du début mélangé
+  const [feed, setFeed] = useState({ page: 2, hasMore: false, cycle: 0, params: {} });
+  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
+  const [feedFailed, setFeedFailed] = useState(false);
+  const feedSentinelRef = useRef(null);
 
   const loadCartFromStorage = () => {
     try {
@@ -64,19 +95,10 @@ const Home = () => {
         ]);
 
         // Handle Products Response
-        let productsData = [];
-        if (productsRes.success) {
-          productsData = productsRes.data;
-        } else if (productsRes.results) {
-          // Handle weird nested structure or standard pagination
-          if (productsRes.results.success) {
-             productsData = productsRes.results.data;
-          } else {
-             productsData = productsRes.results;
-          }
-        }
-        setProducts(productsData);
+        const { data: productsData, next } = extractProductsPage(productsRes);
+        setProducts(tagFeed(productsData, 0));
         setAllProducts(productsData);
+        setFeed({ page: 2, hasMore: Boolean(next), cycle: 0, params: {} });
 
         // Handle Stores Response
         let storesData = [];
@@ -164,17 +186,10 @@ const Home = () => {
       
       const response = await getProducts(params);
       
-      let productsData = [];
-      if (response.success) {
-        productsData = response.data;
-      } else if (response.results) {
-        if (response.results.success) {
-           productsData = response.results.data;
-        } else {
-           productsData = response.results;
-        }
-      }
-      setProducts(productsData);
+      const { data: productsData, next } = extractProductsPage(response);
+      setProducts(tagFeed(productsData, 0));
+      setFeed({ page: 2, hasMore: Boolean(next), cycle: 0, params });
+      setFeedFailed(false);
       if (!search && !storeId) {
         setAllProducts(productsData);
       }
@@ -184,6 +199,47 @@ const Home = () => {
       setLoading(false);
     }
   };
+
+  const loadMoreProducts = useCallback(async () => {
+    if (loading || feedLoadingMore || feedFailed) return;
+    const filtered = Boolean(feed.params.search || feed.params.store);
+    let { page, cycle } = feed;
+    if (!feed.hasMore) {
+      // Recherche ou boutique : la liste a une fin. Accueil : on repart du début, mélangé.
+      if (filtered || products.length === 0) return;
+      page = 1;
+      cycle += 1;
+    }
+    setFeedLoadingMore(true);
+    try {
+      const response = await getProducts({ ...feed.params, page });
+      const { data, next } = extractProductsPage(response);
+      if (data.length === 0 && page === 1) {
+        setFeed((prev) => ({ ...prev, hasMore: false }));
+        setFeedFailed(true);
+        return;
+      }
+      const items = cycle > 0 ? shuffle(data) : data;
+      setProducts((prev) => prev.concat(tagFeed(items, cycle)));
+      setFeed((prev) => ({ ...prev, page: page + 1, hasMore: Boolean(next), cycle }));
+    } catch (err) {
+      console.error(err);
+      setFeedFailed(true);
+    } finally {
+      setFeedLoadingMore(false);
+    }
+  }, [loading, feedLoadingMore, feedFailed, feed, products.length]);
+
+  // Charge la suite quand le bas du fil approche
+  useEffect(() => {
+    const node = feedSentinelRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMoreProducts();
+    }, { rootMargin: '600px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadMoreProducts]);
 
   const fetchStores = async (search = '') => {
     try {
@@ -538,8 +594,42 @@ const Home = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           
+          {/* Mobile : boutiques en bandeau, le fil de produits reste juste en dessous */}
+          <div className="lg:hidden">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-gray-900 font-display">Boutiques locales</h2>
+              <Link to="/boutiques" className="text-sm font-semibold text-amber-700">Tout voir</Link>
+            </div>
+            {storesLoading ? (
+              <div className="flex justify-center py-4"><LoadingSpinner /></div>
+            ) : stores.length === 0 ? (
+              <p className="text-gray-500 text-sm">Aucun magasin trouvé.</p>
+            ) : (
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+                {stores.slice(0, MOBILE_STORES).map((store) => (
+                  <Link
+                    key={store.id}
+                    to={`/stores/${store.id}`}
+                    className="snap-start shrink-0 w-24 flex flex-col items-center text-center gap-1"
+                  >
+                    <span className="relative h-14 w-14 rounded-full overflow-hidden flex items-center justify-center font-bold text-lg bg-indigo-100 text-indigo-600">
+                      {store.name.charAt(0)}
+                      {store.logo && (
+                        <img src={store.logo} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      )}
+                    </span>
+                    <span className="w-full text-xs font-medium text-gray-900 truncate">{store.name}</span>
+                    <span className={`text-[10px] ${store.is_open ? 'text-green-700' : 'text-slate-500'}`}>
+                      {store.is_open ? 'Ouvert' : 'Fermé'}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Sidebar - Magasins Partenaires (1/3) */}
-          <div className="w-full lg:w-1/3">
+          <div className="hidden lg:block lg:w-1/3">
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
               <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2 font-display">
                 Boutiques locales
@@ -548,7 +638,7 @@ const Home = () => {
                 <div className="flex justify-center py-4"><LoadingSpinner /></div>
               ) : (
                 <div className="space-y-4">
-                  {stores.map((store) => (
+                  {stores.slice(0, SIDEBAR_STORES).map((store) => (
                     <div 
                       key={store.id} 
                       onClick={() => handleStoreClick(store.id)}
@@ -593,6 +683,11 @@ const Home = () => {
                   {stores.length === 0 && (
                     <p className="text-gray-500 text-sm text-center">Aucun magasin trouvé.</p>
                   )}
+                  {stores.length > 0 && (
+                    <Link to="/boutiques" className="block text-center text-sm font-semibold text-amber-700 hover:text-amber-800 pt-2">
+                      Voir toutes les boutiques
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
@@ -601,8 +696,8 @@ const Home = () => {
           {/* Main Content - Promotions & Produits (2/3) */}
           <div className="w-full lg:w-2/3">
             
-            {/* Section Promotions */}
-            <div className="mb-8" id="promotions">
+            {/* Section Promotions (cachée quand aucun produit n'est en promotion) */}
+            <div className={allProducts.some(p => p.has_discount) ? 'mb-8' : 'hidden'} id="promotions">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center font-display">
                 <span className="bg-red-100 text-red-600 p-2 rounded-full mr-3">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,7 +749,7 @@ const Home = () => {
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                   {products.map((product) => (
                     <ProductCard
-                      key={product.id}
+                      key={product._feedKey || product.id}
                       product={product}
                       onAddToCart={handleAddToCart}
                       onViewDetails={handleViewDetails}
@@ -666,6 +761,21 @@ const Home = () => {
               {!loading && products.length === 0 && (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
                   <p className="text-gray-500 text-lg">Aucun produit trouvé.</p>
+                </div>
+              )}
+
+              {!loading && products.length > 0 && (
+                <div ref={feedSentinelRef} className="py-6 flex flex-col items-center gap-3">
+                  {feedLoadingMore && <LoadingSpinner />}
+                  {feedFailed && products.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFeedFailed(false)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Charger plus de produits
+                    </button>
+                  )}
                 </div>
               )}
             </div>

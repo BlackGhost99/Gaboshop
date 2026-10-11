@@ -27,7 +27,9 @@ export const getPromotions = async () => {
         data = [];
       }
     } else if (response.data?.results) {
-      data = Array.isArray(response.data.results) ? response.data.results : [];
+      // Liste paginée : { results: { success, data: [...] } }
+      const results = response.data.results;
+      data = Array.isArray(results) ? results : (Array.isArray(results?.data) ? results.data : []);
     } else if (Array.isArray(response.data)) {
       data = response.data;
     } else if (response.data?.data && Array.isArray(response.data.data)) {
@@ -53,6 +55,7 @@ export const getPromotions = async () => {
       title: product.name,
       subtitle: `${product.store_name || 'Magasin'} - Jusqu'à -${product.discount_percentage || 0}%`,
       cta: 'Voir l\'offre',
+      link: product.store ? `/stores/${product.store}` : '/products',
       icon: '🎉',
       image: product.image,
       product_id: product.id,
@@ -98,6 +101,7 @@ export const getCategories = async () => {
       color: cat.color || 'bg-gray-100',
       textColor: cat.text_color || 'text-gray-700',
       slug: cat.slug || `category-${cat.id}`,
+      store_count: typeof cat.store_count === 'number' ? cat.store_count : null,
     }));
   } catch (error) {
     console.error('Erreur récupération catégories:', error);

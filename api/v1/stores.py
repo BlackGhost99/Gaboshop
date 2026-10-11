@@ -17,7 +17,13 @@ from core.models import AuditLog
 class StoreCategoryListView(ListAPIView):
 	permission_classes = [permissions.AllowAny]
 	serializer_class = StoreCategorySerializer
-	queryset = StoreCategory.objects.filter(is_active=True)
+
+	def get_queryset(self):
+		# Nombre de boutiques visibles par les clients, pour remplir l'accueil avec des catégories utiles
+		from django.db.models import Count, Q
+		return StoreCategory.objects.filter(is_active=True).annotate(
+			store_count=Count('stores', filter=Q(stores__is_active=True, stores__is_b2b=False))
+		).order_by('-store_count', 'name')
     
 	def list(self, request, *args, **kwargs):
 		queryset = self.get_queryset()

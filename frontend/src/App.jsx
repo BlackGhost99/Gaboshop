@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AndroidBackButton from './components/AndroidBackButton';
+import ScrollToTop from './components/ScrollToTop';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Register from './pages/Register';
@@ -77,6 +78,7 @@ function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <AndroidBackButton />
       <AIContextProvider>
         <Routes>

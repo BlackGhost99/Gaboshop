@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { register } from '../services/dashboardService';
+import { getStoreCategories } from '../services/storeService';
 import authStorage from '../utils/authStorage';
 import { safeNextPath } from '../utils/session';
 
@@ -33,12 +34,24 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [, setGpsLoading] = useState(false);
+  const [storeCategories, setStoreCategories] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
   const nextPath = safeNextPath(location.search);
 
   const isManager = form.user_type === 'store_manager';
   const isDelivery = form.user_type === 'delivery_agent';
+
+  // Types de commerce proposés au gérant (gérés dans la console admin)
+  useEffect(() => {
+    if (!isManager || storeCategories.length > 0) return;
+    getStoreCategories()
+      .then((res) => {
+        const list = res?.success ? res.data : (res?.results || (Array.isArray(res) ? res : []));
+        setStoreCategories((list || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')));
+      })
+      .catch(() => setStoreCategories([]));
+  }, [isManager, storeCategories.length]);
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -259,6 +272,20 @@ const Register = () => {
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                       required={isManager}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Type de commerce</label>
+                    <select
+                      value={form.store_category_id}
+                      onChange={(e) => updateField('store_category_id', e.target.value)}
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                      required={isManager && storeCategories.length > 0}
+                    >
+                      <option value="">Choisissez le type de votre commerce</option>
+                      {storeCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Téléphone magasin</label>

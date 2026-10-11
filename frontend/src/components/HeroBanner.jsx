@@ -15,6 +15,7 @@ const HeroBanner = ({ promotions = [] }) => {
       title: 'Boutiques locales',
       subtitle: 'Decouvrez les magasins et leurs produits du quotidien',
       cta: 'Voir les boutiques',
+      link: '/boutiques',
       bg: 'bg-gradient-to-r from-zinc-950 via-zinc-800 to-amber-600',
       icon: 'SHOP',
     },
@@ -23,6 +24,7 @@ const HeroBanner = ({ promotions = [] }) => {
       title: 'Catalogue B2C',
       subtitle: 'Produits pour la maison, la famille, et plus',
       cta: 'Explorer',
+      link: '/products',
       bg: 'bg-gradient-to-r from-zinc-900 via-stone-700 to-yellow-600',
       icon: 'B2C',
     },
@@ -31,6 +33,7 @@ const HeroBanner = ({ promotions = [] }) => {
       title: 'Business & Pro',
       subtitle: 'Les boutiques premium mises en avant',
       cta: 'Decouvrir',
+      link: '/boutiques',
       bg: 'bg-gradient-to-r from-amber-700 via-amber-600 to-yellow-500',
       icon: 'PRO',
     },
@@ -69,7 +72,7 @@ const HeroBanner = ({ promotions = [] }) => {
                 {slide.subtitle}
               </p>
               <Link
-                to="/products"
+                to={slide.link || '/products'}
                 className="px-6 py-3 btn-gold font-semibold rounded-lg shadow-lg"
               >
                 {slide.cta || 'Découvrir'}

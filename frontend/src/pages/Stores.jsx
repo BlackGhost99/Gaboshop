@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import HomeNavbar from '../components/HomeNavbar';
 import Footer from '../components/Footer';
-import { getStores } from '../services/storeService';
+import { getStores, getStoreCategories } from '../services/storeService';
 
 const normalizeText = (value) => (value || '').toString().toLowerCase();
 const formatPlanLabel = (plan) => {
@@ -19,31 +19,58 @@ const Stores = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [searchParams] = useSearchParams();
+  const categoryId = searchParams.get('categorie') || '';
+  const [categoryName, setCategoryName] = useState('');
+
   useEffect(() => {
+    let cancelled = false;
+    const extract = (response) => {
+      if (response?.success) return { data: response.data || [], next: null };
+      if (Array.isArray(response?.results)) return { data: response.results, next: response.next };
+      if (Array.isArray(response)) return { data: response, next: null };
+      return { data: [], next: null };
+    };
     const fetchStores = async () => {
       try {
         setLoading(true);
-        const response = await getStores();
+        setError(null);
+        // Toutes les pages : la liste ne doit pas s'arrêter aux 20 premières boutiques
+        const params = categoryId ? { category: categoryId } : {};
         let storesData = [];
-        if (response.success) {
-          storesData = response.data;
-        } else if (response.results) {
-          storesData = response.results;
-        } else if (Array.isArray(response)) {
-          storesData = response;
+        for (let page = 1; page <= 25; page += 1) {
+          const { data, next } = extract(await getStores({ ...params, page }));
+          storesData = storesData.concat(data);
+          if (!next) break;
         }
+        if (cancelled) return;
         setStores(storesData);
         setFilteredStores(storesData);
       } catch (err) {
         console.error(err);
-        setError('Erreur lors du chargement des boutiques.');
+        if (!cancelled) setError('Erreur lors du chargement des boutiques.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchStores();
-  }, []);
+    return () => { cancelled = true; };
+  }, [categoryId]);
+
+  useEffect(() => {
+    if (!categoryId) {
+      setCategoryName('');
+      return;
+    }
+    getStoreCategories()
+      .then((res) => {
+        const list = res?.success ? res.data : (Array.isArray(res) ? res : []);
+        const match = (list || []).find((cat) => String(cat.id) === String(categoryId));
+        setCategoryName(match?.name || '');
+      })
+      .catch(() => setCategoryName(''));
+  }, [categoryId]);
 
   useEffect(() => {
     const term = searchTerm.trim();
@@ -95,7 +122,7 @@ const Stores = () => {
     if (filteredStores.length === 0) {
       return (
         <div className="col-span-full text-center text-sm text-slate-500 bg-white/70 border border-dashed border-slate-200 rounded-2xl p-8">
-          Aucune boutique disponible pour le moment.
+          {categoryId ? 'Aucune boutique dans cette catégorie pour le moment.' : 'Aucune boutique disponible pour le moment.'}
         </div>
       );
     }
@@ -159,7 +186,7 @@ const Stores = () => {
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Boutiques</p>
               <h1 className="text-3xl font-bold text-slate-900 font-display">
-                Toutes les boutiques de GABOSHOP
+                {categoryId ? (categoryName || 'Boutiques de la catégorie') : 'Toutes les boutiques de GABOSHOP'}
               </h1>
               <p className="text-sm text-slate-600 mt-2">
                 Parcourez les boutiques actives et trouvez vos produits favoris en un instant.
@@ -170,6 +197,16 @@ const Stores = () => {
               <span className="text-xs text-slate-500">boutiques disponibles</span>
             </div>
           </div>
+          {categoryId && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              <Link to="/boutiques" className="font-semibold text-emerald-700 hover:text-emerald-800">
+                Voir toutes les boutiques
+              </Link>
+              <Link to="/categories" className="font-semibold text-slate-600 hover:text-slate-900">
+                Autres catégories
+              </Link>
+            </div>
+          )}
           {searchTerm.trim() && (
             <p className="mt-3 text-xs text-slate-500">
               Resultats pour "{searchTerm.trim()}"
