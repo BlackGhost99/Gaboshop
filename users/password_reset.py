@@ -43,10 +43,11 @@ def sms_available():
 
 
 def whatsapp_available():
-	"""WhatsApp Cloud API configuré dans Render et non coupé dans l'admin."""
+	"""WhatsApp Cloud API configuré dans Render, modèle de code approuvé (WHATSAPP_OTP_TEMPLATE) et non coupé dans l'admin."""
 	from api.models import SystemSettings
 	return bool(
 		getattr(settings, 'WHATSAPP_ACCESS_TOKEN', '') and getattr(settings, 'WHATSAPP_PHONE_ID', '')
+		and getattr(settings, 'WHATSAPP_OTP_TEMPLATE', '')
 		and SystemSettings.current('enable_whatsapp', True)
 	)
 
@@ -54,15 +55,14 @@ def whatsapp_available():
 def send_code_whatsapp(phone, code):
 	"""Modèle Meta de catégorie « Authentification » (corps {{1}} + bouton « Copier le code »)."""
 	from notifications.whatsapp import WhatsAppService
-	template = getattr(settings, 'WHATSAPP_OTP_TEMPLATE', '') or 'gaboshop_code'
-	return WhatsAppService.send_template_message(phone, template, [
+	return WhatsAppService.send_template_message(phone, settings.WHATSAPP_OTP_TEMPLATE, [
 		{'type': 'body', 'parameters': [{'type': 'text', 'text': code}]},
 		{'type': 'button', 'sub_type': 'url', 'index': '0', 'parameters': [{'type': 'text', 'text': code}]},
 	])
 
 
 def email_available():
-	return bool(getattr(settings, 'EMAIL_HOST_USER', ''))
+	return bool(getattr(settings, 'BREVO_API_KEY', '') or getattr(settings, 'EMAIL_HOST_USER', ''))
 
 
 def _find_user(phone):

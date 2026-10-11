@@ -41,6 +41,7 @@ export default function ForgotPassword() {
       .catch(() => setAvailable({}));
   }, []);
   const canSend = available && (available.whatsapp_available || available.sms_available || available.email_available);
+  const emailOnly = canSend && !available.whatsapp_available && !available.sms_available;
 
   const sendCode = async (e) => {
     e.preventDefault();
@@ -88,12 +89,17 @@ export default function ForgotPassword() {
         {available === null && <p className="text-center text-sm text-gray-600">Chargement…</p>}
         {available && !canSend && (
           <>
-            <p className="text-sm text-gray-700">L’envoi de code par WhatsApp ou SMS n’est pas encore disponible.</p>
+            <p className="text-sm text-gray-700">L’envoi de code n’est pas encore disponible.</p>
             <SupportContact />
           </>
         )}
         {canSend && step === 'phone' && (
           <form className="space-y-4" onSubmit={sendCode}>
+            {emailOnly && (
+              <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+                Le code sera envoyé à l’adresse e-mail enregistrée sur votre compte. Pas d’e-mail sur le compte ? Contactez le support.
+              </p>
+            )}
             <label className="block text-sm font-medium text-gray-700">
               Numéro de téléphone du compte
               <input type="tel" autoComplete="tel" required className={input} placeholder="+241…" value={phone} onChange={(e) => setPhone(e.target.value)} />

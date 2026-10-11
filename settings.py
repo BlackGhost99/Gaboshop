@@ -429,7 +429,8 @@ WHATSAPP_VERIFY_TOKEN = env('WHATSAPP_VERIFY_TOKEN', default='gaboshop_webhook_2
 # Clé secrète de l'app Meta : vérifie que les webhooks viennent bien de Meta.
 WHATSAPP_APP_SECRET = env('WHATSAPP_APP_SECRET', default='')
 # Modèle Meta « Authentification » utilisé pour les codes (mot de passe oublié).
-WHATSAPP_OTP_TEMPLATE = env('WHATSAPP_OTP_TEMPLATE', default='gaboshop_code')
+# Vide tant que le modèle n'est pas approuvé chez Meta : les codes ne partent alors pas par WhatsApp.
+WHATSAPP_OTP_TEMPLATE = env('WHATSAPP_OTP_TEMPLATE', default='')
 
 # SMS Configuration
 SMS_PROVIDER = env('SMS_PROVIDER', default='twilio')  # twilio, infobip, hub2
@@ -483,6 +484,10 @@ EMAIL_USE_TLS = env('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='GABOSHOP <noreply@gaboshop.ga>')
+# Brevo (API HTTP) : à utiliser sur Render, qui bloque le SMTP sortant des services gratuits.
+BREVO_API_KEY = env('BREVO_API_KEY', default='')
+if BREVO_API_KEY:
+    EMAIL_BACKEND = 'core.email_backends.BrevoEmailBackend'
 
 # Templates de notifications
 NOTIFICATION_TEMPLATES = {

@@ -39,6 +39,7 @@ MARKERS = {
     'Entreprise : nom commercial et forme juridique (9 oct.)': 'Nom / identité juridique',
     'Mot de passe oublié et preuves privées (10 oct.)': 'Recevoir un code',
     'WhatsApp : code et numéro vérifié (11 oct.)': 'Numéro vérifié',
+    'Codes par e-mail (11 oct.)': 'adresse e-mail enregistrée sur votre compte',
 }
 
 

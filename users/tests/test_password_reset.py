@@ -11,7 +11,7 @@ URL = '/api/v1/auth/password-reset/'
 CONFIRM = '/api/v1/auth/password-reset/confirm/'
 
 
-@override_settings(HUB2SMS_API_KEY='test-key', EMAIL_HOST_USER='')
+@override_settings(HUB2SMS_API_KEY='test-key', EMAIL_HOST_USER='', BREVO_API_KEY='')
 class PasswordResetTests(TestCase):
 	def setUp(self):
 		cache.clear()
@@ -58,7 +58,7 @@ class PasswordResetTests(TestCase):
 		self.assertEqual(res.status_code, 400)
 
 
-@override_settings(HUB2SMS_API_KEY='', TWILIO_ACCOUNT_SID='', TWILIO_AUTH_TOKEN='', EMAIL_HOST_USER='')
+@override_settings(HUB2SMS_API_KEY='', TWILIO_ACCOUNT_SID='', TWILIO_AUTH_TOKEN='', EMAIL_HOST_USER='', BREVO_API_KEY='')
 class PasswordResetWithoutSmsTests(TestCase):
 	def test_no_fake_code_without_sms_provider(self):
 		cache.clear()
@@ -71,7 +71,7 @@ class PasswordResetWithoutSmsTests(TestCase):
 		self.assertFalse(PasswordResetCode.objects.exists())
 
 
-@override_settings(HUB2SMS_API_KEY='test-key', WHATSAPP_ACCESS_TOKEN='t', WHATSAPP_PHONE_ID='1', EMAIL_HOST_USER='')
+@override_settings(HUB2SMS_API_KEY='test-key', WHATSAPP_ACCESS_TOKEN='t', WHATSAPP_PHONE_ID='1', WHATSAPP_OTP_TEMPLATE='gaboshop_code', EMAIL_HOST_USER='', BREVO_API_KEY='')
 class PasswordResetWhatsAppTests(TestCase):
 	def test_code_goes_by_whatsapp_template_and_skips_sms(self):
 		cache.clear()
@@ -85,3 +85,29 @@ class PasswordResetWhatsAppTests(TestCase):
 		code = components[0]['parameters'][0]['text']
 		self.assertRegex(code, r'^\d{6}$')
 		self.assertEqual(components[1]['parameters'][0]['text'], code)
+
+
+@override_settings(
+	HUB2SMS_API_KEY='', TWILIO_ACCOUNT_SID='', TWILIO_AUTH_TOKEN='', EMAIL_HOST_USER='',
+	WHATSAPP_ACCESS_TOKEN='t', WHATSAPP_PHONE_ID='1', WHATSAPP_OTP_TEMPLATE='',
+	BREVO_API_KEY='cle-test', EMAIL_BACKEND='core.email_backends.BrevoEmailBackend',
+	DEFAULT_FROM_EMAIL='Gaboshop <contact@exemple.com>',
+)
+class PasswordResetEmailOnlyTests(TestCase):
+	def test_code_goes_by_brevo_email_and_not_whatsapp_without_template(self):
+		cache.clear()
+		User.objects.create_user(phone='+24177444444', password='ancien123', user_type='client', email='client@exemple.com')
+		api = APIClient()
+		data = api.get(URL).json()['data']
+		self.assertFalse(data['whatsapp_available'])
+		self.assertTrue(data['email_available'])
+		with mock.patch('core.email_backends.requests.post') as post, \
+				mock.patch('notifications.whatsapp.WhatsAppService.send_template_message') as wa:
+			post.return_value.raise_for_status.return_value = None
+			api.post(URL, {'phone': '077444444'}, format='json')
+		wa.assert_not_called()
+		payload = post.call_args.kwargs['json']
+		self.assertEqual(payload['to'], [{'email': 'client@exemple.com'}])
+		self.assertEqual(payload['sender'], {'name': 'Gaboshop', 'email': 'contact@exemple.com'})
+		self.assertEqual(post.call_args.kwargs['headers']['api-key'], 'cle-test')
+		self.assertRegex(payload['textContent'], r'\d{6}')

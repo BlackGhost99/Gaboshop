@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 from users.models import User
 
 
-@override_settings(WHATSAPP_ACCESS_TOKEN='t', WHATSAPP_PHONE_ID='1', HUB2SMS_API_KEY='', TWILIO_ACCOUNT_SID='', EMAIL_HOST_USER='')
+@override_settings(WHATSAPP_ACCESS_TOKEN='t', WHATSAPP_PHONE_ID='1', HUB2SMS_API_KEY='', TWILIO_ACCOUNT_SID='', WHATSAPP_OTP_TEMPLATE='gaboshop_code', EMAIL_HOST_USER='', BREVO_API_KEY='')
 class PhoneVerificationTests(TestCase):
 	def setUp(self):
 		cache.clear()
