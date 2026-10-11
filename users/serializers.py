@@ -43,6 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
         # l'envoie vers l'espace admin. Les permissions admin du backend acceptent déjà is_staff.
         if instance.is_superuser or instance.is_staff:
             data['user_type'] = 'admin'
+        data['phone_verified'] = bool(instance.phone_verified_at)
         return data
 
 class RegisterSerializer(serializers.ModelSerializer):

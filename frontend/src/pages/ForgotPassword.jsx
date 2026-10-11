@@ -40,7 +40,7 @@ export default function ForgotPassword() {
       .then((res) => setAvailable(res.data?.data || {}))
       .catch(() => setAvailable({}));
   }, []);
-  const canSend = available && (available.sms_available || available.email_available);
+  const canSend = available && (available.whatsapp_available || available.sms_available || available.email_available);
 
   const sendCode = async (e) => {
     e.preventDefault();
@@ -88,7 +88,7 @@ export default function ForgotPassword() {
         {available === null && <p className="text-center text-sm text-gray-600">Chargement…</p>}
         {available && !canSend && (
           <>
-            <p className="text-sm text-gray-700">L’envoi de code par SMS n’est pas encore disponible.</p>
+            <p className="text-sm text-gray-700">L’envoi de code par WhatsApp ou SMS n’est pas encore disponible.</p>
             <SupportContact />
           </>
         )}

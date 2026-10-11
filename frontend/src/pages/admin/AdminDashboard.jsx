@@ -2320,6 +2320,7 @@ const AdminDashboard = () => {
               <p><span className="font-semibold">Actif: </span>{selectedUser.is_active ? 'Oui' : 'Non'}</p>
               <p><span className="font-semibold">Staff: </span>{selectedUser.is_staff ? 'Oui' : 'Non'}</p>
               <p><span className="font-semibold">Vérifié: </span>{selectedUser.is_verified ? 'Oui' : 'Non'}</p>
+              <p><span className="font-semibold">Numéro vérifié: </span>{selectedUser.phone_verified ? 'Oui (code reçu)' : 'Non'}</p>
               <p><span className="font-semibold">Disponible: </span>{selectedUser.is_available ? 'Oui' : 'Non'}</p>
               <p><span className="font-semibold">Créé le: </span>{new Date(selectedUser.created_at).toLocaleString()}</p>
             </div>

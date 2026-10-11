@@ -8,7 +8,7 @@ from rest_framework.routers import DefaultRouter
 
 from .users import (
     RegisterView, LoginView, ProfileView, RefreshTokenView, DeleteAccountView,
-    PasswordResetRequestView, PasswordResetConfirmView
+    PasswordResetRequestView, PasswordResetConfirmView, PhoneVerificationView, PhoneVerificationConfirmView
 )
 from .stores import (
     StoreCategoryListView, StoreListView, StoreDetailView, StoreCreateView,
@@ -127,6 +127,8 @@ urlpatterns = [
     path('auth/token/refresh/', RefreshTokenView.as_view(), name='token-refresh'),
     path('auth/password-reset/', PasswordResetRequestView.as_view(), name='auth-password-reset'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='auth-password-reset-confirm'),
+    path('auth/phone/verify/', PhoneVerificationView.as_view(), name='auth-phone-verify'),
+    path('auth/phone/verify/confirm/', PhoneVerificationConfirmView.as_view(), name='auth-phone-verify-confirm'),
 
     # Notifications
     path('notifications/', NotificationListView.as_view(), name='notifications'),

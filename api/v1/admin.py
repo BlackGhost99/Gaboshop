@@ -157,6 +157,7 @@ class AdminUsersView(APIView):
                 "is_active": u.is_active,
                 "is_staff": u.is_staff,
                 "is_verified": getattr(u, 'is_verified', False),
+                "phone_verified": bool(u.phone_verified_at),
                 "is_available": getattr(u, 'is_available', False),
                 "created_at": u.date_joined,
             }
@@ -235,6 +236,7 @@ class AdminUsersView(APIView):
                 "is_active": user.is_active,
                 "is_staff": user.is_staff,
                 "is_verified": getattr(user, 'is_verified', False),
+                "phone_verified": bool(user.phone_verified_at),
                 "is_available": getattr(user, 'is_available', False),
                 "created_at": user.date_joined,
             }
@@ -265,6 +267,8 @@ class AdminUsersView(APIView):
             return Response({"success": False, "message": "user_type invalide"}, status=status.HTTP_400_BAD_REQUEST)
 
         if phone:
+            if phone != user.phone:
+                user.phone_verified_at = None
             user.phone = phone
         if user_type:
             user.user_type = user_type
@@ -316,6 +320,7 @@ class AdminUsersView(APIView):
                 "is_active": user.is_active,
                 "is_staff": user.is_staff,
                 "is_verified": getattr(user, 'is_verified', False),
+                "phone_verified": bool(user.phone_verified_at),
                 "is_available": getattr(user, 'is_available', False),
                 "created_at": user.date_joined,
             }

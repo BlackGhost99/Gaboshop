@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import LoadingSpinner from '../LoadingSpinner';
 import authStorage from '../../utils/authStorage';
+import PhoneVerifyBanner from '../PhoneVerifyBanner';
 
 /**
  * Composant réutilisable pour routes authentifiées avec contrôle de rôle
@@ -50,6 +51,6 @@ export default function PrivateRoute({ children, allowedRoles = [] }) {
 		return <LoadingSpinner />;
 	}
 
-	return isAuthorized ? children : null;
+	return isAuthorized ? <><PhoneVerifyBanner />{children}</> : null;
 }
 

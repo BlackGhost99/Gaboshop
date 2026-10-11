@@ -69,3 +69,19 @@ class PasswordResetWithoutSmsTests(TestCase):
 			self.assertEqual(api.post(URL, {'phone': '077222222'}, format='json').status_code, 200)
 		sms.assert_not_called()
 		self.assertFalse(PasswordResetCode.objects.exists())
+
+
+@override_settings(HUB2SMS_API_KEY='test-key', WHATSAPP_ACCESS_TOKEN='t', WHATSAPP_PHONE_ID='1', EMAIL_HOST_USER='')
+class PasswordResetWhatsAppTests(TestCase):
+	def test_code_goes_by_whatsapp_template_and_skips_sms(self):
+		cache.clear()
+		User.objects.create_user(phone='+24177333333', password='ancien123', user_type='client')
+		with mock.patch('notifications.whatsapp.WhatsAppService.send_template_message', return_value=True) as wa, \
+				mock.patch('users.password_reset.SMSService.send_sms') as sms:
+			APIClient().post(URL, {'phone': '077333333'}, format='json')
+		sms.assert_not_called()
+		phone, template, components = wa.call_args[0]
+		self.assertEqual(template, 'gaboshop_code')
+		code = components[0]['parameters'][0]['text']
+		self.assertRegex(code, r'^\d{6}$')
+		self.assertEqual(components[1]['parameters'][0]['text'], code)

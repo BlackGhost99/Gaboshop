@@ -318,8 +318,10 @@ class PasswordResetRequestView(APIView):
 	throttle_classes = [AuthIPThrottle, LoginPhoneThrottle]
 
 	def get(self, request):
-		from users.password_reset import email_available, sms_available
-		return Response({'success': True, 'data': {'sms_available': sms_available(), 'email_available': email_available()}})
+		from users.password_reset import email_available, sms_available, whatsapp_available
+		return Response({'success': True, 'data': {
+			'whatsapp_available': whatsapp_available(), 'sms_available': sms_available(), 'email_available': email_available(),
+		}})
 
 	def post(self, request):
 		from users.password_reset import CODE_MINUTES, request_code
@@ -346,3 +348,36 @@ class PasswordResetConfirmView(APIView):
 		if not ok:
 			return Response({'success': False, 'error': {'code': 400, 'message': reason}}, status=status.HTTP_400_BAD_REQUEST)
 		return Response({'success': True, 'message': 'Mot de passe changé. Vous pouvez vous connecter.'})
+
+
+class PhoneVerificationView(APIView):
+	"""Vérification facultative du numéro : envoie un code (POST) puis le contrôle (POST confirm)."""
+	permission_classes = [permissions.IsAuthenticated]
+	throttle_classes = [AuthIPThrottle]
+
+	def get(self, request):
+		from users.password_reset import channels_available
+		return Response({'success': True, 'data': {
+			'phone_verified': bool(request.user.phone_verified_at), 'available': channels_available(),
+		}})
+
+	def post(self, request):
+		from users.password_reset import CODE_MINUTES, send_phone_verification
+		if request.user.phone_verified_at:
+			return Response({'success': True, 'message': 'Votre numéro est déjà vérifié.'})
+		if not send_phone_verification(request.user):
+			return Response({'success': False, 'error': {'code': 503, 'message': "Le code n'a pas pu être envoyé.",
+				'next_step': 'Réessayez dans quelques minutes.'}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+		return Response({'success': True, 'message': f'Code envoyé au {request.user.phone}. Il est valable {CODE_MINUTES} minutes.'})
+
+
+class PhoneVerificationConfirmView(APIView):
+	permission_classes = [permissions.IsAuthenticated]
+	throttle_classes = [AuthIPThrottle]
+
+	def post(self, request):
+		from users.password_reset import confirm_phone_verification
+		ok, reason = confirm_phone_verification(request.user, request.data.get('code'))
+		if not ok:
+			return Response({'success': False, 'error': {'code': 400, 'message': reason}}, status=status.HTTP_400_BAD_REQUEST)
+		return Response({'success': True, 'message': 'Numéro vérifié.'})

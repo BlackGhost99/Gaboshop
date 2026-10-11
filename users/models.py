@@ -90,6 +90,8 @@ class User(AbstractUser):
     
 	# Email optionnel (certains utilisateurs n'ont pas d'email)
 	email = models.EmailField(blank=True)
+	# Rempli quand l'utilisateur a saisi le code reçu sur son numéro (facultatif).
+	phone_verified_at = models.DateTimeField(null=True, blank=True)
     
 	# === CHAMPS SPÉCIFIQUES PAR TYPE ===
 	# Pour les livreurs
@@ -329,8 +331,10 @@ class UserProfile(models.Model):
 
 
 class PasswordResetCode(models.Model):
-	"""Code à 6 chiffres envoyé pour « mot de passe oublié ». Seule son empreinte est gardée."""
+	"""Code à 6 chiffres (mot de passe oublié, vérification du numéro). Seule son empreinte est gardée."""
+	PURPOSES = (('reset', 'Mot de passe oublié'), ('verify_phone', 'Vérification du numéro'))
 	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_codes')
+	purpose = models.CharField(max_length=20, choices=PURPOSES, default='reset')
 	code_hash = models.CharField(max_length=128)
 	created_at = models.DateTimeField(auto_now_add=True)
 	expires_at = models.DateTimeField()

@@ -426,6 +426,10 @@ WHATSAPP_BUSINESS_API_URL = env('WHATSAPP_BUSINESS_API_URL', default='https://gr
 WHATSAPP_PHONE_ID = env('WHATSAPP_PHONE_ID', default='')
 WHATSAPP_ACCESS_TOKEN = env('WHATSAPP_ACCESS_TOKEN', default='')
 WHATSAPP_VERIFY_TOKEN = env('WHATSAPP_VERIFY_TOKEN', default='gaboshop_webhook_2024')
+# Clé secrète de l'app Meta : vérifie que les webhooks viennent bien de Meta.
+WHATSAPP_APP_SECRET = env('WHATSAPP_APP_SECRET', default='')
+# Modèle Meta « Authentification » utilisé pour les codes (mot de passe oublié).
+WHATSAPP_OTP_TEMPLATE = env('WHATSAPP_OTP_TEMPLATE', default='gaboshop_code')
 
 # SMS Configuration
 SMS_PROVIDER = env('SMS_PROVIDER', default='twilio')  # twilio, infobip, hub2

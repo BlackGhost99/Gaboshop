@@ -1,7 +1,7 @@
-"""« Mot de passe oublié » : un code à 6 chiffres envoyé par SMS (et par e-mail si le compte en a un).
+"""« Mot de passe oublié » : un code à 6 chiffres envoyé par WhatsApp ou SMS (et par e-mail si le compte en a un).
 
 Le code expire au bout de 15 minutes, 5 essais au plus. On ne dit jamais si un numéro a un compte.
-Sans fournisseur SMS configuré, aucun code n'est simulé : l'utilisateur est orienté vers le support,
+Sans WhatsApp ni SMS configuré, aucun code n'est simulé : l'utilisateur est orienté vers le support,
 qui peut définir un nouveau mot de passe depuis l'admin.
 """
 import logging
@@ -42,6 +42,25 @@ def sms_available():
 	)
 
 
+def whatsapp_available():
+	"""WhatsApp Cloud API configuré dans Render et non coupé dans l'admin."""
+	from api.models import SystemSettings
+	return bool(
+		getattr(settings, 'WHATSAPP_ACCESS_TOKEN', '') and getattr(settings, 'WHATSAPP_PHONE_ID', '')
+		and SystemSettings.current('enable_whatsapp', True)
+	)
+
+
+def send_code_whatsapp(phone, code):
+	"""Modèle Meta de catégorie « Authentification » (corps {{1}} + bouton « Copier le code »)."""
+	from notifications.whatsapp import WhatsAppService
+	template = getattr(settings, 'WHATSAPP_OTP_TEMPLATE', '') or 'gaboshop_code'
+	return WhatsAppService.send_template_message(phone, template, [
+		{'type': 'body', 'parameters': [{'type': 'text', 'text': code}]},
+		{'type': 'button', 'sub_type': 'url', 'index': '0', 'parameters': [{'type': 'text', 'text': code}]},
+	])
+
+
 def email_available():
 	return bool(getattr(settings, 'EMAIL_HOST_USER', ''))
 
@@ -51,44 +70,51 @@ def _find_user(phone):
 	return User.objects.filter(phone=normalize_phone(phone), is_active=True).first()
 
 
-def request_code(phone):
-	"""Crée et envoie un code si le compte existe. Ne renvoie rien qui trahisse l'existence du compte."""
+def _issue_code(user, purpose):
+	"""Crée un code et l'envoie (WhatsApp, sinon SMS ; e-mail en plus). Renvoie False si aucun canal."""
 	from users.models import PasswordResetCode
-	user = _find_user(phone)
-	if user is None:
-		return
 	now = timezone.now()
-	if PasswordResetCode.objects.filter(user=user, created_at__gte=now - timedelta(hours=1)).count() >= MAX_CODES_PER_HOUR:
-		return
-	can_sms, can_email = sms_available(), email_available() and bool(user.email)
-	if not (can_sms or can_email):
-		return
+	recent = PasswordResetCode.objects.filter(user=user, purpose=purpose, created_at__gte=now - timedelta(hours=1))
+	if recent.count() >= MAX_CODES_PER_HOUR:
+		return False
+	can_whatsapp, can_sms = whatsapp_available(), sms_available()
+	can_email = email_available() and bool(user.email)
+	if not (can_whatsapp or can_sms or can_email):
+		return False
 	code = f"{secrets.randbelow(1_000_000):06d}"
-	PasswordResetCode.objects.filter(user=user, used_at__isnull=True).update(used_at=now)
+	PasswordResetCode.objects.filter(user=user, purpose=purpose, used_at__isnull=True).update(used_at=now)
 	PasswordResetCode.objects.create(
-		user=user, code_hash=make_password(code), expires_at=now + timedelta(minutes=CODE_MINUTES),
+		user=user, purpose=purpose, code_hash=make_password(code), expires_at=now + timedelta(minutes=CODE_MINUTES),
 	)
-	message = f"Gaboshop : votre code pour changer de mot de passe est {code}. Il expire dans {CODE_MINUTES} min. Ne le donnez à personne."
-	if can_sms:
+	what = 'changer de mot de passe' if purpose == 'reset' else 'vérifier votre numéro'
+	message = f"Gaboshop : votre code pour {what} est {code}. Il expire dans {CODE_MINUTES} min. Ne le donnez à personne."
+	sent = False
+	if can_whatsapp:
 		try:
-			SMSService.send_sms(user.phone, message)
+			sent = send_code_whatsapp(user.phone, code)
 		except Exception:
-			logger.exception("Envoi SMS du code de réinitialisation impossible")
+			logger.exception("Envoi WhatsApp du code impossible")
+	if can_sms and not sent:
+		try:
+			sent = SMSService.send_sms(user.phone, message)
+		except Exception:
+			logger.exception("Envoi SMS du code impossible")
 	if can_email:
 		try:
-			send_mail('Gaboshop : changer votre mot de passe', message, settings.DEFAULT_FROM_EMAIL, [user.email])
+			send_mail('Gaboshop : votre code', message, settings.DEFAULT_FROM_EMAIL, [user.email])
+			sent = True
 		except Exception:
-			logger.exception("Envoi e-mail du code de réinitialisation impossible")
+			logger.exception("Envoi e-mail du code impossible")
+	return sent
 
 
-def reset_password(phone, code, new_password):
-	"""Renvoie (True, '') si le mot de passe a été changé, sinon (False, raison lisible)."""
+def _check_code(user, code, purpose):
+	"""Renvoie (True, '') et consomme le code s'il est bon, sinon (False, raison lisible)."""
 	from users.models import PasswordResetCode
 	invalid = "Code incorrect ou expiré. Demandez un nouveau code."
-	user = _find_user(phone)
-	if user is None:
-		return False, invalid
-	entry = PasswordResetCode.objects.filter(user=user, used_at__isnull=True, expires_at__gt=timezone.now()).first()
+	entry = PasswordResetCode.objects.filter(
+		user=user, purpose=purpose, used_at__isnull=True, expires_at__gt=timezone.now(),
+	).first()
 	if entry is None or entry.attempts >= MAX_ATTEMPTS:
 		return False, invalid
 	if not check_password(str(code or '').strip(), entry.code_hash):
@@ -96,8 +122,42 @@ def reset_password(phone, code, new_password):
 		entry.save(update_fields=['attempts'])
 		left = MAX_ATTEMPTS - entry.attempts
 		return False, (f"Code incorrect. Il vous reste {left} essai(s)." if left > 0 else invalid)
-	user.set_password(new_password)
-	user.save(update_fields=['password'])
 	entry.used_at = timezone.now()
 	entry.save(update_fields=['used_at'])
 	return True, ''
+
+
+def channels_available():
+	return whatsapp_available() or sms_available()
+
+
+def request_code(phone):
+	"""Mot de passe oublié : envoie un code si le compte existe, sans jamais le révéler."""
+	user = _find_user(phone)
+	if user is not None:
+		_issue_code(user, 'reset')
+
+
+def reset_password(phone, code, new_password):
+	"""Renvoie (True, '') si le mot de passe a été changé, sinon (False, raison lisible)."""
+	user = _find_user(phone)
+	if user is None:
+		return False, "Code incorrect ou expiré. Demandez un nouveau code."
+	ok, reason = _check_code(user, code, 'reset')
+	if not ok:
+		return False, reason
+	user.set_password(new_password)
+	user.save(update_fields=['password'])
+	return True, ''
+
+
+def send_phone_verification(user):
+	return _issue_code(user, 'verify_phone')
+
+
+def confirm_phone_verification(user, code):
+	ok, reason = _check_code(user, code, 'verify_phone')
+	if ok:
+		user.phone_verified_at = timezone.now()
+		user.save(update_fields=['phone_verified_at'])
+	return ok, reason
