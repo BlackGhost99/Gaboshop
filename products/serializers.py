@@ -80,9 +80,11 @@ class ProductSerializer(serializers.ModelSerializer):
             'has_discount', 'discount_percentage', 'stock', 
             'sku', 'barcode', 'is_available', 'is_featured',
             'weight_kg', 'length_m', 'estimated_weight_kg', 'attributes',
-            'image', 'image_2', 'image_3', 'created_at'
+            'image', 'image_2', 'image_3', 'images', 'created_at'
         ]
         read_only_fields = ['store', 'created_at']
+
+    images = ProductImageSerializer(many=True, read_only=True)
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     """Serializer détaillé pour un produit"""

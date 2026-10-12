@@ -3,6 +3,8 @@ import { notifyError } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import ConfirmModal from '../../components/ConfirmModal';
+import ProductPhotosField from '../../components/ProductPhotosField';
+import { allPhotos } from '../../utils/productPhotos';
 import { getStoreDashboard } from '../../services/dashboardService';
 import { 
     getStoreProducts, 
@@ -32,7 +34,10 @@ const StoreProducts = () => {
     const [newCategory, setNewCategory] = useState({
         name: '', description: '', commission_rate: '8.00', order: 0
     });
+    const [galleryFiles, setGalleryFiles] = useState([]);
+    const [removedPhotos, setRemovedPhotos] = useState([]);
     const [viewingProduct, setViewingProduct] = useState(null);
+    const [viewingPhoto, setViewingPhoto] = useState(0);
     const [editingProduct, setEditingProduct] = useState(null);
     const [toast, setToast] = useState(null);
     const [subscriptionInfo, setSubscriptionInfo] = useState(null);
@@ -120,6 +125,7 @@ const StoreProducts = () => {
 
     const handleViewProduct = (product) => {
         setViewingProduct(product);
+        setViewingPhoto(0);
     };
 
     const handleEditProduct = (product) => {
@@ -135,6 +141,8 @@ const StoreProducts = () => {
             attributes: product.attributes || {},
             image: null
         });
+        setGalleryFiles([]);
+        setRemovedPhotos([]);
         setShowProductModal(true);
     };
 
@@ -148,6 +156,10 @@ const StoreProducts = () => {
                 formData.append(key, newProduct[key]);
             }
         });
+        galleryFiles.forEach((file) => formData.append('gallery', file));
+        if (editingProduct && removedPhotos.length) {
+            formData.append('remove_images', removedPhotos.join(','));
+        }
 
         try {
             let res;
@@ -165,7 +177,7 @@ const StoreProducts = () => {
                 }
                 setShowProductModal(false);
                 setEditingProduct(null);
-                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null });
+                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null }); setGalleryFiles([]); setRemovedPhotos([]);
             }
         } catch (error) {
             console.error("Error saving product", error);
@@ -294,7 +306,12 @@ const StoreProducts = () => {
                                 {category.items.map(product => (
                                     <div key={product.id} className="border rounded p-4 flex flex-col min-w-[280px] w-[280px] flex-shrink-0 bg-white hover:shadow-md transition-shadow">
                                         {product.image && (
-                                            <img src={product.image} alt={product.name} className="w-full h-40 object-cover mb-3 rounded" />
+                                            <div className="relative mb-3">
+                                                <img src={product.image} alt={product.name} className="w-full h-40 object-cover rounded" />
+                                                {allPhotos(product).length > 1 && (
+                                                    <span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">📷 {allPhotos(product).length}</span>
+                                                )}
+                                            </div>
                                         )}
                                         <h4 className="font-bold text-lg mb-1 truncate" title={product.name}>{product.name}</h4>
                                         <p className="text-sm text-gray-600 mb-3 line-clamp-2 h-10 overflow-hidden">{product.description}</p>
@@ -351,8 +368,19 @@ const StoreProducts = () => {
                             </svg>
                         </button>
                         <h3 className="text-2xl font-bold mb-4 pr-8">{viewingProduct.name}</h3>
-                        {viewingProduct.image && (
-                            <img src={viewingProduct.image} alt={viewingProduct.name} className="w-full h-64 object-cover mb-4 rounded" />
+                        {allPhotos(viewingProduct).length > 0 && (
+                            <div className="mb-4">
+                                <img src={allPhotos(viewingProduct)[viewingPhoto] || allPhotos(viewingProduct)[0]} alt={viewingProduct.name} className="w-full h-64 object-cover rounded" />
+                                {allPhotos(viewingProduct).length > 1 && (
+                                    <div className="mt-2 flex gap-2 overflow-x-auto">
+                                        {allPhotos(viewingProduct).map((src, i) => (
+                                            <button key={src} type="button" onClick={() => setViewingPhoto(i)} className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded border-2 ${i === viewingPhoto ? 'border-indigo-600' : 'border-transparent'}`}>
+                                                <img src={src} alt="" className="h-full w-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         )}
                         <div className="space-y-3">
                             <div>
@@ -550,24 +578,22 @@ const StoreProducts = () => {
                                     required
                                 />
                             </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium mb-1">Image</label>
-                                <input 
-                                    type="file" 
-                                    className="w-full border rounded p-2"
-                                    onChange={e => setNewProduct({...newProduct, image: e.target.files[0]})}
-                                />
-                                {editingProduct && editingProduct.image && (
-                                    <p className="text-xs text-gray-500 mt-1">Laissez vide pour conserver l'image actuelle.</p>
-                                )}
-                            </div>
+                            <ProductPhotosField
+                                product={editingProduct}
+                                mainFile={newProduct.image}
+                                onMainFile={(file) => setNewProduct({ ...newProduct, image: file })}
+                                galleryFiles={galleryFiles}
+                                onGalleryFiles={setGalleryFiles}
+                                removed={removedPhotos}
+                                onRemoved={setRemovedPhotos}
+                            />
                             <div className="sticky bottom-0 -mx-5 px-5 py-3 bg-white border-t border-gray-100 flex justify-end space-x-2">
                                 <button 
                                     type="button"
                                     onClick={() => {
                                         setShowProductModal(false);
                                         setEditingProduct(null);
-                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null });
+                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null }); setGalleryFiles([]); setRemovedPhotos([]);
                                     }}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
                                 >

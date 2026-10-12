@@ -17,6 +17,59 @@ from products.serializers import (
 from stores.models import Store
 from api.v1.admin import IsPlatformAdmin
 
+# Photos d'un produit : la principale (image) + 5 autres au plus (galerie, et anciens image_2/image_3).
+MAX_EXTRA_PHOTOS = 5
+LEGACY_PHOTO_FIELDS = ('image_2', 'image_3')
+
+
+def _photo_error(message):
+    return Response({
+        'success': False,
+        'error': {'code': status.HTTP_400_BAD_REQUEST, 'message': message, 'details': {'gallery': [message]}},
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _clean_gallery_files(request):
+    """Vérifie que les fichiers « gallery » sont de vraies images. Renvoie (fichiers, message d'erreur)."""
+    from django import forms
+    files = request.FILES.getlist('gallery')
+    field = forms.ImageField()
+    for f in files:
+        try:
+            field.clean(f)
+        except forms.ValidationError:
+            return [], f"« {f.name} » n'est pas une image valide (JPG, PNG ou WEBP)."
+        f.seek(0)
+    return files, ''
+
+
+def _removed_photos(request):
+    raw = request.data.get('remove_images', '')
+    values = request.data.getlist('remove_images') if hasattr(request.data, 'getlist') else [raw]
+    return {v.strip() for item in values for v in str(item or '').split(',') if v.strip()}
+
+
+def _extra_photo_count(product, removed=()):
+    legacy = sum(1 for f in LEGACY_PHOTO_FIELDS if getattr(product, f) and f not in removed)
+    gallery = product.images.exclude(id__in=[int(r) for r in removed if r.isdigit()]).count()
+    return legacy + gallery
+
+
+def _apply_photos(product, files, removed):
+    """Retire les photos demandées (« image_2 », « image_3 » ou l'id d'une photo de galerie) puis ajoute les nouvelles."""
+    from products.models import ProductImage
+    for name in LEGACY_PHOTO_FIELDS:
+        if name in removed and getattr(product, name):
+            getattr(product, name).delete(save=False)
+            setattr(product, name, None)
+    product.save()
+    for img in product.images.filter(id__in=[int(r) for r in removed if r.isdigit()]):
+        img.image.delete(save=False)
+        img.delete()
+    start = (product.images.order_by('-order').values_list('order', flat=True).first() or 0) + 1
+    for i, f in enumerate(files):
+        ProductImage.objects.create(product=product, image=f, order=start + i, alt_text=product.name[:200])
+
 # Default templates per StoreCategory.name used as fallback suggestions
 DEFAULT_CATEGORY_TEMPLATES = {
     'Hypermarché': [
@@ -76,7 +129,7 @@ class ProductListView(ListAPIView):
             is_available=True,
             store__is_active=True,
             market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
-        ).select_related('store', 'category').annotate(
+        ).select_related('store', 'category').prefetch_related('images').annotate(
             store_priority=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0))
         ).order_by('-is_sponsored', '-store_priority', '-created_at')
 
@@ -110,7 +163,7 @@ class StoreProductsView(ListAPIView):
             is_available=True,
             store__is_active=True,
             market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
-        ).select_related('store', 'category')
+        ).select_related('store', 'category').prefetch_related('images')
 
     def list(self, request, *args, **kwargs):
         # Vérifier que le magasin existe et est actif
@@ -199,6 +252,12 @@ class ProductCreateView(APIView):
                 }
             }, status=status.HTTP_403_FORBIDDEN)
 
+        gallery, error = _clean_gallery_files(request)
+        if error:
+            return _photo_error(error)
+        if len(gallery) > MAX_EXTRA_PHOTOS:
+            return _photo_error(f"Vous pouvez ajouter {MAX_EXTRA_PHOTOS} autres photos au plus, en plus de la photo principale.")
+
         serializer = ProductCreateSerializer(
             data=request.data,
             context={'request': request}
@@ -221,6 +280,7 @@ class ProductCreateView(APIView):
                 }, status=status.HTTP_403_FORBIDDEN)
 
             product = serializer.save(store=store)
+            _apply_photos(product, gallery, set())
 
             return Response({
                 'success': True,
@@ -256,6 +316,15 @@ class ProductUpdateView(APIView):
                 }
             }, status=status.HTTP_403_FORBIDDEN)
 
+        gallery, error = _clean_gallery_files(request)
+        if error:
+            return _photo_error(error)
+        removed = _removed_photos(request)
+        if _extra_photo_count(product, removed) + len(gallery) > MAX_EXTRA_PHOTOS:
+            return _photo_error(
+                f"Un produit a {MAX_EXTRA_PHOTOS} autres photos au plus, en plus de la photo principale. Retirez-en une avant d'en ajouter."
+            )
+
         serializer = ProductUpdateSerializer(
             product, 
             data=request.data, 
@@ -281,6 +350,7 @@ class ProductUpdateView(APIView):
                 }, status=status.HTTP_403_FORBIDDEN)
 
             product = serializer.save()
+            _apply_photos(product, gallery, removed)
 
             return Response({
                 'success': True,
@@ -459,7 +529,7 @@ class StoreManagerProductsView(ListAPIView):
 
     def get_queryset(self):
         store_id = self.kwargs['store_id']
-        return Product.objects.filter(store_id=store_id).select_related('store', 'category').order_by('-created_at')
+        return Product.objects.filter(store_id=store_id).select_related('store', 'category').prefetch_related('images').order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
         try:

@@ -489,3 +489,67 @@ class StoreOpeningHoursTests(TestCase):
 	def test_unsaved_text_hours_do_not_crash(self):
 		self.store.opening_time, self.store.closing_time = '00:00', '23:59'
 		self.assertIsInstance(self.store.is_open(), bool)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(), MEDIA_IN_DATABASE=False)
+class ProductPhotosTests(TestCase):
+	"""Un commerce met jusqu'à 6 photos par produit : la principale + 5 autres."""
+
+	def setUp(self):
+		from payments.models import SubscriptionPlan
+		from products.models import ProductCategory
+		SubscriptionPlan.objects.get_or_create(plan_type='free', defaults={'name': 'Free', 'slug': 'free', 'price': 0})
+		self.manager = User.objects.create_user(phone='077000040', password='secret123', user_type='store_manager')
+		category = StoreCategory.objects.create(name='Mode')
+		self.store = Store.objects.create(
+			name='Boutique', category=category, manager=self.manager,
+			phone='077000041', zone='Louis', address='Rue 2',
+		)
+		self.cat = ProductCategory.objects.create(name='Robes', store=self.store) if hasattr(ProductCategory, 'store') else None
+		self.client = APIClient()
+		self.client.force_authenticate(self.manager)
+
+	def _create(self, gallery):
+		data = {'name': 'Robe', 'price': '5000', 'stock': '3', 'weight_kg': '0.5', 'length_m': '1',
+			'image': _image('main.png'), 'gallery': gallery}
+		if self.cat:
+			data['category'] = self.cat.id
+		return self.client.post(f'/api/v1/stores/{self.store.id}/products/create/', data, format='multipart')
+
+	def test_create_with_gallery_then_remove_and_add(self):
+		res = self._create([_image('a.png'), _image('b.png')])
+		self.assertIn(res.status_code, (200, 201), res.content)
+		data = res.json()['data']
+		self.assertEqual(len(data['images']), 2)
+		self.assertTrue(data['image'])
+		product_id = data['id']
+		first = data['images'][0]['id']
+
+		res = self.client.patch(f'/api/v1/products/{product_id}/update/', {
+			'remove_images': str(first), 'gallery': [_image('c.png')],
+		}, format='multipart')
+		self.assertEqual(res.status_code, 200, res.content)
+		self.assertEqual(len(res.json()['data']['images']), 2)
+		self.assertNotIn(first, [i['id'] for i in res.json()['data']['images']])
+
+		body = self.client.get(f'/api/v1/stores/{self.store.id}/products/').json()
+		listed = body.get('results') or body.get('data', {}).get('products') or body['data']
+		listed = listed.get('products', listed) if isinstance(listed, dict) else listed
+		self.assertEqual(len(listed[0]['images']), 2)
+
+	def test_limit_of_five_extra_photos(self):
+		res = self._create([_image(f'{i}.png') for i in range(6)])
+		self.assertEqual(res.status_code, 400)
+		res = self._create([_image(f'{i}.png') for i in range(5)])
+		self.assertIn(res.status_code, (200, 201), res.content)
+		res = self.client.patch(f"/api/v1/products/{res.json()['data']['id']}/update/", {
+			'gallery': [_image('trop.png')],
+		}, format='multipart')
+		self.assertEqual(res.status_code, 400)
+		self.assertIn('5 autres photos', res.json()['error']['message'])
+
+	def test_rejects_non_image(self):
+		bad = SimpleUploadedFile('virus.png', b'pas une image', content_type='image/png')
+		res = self._create([bad])
+		self.assertEqual(res.status_code, 400)
+		self.assertFalse(self.store.products.exists())
