@@ -151,3 +151,18 @@ class StoredFile(models.Model):
 
 	def __str__(self):
 		return self.name
+
+
+class ScheduledTaskRun(models.Model):
+	"""Dernier passage de chaque tâche automatique (lancées par le minuteur, sans worker Celery)."""
+	name = models.CharField(max_length=60, unique=True)
+	last_run_at = models.DateTimeField(null=True, blank=True)
+	last_ok = models.BooleanField(default=True)
+	last_message = models.TextField(blank=True)
+
+	class Meta:
+		verbose_name = "Tâche automatique"
+		verbose_name_plural = "Tâches automatiques"
+
+	def __str__(self):
+		return self.name

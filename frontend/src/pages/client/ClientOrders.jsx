@@ -68,6 +68,7 @@ const ClientOrders = () => {
   const [confirming, setConfirming] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
+  const [rating, setRating] = useState(0);
   const [pendingOrderId, setPendingOrderId] = useState(null);
   const [pinError, setPinError] = useState('');
 
@@ -187,6 +188,9 @@ const ClientOrders = () => {
       if (pinCode) {
         payload.pin_code = pinCode;
       }
+      if (rating) {
+        payload.rating = rating;
+      }
 
       const res = await confirmDelivery(orderId, payload);
       if (res.success) {
@@ -195,6 +199,7 @@ const ClientOrders = () => {
         setShowPinModal(false);
         setPinInput('');
         setPinError('');
+        setRating(0);
         fetchOrders(); // Rafraîchir la liste
       } else {
         const msg = res.error?.message || 'Erreur lors de la confirmation';
@@ -448,6 +453,24 @@ const ClientOrders = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-md text-center text-2xl font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
               autoFocus
             />
+            <div className="mb-4 text-center">
+              <p className="text-sm text-gray-700">Notez la livraison (facultatif)</p>
+              <div className="mt-1 flex justify-center gap-1" role="radiogroup" aria-label="Note de la livraison">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={rating === n}
+                    aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
+                    onClick={() => setRating(rating === n ? 0 : n)}
+                    className={`text-3xl leading-none ${n <= rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
             {pinError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
                 {pinError}

@@ -1,0 +1,66 @@
+name: Sauvegarde de la base
+
+# Chaque nuit, copie complète de la base de production (Supabase), chiffrée avant de quitter la machine.
+# Secrets GitHub à créer (Settings > Secrets and variables > Actions) :
+#   BACKUP_DATABASE_URL : adresse Postgres de prod en mode « Session » (port 5432, pas 6543)
+#   BACKUP_PASSPHRASE   : long mot de passe (20+ caractères) à garder hors de GitHub ; sans lui, la sauvegarde est illisible.
+# Le fichier est gardé 30 jours dans l'onglet Actions (artefact « sauvegarde-… »).
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Vérifier les secrets
+        id: check
+        env:
+          DB: ${{ secrets.BACKUP_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$PASS" ]; then
+            echo "Secrets BACKUP_DATABASE_URL et BACKUP_PASSPHRASE absents : aucune sauvegarde."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif [ ${#PASS} -lt 20 ]; then
+            echo "::error::BACKUP_PASSPHRASE doit faire au moins 20 caractères."
+            exit 1
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Installer pg_dump 17
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Sauvegarder et chiffrer
+        if: steps.check.outputs.ready == 'true'
+        env:
+          DB: ${{ secrets.BACKUP_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -o pipefail
+          name="gaboshop-$(date -u +%Y-%m-%d).dump.gpg"
+          /usr/lib/postgresql/17/bin/pg_dump --format=custom --no-owner --no-privileges "$DB" \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase-fd 3 --output "$name" 3<<<"$PASS"
+          size=$(stat -c %s "$name")
+          if [ "$size" -lt 10000 ]; then echo "::error::Sauvegarde trop petite ($size octets)"; exit 1; fi
+          echo "BACKUP_FILE=$name" >> "$GITHUB_ENV"
+          echo "Sauvegarde chiffrée : $name ($size octets)"
+
+      - name: Garder la sauvegarde 30 jours
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-${{ github.run_id }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30

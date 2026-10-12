@@ -47,14 +47,39 @@ class OrderCreateView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
     
 	def post(self, request):
+		# Même panier renvoyé (réponse perdue, connexion coupée) : on rend la commande déjà créée.
+		request_id = str(request.headers.get('Idempotency-Key') or '').strip()[:64]
+		if request_id:
+			existing = Order.objects.filter(client=request.user, client_request_id=request_id).first()
+			if existing:
+				return Response({
+					'success': True,
+					'message': 'Commande déjà créée.',
+					'data': OrderSerializer(existing).data
+				}, status=status.HTTP_200_OK)
+
 		serializer = OrderCreateSerializer(
 			data=request.data,
 			context={'request': request}
 		)
         
 		if serializer.is_valid():
-			with transaction.atomic():
-				order = serializer.save()
+			from django.db import IntegrityError
+			try:
+				with transaction.atomic():
+					order = serializer.save()
+					if request_id:
+						order.client_request_id = request_id
+						order.save(update_fields=['client_request_id'])
+			except IntegrityError:
+				existing = Order.objects.filter(client=request.user, client_request_id=request_id).first() if request_id else None
+				if existing is None:
+					raise
+				return Response({
+					'success': True,
+					'message': 'Commande déjà créée.',
+					'data': OrderSerializer(existing).data
+				}, status=status.HTTP_200_OK)
             
 			return Response({
 				'success': True,
@@ -222,6 +247,20 @@ class OrderStatusUpdateView(APIView):
 			}, status=status.HTTP_404_NOT_FOUND)
 
 
+def _rate_delivery_agent(delivery, rating, comment):
+	"""Enregistre la note du client et met à jour la note moyenne du livreur."""
+	from django.db.models import Avg
+	from delivery.models import Delivery, DeliveryProfile
+	from users.models import LivreurProfile
+	delivery.rating = rating
+	delivery.customer_feedback = comment
+	delivery.save(update_fields=['rating', 'customer_feedback'])
+	average = Delivery.objects.filter(delivery_agent_id=delivery.delivery_agent_id, rating__isnull=False).aggregate(v=Avg('rating'))['v'] or 0
+	average = round(average, 2)
+	DeliveryProfile.objects.filter(user_id=delivery.delivery_agent_id).update(average_rating=average)
+	LivreurProfile.objects.filter(user_id=delivery.delivery_agent_id).update(note_moyenne=average)
+
+
 class ClientConfirmDeliveryView(APIView):
 	"""
 	Permet au client de confirmer qu'il a bien reçu sa commande.
@@ -327,6 +366,14 @@ class ClientConfirmDeliveryView(APIView):
 			proof.client_received_status = True
 			proof.save()
 			proof.refresh_from_db()
+
+			# Note du livreur (facultative) donnée par le client à la confirmation.
+			try:
+				rating = int(request.data.get('rating') or 0)
+			except (TypeError, ValueError):
+				rating = 0
+			if 1 <= rating <= 5 and order.delivery.delivery_agent_id:
+				_rate_delivery_agent(order.delivery, rating, str(request.data.get('comment') or '')[:500])
 
 			# Le client confirme : le livreur reçoit sa part du paiement en ligne.
 			from payments.direct_service import is_manual_order

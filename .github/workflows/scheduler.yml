@@ -1,0 +1,28 @@
+name: Tâches automatiques
+
+# Render gratuit n'a pas de worker Celery : ce minuteur appelle l'API, qui lance les tâches dues
+# (attribution des livreurs, paiements en attente, commandes abandonnées, abonnements expirés).
+# De 6 h à 23 h (heure de Libreville) seulement, pour ménager les heures gratuites de Render.
+on:
+  schedule:
+    - cron: '*/10 5-21 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Lancer les tâches dues
+        env:
+          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+        run: |
+          if [ -z "$CRON_TOKEN" ]; then
+            echo "Secret CRON_TOKEN absent : ajoutez-le dans GitHub (Settings > Secrets > Actions) et dans Render."
+            exit 0
+          fi
+          curl -sS --fail-with-body --max-time 150 --retry 2 --retry-delay 20 \
+            -X POST -H "X-Cron-Token: $CRON_TOKEN" \
+            https://gaboshop-api.onrender.com/api/v1/internal/tick/

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import StatCard from '../../components/StatCard';
@@ -347,7 +347,21 @@ const ClientDashboard = () => {
     );
   };
 
+  // Un identifiant par panier validé, gardé tant que la commande n'est pas confirmée : un renvoi
+  // après une connexion coupée retrouve la commande déjà créée au lieu d'en créer une 2e.
+  const orderRequestIds = useRef({});
+  const orderRequestId = (storeName, payload) => {
+    const signature = JSON.stringify(payload);
+    const saved = orderRequestIds.current[storeName];
+    if (saved && saved.signature === signature) return saved.id;
+    // Panier ou infos modifiés : c'est une nouvelle commande.
+    const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    orderRequestIds.current[storeName] = { id, signature };
+    return id;
+  };
+
   const handleClearStoreCart = (storeName) => {
+    delete orderRequestIds.current[storeName];
     persistCart(cartItems.filter((it) => (it.store_name || 'Magasin') !== storeName));
   };
 
@@ -438,7 +452,7 @@ const ClientDashboard = () => {
 
     setSubmitting((prev) => ({ ...prev, [storeName]: true }));
     try {
-      const res = await createOrder(payload);
+      const res = await createOrder(payload, orderRequestId(storeName, payload));
       if (res.success) {
         const orderId = res.data?.id;
         let paymentInfo = null;

@@ -58,3 +58,22 @@ class OrderCreateErrorTests(TestCase):
         response = self.order()
         self.assertEqual(response.status_code, 400)
         self.assertIn('store', response.json()['error']['details'])
+
+    def test_same_cart_sent_twice_creates_one_order(self):
+        from orders.models import Order
+        with mock.patch('delivery.tasks.assign_nearest_delivery_agent'):
+            payload = {
+                'store': self.store.id, 'city': 'Libreville', 'delivery_address': 'Akanda', 'delivery_phone': '077391199',
+                'delivery_zone': 'Centre', 'delivery_requested': True, 'payment_flow': 'direct_split',
+                'payment_method': 'cash', 'items': [{'product_id': self.product.id, 'quantity': 2}],
+            }
+            first = self.api.post('/api/v1/orders/create/', payload, format='json', HTTP_IDEMPOTENCY_KEY='panier-1')
+            again = self.api.post('/api/v1/orders/create/', payload, format='json', HTTP_IDEMPOTENCY_KEY='panier-1')
+            other = self.api.post('/api/v1/orders/create/', payload, format='json', HTTP_IDEMPOTENCY_KEY='panier-2')
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(again.json()['data']['id'], first.json()['data']['id'])
+        self.assertEqual(other.status_code, 201)
+        self.assertEqual(Order.objects.filter(client=self.client_user).count(), 2)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 16)

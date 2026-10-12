@@ -97,6 +97,7 @@ from b2b.api.views import (
     B2BProductPricingBulkCreateView
 )
 from .b2c_admin import B2CProductPricingListView
+from .internal import HealthView, SchedulerTickView
 from .orders_admin import (
     OrderStatsView, OrdersListView, OrderDetailView as AdminOrderDetailView,
     DeliveryAssignmentView, OrderStatusUpdateView as AdminOrderStatusUpdateView,
@@ -370,4 +371,8 @@ urlpatterns = [
     
     # AI Module
     path('ai/', include('api.v1.ai.urls')),
+
+    # Tâches automatiques (minuteur) et santé de l'API
+    path('internal/tick/', SchedulerTickView.as_view(), name='scheduler-tick'),
+    path('health/', HealthView.as_view(), name='health'),
 ]

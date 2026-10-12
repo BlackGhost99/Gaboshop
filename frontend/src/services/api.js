@@ -9,6 +9,8 @@ const baseURL = envBase ? `${envBase.replace(/\/$/, '')}/api/v1` : '/api/v1';
 
 const api = axios.create({
   baseURL,
+  // Pas d'attente sans fin : 90 s couvrent le réveil du serveur gratuit (environ 1 min).
+  timeout: 90000,
 });
 
 // Intercepteur pour ajouter le token JWT et gérer Content-Type

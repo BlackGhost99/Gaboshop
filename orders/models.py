@@ -40,6 +40,8 @@ class Order(models.Model):
 
 	# B2B Fields
 	is_b2b = models.BooleanField(default=False, help_text="Commande entre professionnels (Store Ã  Store)")
+	# Identifiant envoyé par l'app pour chaque validation de panier : un renvoi (connexion coupée) ne crée pas une 2e commande.
+	client_request_id = models.CharField(max_length=64, blank=True, default='', editable=False)
 	source_store = models.ForeignKey(
 		Store, 
 		on_delete=models.SET_NULL, 
@@ -87,6 +89,12 @@ class Order(models.Model):
 			models.Index(fields=['client', 'status']),
 			models.Index(fields=['store', 'status']),
 			models.Index(fields=['status', 'created_at']),
+		]
+		constraints = [
+			models.UniqueConstraint(
+				fields=['client', 'client_request_id'], condition=~models.Q(client_request_id=''),
+				name='order_unique_client_request',
+			),
 		]
     
 	def __str__(self):

@@ -421,7 +421,16 @@ def _broadcast_delay_seconds(started_at, now):
     return max(0, int(delay))
 
 
+def _no_worker():
+    """Sans worker Celery (Render gratuit), les tâches différées ne seraient jamais traitées :
+    c'est le minuteur (core.scheduled.advance_deliveries) qui gère délais et diffusion."""
+    from django.conf import settings
+    return bool(getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False))
+
+
 def _enqueue_timeout_task(delivery_id, assignment_round, timeout_minutes):
+    if _no_worker():
+        return
     current_app.send_task(
         'delivery.tasks.assignment_timeout_check',
         args=[delivery_id, assignment_round],
@@ -430,6 +439,8 @@ def _enqueue_timeout_task(delivery_id, assignment_round, timeout_minutes):
 
 
 def _enqueue_broadcast_task(delivery_id, delay_seconds):
+    if _no_worker():
+        return
     current_app.send_task(
         'delivery.tasks.broadcast_delivery_if_unaccepted',
         args=[delivery_id],
@@ -438,6 +449,8 @@ def _enqueue_broadcast_task(delivery_id, delay_seconds):
 
 
 def _enqueue_retry_task(delivery_id):
+    if _no_worker():
+        return
     current_app.send_task(
         'delivery.tasks.retry_delivery_assignment',
         args=[delivery_id],

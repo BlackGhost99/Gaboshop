@@ -528,6 +528,8 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Africa/Libreville'
 # Test deployments without a worker run tasks inline (no beat/worker needed).
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
+# Jeton du minuteur (GitHub Actions) qui lance les tâches automatiques : POST /api/v1/internal/tick/.
+CRON_TOKEN = env('CRON_TOKEN', default='')
 CELERY_TASK_EAGER_PROPAGATES = False
 CELERY_ENABLE_UTC = True
 

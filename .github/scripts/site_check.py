@@ -42,6 +42,7 @@ MARKERS = {
     'Codes par e-mail (11 oct.)': 'adresse e-mail enregistrée sur votre compte',
     'Codes par SMS Twilio (11 oct.)': 'Vous recevrez un code par SMS ou WhatsApp',
     'Plusieurs photos par produit (12 oct.)': 'Montrez le produit sous plusieurs angles',
+    'Fiabilité lot 1 : note du livreur (12 oct.)': 'Notez la livraison (facultatif)',
 }
 
 
@@ -110,6 +111,18 @@ def check(site):
         lines.append(f"- Envoi des codes : WhatsApp `{data.get('whatsapp_available')}`, SMS `{data.get('sms_available')}`, e-mail `{data.get('email_available')}`")
     except Exception:
         lines.append(f"- Envoi des codes : **{res['status']}**")
+
+    # Tâches automatiques et commandes bloquées (page santé publique).
+    res = fetch(f'{api}/api/v1/health/')
+    try:
+        data = json.loads(res['body']).get('data', {})
+        lines.append(
+            f"- Minuteur configuré : `{data.get('scheduler_configured')}`, dernier passage : `{data.get('last_tick_at')}`, "
+            f"commandes prêtes sans livreur depuis 30 min : `{data.get('orders_ready_without_driver_30min')}`, "
+            f"paiements en ligne en attente depuis 30 min : `{data.get('online_payments_pending_30min')}`"
+        )
+    except Exception:
+        lines.append(f"- Santé de l'API : **{res['status']}**")
 
     res = fetch(f'{web}/')
     lines.append(f"- Site web : **{res['status']}** en {res['seconds']} s")
