@@ -1,9 +1,10 @@
 name: Sauvegarde de la base
 
 # Chaque nuit, copie complète de la base de production (Supabase), chiffrée avant de quitter la machine.
-# Secrets GitHub à créer (Settings > Secrets and variables > Actions) :
-#   BACKUP_DATABASE_URL : adresse Postgres de prod en mode « Session » (port 5432, pas 6543)
-#   BACKUP_PASSPHRASE   : long mot de passe (20+ caractères) à garder hors de GitHub ; sans lui, la sauvegarde est illisible.
+# Secrets GitHub à créer (Settings > Secrets and variables > Actions), recopiés depuis Render (gaboshop-api) :
+#   BACKUP_DB_HOST, BACKUP_DB_NAME, BACKUP_DB_USER, BACKUP_DB_PASSWORD (= DATABASE_HOST, _NAME, _USER, _PASSWORD)
+#   (ou, à la place, BACKUP_DATABASE_URL : adresse Postgres complète, port 5432)
+#   BACKUP_PASSPHRASE : long mot de passe (20+ caractères) à garder hors de GitHub ; sans lui, la sauvegarde est illisible.
 # Le fichier est gardé 30 jours dans l'onglet Actions (artefact « sauvegarde-… »).
 on:
   schedule:
@@ -22,10 +23,11 @@ jobs:
         id: check
         env:
           DB: ${{ secrets.BACKUP_DATABASE_URL }}
+          DB_HOST: ${{ secrets.BACKUP_DB_HOST }}
           PASS: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          if [ -z "$DB" ] || [ -z "$PASS" ]; then
-            echo "Secrets BACKUP_DATABASE_URL et BACKUP_PASSPHRASE absents : aucune sauvegarde."
+          if { [ -z "$DB" ] && [ -z "$DB_HOST" ]; } || [ -z "$PASS" ]; then
+            echo "Secrets de sauvegarde absents (BACKUP_DB_HOST... ou BACKUP_DATABASE_URL, et BACKUP_PASSPHRASE) : aucune sauvegarde."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           elif [ ${#PASS} -lt 20 ]; then
             echo "::error::BACKUP_PASSPHRASE doit faire au moins 20 caractères."
@@ -46,9 +48,17 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           DB: ${{ secrets.BACKUP_DATABASE_URL }}
+          PGHOST: ${{ secrets.BACKUP_DB_HOST }}
+          PGDATABASE: ${{ secrets.BACKUP_DB_NAME || 'postgres' }}
+          PGUSER: ${{ secrets.BACKUP_DB_USER }}
+          PGPASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+          PGPORT: '5432'
+          PGSSLMODE: require
           PASS: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -o pipefail
+          # Sans adresse complète, pg_dump lit PGHOST, PGUSER, PGPASSWORD... (aucun souci de caractères spéciaux).
+          if [ -z "$DB" ]; then DB="dbname=$PGDATABASE"; fi
           name="gaboshop-$(date -u +%Y-%m-%d).dump.gpg"
           /usr/lib/postgresql/17/bin/pg_dump --format=custom --no-owner --no-privileges "$DB" \
             | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase-fd 3 --output "$name" 3<<<"$PASS"
