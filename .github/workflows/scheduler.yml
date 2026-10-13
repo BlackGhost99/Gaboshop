@@ -13,6 +13,8 @@ on:
     - cron: '0 5 * * *'
     - cron: '*/30 5-21 * * *'
   workflow_dispatch:
+  push:
+    branches: [scheduler-start]
 
 permissions:
   actions: write  # relancer ce minuteur (workflow_dispatch) à la fin d'un passage
