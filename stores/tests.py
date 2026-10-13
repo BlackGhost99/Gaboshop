@@ -24,7 +24,7 @@ class StoreProfileUpdateTests(TestCase):
 	def setUp(self):
 		self.manager = User.objects.create_user(phone='077000010', password='secret123', user_type='store_manager')
 		category = StoreCategory.objects.create(name='Épicerie')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='TestMag1', category=category, manager=self.manager,
 			phone='077000011', zone='Louis', address='Rue 1',
 		)
@@ -70,7 +70,7 @@ class MediaInDatabaseTests(TestCase):
 
 	def setUp(self):
 		self.manager = User.objects.create_user(phone='077000030', password='secret123', user_type='store_manager')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='MagPhoto', category=StoreCategory.objects.create(name='Mode'), manager=self.manager,
 			phone='077000031', zone='Louis', address='Rue 1',
 		)
@@ -108,7 +108,7 @@ class AdminProductCategoryTests(TestCase):
 		self.admin = User.objects.create_superuser(phone='062300001', password='secret123', email='')
 		self.manager = User.objects.create_user(phone='077000020', password='secret123', user_type='store_manager')
 		self.category = StoreCategory.objects.create(name='Supermarché')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='Mag', category=self.category, manager=self.manager,
 			phone='077000021', zone='Louis', address='Rue 1',
 		)
@@ -154,7 +154,7 @@ class AdminProductFormTests(TestCase):
 		self.admin = User.objects.create_superuser(phone='062300002', password='secret123', email='')
 		manager = User.objects.create_user(phone='077000030', password='secret123', user_type='store_manager')
 		category = StoreCategory.objects.create(name='Prêt-à-porter')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='Mode', category=category, manager=manager,
 			phone='077000031', zone='Louis', address='Rue 1',
 		)
@@ -202,7 +202,7 @@ class ShoppingAssistantTests(TestCase):
 	def setUp(self):
 		from products.models import Product
 		manager = User.objects.create_user(phone='077000040', password='secret123', user_type='store_manager')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='Chez Paul', category=StoreCategory.objects.create(name='Mode'), manager=manager,
 			phone='077000041', zone='Louis', address='Rue 1',
 		)
@@ -260,7 +260,7 @@ class AssistantTests(TestCase):
 	def setUp(self):
 		from products.models import Product
 		self.manager = User.objects.create_user(phone='077000050', password='secret123', user_type='store_manager')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='TestMag1', category=StoreCategory.objects.create(name='Mode'), manager=self.manager,
 			phone='077000051', zone='Louis', address='Rue 1',
 		)
@@ -450,7 +450,7 @@ class StoreOpeningHoursTests(TestCase):
 	def setUp(self):
 		manager = User.objects.create_user(phone='077000090', password='secret123', user_type='store_manager')
 		category = StoreCategory.objects.create(name='Horaires')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='Horaires', category=category, manager=manager, phone='077000091', address='Libreville', zone='Centre',
 		)
 
@@ -501,7 +501,7 @@ class ProductPhotosTests(TestCase):
 		SubscriptionPlan.objects.get_or_create(plan_type='free', defaults={'name': 'Free', 'slug': 'free', 'price': 0})
 		self.manager = User.objects.create_user(phone='077000040', password='secret123', user_type='store_manager')
 		category = StoreCategory.objects.create(name='Mode')
-		self.store = Store.objects.create(
+		self.store = Store.objects.create(is_verified=True, 
 			name='Boutique', category=category, manager=self.manager,
 			phone='077000041', zone='Louis', address='Rue 2',
 		)

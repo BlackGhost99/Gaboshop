@@ -865,3 +865,9 @@ export const getDeliveryIncidents = async () => (await api.get('/admin/delivery/
 // Photo de preuve (protégée) : récupérée avec la session de l'admin, jamais par lien public.
 export const getDeliveryProofPhoto = async (deliveryId, kind) => (await api.get(`/dashboard/delivery/${deliveryId}/proof-photo/${kind}/`, { responseType: 'blob' })).data;
 export const assignDeliveryAgent = async (orderId, agentId) => (await api.post(`/admin/orders/${orderId}/assign-delivery/`, { delivery_agent_id: agentId })).data;
+
+// Confiance d'un commerce : { is_verified, is_trusted, payouts_frozen } (un ou plusieurs champs).
+export const setStoreTrustAdmin = async (storeId, payload) => {
+  const res = await api.post(`/admin/stores/${storeId}/trust/`, payload);
+  return res.data;
+};

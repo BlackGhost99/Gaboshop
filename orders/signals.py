@@ -63,9 +63,11 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 		NotificationService.notify_order_status_update(order, order._old_status, order.status)
 	
 	# 2b. Le commerce confirme la commande -> versement de sa part (circuit paiement en ligne)
+	# Seulement pour un commerce de confiance : les autres sont payés après la réception confirmée par le client.
 	if hasattr(order, '_old_status') and order._old_status != 'preparing' and order.status == 'preparing':
-		from payments.store_payout_service import schedule_store_payment
-		schedule_store_payment(order.pk)
+		from payments.store_payout_service import payout_moment_reached, schedule_store_payment
+		if payout_moment_reached(order, 'preparing'):
+			schedule_store_payment(order.pk)
 	
 	# 3. Créer Commission quand commande est payée
 	if order.status == 'paid' and not hasattr(order, 'commission'):

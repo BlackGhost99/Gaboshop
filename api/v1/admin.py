@@ -675,6 +675,7 @@ class AdminStoresView(APIView):
 
         try:
             store = Store.objects.create(
+                is_verified=True, verified_at=timezone.now(),  # créé par l'admin : validé d'office
                 name=name,
                 description=request.data.get('description', ''),
                 category=category,

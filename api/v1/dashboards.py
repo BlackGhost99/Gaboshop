@@ -7,6 +7,7 @@ from payments.models import CategoryCommission
 from django.utils import timezone
 from payments.models import StoreSubscription
 from orders.models import Order
+from payments.store_payout_service import held_funds
 from delivery.models import Delivery
 from orders.models import OrderItem
 from decimal import Decimal
@@ -322,7 +323,11 @@ class StoreDashboardView(APIView):
                     'payout_operator': store.payout_operator,
                     # Le commerce voit seulement si ses versements sont prêts, pas l'identifiant SingPay.
                     'payouts_ready': bool(store.singpay_disbursement_id),
+                    # Tant que Gaboshop n'a pas validé le commerce, il n'est visible de personne.
+                    'is_verified': store.is_verified,
                 },
+                # Argent payé en ligne par les clients, gardé par Gaboshop jusqu'au versement.
+                'held_funds': held_funds(store),
                 'owner': {
                     'email': store.manager.email or '',
                     'first_name': store.manager.first_name or '',

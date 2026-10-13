@@ -23,7 +23,7 @@ class CashVerificationTests(TestCase):
         self.client_user = User.objects.create_user(phone='+24106200003', password='x', user_type='client')
         self.other = User.objects.create_user(phone='+24106200005', password='x', user_type='client')
         self.category = StoreCategory.objects.create(name='Test')
-        self.store = Store.objects.create(
+        self.store = Store.objects.create(is_verified=True, 
             name='Commerce', category=self.category, manager=self.manager, phone='+24106000100', address='Libreville', zone='Centre',
             commission_rate=Decimal('8'), payment_preferences={'instructions': {'airtel_money': 'Code marchand Airtel 123456'}},
         )
@@ -130,7 +130,7 @@ class SecurityFixesTests(TestCase):
         self.manager = User.objects.create_user(phone='+24106300001', password='x', user_type='store_manager', email='gerant@example.com')
         self.client_user = User.objects.create_user(phone='+24106300002', password='secret123', user_type='client')
         category = StoreCategory.objects.create(name='Mode')
-        self.store = Store.objects.create(name='Boutique', category=category, manager=self.manager, phone='+24106000200', address='Libreville', zone='Centre')
+        self.store = Store.objects.create(is_verified=True, name='Boutique', category=category, manager=self.manager, phone='+24106000200', address='Libreville', zone='Centre')
         pcat = ProductCategory.objects.create(store_category=category, name='Habits')
         self.product = Product.objects.create(store=self.store, category=pcat, name='Robe', price=Decimal('15000'), stock=3, weight_kg=Decimal('1'))
         self.commission = CategoryCommission.objects.create(store_category=category, base_rate=Decimal('8'))

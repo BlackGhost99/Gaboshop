@@ -12,6 +12,7 @@ import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils
 import PendingPayments from '../../components/payments/PendingPayments';
 import StorePaymentSettings from '../../components/payments/StorePaymentSettings';
 import OrderPaymentModal from '../../components/payments/OrderPaymentModal';
+import HeldFundsCard from '../../components/payments/HeldFundsCard';
 
 // Axe des ventes en FCFA : entiers lisibles (750, 15 k, 1,2 M) au lieu de 0.004k
 const compactFcfa = new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 });
@@ -161,6 +162,15 @@ const StoreDashboard = () => {
         title={`Dashboard - ${dashboardData?.store?.name || 'Magasin'}`}
         userName={dashboardData?.store?.name}
       >
+        {dashboardData?.store && dashboardData.store.is_verified === false && (
+          <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 mb-6 rounded shadow-sm">
+            <p className="font-bold">Boutique en attente de validation par Gaboshop</p>
+            <p className="text-sm">
+              Pour protéger les clients, une nouvelle boutique n’est visible et ne peut vendre qu’après vérification par notre équipe.
+              Préparez dès maintenant vos produits, vos horaires et vos moyens de paiement : vous serez prévenu dès la validation.
+            </p>
+          </div>
+        )}
         {dashboardData?.store?.store_type === 'wholesaler' && (
           <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded shadow-sm">
             <p className="font-bold flex items-center gap-2">
@@ -357,6 +367,8 @@ const StoreDashboard = () => {
 
               {/* Goal card removed per request */}
             </div>
+
+            <HeldFundsCard funds={dashboardData?.held_funds} />
 
             {/* Statistiques principales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

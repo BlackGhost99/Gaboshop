@@ -18,7 +18,7 @@ class OrderCreateErrorTests(TestCase):
         manager = User.objects.create_user(phone='+24107000202', password='x', user_type='store_manager')
         self.client_user = User.objects.create_user(phone='+24107000203', password='x', user_type='client')
         category = StoreCategory.objects.create(name='Test')
-        self.store = Store.objects.create(
+        self.store = Store.objects.create(is_verified=True, 
             name='Commerce', category=category, manager=manager, phone='+24107000210', address='Libreville',
             zone='Centre', commission_rate=Decimal('8'), opening_time=time(0, 0), closing_time=time(23, 59),
         )

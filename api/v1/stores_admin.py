@@ -173,6 +173,9 @@ class StoresListView(APIView):
                 'products_count': store.products_count,
                 'orders_count': store.orders_count,
                 'is_active': store.is_active,
+                'is_verified': store.is_verified,
+                'is_trusted': store.is_trusted,
+                'payouts_frozen': store.payouts_frozen,
                 'is_b2b': store.is_b2b,
                 'is_b2c': store.is_b2c,
                 'market_mode': store.market_mode,
@@ -272,6 +275,7 @@ class StoreCreateView(APIView):
             
             # Create store
             store = Store.objects.create(
+                is_verified=True, verified_at=timezone.now(),  # créé par l'admin : validé d'office
                 name=data.get('name'),
                 description=data.get('description', ''),
                 category_id=data.get('category_id'),
@@ -679,3 +683,65 @@ class StoreDeliveryAgentsView(APIView):
             'data': data,
             'count': len(data)
         })
+
+
+class AdminStoreTrustView(APIView):
+    """POST /admin/stores/<id>/trust/ : valider un commerce, le marquer de confiance, geler ou dégeler ses versements."""
+    permission_classes = [IsPlatformAdmin]
+    FIELDS = ('is_verified', 'is_trusted', 'payouts_frozen')
+
+    def post(self, request, store_id):
+        from core.models import AuditLog
+        from notifications.service import NotificationService
+        from payments.models import StorePayout
+        from payments.store_payout_service import FROZEN_NOTE, release_store_payment
+
+        store = get_object_or_404(Store, id=store_id)
+        changes = {}
+        for field in self.FIELDS:
+            if field in request.data:
+                value = str(request.data.get(field)).lower() in ('1', 'true', 'yes', 'on')
+                if getattr(store, field) != value:
+                    changes[field] = (getattr(store, field), value)
+                    setattr(store, field, value)
+        if not changes:
+            return Response({'success': True, 'message': 'Aucun changement.', 'data': self._data(store)})
+        if 'is_verified' in changes:
+            store.verified_at = timezone.now() if store.is_verified else None
+        store.save(update_fields=[*changes, 'verified_at', 'updated_at'])
+
+        labels = {
+            'is_verified': ('commerce validé', 'validation retirée'),
+            'is_trusted': ('commerce de confiance', 'confiance retirée'),
+            'payouts_frozen': ('versements gelés', 'versements dégelés'),
+        }
+        summary = ', '.join(labels[f][0 if new else 1] for f, (_, new) in changes.items())
+        AuditLog.log_action(
+            action_type='store_updated', user=request.user, object_type='store', object_id=store.id,
+            old_value={f: old for f, (old, _) in changes.items()}, new_value={f: new for f, (_, new) in changes.items()},
+            ip_address=request.META.get('REMOTE_ADDR'), reason=summary,
+        )
+
+        if changes.get('is_verified', (None, False))[1] and store.manager_id:
+            try:
+                NotificationService.notify_user(store.manager, {
+                    'title': 'Boutique validée par Gaboshop',
+                    'body': f"« {store.name} » est maintenant visible des clients et peut recevoir des commandes.",
+                    'level': 'success',
+                    'next_step': 'Vérifiez vos produits, vos horaires et vos moyens de paiement.',
+                }, notif_type='info')
+            except Exception:
+                pass
+        if changes.get('payouts_frozen', (None, True))[1] is False:
+            # Dégel : les versements retenus repartent.
+            for payout in StorePayout.objects.filter(store=store, status='pending', note=FROZEN_NOTE):
+                release_store_payment(payout.order_id)
+
+        return Response({'success': True, 'message': summary[:1].upper() + summary[1:] + '.', 'data': self._data(store)})
+
+    @staticmethod
+    def _data(store):
+        return {
+            'id': store.id, 'is_verified': store.is_verified, 'is_trusted': store.is_trusted,
+            'payouts_frozen': store.payouts_frozen, 'verified_at': store.verified_at,
+        }

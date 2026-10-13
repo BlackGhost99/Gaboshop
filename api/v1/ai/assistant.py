@@ -177,7 +177,7 @@ def t_search_products(ctx, query='', max_price=None, min_price=None, brand=None,
 
 def t_get_product(ctx, product_id):
     p = Product.objects.select_related('store', 'category').filter(
-        id=product_id, is_available=True, store__is_active=True).first()
+        id=product_id, is_available=True, store__is_active=True, store__is_verified=True).first()
     if not p:
         return {'error': 'Produit introuvable ou indisponible.'}
     ctx.show([p])
@@ -192,7 +192,7 @@ def t_get_product(ctx, product_id):
 
 def t_add_to_cart(ctx, product_id, quantity=1, size=None):
     p = Product.objects.select_related('store').filter(
-        id=product_id, is_available=True, store__is_active=True).first()
+        id=product_id, is_available=True, store__is_active=True, store__is_verified=True).first()
     if not p:
         return {'error': 'Produit introuvable ou indisponible.'}
     try:

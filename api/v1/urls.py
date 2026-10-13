@@ -107,7 +107,7 @@ from .stores_admin import (
     StoresListView, StoreDetailView as AdminStoreDetailView, StoreCreateView as AdminStoreCreateView,
     StoreUpdateView as AdminStoreUpdateView, StoreMarketModeUpdateView, StoreB2BSettingsUpdateView, StoreB2CSettingsUpdateView, StoreDeactivateView, StoreActivateView,
     StoreDeleteView, StoreProductsView as AdminStoreProductsView,
-    StoreOrdersView as AdminStoreOrdersView, StoreDeliveryAgentsView
+    StoreOrdersView as AdminStoreOrdersView, StoreDeliveryAgentsView, AdminStoreTrustView
 )
 from .products_admin import (
     ProductsListView, ProductDetailView as AdminProductDetailView,
@@ -243,6 +243,7 @@ urlpatterns = [
     path('admin/stores/<int:store_id>/b2c-settings/', StoreB2CSettingsUpdateView.as_view(), name='admin-stores-b2c-settings'),
     path('admin/stores/<int:store_id>/deactivate/', StoreDeactivateView.as_view(), name='admin-stores-deactivate'),
     path('admin/stores/<int:store_id>/activate/', StoreActivateView.as_view(), name='admin-stores-activate'),
+    path('admin/stores/<int:store_id>/trust/', AdminStoreTrustView.as_view(), name='admin-stores-trust'),
     path('admin/stores/<int:store_id>/', StoreDeleteView.as_view(), name='admin-stores-delete'),
     path('admin/stores/<int:store_id>/products/', AdminStoreProductsView.as_view(), name='admin-stores-products'),
     path('admin/stores/<int:store_id>/orders/', AdminStoreOrdersView.as_view(), name='admin-stores-orders'),

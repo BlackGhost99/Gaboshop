@@ -157,7 +157,13 @@ class Store(models.Model):
     
 	# Statut et métadonnées
 	is_active = models.BooleanField(default=True)
+	# Validé par Gaboshop : sans ça, le commerce prépare sa boutique mais n'est visible de personne et ne vend pas.
 	is_verified = models.BooleanField(default=False)
+	verified_at = models.DateTimeField(null=True, blank=True)
+	# De confiance : sa part peut lui être versée dès la préparation ; sinon après la réception confirmée par le client.
+	is_trusted = models.BooleanField(default=False)
+	# Versements gelés par l'admin (enquête, plainte) : les ventes continuent, l'argent reste chez Gaboshop.
+	payouts_frozen = models.BooleanField(default=False)
 	
 	# Configuration B2B/B2C
 	STORE_TYPE_CHOICES = (
@@ -371,3 +377,14 @@ class Store(models.Model):
 		"""Vérifie si le magasin peut sponsoriser des produits"""
 		plan = self.get_current_plan()
 		return plan and plan.can_sponsor_products
+
+
+def visible_store_filter(user, prefix=''):
+	"""Commerce visible : validé par Gaboshop ; son gérant et l'admin le voient aussi avant validation (aperçu)."""
+	from django.db.models import Q
+	visible = Q(**{f'{prefix}is_verified': True})
+	if user is not None and getattr(user, 'is_authenticated', False):
+		if user.is_staff or user.is_superuser or getattr(user, 'user_type', '') == 'admin':
+			return Q()
+		visible |= Q(**{f'{prefix}manager': user})
+	return visible

@@ -235,7 +235,7 @@ class B2BOrderCreateSerializer(serializers.Serializer):
 		
 		# Vérifier que le grossiste existe
 		try:
-			wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True)
+			wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True, is_verified=True)
 		except Store.DoesNotExist:
 			raise serializers.ValidationError({
 				'wholesaler_id': 'Grossiste non trouvé ou non actif.'

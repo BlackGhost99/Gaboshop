@@ -54,6 +54,9 @@ def _provider_amount(amount):
     return int(amount) if amount == amount.to_integral_value() else float(amount)
 
 
+FROZEN_NOTE = 'Versements gelés par Gaboshop'
+
+
 def release_store_payment(order_id):
     """Crée (ou relance) le versement du commerce pour une commande. Idempotent."""
     try:
@@ -81,6 +84,10 @@ def release_store_payment(order_id):
 
             if amount <= 0:
                 payout.status, payout.note = 'skipped', 'Montant nul'
+                payout.save()
+                return payout
+            if order.store.payouts_frozen:
+                payout.status, payout.note = 'pending', FROZEN_NOTE
                 payout.save()
                 return payout
             if not disbursement_id:
@@ -142,6 +149,47 @@ def _notify_store(payout):
         logger.exception('Notification du versement %s impossible', payout.pk)
 
 
+def payout_moment_reached(order, moment):
+    """Un commerce de confiance est payé dès la préparation ; les autres, une fois la réception confirmée."""
+    trusted = bool(getattr(order.store, 'is_trusted', False))
+    return moment == ('preparing' if trusted else 'client_confirmed')
+
+
 def schedule_store_payment(order_id):
     """À appeler depuis un signal : exécute le versement après validation de la transaction courante."""
     transaction.on_commit(lambda: release_store_payment(order_id))
+
+
+def held_funds(store, limit=10):
+    """Argent encaissé en ligne par Gaboshop pour ce commerce et pas encore versé : rassure le commerce."""
+    from django.db.models import Q
+    orders = (
+        Order.objects.filter(store=store, is_b2b=False, payment__status__in=ONLINE_SUCCESS)
+        .exclude(status__in=('cancelled', 'refunded'))
+        .filter(Q(payment_arrangement__isnull=True) | Q(payment_arrangement__flow='platform_online'))
+        .exclude(store_payout__status__in=('paid', 'skipped'))
+        .select_related('store', 'store_payout')
+        .order_by('-created_at')
+    )
+    total, count, items = Decimal('0'), 0, []
+    for order in orders[:200]:
+        payout = getattr(order, 'store_payout', None)
+        amount = payout.amount if payout else compute_store_share(order)[3]
+        if payout and payout.status == 'processing':
+            stage = 'Versement en cours'
+        elif payout and payout.note == FROZEN_NOTE:
+            stage = 'Retenu par Gaboshop (vérification)'
+        elif payout:
+            stage = 'Versement en préparation'
+        elif store.is_trusted:
+            stage = 'Versé dès la préparation de la commande'
+        else:
+            stage = 'En attente de la réception par le client'
+        total += amount
+        count += 1
+        if len(items) < limit:
+            items.append({'order_number': order.order_number, 'amount': float(amount), 'stage': stage})
+    return {
+        'total': float(total), 'count': count, 'items': items,
+        'frozen': bool(store.payouts_frozen), 'trusted': bool(store.is_trusted),
+    }

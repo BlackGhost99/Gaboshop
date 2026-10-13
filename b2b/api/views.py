@@ -206,7 +206,7 @@ class WholesalerDetailView(RetrieveAPIView):
 			from rest_framework.exceptions import PermissionDenied
 			raise PermissionDenied("Aucun magasin actif trouvé")
 		
-		wholesaler = get_object_or_404(Store, id=wholesaler_id, is_b2b=True, is_active=True)
+		wholesaler = get_object_or_404(Store, id=wholesaler_id, is_b2b=True, is_active=True, is_verified=True)
 		
 		# Vérifier que le magasin peut acheter de ce grossiste
 		can_purchase, error_msg = can_purchase_from_wholesaler(buyer_store, wholesaler)
@@ -274,7 +274,7 @@ class WholesalerProductsView(ListAPIView):
 		
 		# Vérifier que le grossiste existe et est accessible
 		try:
-			wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True)
+			wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True, is_verified=True)
 			can_purchase, error_msg = can_purchase_from_wholesaler(buyer_store, wholesaler)
 			if not can_purchase:
 				return Response({
@@ -529,7 +529,7 @@ class B2BOrderCreateView(APIView):
 		
 		# Récupérer le grossiste
 		try:
-			wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True)
+			wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True, is_verified=True)
 		except Store.DoesNotExist:
 			return Response({
 				'success': False,

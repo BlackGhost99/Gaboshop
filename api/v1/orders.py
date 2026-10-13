@@ -247,6 +247,13 @@ class OrderStatusUpdateView(APIView):
 			}, status=status.HTTP_404_NOT_FOUND)
 
 
+def _pay_store_after_confirmation(order):
+	"""Réception confirmée : la part du commerce (non « de confiance ») peut maintenant lui être versée."""
+	from payments.store_payout_service import payout_moment_reached, schedule_store_payment
+	if payout_moment_reached(order, 'client_confirmed'):
+		schedule_store_payment(order.pk)
+
+
 def _rate_delivery_agent(delivery, rating, comment):
 	"""Enregistre la note du client et met à jour la note moyenne du livreur."""
 	from django.db.models import Avg
@@ -294,6 +301,7 @@ class ClientConfirmDeliveryView(APIView):
 					order.status = 'delivered'
 					order.delivered_at = timezone.now()
 					order.save(update_fields=['status', 'delivered_at', 'updated_at'])
+				_pay_store_after_confirmation(order)
 				return Response({
 					'success': True,
 					'message': 'Réception confirmée. Merci !',
@@ -366,6 +374,7 @@ class ClientConfirmDeliveryView(APIView):
 			proof.client_received_status = True
 			proof.save()
 			proof.refresh_from_db()
+			_pay_store_after_confirmation(order)
 
 			# Note du livreur (facultative) donnée par le client à la confirmation.
 			try:

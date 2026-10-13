@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import StoreMarketModeModal from './StoreMarketModeModal';
 import useEnabledCities from '../hooks/useEnabledCities';
+import StoreTrustControls from './admin/StoreTrustControls';
 
 const AdminStoresSection = ({
   storesListAdmin,
@@ -37,7 +38,8 @@ const AdminStoresSection = ({
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     }).length;
 
-    return { total, active, inactive, newThisMonth };
+    const toVerify = storesListAdmin.filter(s => s.is_verified === false).length;
+    return { total, active, inactive, newThisMonth, toVerify };
   }, [storesListAdmin]);
 
   const handleSearch = (value) => {
@@ -82,6 +84,11 @@ const AdminStoresSection = ({
           <p className="text-2xl font-bold text-blue-800">{stats.newThisMonth}</p>
         </div>
       </div>
+      {stats.toVerify > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <strong>{stats.toVerify} commerce{stats.toVerify > 1 ? 's' : ''} à valider.</strong> Invisible{stats.toVerify > 1 ? 's' : ''} des clients tant que vous n’avez pas vérifié l’identité du responsable, son téléphone, l’adresse et les moyens de paiement. Cliquez sur « À valider » dans la colonne Statut.
+        </div>
+      )}
 
       {/* Filtres */}
       <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
@@ -199,6 +206,7 @@ const AdminStoresSection = ({
                         B2B
                       </span>
                     )}
+                    <StoreTrustControls store={store} onChanged={loadStoresData} />
                   </div>
                 </td>
                 <td className="px-4 py-3">

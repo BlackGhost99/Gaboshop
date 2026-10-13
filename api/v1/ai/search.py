@@ -58,6 +58,7 @@ def ai_search_products(request):
             queryset = Product.objects.filter(
                 is_available=True,
                 store__is_active=True,
+                store__is_verified=True,
                 market_type__in=['b2c', 'both']
             ).select_related('store', 'category')
             
@@ -139,6 +140,7 @@ Exemple pour "riz alimentaire moins de 2000 FCFA":
         queryset = Product.objects.filter(
             is_available=True,
             store__is_active=True,
+            store__is_verified=True,
             market_type__in=['b2c', 'both']
         ).select_related('store', 'category')
         

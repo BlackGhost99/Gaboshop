@@ -22,7 +22,7 @@ class StoreCategoryListView(ListAPIView):
 		# Nombre de boutiques visibles par les clients, pour remplir l'accueil avec des catégories utiles
 		from django.db.models import Count, Q
 		return StoreCategory.objects.filter(is_active=True).annotate(
-			store_count=Count('stores', filter=Q(stores__is_active=True, stores__is_b2b=False))
+			store_count=Count('stores', filter=Q(stores__is_active=True, stores__is_verified=True, stores__is_b2b=False))
 		).order_by('-store_count', 'name')
     
 	def list(self, request, *args, **kwargs):
@@ -42,7 +42,7 @@ class StoreListView(ListAPIView):
 	search_fields = ['name', 'description']
     
 	def get_queryset(self):
-		queryset = Store.objects.filter(is_active=True)
+		queryset = Store.objects.filter(is_active=True, is_verified=True)
 		
 		# B2B Visibility Logic
 		user = self.request.user
@@ -101,7 +101,9 @@ class StoreListView(ListAPIView):
 class StoreDetailView(RetrieveAPIView):
 	permission_classes = [permissions.AllowAny]
 	serializer_class = StoreDetailSerializer
-	queryset = Store.objects.filter(is_active=True)
+	def get_queryset(self):
+		from stores.models import visible_store_filter
+		return Store.objects.filter(visible_store_filter(self.request.user), is_active=True)
     
 	def retrieve(self, request, *args, **kwargs):
 		instance = self.get_object()

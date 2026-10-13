@@ -21,7 +21,8 @@ def get_available_wholesalers(buyer_store=None):
 	"""
 	queryset = Store.objects.filter(
 		is_b2b=True,
-		is_active=True
+		is_active=True,
+		is_verified=True,
 	).select_related('b2b_profile', 'category', 'manager').prefetch_related('products')
 	
 	# Filtrer uniquement les magasins avec profil B2B actif
@@ -77,7 +78,7 @@ def get_b2b_products(wholesaler_id, category_id=None, search=None):
 		QuerySet de Product avec prix B2B
 	"""
 	try:
-		wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True)
+		wholesaler = Store.objects.get(id=wholesaler_id, is_b2b=True, is_active=True, is_verified=True)
 	except Store.DoesNotExist:
 		return Product.objects.none()
 	

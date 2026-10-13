@@ -272,6 +272,11 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'store': _('Ce magasin n\'est pas actif.')
             })
+        # Un commerce non encore validé par Gaboshop ne peut pas vendre (protection contre les faux commerces).
+        if not store.is_verified:
+            raise serializers.ValidationError({
+                'store': _('Ce commerce est en cours de vérification par Gaboshop et ne peut pas encore recevoir de commandes.')
+            })
         
         # Vérifier les heures d'ouverture
         if not store.is_open():

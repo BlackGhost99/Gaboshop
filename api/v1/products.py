@@ -14,7 +14,7 @@ from products.serializers import (
     ProductCategorySerializer, ProductCreateSerializer,
     ProductUpdateSerializer
 )
-from stores.models import Store
+from stores.models import Store, visible_store_filter
 from api.v1.admin import IsPlatformAdmin
 
 # Photos d'un produit : la principale (image) + 5 autres au plus (galerie, et anciens image_2/image_3).
@@ -128,6 +128,7 @@ class ProductListView(ListAPIView):
         return Product.objects.filter(
             is_available=True,
             store__is_active=True,
+            store__is_verified=True,
             market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
         ).select_related('store', 'category').prefetch_related('images').annotate(
             store_priority=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0))
@@ -159,6 +160,7 @@ class StoreProductsView(ListAPIView):
     def get_queryset(self):
         store_id = self.kwargs['store_id']
         return Product.objects.filter(
+            visible_store_filter(self.request.user, 'store__'),
             store_id=store_id, 
             is_available=True,
             store__is_active=True,
@@ -169,8 +171,9 @@ class StoreProductsView(ListAPIView):
         # Vérifier que le magasin existe et est actif
         try:
             store = Store.objects.get(
+                visible_store_filter(request.user),
                 id=self.kwargs['store_id'], 
-                is_active=True
+                is_active=True,
             )
         except Store.DoesNotExist:
             return Response({
@@ -204,11 +207,13 @@ class StoreProductsView(ListAPIView):
 class ProductDetailView(RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = ProductDetailSerializer
-    queryset = Product.objects.filter(
-        is_available=True, 
-        store__is_active=True,
-        market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
-    )
+    def get_queryset(self):
+        return Product.objects.filter(
+            visible_store_filter(self.request.user, 'store__'),
+            is_available=True, 
+            store__is_active=True,
+            market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
+        )
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()

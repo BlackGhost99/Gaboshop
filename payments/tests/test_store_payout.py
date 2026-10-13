@@ -28,7 +28,7 @@ class StorePayoutTests(TestCase):
         self.other_manager = User.objects.create_user(phone='+24107000005', password='x', user_type='store_manager')
         self.client_user = User.objects.create_user(phone='+24107000003', password='x', user_type='client')
         category = StoreCategory.objects.create(name='Test')
-        self.store = Store.objects.create(
+        self.store = Store.objects.create(is_verified=True, 
             name='Commerce test', category=category, manager=self.manager, phone='+24107000100',
             address='Libreville', zone='Centre', commission_rate=Decimal('8'), agent_code='AGENT-001',
             singpay_disbursement_id='DISB-001',
@@ -183,6 +183,8 @@ class StorePayoutTests(TestCase):
     # --- déclenchement par la confirmation du commerce -------------------------------
     @override_settings(SINGPAY_ENABLE_TRANSFER=False)
     def test_store_confirmation_triggers_one_payout(self):
+        # Commerce de confiance : payé dès la préparation (les autres, après la réception confirmée).
+        Store.objects.filter(pk=self.store.pk).update(is_trusted=True)
         order = self.make_order(status='confirmed')
         with self.captureOnCommitCallbacks(execute=True):
             order.status = 'preparing'

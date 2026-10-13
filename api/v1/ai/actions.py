@@ -85,6 +85,7 @@ def prepare_order(request):
         products = Product.objects.filter(
             is_available=True,
             store__is_active=True,
+            store__is_verified=True,
             market_type__in=['b2c', 'both'],
             stock__gt=0
         )
@@ -209,7 +210,7 @@ Si plusieurs magasins, choisis le premier disponible."""
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            store = Store.objects.get(id=store_id, is_active=True)
+            store = Store.objects.get(id=store_id, is_active=True, is_verified=True)
         except Store.DoesNotExist:
             return Response({
                 "success": False,
@@ -380,7 +381,7 @@ def confirm_action(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            store = Store.objects.get(id=store_id, is_active=True)
+            store = Store.objects.get(id=store_id, is_active=True, is_verified=True)
         except Store.DoesNotExist:
             return Response({
                 "success": False,

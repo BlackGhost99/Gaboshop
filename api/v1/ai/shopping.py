@@ -96,7 +96,7 @@ def _stem(word):
 def search_catalog(criteria, limit=MAX_RESULTS):
     keywords = [_stem(k) for k in criteria.get('keywords') or []]
     qs = Product.objects.filter(
-        is_available=True, store__is_active=True, market_type__in=['b2c', 'both'],
+        is_available=True, store__is_active=True, store__is_verified=True, market_type__in=['b2c', 'both'],
     ).select_related('store', 'category')
     if criteria.get('max_price'):
         qs = qs.filter(price__lte=criteria['max_price'])

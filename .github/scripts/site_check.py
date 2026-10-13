@@ -43,6 +43,7 @@ MARKERS = {
     'Codes par SMS Twilio (11 oct.)': 'Vous recevrez un code par SMS ou WhatsApp',
     'Plusieurs photos par produit (12 oct.)': 'Montrez le produit sous plusieurs angles',
     'Fiabilité lot 1 : note du livreur (12 oct.)': 'Notez la livraison (facultatif)',
+    'Commerces validés et argent en sécurité (13 oct.)': 'Votre argent en sécurité chez Gaboshop',
 }
 
 

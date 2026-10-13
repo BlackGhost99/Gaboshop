@@ -50,7 +50,7 @@ class StoreCategoryListTests(TestCase):
         empty = StoreCategory.objects.create(name='Aaa vide')
         filled = StoreCategory.objects.create(name='Zzz remplie')
         manager = User.objects.create_user(phone='+24106000310', password='x', user_type='store_manager')
-        Store.objects.create(name='B', category=filled, manager=manager, phone='+24106000311', address='x', zone='Centre')
+        Store.objects.create(is_verified=True, name='B', category=filled, manager=manager, phone='+24106000311', address='x', zone='Centre')
         r = APIClient().get('/api/v1/stores/categories/')
         self.assertEqual(r.status_code, 200)
         data = r.json()['data']
