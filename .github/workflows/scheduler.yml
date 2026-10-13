@@ -3,26 +3,49 @@ name: Tâches automatiques
 # Render gratuit n'a pas de worker Celery : ce minuteur appelle l'API, qui lance les tâches dues
 # (attribution des livreurs, paiements en attente, commandes abandonnées, abonnements expirés).
 # De 6 h à 23 h (heure de Libreville) seulement, pour ménager les heures gratuites de Render.
+#
+# GitHub saute souvent les déclenchements programmés fréquents (une seule fois en 4 h le 13 oct.).
+# Chaque passage reste donc actif jusqu'à ~5 h 40 et appelle l'API toutes les 10 minutes, puis
+# relance lui-même le passage suivant. Les déclenchements programmés ne servent qu'à redémarrer
+# la boucle (le matin, ou si elle s'est arrêtée) ; la file « concurrency » évite les doublons.
 on:
   schedule:
-    - cron: '*/10 5-21 * * *'
+    - cron: '0 5 * * *'
+    - cron: '*/30 5-21 * * *'
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: write  # relancer ce minuteur (workflow_dispatch) à la fin d'un passage
+
+concurrency:
+  group: taches-automatiques
+  cancel-in-progress: false
 
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 350
     steps:
-      - name: Lancer les tâches dues
+      - name: Lancer les tâches dues toutes les 10 minutes
         env:
           CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$CRON_TOKEN" ]; then
             echo "Secret CRON_TOKEN absent : ajoutez-le dans GitHub (Settings > Secrets > Actions) et dans Render."
             exit 0
           fi
-          curl -sS --fail-with-body --max-time 150 --retry 2 --retry-delay 20 \
-            -X POST -H "X-Cron-Token: $CRON_TOKEN" \
-            https://gaboshop-api.onrender.com/api/v1/internal/tick/
+          in_hours() { [ "$(date -u +%H | sed 's/^0//')" -ge 5 ] && [ "$(date -u +%H | sed 's/^0//')" -le 21 ]; }
+          start=$(date +%s)
+          while in_hours && [ $(( $(date +%s) - start )) -lt 20400 ]; do
+            echo "$(date -u +%H:%M) UTC"
+            curl -sS --max-time 150 --retry 2 --retry-delay 20 \
+              -X POST -H "X-Cron-Token: $CRON_TOKEN" \
+              https://gaboshop-api.onrender.com/api/v1/internal/tick/ || echo "Appel en échec, nouvel essai dans 10 minutes."
+            echo
+            sleep 600
+          done
+          if in_hours; then
+            gh workflow run scheduler.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+            echo "Passage suivant relancé."
+          fi
