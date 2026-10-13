@@ -50,8 +50,8 @@ jobs:
           DB: ${{ secrets.BACKUP_DATABASE_URL }}
           PGHOST: ${{ secrets.BACKUP_DB_HOST }}
           PGDATABASE: ${{ secrets.BACKUP_DB_NAME || 'postgres' }}
-          PGUSER: ${{ secrets.BACKUP_DB_USER }}
-          PGPASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+          PGUSER: ${{ secrets.BACKUP_DB_USER || secrets.DATABASE_USER }}
+          PGPASSWORD: ${{ secrets.BACKUP_DB_PASSWORD || secrets.DATABASE_PASSWORD }}
           PGPORT: '5432'
           PGSSLMODE: require
           PASS: ${{ secrets.BACKUP_PASSPHRASE }}
