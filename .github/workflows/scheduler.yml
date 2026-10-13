@@ -5,8 +5,8 @@ name: Tâches automatiques
 # De 6 h à 23 h (heure de Libreville) seulement, pour ménager les heures gratuites de Render.
 #
 # GitHub saute souvent les déclenchements programmés fréquents (une seule fois en 4 h le 13 oct.).
-# Chaque passage reste donc actif jusqu'à ~5 h 40 et appelle l'API toutes les 10 minutes, puis
-# relance lui-même le passage suivant. Les déclenchements programmés ne servent qu'à redémarrer
+# Chaque passage reste donc actif ~5 h 40, appelle l'API toutes les 10 minutes en journée, puis
+# relance lui-même le passage suivant, jour et nuit. Les déclenchements programmés ne servent qu'à redémarrer
 # la boucle (le matin, ou si elle s'est arrêtée) ; la file « concurrency » évite les doublons.
 on:
   schedule:
@@ -35,17 +35,19 @@ jobs:
             echo "Secret CRON_TOKEN absent : ajoutez-le dans GitHub (Settings > Secrets > Actions) et dans Render."
             exit 0
           fi
-          in_hours() { [ "$(date -u +%H | sed 's/^0//')" -ge 5 ] && [ "$(date -u +%H | sed 's/^0//')" -le 21 ]; }
+          in_hours() { h=$(date -u +%H | sed 's/^0//'); [ "$h" -ge 5 ] && [ "$h" -le 21 ]; }
           start=$(date +%s)
-          while in_hours && [ $(( $(date +%s) - start )) -lt 20400 ]; do
-            echo "$(date -u +%H:%M) UTC"
-            curl -sS --max-time 150 --retry 2 --retry-delay 20 \
-              -X POST -H "X-Cron-Token: $CRON_TOKEN" \
-              https://gaboshop-api.onrender.com/api/v1/internal/tick/ || echo "Appel en échec, nouvel essai dans 10 minutes."
-            echo
+          # La boucle tourne jour et nuit (sinon rien ne la relancerait le matin), mais n'appelle
+          # le serveur qu'en journée : la nuit, Render peut dormir.
+          while [ $(( $(date +%s) - start )) -lt 20400 ]; do
+            if in_hours; then
+              echo "$(date -u +%H:%M) UTC"
+              curl -sS --max-time 150 --retry 2 --retry-delay 20 \
+                -X POST -H "X-Cron-Token: $CRON_TOKEN" \
+                https://gaboshop-api.onrender.com/api/v1/internal/tick/ || echo "Appel en échec, nouvel essai dans 10 minutes."
+              echo
+            fi
             sleep 600
           done
-          if in_hours; then
-            gh workflow run scheduler.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
-            echo "Passage suivant relancé."
-          fi
+          gh workflow run scheduler.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "Passage suivant relancé."
