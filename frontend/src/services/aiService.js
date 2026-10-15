@@ -44,17 +44,6 @@ export const aiService = {
     return response.data;
   },
 
-  /**
-   * Confirmer une action
-   */
-  async confirmAction(actionType, preparationData, additionalData = {}) {
-    const response = await api.post('/ai/confirm-action/', {
-      action_type: actionType,
-      preparation_data: preparationData,
-      ...additionalData,
-    });
-    return response.data;
-  },
 };
 
 export default aiService;

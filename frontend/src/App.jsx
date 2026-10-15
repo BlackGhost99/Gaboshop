@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AndroidBackButton from './components/AndroidBackButton';
 import ScrollToTop from './components/ScrollToTop';
@@ -15,27 +15,35 @@ import GaboshopAI from './components/GaboshopAI';
 import FeedbackCenter from './components/FeedbackCenter';
 import AIAlertBanner from './components/AIAlertBanner';
 import { AIContextProvider } from './context/AIContext';
-import ClientDashboard from './pages/client/ClientDashboard';
-import ClientOrders from './pages/client/ClientOrders';
-import StoreDashboard from './pages/store/StoreDashboard';
-import StoreProducts from './pages/store/StoreProducts';
-import StoreOrders from './pages/store/StoreOrders';
-import StoreSettings from './pages/store/StoreSettings';
-import StoreProfile from './pages/store/StoreProfile';
-import B2BProcurement from './pages/store/B2BProcurement';
-import Finance from './pages/store/Finance';
-import StoreSubscriptionPlans from './pages/store/SubscriptionPlans';
-import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
-import AdminDashboard from './pages/admin/AdminDashboard';
+const ClientDashboard = lazy(() => import('./pages/client/ClientDashboard'));
+const ClientOrders = lazy(() => import('./pages/client/ClientOrders'));
+const StoreDashboard = lazy(() => import('./pages/store/StoreDashboard'));
+const StoreProducts = lazy(() => import('./pages/store/StoreProducts'));
+const StoreOrders = lazy(() => import('./pages/store/StoreOrders'));
+const StoreSettings = lazy(() => import('./pages/store/StoreSettings'));
+const StoreProfile = lazy(() => import('./pages/store/StoreProfile'));
+const B2BProcurement = lazy(() => import('./pages/store/B2BProcurement'));
+const Finance = lazy(() => import('./pages/store/Finance'));
+const StoreSubscriptionPlans = lazy(() => import('./pages/store/SubscriptionPlans'));
+const DeliveryDashboard = lazy(() => import('./pages/delivery/DeliveryDashboard'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 import ErrorBoundary from './components/ErrorBoundary';
 import PrivateRoute from './components/guards/PrivateRoute';
 import PublicRoute from './components/guards/PublicRoute';
 import authStorage from './utils/authStorage';
-import CGU from './pages/legal/CGU';
-import Confidentialite from './pages/legal/Confidentialite';
-import MentionsLegales from './pages/legal/MentionsLegales';
-import SuppressionCompte from './pages/legal/SuppressionCompte';
-import DeleteAccount from './pages/DeleteAccount';
+const CGU = lazy(() => import('./pages/legal/CGU'));
+const Confidentialite = lazy(() => import('./pages/legal/Confidentialite'));
+const MentionsLegales = lazy(() => import('./pages/legal/MentionsLegales'));
+const SuppressionCompte = lazy(() => import('./pages/legal/SuppressionCompte'));
+const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
+
+// Les espaces client, commerce, livreur et admin se chargent à la demande :
+// le premier écran du site reste léger.
+const PageLoader = () => (
+  <div className="flex min-h-[50vh] items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+  </div>
+);
 
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
@@ -81,6 +89,7 @@ function App() {
       <ScrollToTop />
       <AndroidBackButton />
       <AIContextProvider>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
         {/* Routes publiques (BLOQUEES pour store_managers) */}
         <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
@@ -179,6 +188,7 @@ function App() {
           </PrivateRoute>
         } />
         </Routes>
+        </Suspense>
         <AIAlertBanner />
         <GaboshopAI />
         <FeedbackCenter />

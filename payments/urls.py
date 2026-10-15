@@ -5,7 +5,6 @@ from .views import (
     CheckPaymentAPIView,
     RefundAPIView,
     SubscriptionPlansAPIView,
-    SubscribeToPlanView,
     SubscriptionPaymentIntentAPIView,
 )
 
@@ -45,7 +44,7 @@ urlpatterns = [
     path("subscription-plans/", SubscriptionPlansAPIView.as_view(), name="subscription-plans"),
     
     # Souscrire à un plan
-    path("subscriptions/subscribe/", SubscribeToPlanView.as_view(), name="subscribe-to-plan"),
+    # L'ancienne route subscriptions/subscribe/ arrêtait le forfait en cours avant paiement : retirée.
     # Souscription par paiement (Airtel/Moov/Cinetpay)
     path("subscriptions/intent/", SubscriptionPaymentIntentAPIView.as_view(), name="subscribe-payment-intent"),
 ]

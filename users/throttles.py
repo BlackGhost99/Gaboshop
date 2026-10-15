@@ -12,9 +12,10 @@ class _SafeThrottle(SimpleRateThrottle):
 
 
 class AuthIPThrottle(_SafeThrottle):
-	"""Par adresse IP : 20 essais par minute."""
+	"""Par adresse IP : 60 essais par minute (au Gabon, beaucoup de clients mobiles partagent la même IP opérateur ;
+	la vraie protection anti-force brute est la limite par numéro ci-dessous)."""
 	scope = 'auth_ip'
-	rate = '20/min'
+	rate = '60/min'
 
 	def get_cache_key(self, request, view):
 		return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}

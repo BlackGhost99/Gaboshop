@@ -21,8 +21,6 @@ export const getPromotions = async () => {
       } else if (response.data.data?.data && Array.isArray(response.data.data.data)) {
         // Cas où la structure est { success: true, data: { data: [...] } }
         data = response.data.data.data;
-      } else if (Array.isArray(response.data.data)) {
-        data = response.data.data;
       } else {
         data = [];
       }
