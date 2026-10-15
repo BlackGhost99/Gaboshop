@@ -3,6 +3,7 @@ from datetime import time
 from decimal import Decimal
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -18,6 +19,7 @@ from users.models import User
 
 class ZoneTests(TestCase):
     def setUp(self):
+        cache.clear()  # limite de commandes par heure : partagée entre les tests sinon
         manager = User.objects.create_user(phone='+24107300202', password='x', user_type='store_manager')
         self.client_user = User.objects.create_user(phone='+24107300203', password='x', user_type='client')
         category = StoreCategory.objects.create(name='Test')

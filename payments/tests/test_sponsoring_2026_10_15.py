@@ -3,6 +3,7 @@ from datetime import time, timedelta
 from decimal import Decimal
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -20,6 +21,7 @@ INIT_OK = {'status': 'pending'}
 
 class SponsoringTests(TestCase):
     def setUp(self):
+        cache.clear()  # limite de commandes par heure : partagée entre les tests sinon
         self.manager = User.objects.create_user(phone='+24107400101', password='x', user_type='store_manager')
         other_manager = User.objects.create_user(phone='+24107400102', password='x', user_type='store_manager')
         category = StoreCategory.objects.create(name='Test')
@@ -121,6 +123,7 @@ class SponsoringTests(TestCase):
 
 class SmallOrderFeeTests(TestCase):
     def setUp(self):
+        cache.clear()  # limite de commandes par heure : partagée entre les tests sinon
         manager = User.objects.create_user(phone='+24107400201', password='x', user_type='store_manager')
         self.client_user = User.objects.create_user(phone='+24107400202', password='x', user_type='client')
         category = StoreCategory.objects.create(name='Test')

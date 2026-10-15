@@ -4,6 +4,7 @@ from datetime import time, timedelta
 from decimal import Decimal
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -23,6 +24,7 @@ from users.models import User
 @override_settings(SINGPAY_ENABLE_TRANSFER=False)
 class DecisionsTests(TestCase):
     def setUp(self):
+        cache.clear()  # limite de commandes par heure : partagée entre les tests sinon
         self.manager = User.objects.create_user(phone='+24107200001', password='x', user_type='store_manager')
         self.client_user = User.objects.create_user(phone='+24107200002', password='x', user_type='client')
         self.driver = User.objects.create_user(phone='+24107200003', password='x', user_type='delivery_agent')
