@@ -77,6 +77,7 @@ class OrderSerializer(serializers.ModelSerializer):
     invoice_breakdown = serializers.SerializerMethodField()
     payment_arrangement = serializers.SerializerMethodField()
     delivered_by_store = serializers.SerializerMethodField()
+    store_can_cancel = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -86,14 +87,25 @@ class OrderSerializer(serializers.ModelSerializer):
             'total_amount', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
             'notes', 'items', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
-            'invoice_breakdown', 'payment_arrangement', 'delivered_by_store'
+            'invoice_breakdown', 'payment_arrangement', 'delivered_by_store', 'store_can_cancel',
+            'client_problem_reported_at', 'client_problem', 'forfait_discount'
         ]
         read_only_fields = [
             'id', 'order_number', 'client', 'items_total', 'total_amount', 'operator_fee', 'payment_fees',
             'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
-            'invoice_breakdown', 'payment_arrangement', 'delivery_cost', 'vehicle_type', 'delivered_by_store'
+            'invoice_breakdown', 'payment_arrangement', 'delivery_cost', 'vehicle_type', 'delivered_by_store',
+            'store_can_cancel', 'client_problem_reported_at', 'client_problem', 'forfait_discount'
         ]
+
+    def get_store_can_cancel(self, obj):
+        """Le commerce ne peut plus annuler une commande payée qui est en route vers le client."""
+        if obj.status in ('delivered', 'cancelled', 'refunded'):
+            return False
+        if obj.status in ('assigned', 'in_transit'):
+            from api.v1.orders import _client_has_paid
+            return not _client_has_paid(obj)
+        return True
 
     def _get_delivery(self, obj):
         return getattr(obj, 'delivery', None)
@@ -185,6 +197,11 @@ class OrderSerializer(serializers.ModelSerializer):
                         'amount': str(obj.operator_fee),
                         'currency': 'FCFA'
                     }] if obj.operator_fee > 0 else []),
+                    *([{
+                        'description': 'Réduction forfait (offerte par Gaboshop)',
+                        'amount': f'-{obj.applied_forfait_discount()}',
+                        'currency': 'FCFA'
+                    }] if obj.applied_forfait_discount() > 0 else []),
                     *([{
                         'description': 'Taxes',
                         'amount': str(obj.tax_amount),
@@ -346,6 +363,15 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         # Recalculate totals (commission depends on created OrderItems)
         operator = 'moov' if payment_method == 'moov_money' else 'airtel'
         order.calculate_totals(operator=operator, payment_method=payment_method)
+
+        # Forfait client : réduction sur la livraison, offerte par Gaboshop, seulement si Gaboshop encaisse (paiement en ligne).
+        if payment_flow == 'platform_online':
+            from payments.client_forfaits import delivery_discount
+            discount = delivery_discount(request.user, order.delivery_fee)
+            if discount > 0:
+                order.forfait_discount = discount
+                order.total_amount -= order.applied_forfait_discount()
+                order.save(update_fields=['forfait_discount', 'total_amount', 'updated_at'])
 
         from payments.direct_service import create_arrangement
         create_arrangement(order, payment_flow, payment_method, delivery_payment_method, request.user)

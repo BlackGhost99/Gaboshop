@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import StatCard from '../../components/StatCard';
+import ClientForfaitCard from '../../components/ClientForfaitCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { getClientDashboard } from '../../services/dashboardService';
 import { formatCurrency, formatDateTime, getOrderStatusBadge } from '../../utils/helpers';
@@ -621,6 +622,8 @@ const ClientDashboard = () => {
             bgColor="bg-teal-500"
           />
         </div>
+
+        <ClientForfaitCard />
 
         {/* Commandes récentes */}
         <div className="bg-white rounded-lg shadow-md p-6">

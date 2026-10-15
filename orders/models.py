@@ -68,6 +68,13 @@ class Order(models.Model):
 	commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=8.00, help_text="Taux de commission en %")
 	total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Total à payer")
     
+	# Réduction de livraison offerte par Gaboshop au client abonné à un forfait (paiement en ligne uniquement).
+	forfait_discount = models.DecimalField(max_digits=8, decimal_places=2, default=0, help_text="Réduction forfait client sur la livraison")
+
+	# Le client signale un problème après la livraison : le versement automatique (48 h) est suspendu.
+	client_problem_reported_at = models.DateTimeField(null=True, blank=True)
+	client_problem = models.TextField(blank=True, default='')
+
 	# Adresse de livraison
 	city = models.CharField(max_length=100, default='Libreville', help_text="Ville de livraison")
 	delivery_address = models.TextField(help_text="Adresse complète de livraison")
@@ -408,8 +415,14 @@ class Order(models.Model):
 		self.payment_fees = Decimal(str(self.payment_fees or 0))
 
 		# Le total inclut désormais tous les frais
-		self.total_amount = self.items_total + self.delivery_fee + self.operator_fee + self.tax_amount + self.payment_fees
+		self.total_amount = (self.items_total + self.delivery_fee + self.operator_fee + self.tax_amount
+			+ self.payment_fees - self.applied_forfait_discount())
 		self.save()
+
+	def applied_forfait_discount(self):
+		"""Réduction forfait, jamais plus que les frais de livraison."""
+		from decimal import Decimal
+		return min(Decimal(self.forfait_discount or 0), Decimal(self.delivery_fee or 0))
 
 
 class OrderItem(models.Model):

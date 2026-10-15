@@ -809,8 +809,9 @@ class DeliveryProofUploadView(APIView):
 			recipient_name = request.data.get('recipient_name', '')
 			gps_accuracy = request.data.get('gps_accuracy')
 			notes = request.data.get('notes', '')
-			client_received_status_raw = request.data.get('client_received_status')
-			client_received_status = str(client_received_status_raw).lower() in ['true', '1', 'yes', 'on'] if client_received_status_raw is not None else False
+			# Seul le client confirme sa réception (dans son application) : le livreur ne peut pas le faire à sa place,
+			# sinon le commerce et le livreur ne seraient jamais payés par la confirmation du client.
+			client_received_status = False
 			
 			# Préparer les données pour validation
 			proof_data = {

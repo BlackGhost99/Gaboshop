@@ -415,6 +415,37 @@ class OrdersCancelView(APIView):
             return Response({"success": False, "error": "Commande non trouvée"}, status=404)
 
 
+class OrderProblemResolveView(APIView):
+    """POST admin/orders/<id>/resolve-problem/ : l'admin a vérifié le problème signalé par le client.
+
+    Le signalement est levé (gardé dans l'historique) et le commerce et le livreur sont payés tout de suite.
+    Pour donner raison au client, l'admin annule plutôt la commande avec remboursement.
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, order_id):
+        order = Order.objects.filter(id=order_id).first()
+        if order is None:
+            return Response({"success": False, "error": "Commande non trouvée"}, status=404)
+        if not order.client_problem_reported_at:
+            return Response({"success": False, "error": "Aucun problème signalé sur cette commande."}, status=400)
+        from core.models import AuditLog
+        AuditLog.log_action(
+            'order_status_change', request.user, 'order', order.id, old_value='client_problem', new_value='problem_resolved',
+            reason=f'Problème vérifié par l’admin : {order.client_problem}',
+        )
+        order.client_problem_reported_at = None
+        order.client_problem = f'[Vérifié par l’admin le {timezone.now():%d/%m/%Y}] {order.client_problem}'[:1000]
+        order.save(update_fields=['client_problem_reported_at', 'client_problem', 'updated_at'])
+        from payments.store_payout_service import release_store_payment
+        release_store_payment(order.pk)
+        delivery = getattr(order, 'delivery', None)
+        if delivery is not None and delivery.delivery_agent_id and delivery.status == 'delivered':
+            from payments.services import PaymentService
+            PaymentService.payout_delivery_agent(delivery)
+        return Response({"success": True, "message": "Problème levé : le commerce et le livreur sont payés."})
+
+
 class OrdersByStoreView(APIView):
     """Statistiques des commandes par magasin"""
     permission_classes = [IsPlatformAdmin]

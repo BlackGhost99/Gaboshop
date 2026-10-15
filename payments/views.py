@@ -51,8 +51,29 @@ def _get_subscription_price(store, plan):
     return int(Decimal(plan.price))
 
 
+def _activate_client_forfait_from_intent(intent):
+    """Paiement d'un forfait client confirmé : active ou prolonge le forfait (une seule fois par paiement)."""
+    from .client_forfaits import activate_forfait
+    from .models import Forfait
+    meta = intent.metadata or {}
+    if meta.get('subscription_activated'):
+        return None
+    forfait = Forfait.objects.filter(id=meta.get('forfait_id')).first()
+    if forfait is None:
+        logger.warning("Forfait client introuvable pour %s", intent.reference)
+        return None
+    current = activate_forfait(intent.user, forfait)
+    meta['subscription_activated'] = True
+    meta['client_forfait_id'] = current.id
+    intent.metadata = meta
+    intent.save(update_fields=['metadata'])
+    return current
+
+
 def _activate_subscription_from_intent(intent):
     meta = intent.metadata or {}
+    if meta.get('purpose') == 'client_forfait':
+        return _activate_client_forfait_from_intent(intent)
     if meta.get('purpose') != 'store_subscription':
         return None
     if meta.get('subscription_activated'):

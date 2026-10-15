@@ -142,6 +142,7 @@ class PaymentInitView(APIView):
                 order.operator_fee = total_mobile_money_fees
                 order.total_amount = (
                     order.items_total + order.delivery_fee + order.operator_fee + order.tax_amount + order.payment_fees
+                    - order.applied_forfait_discount()
                 )
                 order.save(update_fields=['payment_fees', 'operator_fee', 'total_amount', 'updated_at'])
 

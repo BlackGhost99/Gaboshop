@@ -94,6 +94,25 @@ def check_online_payments():
 			logger.exception('Vérification SingPay impossible pour le paiement %s', payment.pk)
 			outcome = 'erreur'
 		results[outcome] = results.get(outcome, 0) + 1
+	# Abonnements de commerce et forfaits clients (PaymentIntent) : sans notification de SingPay,
+	# ils resteraient « en attente » alors que l'argent est parti.
+	from payments.models import PaymentIntent
+	from payments.online_verification import verify_intent
+	from payments.views import process_intent_outcome
+	intents = PaymentIntent.objects.filter(
+		provider='singpay', status='PENDING',
+		created_at__lte=now - PAYMENT_CHECK_AFTER, created_at__gte=now - PAYMENT_CHECK_UNTIL,
+	).order_by('created_at')[:PAYMENT_CHECKS_PER_TICK]
+	for intent in intents:
+		try:
+			outcome, provider_tx_id, raw = verify_intent(intent)
+			if outcome != 'unknown' and provider_tx_id:
+				process_intent_outcome(intent, provider_tx_id, outcome, raw)
+			outcome = f'abonnement {outcome}'
+		except Exception:
+			logger.exception('Vérification SingPay impossible pour l’abonnement %s', intent.reference)
+			outcome = 'abonnement erreur'
+		results[outcome] = results.get(outcome, 0) + 1
 	return ', '.join(f'{n} {k}' for k, n in results.items()) or 'aucun paiement en attente'
 
 
@@ -148,11 +167,52 @@ def expire_subscriptions():
 	return f'{count} abonnement(s) expiré(s)'
 
 
+# Le client n'a ni confirmé ni signalé de problème 48 h après la livraison : le commerce (et le livreur) sont payés.
+AUTO_RELEASE_AFTER = timedelta(hours=48)
+
+
+def release_unconfirmed_payouts():
+	"""Verse la part du commerce et du livreur des commandes livrées depuis 48 h sans confirmation du client.
+
+	Rattrape aussi les commandes dont la réception a été confirmée sans déclencher le versement.
+	Les versements restent idempotents : une commande déjà versée ou en cours n'est jamais repayée.
+	"""
+	from django.db.models.functions import Coalesce
+	from orders.models import Order
+	from payments.models import Payment
+	from payments.store_payout_service import release_store_payment
+
+	limit = timezone.now() - AUTO_RELEASE_AFTER
+	orders = (
+		Order.objects.filter(status='delivered', is_b2b=False, payment__status__in=('success', 'completed'))
+		.annotate(done_at=Coalesce('delivery__delivered_at', 'delivered_at', 'updated_at'))
+		.filter(done_at__lte=limit, client_problem_reported_at__isnull=True)
+		.exclude(store_payout__status__in=('processing', 'paid', 'skipped'))
+		.select_related('delivery', 'store')
+		.distinct()[:50]
+	)
+	stores = drivers = 0
+	for order in orders:
+		try:
+			payout = release_store_payment(order.pk)
+			if payout is not None and payout.status in ('processing', 'paid', 'pending'):
+				stores += 1
+			if order.delivery.delivery_agent_id:
+				from payments.services import PaymentService
+				result = PaymentService.payout_delivery_agent(order.delivery)
+				if result.get('success') and not result.get('skipped') and not result.get('already_processed'):
+					drivers += 1
+		except Exception:
+			logger.exception('Versement automatique impossible pour la commande %s', order.order_number)
+	return f'{stores} versement(s) commerce et {drivers} versement(s) livreur après 48 h sans confirmation'
+
+
 JOBS = (
 	('livraisons', timedelta(minutes=2), advance_deliveries),
 	('paiements_en_ligne', timedelta(minutes=2), check_online_payments),
 	('commandes_abandonnees', timedelta(hours=1), cancel_abandoned_orders),
 	('abonnements_expires', timedelta(hours=12), expire_subscriptions),
+	('versements_sans_confirmation', timedelta(hours=1), release_unconfirmed_payouts),
 )
 
 

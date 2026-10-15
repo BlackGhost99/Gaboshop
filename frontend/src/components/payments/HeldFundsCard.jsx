@@ -13,7 +13,7 @@ export default function HeldFundsCard({ funds }) {
           <p className="text-sm text-emerald-800">
             {trusted
               ? 'Quand un client paie en ligne, Gaboshop garde l’argent puis vous le verse sur votre Mobile Money dès que vous préparez la commande.'
-              : 'Quand un client paie en ligne, Gaboshop garde l’argent puis vous le verse sur votre Mobile Money dès que le client confirme la réception.'}
+              : 'Quand un client paie en ligne, Gaboshop garde l’argent puis vous le verse sur votre Mobile Money dès que le client confirme la réception, ou automatiquement 48 h après la livraison s’il ne la confirme pas.'}
           </p>
         </div>
         <div className="text-right">

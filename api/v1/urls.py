@@ -23,7 +23,7 @@ from .products import AllProductCategoryListView
 from products.views import ProductViewSet
 from .orders import (
     OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
-    ClientConfirmDeliveryView, OrderSelectVehicleView
+    ClientConfirmDeliveryView, OrderSelectVehicleView, ClientReportProblemView
 )
 from .payments import (
     PaymentInitView, PaymentDetailView, PaymentWebhookView, PaymentVerifyView,
@@ -39,6 +39,7 @@ from .notifications import (
     NotificationDeleteView
 )
 from . import delivery_admin
+from . import client_forfaits
 from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
@@ -101,8 +102,8 @@ from .internal import HealthView, SchedulerTickView
 from .orders_admin import (
     OrderStatsView, OrdersListView, OrderDetailView as AdminOrderDetailView,
     DeliveryAssignmentView, OrderStatusUpdateView as AdminOrderStatusUpdateView,
-    OrdersCancelView, OrdersByStoreView, DeliveryAgentStatsView
-)
+    OrdersCancelView, OrdersByStoreView, DeliveryAgentStatsView,
+    OrderProblemResolveView)
 from .stores_admin import (
     StoresListView, StoreDetailView as AdminStoreDetailView, StoreCreateView as AdminStoreCreateView,
     StoreUpdateView as AdminStoreUpdateView, StoreMarketModeUpdateView, StoreB2BSettingsUpdateView, StoreB2CSettingsUpdateView, StoreDeactivateView, StoreActivateView,
@@ -229,6 +230,7 @@ urlpatterns = [
     path('admin/orders/list/', OrdersListView.as_view(), name='orders-list-admin'),
     path('admin/orders/<int:order_id>/', AdminOrderDetailView.as_view(), name='orders-detail-admin'),
     path('admin/orders/<int:order_id>/assign-delivery/', DeliveryAssignmentView.as_view(), name='orders-assign-delivery'),
+    path('admin/orders/<int:order_id>/resolve-problem/', OrderProblemResolveView.as_view(), name='admin-orders-resolve-problem'),
     path('admin/orders/<int:order_id>/cancel/', OrdersCancelView.as_view(), name='orders-cancel'),
     path('admin/orders/by-store/', OrdersByStoreView.as_view(), name='orders-by-store'),
     path('admin/delivery-agents/stats/', DeliveryAgentStatsView.as_view(), name='delivery-agents-stats'),
@@ -322,6 +324,7 @@ urlpatterns = [
     path('orders/<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
     path('orders/<int:order_id>/status/', OrderStatusUpdateView.as_view(), name='order-status-update'),
     path('orders/<int:order_id>/confirm-delivery/', ClientConfirmDeliveryView.as_view(), name='client-confirm-delivery'),
+    path('orders/<int:order_id>/report-problem/', ClientReportProblemView.as_view(), name='client-report-problem'),
     path('orders/<int:order_id>/select-vehicle/', OrderSelectVehicleView.as_view(), name='order-select-vehicle'),
 
     # Payments
@@ -331,9 +334,10 @@ urlpatterns = [
     path('payments/webhook/', PaymentWebhookView.as_view(), name='payment-webhook'),
     
     # Forfaits Clients (Plans/Subscriptions)
-    path('forfaits/', ForfaitListView.as_view(), name='forfaits-list'),
-    path('my-forfait/', ClientForfaitListView.as_view(), name='my-forfait'),
-    path('my-forfait/update/', ClientForfaitUpdateView.as_view(), name='update-forfait'),
+    # (Ces routes pointaient par erreur vers les vues admin du même nom, importées plus bas.)
+    path('forfaits/', client_forfaits.ForfaitCatalogView.as_view(), name='forfaits-list'),
+    path('my-forfait/', client_forfaits.MyForfaitView.as_view(), name='my-forfait'),
+    path('my-forfait/subscribe/', client_forfaits.ForfaitSubscribeView.as_view(), name='subscribe-forfait'),
     
     # Payouts (Paiements automatiques aux livreurs et commerçants)
     path('payouts/', PayoutListView.as_view(), name='payouts-list'),

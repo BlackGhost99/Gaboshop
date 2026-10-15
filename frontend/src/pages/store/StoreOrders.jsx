@@ -118,7 +118,9 @@ const StoreOrders = () => {
     }
   };
 
-  const canCancel = (status) => !['delivered', 'cancelled', 'refunded'].includes(status);
+  // Payée et en route vers le client : seul l'admin peut encore l'annuler (et rembourser).
+  const canCancel = (order) => Boolean(order) && order.store_can_cancel !== false
+    && !['delivered', 'cancelled', 'refunded'].includes(order.status);
 
   // Option « tout au commerce » : le commerce livre lui-même, puis le client confirme la réception.
   const nextAction = (order) => {
@@ -147,7 +149,7 @@ const StoreOrders = () => {
   };
 
   const handleCancel = async (order) => {
-    if (!canCancel(order.status)) return;
+    if (!canCancel(order)) return;
     if (!window.confirm(`Annuler la commande #${order.id} ?`)) return;
     setActionLoading((prev) => ({ ...prev, [order.id]: true }));
     try {
@@ -244,7 +246,7 @@ const StoreOrders = () => {
                       {nextAction(order).to === 'ready' ? 'Marquer prête' : nextAction(order).label}
                     </button>
                   )}
-                  {canCancel(order.status) && (
+                  {canCancel(order) && (
                     <button
                       onClick={() => handleCancel(order)}
                       disabled={!!actionLoading[order.id]}
@@ -304,7 +306,7 @@ const StoreOrders = () => {
                           </svg>
                         </button>
                       )}
-                      {canCancel(order.status) && (
+                      {canCancel(order) && (
                         <button
                           onClick={() => handleCancel(order)}
                           disabled={!!actionLoading[order.id]}
@@ -386,7 +388,7 @@ const StoreOrders = () => {
                   {nextAction(detail).label}
                 </button>
               )}
-              {detail && canCancel(detail.status) && (
+              {detail && canCancel(detail) && (
                 <button
                   onClick={() => handleCancel(detail)}
                   disabled={!!actionLoading[detail.id]}

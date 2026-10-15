@@ -466,7 +466,7 @@ const DeliveryDashboard = () => {
         {dashboardData && !profile.mobile_money_phone && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Ajoutez votre numéro Mobile Money</p>
-            <p className="mt-1">Vos gains de livraison sont envoyés sur ce numéro dès que le client confirme la réception. Sans lui, Gaboshop ne peut pas vous payer.</p>
+            <p className="mt-1">Vos gains de livraison sont envoyés sur ce numéro dès que le client confirme la réception (ou 48 h après la livraison s’il ne confirme pas). Sans lui, Gaboshop ne peut pas vous payer.</p>
             <button
               type="button"
               onClick={() => setShowProfileModal(true)}
@@ -1007,7 +1007,7 @@ const DeliveryDashboard = () => {
                   required
                   className="mt-1 block w-full border rounded-md shadow-sm p-2"
                 />
-                <p className="mt-1 text-xs text-gray-500">Vos gains y sont envoyés quand le client confirme la réception.</p>
+                <p className="mt-1 text-xs text-gray-500">Vos gains y sont envoyés quand le client confirme la réception, ou 48 h après la livraison.</p>
               </div>
 
               <div className="pt-4">

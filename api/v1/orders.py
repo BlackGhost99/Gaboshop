@@ -212,6 +212,14 @@ class OrderStatusUpdateView(APIView):
 						'reason': 'La commande est livrée par un livreur Gaboshop : c’est lui qui la prend, la transporte et la remet au client.',
 						'next_step': 'Passez la commande à « Prête » : un livreur viendra la chercher.',
 					}}, status=status.HTTP_409_CONFLICT)
+				if (request.user.is_store_manager() and request.data.get('status') == 'cancelled'
+						and order.status in ('assigned', 'in_transit') and _client_has_paid(order)):
+					return Response({'success': False, 'error': {
+						'code': 409,
+						'message': 'Cette commande est payée et en route vers le client : vous ne pouvez plus l’annuler.',
+						'reason': 'Le client a déjà payé et la commande est en cours de livraison.',
+						'next_step': 'En cas de problème, contactez Gaboshop : seul l’administrateur peut annuler et rembourser le client.',
+					}}, status=status.HTTP_409_CONFLICT)
 				if request.data.get('status') == 'in_transit' and order.status == 'ready' and not store_delivers(order):
 					return Response({'success': False, 'error': {
 						'code': 409,
@@ -256,6 +264,19 @@ class OrderStatusUpdateView(APIView):
 					'message': 'Commande non trouvée.'
 				}
 			}, status=status.HTTP_404_NOT_FOUND)
+
+
+def _client_has_paid(order):
+	"""Le client a payé : paiement en ligne réussi, ou paiement des articles confirmé (Mobile Money au commerce)."""
+	from payments.models import Payment
+	if Payment.objects.filter(order=order, status__in=('success', 'completed')).exists():
+		return True
+	arrangement = getattr(order, 'payment_arrangement', None)
+	if arrangement is None:
+		return False
+	from payments.direct_service import _refresh_status
+	products = arrangement.obligations.filter(kind='products').first()
+	return bool(products and _refresh_status(products) == 'paid')
 
 
 def _pay_store_after_confirmation(order):
@@ -369,6 +390,12 @@ class ClientConfirmDeliveryView(APIView):
 			
 			# Vérifier si déjà confirmé
 			if proof.client_received_status:
+				# Ancienne preuve marquée « reçue » par le livreur : on s'assure que les versements sont partis (idempotent).
+				_pay_store_after_confirmation(order)
+				from payments.direct_service import is_manual_order
+				if not is_manual_order(order) and order.delivery.delivery_agent_id:
+					from payments.services import PaymentService
+					PaymentService.payout_delivery_agent(order.delivery)
 				return Response({
 					'success': True,
 					'message': 'Réception déjà confirmée.',
@@ -416,19 +443,12 @@ class ClientConfirmDeliveryView(APIView):
 			
 			# Log dans l'audit trail
 			from core.models import AuditLog
-			AuditLog.objects.create(
-				user=request.user,
-				action='CLIENT_CONFIRM_DELIVERY',
-				model_name='DeliveryProof',
-				object_id=proof.id,
-				changes={
-					'client_received_status': True,
-					'pin_verified': pin_code != '',
-					'confirmed_by': request.user.get_full_name() or request.user.email,
-					'order_number': order.order_number
-				},
+			AuditLog.log_action(
+				'delivery_status_change', request.user, 'delivery', order.delivery.id,
+				new_value='client_confirmed',
 				ip_address=request.META.get('REMOTE_ADDR'),
-				user_agent=request.META.get('HTTP_USER_AGENT', '')
+				user_agent=request.META.get('HTTP_USER_AGENT', ''),
+				reason=f'Réception confirmée par le client (commande {order.order_number}, PIN {"vérifié" if pin_code else "non saisi"})',
 			)
 			
 			return Response({
@@ -451,6 +471,43 @@ class ClientConfirmDeliveryView(APIView):
 					'message': 'Commande non trouvée ou vous n\'êtes pas autorisé.'
 				}
 			}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ClientReportProblemView(APIView):
+	"""POST /api/v1/orders/<id>/report-problem/ : le client signale un problème sur une commande livrée.
+
+	Le versement automatique (48 h sans confirmation) est suspendu et l'admin est prévenu.
+	"""
+	permission_classes = [permissions.IsAuthenticated]
+
+	def post(self, request, order_id):
+		order = Order.objects.filter(id=order_id, client=request.user).first()
+		if order is None:
+			return Response({'success': False, 'error': {'code': 404, 'message': 'Commande non trouvée.'}}, status=status.HTTP_404_NOT_FOUND)
+		problem = str(request.data.get('problem') or '').strip()[:1000]
+		if not problem:
+			return Response({'success': False, 'error': {'code': 400, 'message': 'Décrivez le problème en quelques mots.'}}, status=status.HTTP_400_BAD_REQUEST)
+		if order.status not in ('in_transit', 'delivered'):
+			return Response({'success': False, 'error': {
+				'code': 400, 'message': 'Un problème se signale une fois la commande livrée.',
+				'next_step': 'Avant la livraison, contactez le commerce ou demandez à l’assistant.',
+			}}, status=status.HTTP_400_BAD_REQUEST)
+		order.client_problem = problem
+		order.client_problem_reported_at = timezone.now()
+		order.save(update_fields=['client_problem', 'client_problem_reported_at', 'updated_at'])
+		for admin in User.objects.filter(is_active=True).filter(user_type='admin'):
+			Notification.objects.create(
+				user=admin, title=f'Problème signalé : commande {order.order_number}',
+				body=f'{order.store.name} — {problem}', notif_type='warning',
+				metadata={'order_id': order.id, 'action': 'client_problem'},
+			)
+		from core.models import AuditLog
+		AuditLog.log_action(
+			'order_status_change', request.user, 'order', order.id, new_value='client_problem',
+			ip_address=request.META.get('REMOTE_ADDR'), user_agent=request.META.get('HTTP_USER_AGENT', ''),
+			reason=f'Problème signalé par le client : {problem}',
+		)
+		return Response({'success': True, 'message': 'Problème transmis à Gaboshop. Le paiement du commerce est suspendu le temps de vérifier.'})
 
 
 class OrderSelectVehicleView(APIView):

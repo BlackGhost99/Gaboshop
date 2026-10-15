@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { notifySuccess } from '../../utils/feedback';
+import { notifySuccess, notifyError } from '../../utils/feedback';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { getOrders, getOrderDetail, confirmDelivery } from '../../services/dashboardService';
+import { getOrders, getOrderDetail, confirmDelivery, reportOrderProblem } from '../../services/dashboardService';
 import { formatCurrency, formatDateTime } from '../../utils/helpers';
 import useVisibleInterval from '../../hooks/useVisibleInterval';
 import OrderPaymentPanel from '../../components/payments/OrderPaymentPanel';
@@ -66,6 +66,25 @@ const ClientOrders = () => {
   const [activeFilter, setActiveFilter] = useState('active');
   const [detail, setDetail] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [problemText, setProblemText] = useState('');
+  const [showProblem, setShowProblem] = useState(false);
+  const [sendingProblem, setSendingProblem] = useState(false);
+
+  const sendProblem = async () => {
+    if (!detail || !problemText.trim()) return;
+    setSendingProblem(true);
+    try {
+      const res = await reportOrderProblem(detail.id, problemText.trim());
+      notifySuccess('Problème transmis', res.message || 'Gaboshop va vérifier avec le commerce.');
+      setDetail({ ...detail, client_problem_reported_at: new Date().toISOString(), client_problem: problemText.trim() });
+      setShowProblem(false);
+      setProblemText('');
+    } catch (err) {
+      notifyError(err, { action: 'Signaler un problème' });
+    } finally {
+      setSendingProblem(false);
+    }
+  };
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [rating, setRating] = useState(0);
@@ -406,6 +425,38 @@ const ClientOrders = () => {
                 </div>
               </div>
             </div>
+
+            {(detail.status === 'delivered' || (detail.delivered_by_store && detail.status === 'in_transit')) && !detail.client_received_status && (
+              <div className="px-5 py-3 border-t text-sm text-gray-600 space-y-2">
+                {detail.client_problem_reported_at ? (
+                  <p className="text-amber-700">Problème signalé : Gaboshop vérifie avec le commerce avant de le payer.</p>
+                ) : (
+                  <>
+                    <p>Sans confirmation ni problème signalé, le commerce est payé automatiquement 48 h après la livraison.</p>
+                    {showProblem ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={problemText}
+                          onChange={(e) => setProblemText(e.target.value)}
+                          rows={3}
+                          maxLength={1000}
+                          placeholder="Ex. : article manquant, abîmé, pas reçu…"
+                          className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={sendProblem} disabled={sendingProblem || !problemText.trim()} className="px-3 py-2 rounded-md bg-amber-600 text-white font-medium disabled:opacity-50">
+                            {sendingProblem ? 'Envoi…' : 'Envoyer'}
+                          </button>
+                          <button onClick={() => setShowProblem(false)} className="px-3 py-2 rounded-md border border-gray-200">Annuler</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setShowProblem(true)} className="text-amber-700 font-medium underline">Signaler un problème</button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="px-5 py-3 border-t bg-gray-50 flex justify-between items-center text-sm">
               <div>

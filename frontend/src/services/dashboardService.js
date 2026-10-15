@@ -79,6 +79,12 @@ export const getOrderDetail = async (orderId) => {
   return response.data;
 };
 
+// Le client signale un problème après la livraison : le versement automatique au commerce est suspendu.
+export const reportOrderProblem = async (orderId, problem) => {
+  const response = await api.post(`/orders/${orderId}/report-problem/`, { problem });
+  return response.data;
+};
+
 export const confirmDelivery = async (orderId, payload = {}) => {
   try {
     const response = await api.post(`/orders/${orderId}/confirm-delivery/`, payload);

@@ -184,7 +184,7 @@ def held_funds(store, limit=10):
         elif store.is_trusted:
             stage = 'Versé dès la préparation de la commande'
         else:
-            stage = 'En attente de la réception par le client'
+            stage = 'Versé à la confirmation du client (ou 48 h après la livraison)'
         total += amount
         count += 1
         if len(items) < limit:

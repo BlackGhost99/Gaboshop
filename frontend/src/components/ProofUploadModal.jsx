@@ -157,8 +157,6 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
       formData.append('pin_verified', true);
     }
 
-    formData.append('client_received_status', true);
-
     setLoading(true);
 
     try {

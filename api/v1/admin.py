@@ -139,8 +139,14 @@ def _system_status():
     stuck_payments = Payment.objects.filter(status__in=('pending', 'processing'), payment_method__in=('airtel_money', 'moov_money'), created_at__lt=stuck_since).count()
     # Le minuteur passe toutes les 10 minutes de 6 h à 23 h (Libreville) : au-delà d'une heure sans passage, il est arrêté.
     timer_ok = bool(last_tick and now - last_tick < timedelta(hours=1))
+    problems = list(
+        Order.objects.filter(client_problem_reported_at__isnull=False)
+        .order_by('client_problem_reported_at')
+        .values('id', 'order_number', 'client_problem', 'client_problem_reported_at', 'store__name')[:20]
+    )
     return {
         "api_health": "OK",
+        "client_problems": problems,
         "timer_ok": timer_ok,
         "last_tick_at": last_tick,
         "failed_jobs": failed_jobs,

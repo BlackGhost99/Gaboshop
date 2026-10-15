@@ -86,7 +86,9 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
     else:
         # Paiement en ligne : Gaboshop encaisse tout, puis reverse la livraison au livreur, ou au commerce s'il livre.
         delivery_payee = 'store' if delivery_method == STORE_DELIVERY else 'courier'
-        specs = [('products', 'client', 'platform', order.items_total), ('delivery_collection', 'client', 'platform', order.delivery_fee), ('delivery', 'platform', delivery_payee, order.delivery_fee)]
+        # Le client paie la livraison moins la réduction de son forfait ; le livreur (ou le commerce) touche le prix plein.
+        collected = order.delivery_fee - order.applied_forfait_discount()
+        specs = [('products', 'client', 'platform', order.items_total), ('delivery_collection', 'client', 'platform', collected), ('delivery', 'platform', delivery_payee, order.delivery_fee)]
     for kind, payer, payee, amount in specs:
         if amount:
             PaymentObligation.objects.create(arrangement=arrangement, kind=kind, payer=payer, payee=payee, amount=amount, status='unpaid', requires_delivery_proof=(kind == 'delivery'))

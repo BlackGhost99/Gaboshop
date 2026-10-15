@@ -129,14 +129,25 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 						category=wholesaler_product.category,
 						name=wholesaler_product.name,
 						description=f"{wholesaler_product.description} (Recu via B2B)",
-						price=wholesaler_product.price,  # Prix de revente suggéré
+						price=wholesaler_product.price,  # Prix d'achat : le commerce fixe son prix de vente
 						stock=order_item.quantity,
-						is_available=True,
+						# Masqué tant que le commerce n'a pas fixé son prix de vente (sinon vendu au prix de gros).
+						is_available=False,
 						image=wholesaler_product.image
 					)
 					print(f"  [OK] {wholesaler_product.name}: Nouveau produit cree avec stock {buyer_product.stock}")
 			
 			print(f"[OK] Inventaire mis a jour pour {buyer_store.name}")
+			if buyer_store.manager_id:
+				from notifications.models import Notification
+				Notification.objects.create(
+					user_id=buyer_store.manager_id,
+					title=f'Marchandise reçue : commande {order.order_number}',
+					body='Les nouveaux articles sont dans « Mes produits », masqués pour vos clients. '
+						 'Fixez votre prix de vente puis rendez-les visibles.',
+					notif_type='order',
+					metadata={'order_id': order.id, 'action': 'b2b_received'},
+				)
 
 
 @receiver(post_save, sender=Payment)
