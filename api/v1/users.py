@@ -72,15 +72,78 @@ class RegisterView(APIView):
 				'success': False,
 				'error': {
 					'code': status.HTTP_400_BAD_REQUEST,
-					'message': _('Données invalides.'),
+					'message': _('Inscription impossible : vérifiez les informations indiquées.'),
 					'details': serializer.errors
 				}
 			}, status=status.HTTP_400_BAD_REQUEST)
 
+def _minutes(seconds):
+	return max(1, int(-(-float(seconds or 0) // 60)))
+
+
 class LoginView(APIView):
 	permission_classes = [permissions.AllowAny]
 	throttle_classes = [AuthIPThrottle, LoginPhoneThrottle]
-    
+
+	def _attempts(self, request):
+		"""Essais déjà faits sur ce numéro dans le quart d'heure (celui-ci compris)."""
+		from django.core.cache import cache
+		throttle = LoginPhoneThrottle()
+		key = throttle.get_cache_key(request, self)
+		try:
+			return len(cache.get(key) or []) if key else 0
+		except Exception:
+			return 0
+
+	def handle_exception(self, exc):
+		from rest_framework.exceptions import Throttled
+		if isinstance(exc, Throttled):
+			minutes = _minutes(exc.wait)
+			phone_locked = self._attempts(self.request) >= LoginPhoneThrottle.ATTEMPTS
+			return Response({'success': False, 'error': {
+				'code': status.HTTP_429_TOO_MANY_REQUESTS,
+				'message': f'Connexion bloquée pendant encore {minutes} min.',
+				'reason': (f'Trop de mots de passe faux sur ce numéro ({LoginPhoneThrottle.ATTEMPTS} essais en 15 minutes) : '
+					'le compte est protégé contre les tentatives de piratage.') if phone_locked
+					else 'Trop de tentatives de connexion depuis ce réseau en peu de temps.',
+				'next_step': f'Attendez {minutes} min puis réessayez avec le bon mot de passe. '
+					'Mot de passe oublié : contactez le support Gaboshop.',
+				'locked': True, 'retry_after_seconds': int(exc.wait or 0),
+			}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+		return super().handle_exception(exc)
+
+	def _warn_locked(self, request):
+		"""Blocage atteint : le titulaire du numéro et les admins sont prévenus."""
+		from users.serializers import normalize_login_phone
+		from core.guardian import _admins
+		from notifications.service import NotificationService
+		phone = normalize_login_phone(request.data.get('phone') or '')
+		core = phone[4:].lstrip('0') if phone.startswith('+241') else ''
+		owner = User.objects.filter(phone__in=[phone] + ([f'+241{core}', f'+2410{core}'] if core else [])).first()
+		try:
+			if owner:
+				NotificationService.notify_user(owner, {
+					'title': 'Connexion bloquée 15 minutes',
+					'body': f'{LoginPhoneThrottle.ATTEMPTS} mots de passe faux ont été tapés sur votre numéro.',
+					'level': 'warning', 'reason': 'Protection contre les tentatives de piratage.',
+					'next_step': 'Si ce n’était pas vous, changez votre mot de passe dès que vous êtes connecté.',
+				}, notif_type='warning', metadata={'action': 'login_locked'})
+			who = f"{owner.get_full_name() or owner.phone} ({owner.get_user_type_display()})" if owner else f'{phone} (aucun compte)'
+			for admin in _admins():
+				NotificationService.notify_user(admin, {
+					'title': f'Connexion bloquée : {who}',
+					'body': f'{LoginPhoneThrottle.ATTEMPTS} mots de passe faux en 15 minutes. Le numéro est bloqué 15 minutes.',
+					'level': 'warning', 'reason': 'Oubli du mot de passe ou tentative de piratage.',
+					'next_step': 'Si la personne vous contacte, vérifiez son identité avant de l’aider à changer son mot de passe.',
+				}, notif_type='warning', metadata={'action': 'login_locked', 'phone': phone})
+			AuditLog.log_action(
+				action_type='user_login', user=owner, object_type='user', object_id=owner.id if owner else 0,
+				old_value=None, new_value='login_locked', ip_address=request.META.get('REMOTE_ADDR'),
+				user_agent=request.META.get('HTTP_USER_AGENT', ''), reason=f'Connexion bloquée : {phone}', is_suspicious=True,
+			)
+		except Exception:
+			pass
+
 	def post(self, request):
 		serializer = LoginSerializer(data=request.data, context={'request': request})
         
@@ -115,11 +178,24 @@ class LoginView(APIView):
 				}
 			})
         
+		errors = serializer.errors.get('non_field_errors') or []
+		message = str(errors[0]) if errors else str(_('Numéro de téléphone ou mot de passe incorrect.'))
+		left = max(0, LoginPhoneThrottle.ATTEMPTS - self._attempts(request))
+		if left == 0:
+			self._warn_locked(request)
+			reason = 'C’était le dernier essai : ce numéro est maintenant bloqué 15 minutes.'
+			next_step = 'Attendez 15 min. Mot de passe oublié : contactez le support Gaboshop.'
+		else:
+			reason = f'Il vous reste {left} essai{"s" if left > 1 else ""} avant un blocage de 15 minutes.'
+			next_step = 'Vérifiez le numéro (avec le 0 du début) et le mot de passe, puis réessayez.'
 		return Response({
 			'success': False,
 			'error': {
 				'code': status.HTTP_401_UNAUTHORIZED,
-				'message': _('Échec de l\'authentification.'),
+				'message': message,
+				'reason': reason,
+				'next_step': next_step,
+				'attempts_left': left,
 				'details': serializer.errors
 			}
 		}, status=status.HTTP_401_UNAUTHORIZED)

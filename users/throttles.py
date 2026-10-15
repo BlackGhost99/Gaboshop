@@ -58,9 +58,10 @@ class LoginPhoneThrottle(_SafeThrottle):
 	"""Par numéro de téléphone visé : 10 essais par quart d'heure."""
 	scope = 'login_phone'
 	rate = '10/15m'
+	ATTEMPTS = 10
 
 	def parse_rate(self, rate):
-		return (10, 15 * 60)
+		return (self.ATTEMPTS, 15 * 60)
 
 	def get_cache_key(self, request, view):
 		phone = ''.join(ch for ch in str(request.data.get('phone') or request.data.get('username') or '') if ch.isdigit())[-8:]

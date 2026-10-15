@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '../services/dashboardService';
 import authStorage from '../utils/authStorage';
 import { safeNextPath } from '../utils/session';
+import { describeError } from '../utils/feedback';
+import FormError from '../components/FormError';
 
 const Login = () => {
   const [phone, setPhone] = useState('');
@@ -41,15 +43,8 @@ const Login = () => {
       }
       
     } catch (err) {
-      console.error(err);
-      if (!err.response) {
-        // Pas de réponse : serveur endormi, réseau coupé ou accès refusé (CORS)
-        setError('Impossible de joindre le serveur. Vérifiez votre connexion et réessayez dans une minute.');
-      } else if (err.response.status >= 500) {
-        setError('Le serveur rencontre un problème. Réessayez dans un instant.');
-      } else {
-        setError('Identifiants invalides. Veuillez réessayer.');
-      }
+      // Mot de passe faux (avec les essais restants), numéro bloqué, serveur injoignable : le message du serveur.
+      setError(describeError(err, 'Connexion impossible.'));
     } finally {
       setLoading(false);
     }
@@ -110,11 +105,7 @@ const Login = () => {
               <a href="/mot-de-passe-oublie" className="font-medium text-indigo-600 hover:text-indigo-500">Mot de passe oublié ?</a>
             </div>
 
-            {error && (
-              <div className="text-red-600 text-sm text-center">
-                {error}
-              </div>
-            )}
+            <FormError error={error} />
 
             <div>
               <button

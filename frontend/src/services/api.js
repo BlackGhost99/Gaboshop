@@ -57,7 +57,9 @@ api.interceptors.response.use(
       window.dispatchEvent(new CustomEvent('api-error', { detail: errorData }));
     }
     
-    if (status === 401) {
+    // Mot de passe faux à la connexion : pas une session expirée, la page affiche le message du serveur.
+    const authCall = /\/auth\/(login|register)\/?$/.test(error.config?.url || '');
+    if (status === 401 && !authCall) {
       // Token expiré ou invalide
       authStorage.removeItem('token');
       authStorage.removeItem('refresh_token');

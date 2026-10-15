@@ -4,6 +4,8 @@ import { register } from '../services/dashboardService';
 import { getStoreCategories } from '../services/storeService';
 import authStorage from '../utils/authStorage';
 import { safeNextPath } from '../utils/session';
+import { describeError } from '../utils/feedback';
+import FormError from '../components/FormError';
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -136,8 +138,8 @@ const Register = () => {
         setError(res.error?.message || 'Inscription impossible.');
       }
     } catch (err) {
-      const msg = err?.error?.details ? JSON.stringify(err.error.details) : err?.error?.message || 'Erreur inscription';
-      setError(msg);
+      // Ex. « Téléphone : Ce numéro a déjà un compte… » au lieu d'un message vague.
+      setError(describeError(err, 'Inscription impossible.'));
     } finally {
       setLoading(false);
     }
@@ -365,7 +367,7 @@ const Register = () => {
               </div>
             )}
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            <FormError error={error} />
 
             <div className="flex items-center justify-between">
               <Link to={`/login${location.search}`} className="text-sm text-indigo-600 hover:text-indigo-500">Déjà inscrit ? Connexion</Link>

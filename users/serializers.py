@@ -84,6 +84,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             'store_name', 'store_category_id', 'store_phone', 'store_address', 'store_city', 'store_zone', 'store_min_order_amount',
             'vehicle_type', 'vehicle_plate', 'mobile_money_phone', 'position_lat', 'position_lng'
         ]
+        # Numéro déjà pris : vérifié dans validate() avec un message clair (le message par défaut est en anglais).
+        extra_kwargs = {'phone': {'validators': []}}
     
     def validate(self, attrs):
         
@@ -290,25 +292,37 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         return user
 
+def normalize_login_phone(phone):
+    """Formats acceptés à la connexion : +241xxxxxx, 241xxxxxx, 0xxxxxxx, xxxxxxxx."""
+    phone = str(phone or '').strip().replace(' ', '')
+    if phone.startswith('+241'):
+        return phone
+    if phone.startswith('241'):
+        return '+' + phone
+    if phone.startswith('0'):
+        return '+241' + phone[1:]
+    if phone.isdigit() and len(phone) == 8:
+        return '+241' + phone
+    return phone
+
+
 class LoginSerializer(serializers.Serializer):
     phone = serializers.CharField()
     password = serializers.CharField(write_only=True)
     
     def validate(self, attrs):
-        phone = attrs.get('phone', '').strip().replace(' ', '')
+        phone = normalize_login_phone(attrs.get('phone', ''))
         password = attrs.get('password')
         
-        # Normalisation téléphone (formats acceptés: +241xxxxxx, 241xxxxxx, 0xxxxxxx, xxxxxxxx)
-        if phone.startswith('+241'):
-            phone = phone
-        elif phone.startswith('241'):
-            phone = '+' + phone
-        elif phone.startswith('0'):
-            phone = '+241' + phone[1:]
-        elif phone.isdigit() and len(phone) == 8:
-            phone = '+241' + phone
-        
-        user = authenticate(request=self.context.get('request'), phone=phone, password=password)
+        user = None
+        # Le même numéro peut être enregistré avec ou sans le 0 (+24107… ou +2417…) : on essaie les deux.
+        digits = phone[4:] if phone.startswith('+241') else ''
+        core = digits.lstrip('0')
+        candidates = [phone] + ([f'+241{core}', f'+2410{core}'] if core else [])
+        for candidate in dict.fromkeys(candidates):
+            user = authenticate(request=self.context.get('request'), phone=candidate, password=password)
+            if user:
+                break
         
         if not user:
             raise serializers.ValidationError(_('Numéro de téléphone ou mot de passe incorrect.'))
