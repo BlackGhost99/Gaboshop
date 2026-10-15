@@ -13,6 +13,7 @@ import PendingPayments from '../../components/payments/PendingPayments';
 import StorePaymentSettings from '../../components/payments/StorePaymentSettings';
 import OrderPaymentModal from '../../components/payments/OrderPaymentModal';
 import HeldFundsCard from '../../components/payments/HeldFundsCard';
+import MyPlatformDebt from '../../components/payments/MyPlatformDebt';
 
 // Axe des ventes en FCFA : entiers lisibles (750, 15 k, 1,2 M) au lieu de 0.004k
 const compactFcfa = new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 });
@@ -309,6 +310,7 @@ const StoreDashboard = () => {
           <>
             <PendingPayments />
             <HeldFundsCard funds={dashboardData?.held_funds} />
+            <MyPlatformDebt />
 
             {/* Statistiques principales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

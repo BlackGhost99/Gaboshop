@@ -79,6 +79,8 @@ import AdminClientCreditsSection from '../../components/AdminClientCreditsSectio
 import AdminForfaitsSection from '../../components/AdminForfaitsSection';
 import AdminPaymentLogsSection from '../../components/AdminPaymentLogsSection';
 import AdminPayoutsSection from '../../components/AdminPayoutsSection';
+import EconomicSimulator from '../../components/admin/EconomicSimulator';
+import PlatformDebts from '../../components/admin/PlatformDebts';
 import AlertModal from '../../components/AlertModal';
 import ConfirmModal from '../../components/ConfirmModal';
 import StoreDetailModal from '../../components/StoreDetailModal';
@@ -2171,6 +2173,8 @@ const AdminDashboard = () => {
         {activeTab === 'users' && usersSection}
         {activeTab === 'orders' && ordersSection}
         {activeTab === 'finances' && financesSection}
+        {activeTab === 'simulator' && <EconomicSimulator />}
+        {activeTab === 'debts' && <PlatformDebts />}
         {activeTab === 'subscriptions' && <AdminSubscriptionsSection />}
         {activeTab === 'b2b_management' && <AdminB2BManagementSection />}
         {activeTab === 'b2c_management' && <AdminB2CManagementSection />}

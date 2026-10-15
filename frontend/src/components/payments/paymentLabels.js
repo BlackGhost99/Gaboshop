@@ -19,6 +19,7 @@ export const KIND_LABELS = {
   delivery_collection: 'Frais de livraison',
   courier_remittance: 'Espèces à remettre au commerce',
   commission: 'Commission Gaboshop',
+  delivery_margin: 'Part Gaboshop de la livraison',
   failed_trip: 'Course échouée',
 };
 

@@ -871,3 +871,11 @@ export const setStoreTrustAdmin = async (storeId, payload) => {
   const res = await api.post(`/admin/stores/${storeId}/trust/`, payload);
   return res.data;
 };
+
+// Simulateur « Combien gagne Gaboshop » (aucune écriture)
+export const getEconomicSimulator = async (days = 30) => (await api.get('/admin/finance/simulator/', { params: { days } })).data;
+export const runEconomicSimulator = async (payload) => (await api.post('/admin/finance/simulator/', payload)).data;
+
+// Dettes envers Gaboshop (paiement direct) : liste et encaissement par l'admin
+export const getPlatformDebts = async () => (await api.get('/payments/debts/')).data;
+export const collectPlatformDebt = async (payload) => (await api.post('/payments/debts/collect/', payload)).data;

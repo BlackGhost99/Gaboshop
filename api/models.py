@@ -49,6 +49,11 @@ class SystemSettings(models.Model):
         help_text="Part des frais de livraison versée au livreur ; le reste revient à Gaboshop (%)"
     )
     
+    direct_delivery_margin = models.BooleanField(
+        default=True,
+        help_text="Paiement direct ou espèces : la part Gaboshop de la livraison est due à Gaboshop par celui qui encaisse la livraison"
+    )
+
     # === 2. PAIEMENTS ===
     moov_money_fee = models.DecimalField(
         max_digits=5, 
@@ -68,6 +73,17 @@ class SystemSettings(models.Model):
         default=30,
         validators=[MinValueValidator(1)],
         help_text="Durée de validité d'une demande de paiement en ligne (minutes)"
+    )
+    # Coût réel du prestataire de paiement, distinct des frais facturés au client (ci-dessus).
+    singpay_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=2.50,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Ce que SingPay prélève à Gaboshop sur chaque paiement reçu (%)"
+    )
+    singpay_payout_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Ce que SingPay prélève sur chaque versement envoyé à un commerce ou un livreur (%)"
     )
     payment_policy = models.JSONField(default=dict, blank=True, help_text="Circuits et plafonds de paiement actifs")
     
@@ -182,6 +198,19 @@ class SystemSettings(models.Model):
     subscription_reminder_days = models.IntegerField(
         default=7, validators=[MinValueValidator(1)],
         help_text="Rappel avant la fin d'un abonnement (jours)"
+    )
+
+    # === 6b. SPONSORING ===
+    sponsoring_enabled = models.BooleanField(
+        default=False, help_text="Les commerces peuvent acheter une mise en avant (sinon l'offre est affichée « bientôt »)"
+    )
+    sponsor_product_week_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=1500.00, validators=[MinValueValidator(0)],
+        help_text="Prix d'une semaine de mise en avant pour un produit (FCFA)"
+    )
+    sponsor_store_week_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=5000.00, validators=[MinValueValidator(0)],
+        help_text="Prix d'une semaine de mise en avant pour une boutique (FCFA)"
     )
 
     # === 7. NOTIFICATIONS ===

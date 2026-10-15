@@ -182,8 +182,8 @@ def assign_next_driver(delivery_id, reason='timeout', force=False):
             delivery.assignment_attempts = attempts
 
             if delivery.order and delivery.order.delivery_fee:
-                from payments.direct_service import is_manual_order
-                delivery.agent_commission = delivery.order.delivery_fee if is_manual_order(delivery.order) else SystemSettings.courier_share(delivery.order.delivery_fee)
+                from payments.direct_service import courier_earning
+                delivery.agent_commission = courier_earning(delivery.order)
 
             delivery.save()
 

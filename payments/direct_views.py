@@ -15,7 +15,7 @@ from stores.models import Store
 from .configuration import available_payment_options, get_payment_policy, validate_store_preferences
 from core.validators import validate_proof_file
 from .direct_models import PaymentArrangement, PaymentObligation, PaymentReceipt, CommissionSettlement
-from .direct_service import can_declare, can_review, receipt_payload, role_user_id, payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure
+from .direct_service import can_declare, can_review, receipt_payload, role_user_id, payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure, platform_debts, debt_summary, collect_platform_debt
 
 
 def _is_admin(user):
@@ -363,3 +363,72 @@ class SettlementProofView(APIView):
         if not (_is_admin(request.user) or settlement.store.manager_id == request.user.id):
             self.permission_denied(request)
         return private_file_response(settlement.proof)
+
+
+class MyPlatformDebtView(APIView):
+    """GET /payments/debts/mine/ : ce que le commerce ou le livreur connecté doit à Gaboshop."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from api.models import SystemSettings
+        user = request.user
+        if getattr(user, 'user_type', '') == 'delivery_agent':
+            debts = platform_debts('courier', user)
+        else:
+            store = Store.objects.filter(manager=user).first()
+            debts = platform_debts('store', store) if store else []
+        data = debt_summary(debts)
+        rules = SystemSettings.get_settings()
+        data['pay_to'] = {'phone': rules.support_phone, 'whatsapp': rules.support_whatsapp}
+        return Response({'success': True, 'data': data})
+
+
+class PlatformDebtsAdminView(APIView):
+    """GET /payments/debts/ : dettes envers Gaboshop par commerce et par livreur (admin).
+    POST /payments/debts/collect/ : l'admin note l'argent reçu ; il est réparti sur les plus vieilles dettes."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not _is_admin(request.user):
+            self.permission_denied(request)
+        from users.models import User
+        rows = []
+        for store in Store.objects.filter(payment_arrangements__obligations__payee='platform').distinct():
+            summary = debt_summary(platform_debts('store', store))
+            if Decimal(summary['total_due']) > 0:
+                rows.append({'party': 'store', 'id': store.id, 'name': store.name, 'phone': store.phone, **summary})
+        couriers = User.objects.filter(user_type='delivery_agent', deliveries__order__payment_arrangement__obligations__payer='courier',
+                                       deliveries__order__payment_arrangement__obligations__payee='platform').distinct()
+        for courier in couriers:
+            summary = debt_summary(platform_debts('courier', courier))
+            if Decimal(summary['total_due']) > 0:
+                name = courier.get_full_name() if hasattr(courier, 'get_full_name') else ''
+                rows.append({'party': 'courier', 'id': courier.id, 'name': name or courier.phone, 'phone': courier.phone, **summary})
+        rows.sort(key=lambda r: Decimal(r['total_due']), reverse=True)
+        return Response({'success': True, 'data': rows})
+
+    def post(self, request):
+        if not _is_admin(request.user):
+            self.permission_denied(request)
+        from users.models import User
+        party = request.data.get('party')
+        if party == 'store':
+            target = get_object_or_404(Store, pk=request.data.get('id'))
+        elif party == 'courier':
+            target = get_object_or_404(User, pk=request.data.get('id'), user_type='delivery_agent')
+        else:
+            raise ValidationError({'party': 'store ou courier'})
+        method = str(request.data.get('method') or '').strip()
+        if method not in ('cash', 'airtel_money', 'moov_money', 'bank_transfer'):
+            raise ValidationError({'method': 'Moyen de paiement inconnu.'})
+        try:
+            amount = Decimal(str(request.data.get('amount')))
+        except (InvalidOperation, TypeError):
+            raise ValidationError({'amount': 'Montant invalide.'})
+        receipts = collect_platform_debt(party, target, amount, method, request.data.get('reference'), request.user,
+                                         request.data.get('idempotency_key'))
+        return Response({'success': True, 'data': {
+            'collected': str(sum((r.amount for r in receipts), Decimal('0'))),
+            'receipts': [receipt_payload(r) for r in receipts],
+            **debt_summary(platform_debts(party, target)),
+        }}, status=status.HTTP_201_CREATED)

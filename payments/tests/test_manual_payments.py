@@ -84,6 +84,8 @@ class ManualPaymentWorkflowTests(TestCase):
         self.assertEqual(obligation.receipts.filter(status='confirmed').count(), 1)
 
     def test_courier_direct_payment_is_full_delivery_price(self):
+        # Sans « part Gaboshop aussi en direct », le livreur garde toute la livraison (règle d'avant le 15 oct.).
+        SystemSettings.objects.filter(pk=1).update(direct_delivery_margin=False)
         order = self.make_order()
         create_arrangement(order, 'direct_split', 'cash', user=self.client)
         order.delivery.refresh_from_db()
@@ -166,7 +168,10 @@ class ManualPaymentWorkflowTests(TestCase):
     def test_store_collects_all_creates_delivery_debt_from_store(self):
         arrangement = create_arrangement(self.make_order(), 'store_collects_all', 'cash', user=self.client)
         delivery = arrangement.obligations.get(kind='delivery')
-        self.assertEqual((delivery.payer, delivery.payee, delivery.amount), ('store', 'courier', Decimal('2000')))
+        # Le commerce paie au livreur sa part (80 %) et doit le reste à Gaboshop.
+        self.assertEqual((delivery.payer, delivery.payee, delivery.amount), ('store', 'courier', Decimal('1600')))
+        margin = arrangement.obligations.get(kind='delivery_margin')
+        self.assertEqual((margin.payer, margin.payee, margin.amount), ('store', 'platform', Decimal('400')))
 
     def test_courier_cash_limit_blocks_another_collection(self):
         settings = SystemSettings.get_settings()
@@ -259,7 +264,7 @@ class ManualPaymentWorkflowTests(TestCase):
         confirm_receipt(collection, self.client)
         delivery_collection = PaymentReceipt.objects.create(obligation=arrangement.obligations.get(kind='delivery_collection'), actor=self.manager, amount='2000', method='cash', reference='STORE-DC', idempotency_key='STORE-DC')
         confirm_receipt(delivery_collection, self.client)
-        payout = PaymentReceipt.objects.create(obligation=arrangement.obligations.get(kind='delivery'), actor=self.courier, amount='2000', method='cash', reference='STORE-DP', idempotency_key='STORE-DP')
+        payout = PaymentReceipt.objects.create(obligation=arrangement.obligations.get(kind='delivery'), actor=self.courier, amount='1600', method='cash', reference='STORE-DP', idempotency_key='STORE-DP')
         confirm_receipt(payout, self.manager)
         record_refund(order, 'products', Decimal('2500'), self.admin, 'STORE-REF', 'Remboursement partiel')
         products = arrangement.obligations.get(kind='products')

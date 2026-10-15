@@ -66,7 +66,7 @@ from .finances import (
     CommissionListView, CommissionSettleView,
     CategoryCommissionChangeLogListView,
     DeliveryPayoutUpdateView,
-    SponsoredProductCreateView, SponsoredProductUpdateView,
+    SponsoredProductCreateView, SponsoredProductUpdateView, EconomicSimulatorView,
     ClientCreditListView, ClientCreditCreateView, ClientCreditUpdateView,
     ForfaitListView, ForfaitCreateView, ForfaitUpdateView,
     ClientForfaitListView, ClientForfaitCreateView, ClientForfaitUpdateView
@@ -214,6 +214,7 @@ urlpatterns = [
     path('admin/finance/commissions/<int:commission_id>/settle/', CommissionSettleView.as_view(), name='admin-finance-commissions-settle'),
     path('admin/finance/category-commission-logs/', CategoryCommissionChangeLogListView.as_view(), name='admin-finance-category-commission-logs'),
     path('admin/finance/delivery-payouts/<int:payout_id>/', DeliveryPayoutUpdateView.as_view(), name='admin-finance-delivery-payouts-update'),
+    path('admin/finance/simulator/', EconomicSimulatorView.as_view(), name='admin-finance-simulator'),
     path('admin/finance/sponsored-products/create/', SponsoredProductCreateView.as_view(), name='admin-finance-sponsored-products-create'),
     path('admin/finance/sponsored-products/<int:sponsored_id>/', SponsoredProductUpdateView.as_view(), name='admin-finance-sponsored-products-update'),
     path('admin/finance/client-credits/', ClientCreditListView.as_view(), name='admin-finance-client-credits'),

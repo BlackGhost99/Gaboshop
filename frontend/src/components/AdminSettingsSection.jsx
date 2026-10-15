@@ -198,8 +198,13 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
 
       <Card title="Paiements">
         <div className="grid gap-4 md:grid-cols-3">
-          <NumberField label="Frais Airtel Money" suffix="%" step="0.1" min={0} max={100} value={form.airtel_money_fee} onChange={set('airtel_money_fee')} />
-          <NumberField label="Frais Moov Money" suffix="%" step="0.1" min={0} max={100} value={form.moov_money_fee} onChange={set('moov_money_fee')} />
+          <NumberField label="Frais Airtel Money facturés au client" suffix="%" step="0.1" min={0} max={100} value={form.airtel_money_fee} onChange={set('airtel_money_fee')}
+            help="Ajoutés au total payé en ligne par le client. 0 = Gaboshop paie seul les frais SingPay." />
+          <NumberField label="Frais Moov Money facturés au client" suffix="%" step="0.1" min={0} max={100} value={form.moov_money_fee} onChange={set('moov_money_fee')} />
+          <NumberField label="Frais SingPay réels (paiement reçu)" suffix="%" step="0.1" min={0} max={100} value={form.singpay_fee_percent}
+            onChange={set('singpay_fee_percent')} help="Ce que SingPay prélève à Gaboshop. Sert au simulateur et aux comptes, jamais facturé tel quel." />
+          <NumberField label="Frais SingPay réels (versement envoyé)" suffix="%" step="0.1" min={0} max={100} value={form.singpay_payout_fee_percent}
+            onChange={set('singpay_payout_fee_percent')} help="Sur chaque versement à un commerce ou un livreur. 0 si SingPay ne les facture pas." />
           <NumberField label="Validité d’une demande de paiement" suffix="min" min={5} max={1440} value={form.unpaid_order_expiry_minutes}
             onChange={set('unpaid_order_expiry_minutes')} help="Après ce délai, le client doit relancer le paiement." />
         </div>
@@ -216,6 +221,9 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
         <div className="grid gap-4 md:grid-cols-2">
           <NumberField label="Part des frais de livraison pour le livreur" suffix="%" step="1" min={0} max={100} value={form.courier_share_percent}
             onChange={set('courier_share_percent')} help="Le reste revient à Gaboshop. Non appliqué quand le commerce livre lui-même." />
+          <Toggle label="Part Gaboshop aussi en paiement direct ou espèces"
+            help="Le livreur (ou le commerce qui encaisse la livraison) doit la part Gaboshop après la livraison, comme la commission. Désactivé : le livreur garde toute la livraison."
+            checked={form.direct_delivery_margin} onChange={set('direct_delivery_margin')} />
           <NumberField label="Livraisons en cours maximum par livreur" min={1} max={20} value={form.max_orders_per_delivery} onChange={set('max_orders_per_delivery')}
             help="Au-delà, Gaboshop ne lui propose plus de nouvelle course tant qu’il n’a pas livré." />
           <NumberField label="Temps pour accepter une course" suffix="min" min={1} max={120} value={form.assignment_timeout_minutes}

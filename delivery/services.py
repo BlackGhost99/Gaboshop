@@ -42,9 +42,9 @@ class DeliveryService:
                 delivery.status = 'assigned'
                 delivery.assigned_at = timezone.now()
                 
-                # Part du livreur réglée dans l'admin
-                from api.models import SystemSettings
-                delivery.agent_commission = SystemSettings.courier_share(order.delivery_fee)
+                # Part du livreur selon le circuit de paiement (même règle partout)
+                from payments.direct_service import courier_earning
+                delivery.agent_commission = courier_earning(order)
                 delivery.save()
                 
                 # Mettre à jour le statut de la commande

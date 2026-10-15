@@ -16,6 +16,7 @@ import { formatCurrency, getDeliveryStatusBadge } from '../../utils/helpers';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from '../../services/notificationService';
 import authStorage from '../../utils/authStorage';
 import PendingPayments from '../../components/payments/PendingPayments';
+import MyPlatformDebt from '../../components/payments/MyPlatformDebt';
 
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -463,6 +464,7 @@ const DeliveryDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PendingPayments title="Paiements à confirmer" />
+        <MyPlatformDebt />
         {dashboardData && !profile.mobile_money_phone && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Ajoutez votre numéro Mobile Money</p>

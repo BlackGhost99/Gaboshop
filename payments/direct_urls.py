@@ -2,7 +2,7 @@ from django.urls import path
 from .direct_views import (
     PaymentOptionsView, StorePaymentPreferencesView, ArrangementDetailView,
     ReceiptCreateView, PendingReceiptsView, ReceiptConfirmView, ReceiptRejectView, SettlementListCreateView, SettlementConfirmView, FinancialControlView,
-    ReceiptProofView, SettlementProofView,
+    ReceiptProofView, SettlementProofView, MyPlatformDebtView, PlatformDebtsAdminView,
 )
 
 urlpatterns = [
@@ -17,5 +17,8 @@ urlpatterns = [
     path('settlements/<int:settlement_id>/confirm/', SettlementConfirmView.as_view(), name='commission-settlement-confirm'),
     path('receipts/<int:receipt_id>/proof/', ReceiptProofView.as_view(), name='payment-receipt-proof'),
     path('settlements/<int:settlement_id>/proof/', SettlementProofView.as_view(), name='commission-settlement-proof'),
+    path('debts/', PlatformDebtsAdminView.as_view(), name='platform-debts'),
+    path('debts/collect/', PlatformDebtsAdminView.as_view(), name='platform-debts-collect'),
+    path('debts/mine/', MyPlatformDebtView.as_view(), name='platform-debts-mine'),
     path('financial-control/', FinancialControlView.as_view(), name='financial-control'),
 ]

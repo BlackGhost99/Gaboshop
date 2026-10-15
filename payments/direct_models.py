@@ -51,6 +51,7 @@ class PaymentObligation(models.Model):
         ('delivery_collection', 'Encaissement des frais de livraison'),
         ('courier_remittance', 'Reversement des espèces au commerce'),
         ('commission', 'Commission Gaboshop'),
+        ('delivery_margin', 'Part Gaboshop de la livraison'),
         ('failed_trip', 'Indemnité course échouée'),
     ]
     STATUS_CHOICES = [

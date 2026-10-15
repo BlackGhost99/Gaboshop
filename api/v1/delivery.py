@@ -452,7 +452,8 @@ class DeliveryClaimView(APIView):
 				# Compute agent commission if not set
 				try:
 					if delivery.order and delivery.order.delivery_fee:
-						delivery.agent_commission = delivery.order.delivery_fee if is_manual_order(delivery.order) else delivery.order.delivery_fee * Decimal('0.8')
+						from payments.direct_service import courier_earning
+						delivery.agent_commission = courier_earning(delivery.order)
 				except Exception:
 					pass
 				delivery.save()

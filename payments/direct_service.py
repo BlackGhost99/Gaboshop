@@ -30,6 +30,29 @@ def store_delivers(order):
     return bool(getattr(store, 'offers_delivery', False))
 
 
+# Ce que Gaboshop se fait devoir après une commande payée en direct (hors de SingPay).
+PLATFORM_DEBT_KINDS = ('commission', 'delivery_margin')
+
+
+def direct_margin_on(arrangement):
+    """La part Gaboshop de la livraison est-elle due sur cette commande directe ? Figé à la création."""
+    return bool(arrangement.policy_snapshot.get('direct_delivery_margin'))
+
+
+def courier_earning(order):
+    """Ce que touche le livreur pour la course, selon le circuit de paiement de la commande.
+
+    Paiement en ligne : la part réglée dans l'admin. Paiement direct : toute la livraison, sauf si la
+    commande a été créée avec « part Gaboshop aussi en direct » (le livreur doit alors cette part à Gaboshop).
+    """
+    from api.models import SystemSettings
+    fee = Decimal(order.delivery_fee or 0)
+    arrangement = getattr(order, 'payment_arrangement', None)
+    if arrangement is not None and arrangement.flow != 'platform_online' and not direct_margin_on(arrangement):
+        return fee
+    return SystemSettings.courier_share(fee)
+
+
 def _refresh_status(obligation):
     paid = obligation.received_amount
     if obligation.status in ('cancelled', 'waived', 'refunded'):
@@ -57,7 +80,7 @@ def ensure_credit_limit(store, additional_commission=Decimal('0')):
     # Seules les commissions exigibles (commande livrée) comptent : des commandes passées puis jamais
     # livrées (par un concurrent malveillant, par exemple) ne bloquent plus le commerce.
     debts = PaymentObligation.objects.filter(
-        arrangement__store=store, kind='commission'
+        arrangement__store=store, kind__in=PLATFORM_DEBT_KINDS, payer='store'
     ).exclude(status__in=['paid', 'cancelled', 'waived', 'not_due']).prefetch_related('receipts', 'adjustments')
     outstanding = sum((debt.remaining_amount for debt in debts), Decimal('0'))
     if outstanding + Decimal(additional_commission) > Decimal(policy['merchant_debt_limit']):
@@ -75,6 +98,10 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
         raise ValidationError('Ce circuit ou moyen de paiement n’est pas autorisé pour ce commerce.')
     if flow != 'platform_online':
         ensure_credit_limit(order.store, order.commission_amount)
+    from api.models import SystemSettings
+    margin_on = (flow != 'platform_online' and bool(order.delivery_fee) and not order.store.offers_delivery
+                 and bool(SystemSettings.current('direct_delivery_margin', False)))
+    policy = {**policy, 'direct_delivery_margin': margin_on}
     arrangement = PaymentArrangement.objects.create(
         order=order, store=order.store, created_by=user or order.client, flow=flow, method=method,
         delivery_method=delivery_method or method, policy_snapshot=policy,
@@ -83,10 +110,12 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
     )
     due = timezone.now() + timedelta(days=policy['commission_settlement_days'])
     specs = []
+    courier_part = SystemSettings.courier_share(order.delivery_fee) if margin_on else order.delivery_fee
+    margin = Decimal(order.delivery_fee or 0) - Decimal(courier_part) if margin_on else Decimal('0')
     if flow == 'direct_split':
         specs = [('products', 'client', 'store', order.items_total), ('delivery', 'client', 'courier', order.delivery_fee)]
     elif flow == 'store_collects_all':
-        specs = [('products', 'client', 'store', order.items_total), ('delivery_collection', 'client', 'store', order.delivery_fee), ('delivery', 'store', 'courier', order.delivery_fee)]
+        specs = [('products', 'client', 'store', order.items_total), ('delivery_collection', 'client', 'store', order.delivery_fee), ('delivery', 'store', 'courier', courier_part)]
     elif flow == 'courier_cash':
         specs = [('products', 'client', 'courier', order.items_total), ('delivery', 'client', 'courier', order.delivery_fee), ('courier_remittance', 'courier', 'store', order.items_total)]
     else:
@@ -104,12 +133,20 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
         status='paid' if flow == 'platform_online' else 'not_due',
         due_at=None if flow == 'platform_online' else due,
     )
+    if margin:
+        # Celui qui encaisse la livraison (le livreur, ou le commerce en « il encaisse tout ») doit la part Gaboshop,
+        # exigible à la livraison comme la commission.
+        PaymentObligation.objects.create(
+            arrangement=arrangement, kind='delivery_margin',
+            payer='store' if flow == 'store_collects_all' else 'courier', payee='platform',
+            amount=margin, status='not_due', due_at=due,
+        )
     if flow != 'platform_online':
         order.status = 'confirmed'
         order.confirmed_at = timezone.now()
         order.save(update_fields=['status', 'confirmed_at'])
         if hasattr(order, 'delivery'):
-            order.delivery.agent_commission = order.delivery_fee
+            order.delivery.agent_commission = courier_part
             order.delivery.save(update_fields=['agent_commission'])
     return arrangement
 
@@ -132,12 +169,11 @@ def sync_on_order_status(order):
         return
     arrangement = order.payment_arrangement
     if order.status == 'delivered':
-        commission = arrangement.obligations.filter(kind='commission').first()
-        if commission and commission.status == 'not_due':
-            commission.status = 'overdue' if commission.due_at and commission.due_at < timezone.now() else 'unpaid'
-            commission.save(update_fields=['status', 'updated_at'])
+        for debt in arrangement.obligations.filter(kind__in=PLATFORM_DEBT_KINDS, status='not_due'):
+            debt.status = 'overdue' if debt.due_at and debt.due_at < timezone.now() else 'unpaid'
+            debt.save(update_fields=['status', 'updated_at'])
     elif order.status in ('cancelled', 'refunded'):
-        arrangement.obligations.filter(kind='commission', status='not_due').update(status='cancelled')
+        arrangement.obligations.filter(kind__in=PLATFORM_DEBT_KINDS, status='not_due').update(status='cancelled')
 
 
 def is_admin_user(user):
@@ -383,3 +419,78 @@ def record_refund(order, component, amount, user, reference, reason=''):
             commission.status = 'cancelled'
             commission.save(update_fields=['status', 'updated_at'])
     return adjustment
+
+
+# ---------------------------------------------------------------------------
+# Dettes envers Gaboshop (paiement direct) : commission du commerce, part livraison du livreur.
+# ---------------------------------------------------------------------------
+DUE_STATUSES = ('unpaid', 'overdue', 'partially_paid')
+
+
+def platform_debts(party, target):
+    """Dettes exigibles (commande livrée) d'un commerce ou d'un livreur envers Gaboshop, les plus anciennes d'abord."""
+    qs = PaymentObligation.objects.filter(kind__in=PLATFORM_DEBT_KINDS, payee='platform', payer=party)
+    if party == 'store':
+        qs = qs.filter(arrangement__store=target)
+    elif party == 'courier':
+        qs = qs.filter(arrangement__order__delivery__delivery_agent=target)
+    else:
+        raise ValidationError('Débiteur inconnu.')
+    debts = list(qs.select_related('arrangement__order').prefetch_related('receipts', 'adjustments').order_by('due_at', 'id'))
+    for debt in debts:
+        _refresh_status(debt)
+    return [d for d in debts if d.status in DUE_STATUSES and d.remaining_amount > 0]
+
+
+def debt_summary(debts):
+    return {
+        'total_due': str(sum((d.remaining_amount for d in debts), Decimal('0'))),
+        'overdue': str(sum((d.remaining_amount for d in debts if d.status == 'overdue'), Decimal('0'))),
+        'items': [{
+            'obligation_id': d.id, 'kind': d.kind, 'order_number': d.arrangement.order.order_number,
+            'amount': str(d.amount), 'remaining': str(d.remaining_amount), 'status': d.status, 'due_at': d.due_at,
+        } for d in debts],
+    }
+
+
+@transaction.atomic
+def collect_platform_debt(party, target, amount, method, reference, admin, idempotency_key):
+    """L'admin note l'argent qu'il a reçu d'un commerce ou d'un livreur : réparti sur les plus vieilles dettes.
+
+    Idempotent (même clé = même encaissement) ; un ID de transaction Mobile Money ne sert qu'une fois.
+    """
+    amount = Decimal(str(amount))
+    if amount <= 0:
+        raise ValidationError({'amount': 'Le montant doit être positif.'})
+    idem = (idempotency_key or '').strip()[:60]
+    if not idem:
+        raise ValidationError('Une clé d’idempotence est obligatoire.')
+    existing = list(PaymentReceipt.objects.filter(idempotency_key__startswith=f'collect:{idem}:'))
+    if existing:
+        return existing
+    reference = (reference or '').strip().replace(' ', '').upper()
+    if method == 'cash' and not reference:
+        reference = f'ESPECES-{timezone.now():%Y%m%d%H%M%S}-{admin.id}'
+    if not reference:
+        raise ValidationError({'reference': 'Indiquez l’ID de transaction reçu par SMS.'})
+    if method != 'cash' and PaymentReceipt.objects.exclude(status='rejected').filter(reference__startswith=reference).exists():
+        raise ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'})
+    debts = platform_debts(party, target)
+    locked = {o.pk: o for o in PaymentObligation.objects.select_for_update().filter(pk__in=[d.pk for d in debts])}
+    total = sum((d.remaining_amount for d in debts), Decimal('0'))
+    if amount > total:
+        raise ValidationError({'amount': f'Le montant dépasse la dette ({total:.0f} FCFA).'})
+    receipts, remaining = [], amount
+    for debt in debts:
+        part = min(remaining, debt.remaining_amount)
+        if part <= 0:
+            break
+        receipt = PaymentReceipt.objects.create(
+            obligation=locked[debt.pk], actor=admin, amount=part, method=method,
+            reference=f'{reference}-{debt.pk}', idempotency_key=f'collect:{idem}:{debt.pk}',
+            comment='Encaissé par Gaboshop', status='confirmed', confirmed_by=admin, confirmed_at=timezone.now(),
+        )
+        _refresh_status(locked[debt.pk])
+        receipts.append(receipt)
+        remaining -= part
+    return receipts

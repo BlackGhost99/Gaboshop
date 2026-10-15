@@ -1056,6 +1056,12 @@ class SystemSettingsView(APIView):
         'subscription_reminder_days': ('int', 1, 60),
         'moov_money_fee': ('decimal', 0, 100),
         'airtel_money_fee': ('decimal', 0, 100),
+        'singpay_fee_percent': ('decimal', 0, 100),
+        'singpay_payout_fee_percent': ('decimal', 0, 100),
+        'direct_delivery_margin': ('bool', None, None),
+        'sponsoring_enabled': ('bool', None, None),
+        'sponsor_product_week_price': ('decimal', 0, 10_000_000),
+        'sponsor_store_week_price': ('decimal', 0, 10_000_000),
         'unpaid_order_expiry_minutes': ('int', 5, 1440),
         'default_city': ('text', None, None),
         'enabled_cities': ('cities', None, None),
@@ -1088,7 +1094,7 @@ class SystemSettingsView(APIView):
         'ai_instructions': ('text_optional', None, 2000),
     }
 
-    ADMIN_ONLY = ('ai_instructions', 'ai_model', 'ai_provider')
+    ADMIN_ONLY = ('ai_instructions', 'ai_model', 'ai_provider', 'singpay_fee_percent', 'singpay_payout_fee_percent')
 
     def get_permissions(self):
         if self.request.method == 'PATCH':

@@ -1022,3 +1022,28 @@ class ClientForfaitUpdateView(APIView):
                 'success': False,
                 'error': 'Abonnement client introuvable'
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+class EconomicSimulatorView(APIView):
+	"""Simulateur « Combien gagne Gaboshop » (admin uniquement, aucune écriture).
+
+	GET  /admin/finance/simulator/ : réglages actuels (valeurs de départ) et chiffres réels des 30 derniers jours.
+	POST /admin/finance/simulator/ : répartition client / commerce / livreur / Gaboshop pour les valeurs envoyées.
+	"""
+	permission_classes = [IsPlatformAdmin]
+
+	def get(self, request):
+		from payments.economics import default_inputs, real_figures
+		try:
+			days = max(1, min(365, int(request.query_params.get('days', 30))))
+		except (TypeError, ValueError):
+			days = 30
+		return Response({"success": True, "data": {"defaults": default_inputs(), "real": real_figures(days)}})
+
+	def post(self, request):
+		from payments.economics import clean_inputs, simulate
+		try:
+			params = clean_inputs(request.data)
+		except ValueError as exc:
+			return Response({"success": False, "error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+		return Response({"success": True, "data": simulate(params)})
