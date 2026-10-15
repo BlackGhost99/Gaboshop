@@ -18,9 +18,22 @@ DEFAULT_PAYMENT_POLICY = {
 }
 
 
+def payments_simulated():
+    """Site de test : paiements en ligne simulés (faux SingPay), jamais avec PAYMENTS_DISABLED."""
+    return bool(getattr(django_settings, 'PAYMENTS_SIMULATED', False)) \
+        and not getattr(django_settings, 'PAYMENTS_DISABLED', False)
+
+
+def transfers_enabled():
+    """Versements automatiques aux commerces et livreurs (toujours simulés sur le site de test)."""
+    return payments_simulated() or bool(getattr(django_settings, 'SINGPAY_ENABLE_TRANSFER', False))
+
+
 def platform_online_ready():
     if getattr(django_settings, 'PAYMENTS_DISABLED', False):
         return False
+    if payments_simulated():
+        return True
     required = ('SINGPAY_CLIENT_ID', 'SINGPAY_CLIENT_SECRET', 'SINGPAY_WALLET_ID')
     return all(bool(getattr(django_settings, key, '')) for key in required)
 
@@ -118,6 +131,9 @@ def available_payment_options(store, delivery_requested=True, b2b=False, user=No
         from core import guardian
         if guardian.cash_blocked(user):
             options = [o for o in options if o['method'] != 'cash' and o['flow'] != 'courier_cash']
+    if payments_simulated():
+        # Site de test : le client est prévenu que rien n'est vraiment débité.
+        options = [{**o, 'simulated': True} if o['flow'] == 'platform_online' else o for o in options]
     return policy, options
 
 

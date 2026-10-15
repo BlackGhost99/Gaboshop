@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from orders.models import Order
 from .models import Payment, StorePayout
+from .configuration import payments_simulated, transfers_enabled
 from .references import base_reference, paid_reference
 from .utils import call_singpay_transfer
 
@@ -180,6 +181,8 @@ def release_store_payment(order_id, admin_override=False, admin_retry=False):
             # SingPay verse vers un décaissement enregistré dans l'espace marchand de Gaboshop
             # (le code agent ou le numéro Mobile Money indiqué par le commerce), jamais vers un simple numéro.
             disbursement_id = (order.store.singpay_disbursement_id or '').strip()
+            if not disbursement_id and payments_simulated():
+                disbursement_id = 'SIMULATION'  # site de test : versement simulé
             if payout is None:
                 payout = StorePayout.objects.create(
                     order=order, store=order.store, amount=amount, products_amount=products,
@@ -205,7 +208,7 @@ def release_store_payment(order_id, admin_override=False, admin_retry=False):
                 if changed:
                     transaction.on_commit(lambda p=payout: _notify_store(p))
                 return payout
-            if not getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False):
+            if not transfers_enabled():
                 changed = payout.status != 'pending' or payout.note != 'Transferts automatiques désactivés : versement manuel'
                 payout.status, payout.note = 'pending', 'Transferts automatiques désactivés : versement manuel'
                 payout.save()

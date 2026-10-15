@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from payments.client_forfaits import activate_forfait, active_forfait, catalog, forfait_payload
+from payments.online_verification import refresh_pending_intents
 from payments.models import Forfait, PaymentIntent, PaymentTransaction
 from payments.utils import call_airtel_money_init, call_moov_money_init, payment_request_minutes
 
@@ -32,6 +33,7 @@ class MyForfaitView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        refresh_pending_intents(request.user)
         current = active_forfait(request.user)
         pending = PaymentIntent.objects.filter(
             user=request.user, status='PENDING', metadata__purpose='client_forfait',

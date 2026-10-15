@@ -57,9 +57,10 @@ services:
       # Pas de simulation : avec les clés SingPay, on veut voir les vraies erreurs.
       - key: PAYMENT_SIMULATION_MODE
         value: "0"
-      # Site de test : aucun paiement réel. SingPay n'est jamais appelé, même si ses clés sont saisies ;
-      # les clients voient seulement espèces et paiement direct. Mettre "0" pour tester un vrai paiement.
-      - key: PAYMENTS_DISABLED
+      # Site de test : paiements en ligne simulés (faux SingPay, payments/singpay_simulator.py).
+      # Aucun appel à SingPay, aucun argent réel, même si ses clés sont saisies. Le paiement est confirmé
+      # tout seul après quelques secondes ; un numéro finissant par 99 est refusé. Versements simulés aussi.
+      - key: PAYMENTS_SIMULATED
         value: "1"
       - key: SINGPAY_ENABLE_TRANSFER
         value: "False"

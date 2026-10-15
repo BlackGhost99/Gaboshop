@@ -10,7 +10,7 @@ from orders.models import Order
 # Persisted notifications service (DB + multi-canal)
 from notifications.service import NotificationService
 from payments.utils import call_singpay_payment, call_singpay_transfer
-from payments.configuration import platform_online_ready
+from payments.configuration import payments_simulated, platform_online_ready, transfers_enabled
 from payments.references import base_reference
 
 logger = logging.getLogger(__name__)
@@ -528,6 +528,8 @@ class PaymentService:
             return {'success': False, 'error': 'Aucune commission a payer'}
 
         disbursement_id = (agent.singpay_disbursement_id or '').strip()
+        if not disbursement_id and payments_simulated():
+            disbursement_id = 'SIMULATION'  # site de test : versement simulé
         reference = paid_reference(paid)
         with transaction.atomic():
             # Verrou sur la commande : deux déclenchements simultanés ne créent qu'un seul versement.
@@ -574,7 +576,7 @@ class PaymentService:
                 return already(payout)
             if not disbursement_id:
                 note = 'Numéro Mobile Money du livreur pas encore activé pour les versements'
-            elif not getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False):
+            elif not transfers_enabled():
                 note = 'Transferts automatiques désactivés : versement manuel'
             else:
                 note = ''

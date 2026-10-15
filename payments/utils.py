@@ -101,6 +101,11 @@ def _singpay_request(method, path, payload=None, params=None, wallet_id=None, re
         # Site de test : jamais d'argent réel (paiement, statut, versement).
         logger.warning("SingPay %s %s bloqué : paiements désactivés (PAYMENTS_DISABLED)", method, path)
         return {"error": "Paiements désactivés sur le site de test", "disabled": True}
+    from .configuration import payments_simulated
+    if payments_simulated():
+        # Site de test : faux SingPay, aucun appel réseau, aucun argent réel.
+        from .singpay_simulator import handle
+        return handle(method, path, payload)
     base = _singpay_base_url()
     if not base:
         return {"error": "SINGPAY_BASE_URL manquant"}

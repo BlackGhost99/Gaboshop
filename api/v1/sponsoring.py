@@ -3,6 +3,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from payments.online_verification import refresh_pending_intents
 from payments.sponsoring import SponsoringError, mine, offer, request_purchase
 from stores.models import Store
 
@@ -26,6 +27,7 @@ class StoreSponsoringView(APIView):
         store = self._store(request)
         if store is None:
             return _error('Réservé aux commerces.', 403)
+        refresh_pending_intents(request.user)
         products = list(store.products.filter(is_available=True, market_type__in=['b2c', 'both'])
                         .order_by('name').values('id', 'name')[:200])
         return Response({'success': True, 'data': {**offer(), 'mine': mine(store), 'products': products}})

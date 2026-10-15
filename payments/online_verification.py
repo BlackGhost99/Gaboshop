@@ -308,3 +308,25 @@ def find_intent(reference):
     if not reference:
         return None
     return PaymentIntent.objects.filter(reference=str(reference)).first()
+
+
+def refresh_pending_intents(user, limit=3):
+    """Revérifie auprès de SingPay les paiements d'abonnement, de forfait ou de mise en avant encore « en attente »
+    de cet utilisateur (dernière heure). Appelé quand il ouvre la page concernée : le résultat s'affiche sans
+    attendre la tâche automatique. Une vérification au plus toutes les quelques secondes par paiement."""
+    from datetime import timedelta
+    from .views import process_intent_outcome
+    if not getattr(user, 'is_authenticated', False):
+        return
+    since = timezone.now() - timedelta(hours=1)
+    pending = PaymentIntent.objects.filter(user=user, provider='singpay', status='PENDING', created_at__gte=since) \
+        .order_by('-created_at')[:limit]
+    for intent in pending:
+        if not check_allowed(f'intent:{intent.pk}'):
+            continue
+        try:
+            outcome, provider_tx_id, raw = verify_intent(intent)
+            if outcome != 'unknown' and provider_tx_id:
+                process_intent_outcome(intent, provider_tx_id, outcome, raw)
+        except Exception:
+            logger.exception('Vérification SingPay impossible pour %s', intent.reference)

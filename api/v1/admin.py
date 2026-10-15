@@ -1123,12 +1123,13 @@ class SystemSettingsView(APIView):
     def _technical_status():
         """Interrupteurs gardés dans Render pour la sécurité : affichés ici, jamais modifiables depuis l'app."""
         from django.conf import settings as django_settings
-        from payments.configuration import platform_online_ready
+        from payments.configuration import payments_simulated, platform_online_ready
         from api.v1.ai.providers import AIProvider
         return {
             'singpay_ready': platform_online_ready(),
             'singpay_transfers_enabled': bool(getattr(django_settings, 'SINGPAY_ENABLE_TRANSFER', False)),
-            'payment_simulation_mode': bool(getattr(django_settings, 'PAYMENT_SIMULATION_MODE', False)),
+            'payment_simulation_mode': bool(getattr(django_settings, 'PAYMENT_SIMULATION_MODE', False))
+            or payments_simulated(),
             'ai_provider': getattr(django_settings, 'AI_PROVIDER', '') or 'local',
             'ai_providers_available': AIProvider.configured_providers(),
             'ai_active': AIProvider.get_provider_config().get('name'),

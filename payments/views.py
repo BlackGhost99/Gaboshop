@@ -904,6 +904,8 @@ class SubscriptionPlansAPIView(APIView):
         from payments.subscription_check import SubscriptionChecker
         from b2b.models import B2BSubscriptionPlan, B2BStoreSubscription
         
+        from .online_verification import refresh_pending_intents
+        refresh_pending_intents(request.user)
         store = Store.objects.filter(manager=request.user).first()
         
         # Si le store est B2B, retourner les plans B2B

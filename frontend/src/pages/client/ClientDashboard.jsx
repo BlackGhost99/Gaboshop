@@ -846,6 +846,11 @@ const ClientDashboard = () => {
                     </select>
                     <div className="md:col-span-2 text-xs text-gray-500 -mt-1">
                       {paymentHint(storeForms[storeName]?.payment_flow, storeForms[storeName]?.payment_method, storeForms[storeName]?.delivery_by)}
+                      {storeForms[storeName]?.payment_flow === 'platform_online' && (paymentOptions[storeName] || []).some((o) => o.simulated) && (
+                        <span className="mt-1 block font-semibold text-amber-700">
+                          Site de test : paiement simulé, rien n’est débité. Il est confirmé tout seul après quelques secondes ; un numéro finissant par 99 est refusé.
+                        </span>
+                      )}
                     </div>
                     <textarea
                       className="md:col-span-2 w-full border border-gray-200 rounded-md px-3 py-2"

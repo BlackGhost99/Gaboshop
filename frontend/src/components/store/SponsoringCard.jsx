@@ -39,6 +39,9 @@ export default function SponsoringCard() {
       const res = await api.post('/store/sponsoring/', form);
       notifySuccess('Demande de paiement envoyée', res.data?.message || '');
       load();
+      // Le paiement se confirme sur le téléphone : on revérifie un peu plus tard.
+      setTimeout(load, 12000);
+      setTimeout(load, 30000);
     } catch (err) {
       notifyError(err, { action: 'Mettre en avant' });
     } finally {
