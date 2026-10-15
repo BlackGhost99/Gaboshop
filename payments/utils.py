@@ -97,6 +97,10 @@ def _normalize_msisdn(phone):
 
 
 def _singpay_request(method, path, payload=None, params=None, wallet_id=None, require_wallet=True):
+    if getattr(settings, 'PAYMENTS_DISABLED', False):
+        # Site de test : jamais d'argent réel (paiement, statut, versement).
+        logger.warning("SingPay %s %s bloqué : paiements désactivés (PAYMENTS_DISABLED)", method, path)
+        return {"error": "Paiements désactivés sur le site de test", "disabled": True}
     base = _singpay_base_url()
     if not base:
         return {"error": "SINGPAY_BASE_URL manquant"}

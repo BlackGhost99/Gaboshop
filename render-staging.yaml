@@ -57,6 +57,10 @@ services:
       # Pas de simulation : avec les clés SingPay, on veut voir les vraies erreurs.
       - key: PAYMENT_SIMULATION_MODE
         value: "0"
+      # Site de test : aucun paiement réel. SingPay n'est jamais appelé, même si ses clés sont saisies ;
+      # les clients voient seulement espèces et paiement direct. Mettre "0" pour tester un vrai paiement.
+      - key: PAYMENTS_DISABLED
+        value: "1"
       - key: SINGPAY_ENABLE_TRANSFER
         value: "False"
       # Adresse publique de l'API SingPay (pas un secret). Les clés SINGPAY_CLIENT_ID,

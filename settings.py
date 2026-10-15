@@ -618,6 +618,8 @@ SINGPAY_WALLET_ID = env('SINGPAY_WALLET_ID', default='')
 SINGPAY_DISBURSEMENT_ID = env('SINGPAY_DISBURSEMENT_ID', default='')
 SINGPAY_TIMEOUT = env('SINGPAY_TIMEOUT', default='30')
 SINGPAY_ENABLE_TRANSFER = env('SINGPAY_ENABLE_TRANSFER', default='False').lower() in ('1','true','yes')
+# Site de test : aucun appel SingPay, aucun argent ne bouge ; seuls espèces et paiement direct restent proposés.
+PAYMENTS_DISABLED = env('PAYMENTS_DISABLED', default='False').lower() in ('1', 'true', 'yes')
 PAYMENT_SIMULATION_MODE = env('PAYMENT_SIMULATION_MODE', default='False').lower() in ('1', 'true', 'yes')
 PAYMENT_WEBHOOK_SECRET = env('PAYMENT_WEBHOOK_SECRET', default='')
 PAYMENT_WEBHOOK_SIGNATURE_REQUIRED = env_bool(

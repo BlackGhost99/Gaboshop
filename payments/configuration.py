@@ -19,6 +19,8 @@ DEFAULT_PAYMENT_POLICY = {
 
 
 def platform_online_ready():
+    if getattr(django_settings, 'PAYMENTS_DISABLED', False):
+        return False
     required = ('SINGPAY_CLIENT_ID', 'SINGPAY_CLIENT_SECRET', 'SINGPAY_WALLET_ID')
     return all(bool(getattr(django_settings, key, '')) for key in required)
 
@@ -37,6 +39,11 @@ def validate_payment_policy(value):
     policy = {**deepcopy(DEFAULT_PAYMENT_POLICY), **(value or {})}
     flows = list(dict.fromkeys(policy.get('enabled_flows') or []))
     methods = list(dict.fromkeys(policy.get('enabled_methods') or []))
+    if getattr(django_settings, 'PAYMENTS_DISABLED', False) and 'platform_online' in flows:
+        # Site de test sans paiement : le circuit en ligne est retiré au lieu de bloquer tous les réglages.
+        flows = [flow for flow in flows if flow != 'platform_online'] or list(DEFAULT_PAYMENT_POLICY['enabled_flows'])
+        if policy.get('default_flow') not in flows:
+            policy['default_flow'] = flows[0]
     if not flows or any(flow not in FLOWS for flow in flows):
         raise ValidationError({'enabled_flows': 'Activez au moins un circuit connu.'})
     if policy.get('default_flow') not in flows:
