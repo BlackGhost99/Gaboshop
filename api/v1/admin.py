@@ -1059,6 +1059,8 @@ class SystemSettingsView(APIView):
         'singpay_fee_percent': ('decimal', 0, 100),
         'singpay_payout_fee_percent': ('decimal', 0, 100),
         'direct_delivery_margin': ('bool', None, None),
+        'small_order_fee': ('decimal', 0, 100_000),
+        'small_order_threshold': ('decimal', 0, 100_000_000),
         'sponsoring_enabled': ('bool', None, None),
         'sponsor_product_week_price': ('decimal', 0, 10_000_000),
         'sponsor_store_week_price': ('decimal', 0, 10_000_000),

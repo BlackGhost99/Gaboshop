@@ -672,6 +672,11 @@ const Home = () => {
                         >
                           {store.is_open ? 'Ouvert' : 'Fermé'}
                         </span>
+                        {store.sponsored && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                            Sponsorisé
+                          </span>
+                        )}
                         {store.subscription_plan && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
                             {formatPlanLabel(store.subscription_plan)}

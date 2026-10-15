@@ -78,9 +78,11 @@ class StoreListView(ListAPIView):
 				end_date__gte=today
 			).order_by('-end_date').values('plan__priority_listing')[:1]
 
+			from payments.sponsoring import sponsored_store_exists
 			queryset = queryset.annotate(
-				priority_listing=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0))
-			).order_by('-priority_listing', '-created_at')
+				priority_listing=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0)),
+				sponsored_now=sponsored_store_exists(),
+			).order_by('-sponsored_now', '-priority_listing', '-created_at')
 
 		return queryset.select_related('category')
     

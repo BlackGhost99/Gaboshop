@@ -204,7 +204,7 @@ class OrderSerializer(serializers.ModelSerializer):
                         'currency': 'FCFA'
                     }] if obj.tax_amount > 0 else []),
                     *([{
-                        'description': 'Frais de transaction (Mobile Money)',
+                        'description': 'Frais petit panier',
                         'amount': str(obj.payment_fees),
                         'currency': 'FCFA'
                     }] if obj.payment_fees > 0 else []),
@@ -385,6 +385,16 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 order.forfait_discount = discount
                 order.total_amount -= order.applied_forfait_discount()
                 order.save(update_fields=['forfait_discount', 'total_amount', 'updated_at'])
+
+        # Frais petit panier (réglage admin, éteint par défaut) : seulement quand le client paie en ligne,
+        # figé sur la commande comme les autres montants.
+        if payment_flow == 'platform_online':
+            from payments.economics import small_order_fee
+            fee = small_order_fee(order.items_total)
+            if fee > 0:
+                order.payment_fees = fee
+                order.total_amount += fee
+                order.save(update_fields=['payment_fees', 'total_amount', 'updated_at'])
 
         from payments.direct_service import create_arrangement
         create_arrangement(order, payment_flow, payment_method, delivery_payment_method, request.user)

@@ -207,6 +207,19 @@ export default function AdminSettingsSection({ initial = null, onSaved }) {
             onChange={set('singpay_payout_fee_percent')} help="Sur chaque versement à un commerce ou un livreur. 0 si SingPay ne les facture pas." />
           <NumberField label="Validité d’une demande de paiement" suffix="min" min={5} max={1440} value={form.unpaid_order_expiry_minutes}
             onChange={set('unpaid_order_expiry_minutes')} help="Après ce délai, le client doit relancer le paiement." />
+          <NumberField label="Frais petit panier (paiement en ligne)" suffix="FCFA" min={0} max={100000} value={form.small_order_fee}
+            onChange={set('small_order_fee')} help="Montant fixe payé par le client sous le seuil ci-contre. 0 = éteint." />
+          <NumberField label="Seuil du petit panier" suffix="FCFA" min={0} max={100000000} value={form.small_order_threshold}
+            onChange={set('small_order_threshold')} help="Articles en dessous de ce montant : le frais s’ajoute. Au-dessus : rien." />
+        </div>
+      </Card>
+
+      <Card title="Mise en avant (sponsoring)" description="Les commerces paient pour passer en tête des listes, marqués « Sponsorisé ». Éteint : l’offre est visible mais grisée « Bientôt disponible ».">
+        <Toggle label="Les commerces peuvent acheter une mise en avant" help="Paiement Airtel Money ou Moov Money ; la mise en avant démarre quand SingPay confirme."
+          checked={form.sponsoring_enabled} onChange={set('sponsoring_enabled')} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <NumberField label="Prix d’une semaine pour un produit" suffix="FCFA" min={0} max={10000000} value={form.sponsor_product_week_price} onChange={set('sponsor_product_week_price')} />
+          <NumberField label="Prix d’une semaine pour tout le commerce" suffix="FCFA" min={0} max={10000000} value={form.sponsor_store_week_price} onChange={set('sponsor_store_week_price')} />
         </div>
       </Card>
       <PaymentPolicySettings value={form.payment_policy} onChange={set('payment_policy')} />

@@ -117,6 +117,7 @@ class ProductListView(ListAPIView):
         from django.db.models.functions import Coalesce
         from django.utils import timezone
         from payments.models import StoreSubscription
+        from payments.sponsoring import sponsored_product_exists
 
         today = timezone.now().date()
         priority_subquery = StoreSubscription.objects.filter(
@@ -131,8 +132,10 @@ class ProductListView(ListAPIView):
             store__is_verified=True,
             market_type__in=['b2c', 'both']  # BLOQUER les produits B2B purs
         ).select_related('store', 'category').prefetch_related('images').annotate(
-            store_priority=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0))
-        ).order_by('-is_sponsored', '-store_priority', '-created_at')
+            store_priority=Coalesce(Subquery(priority_subquery, output_field=IntegerField()), Value(0)),
+            # Mise en avant payée et en cours (payments/sponsoring.py), affichée « Sponsorisé ».
+            sponsored_now=sponsored_product_exists(),
+        ).order_by('-sponsored_now', '-store_priority', '-created_at')
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

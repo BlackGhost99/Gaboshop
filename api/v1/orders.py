@@ -736,10 +736,13 @@ class DeliveryQuoteView(APIView):
 			return Response({'success': False, 'error': 'Commerce introuvable.'}, status=status.HTTP_400_BAD_REQUEST)
 		city = (request.data.get('city') or 'Libreville').strip()
 		zones = list(active_zones(city).values_list('name', flat=True))
-		try:
-			zone = resolve_zone(city, request.data.get('delivery_zone'))
-		except ValueError as exc:
-			return Response({'success': True, 'data': {'delivery_fee': None, 'zones': zones, 'message': str(exc)}})
+		pickup = request.data.get('delivery_requested') is False
+		zone = ''
+		if not pickup:
+			try:
+				zone = resolve_zone(city, request.data.get('delivery_zone'))
+			except ValueError as exc:
+				return Response({'success': True, 'data': {'delivery_fee': None, 'zones': zones, 'message': str(exc)}})
 		pairs = []
 		for item in (request.data.get('items') or [])[:100]:
 			try:
@@ -752,7 +755,11 @@ class DeliveryQuoteView(APIView):
 		if not pairs:
 			return Response({'success': False, 'error': 'Panier vide.'}, status=status.HTTP_400_BAD_REQUEST)
 		order = Order(store=store, city=city, delivery_zone=zone, delivery_type='standard')
-		fee = order.quote_delivery(pairs)
+		fee = Decimal('0') if pickup else order.quote_delivery(pairs)
+		from payments.economics import small_order_fee
+		items_total = sum((Decimal(product.price or 0) * quantity for product, quantity in pairs), Decimal('0'))
 		return Response({'success': True, 'data': {
 			'delivery_fee': str(Decimal(fee)), 'vehicle_type': order.vehicle_type, 'zone': zone, 'zones': zones,
+			# Ajouté seulement si le client paie en ligne (voir OrderCreateSerializer.create).
+			'small_order_fee_online': str(small_order_fee(items_total)),
 		}})

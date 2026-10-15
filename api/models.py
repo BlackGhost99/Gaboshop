@@ -85,6 +85,16 @@ class SystemSettings(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Ce que SingPay prélève sur chaque versement envoyé à un commerce ou un livreur (%)"
     )
+    # Frais fixe « petit panier » payé par le client, seulement en paiement en ligne et sous le seuil.
+    # 0 = éteint. Les gros paniers sont déjà couverts par les pourcentages.
+    small_order_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0.00, validators=[MinValueValidator(0)],
+        help_text="Frais petit panier payé par le client en paiement en ligne (FCFA, 0 = éteint)"
+    )
+    small_order_threshold = models.DecimalField(
+        max_digits=10, decimal_places=2, default=5000.00, validators=[MinValueValidator(0)],
+        help_text="Panier (articles) en dessous duquel le frais petit panier s'applique (FCFA)"
+    )
     payment_policy = models.JSONField(default=dict, blank=True, help_text="Circuits et plafonds de paiement actifs")
     
     # === 3. VILLES & GÉOLOCALISATION ===

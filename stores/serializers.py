@@ -20,6 +20,7 @@ class StoreListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     is_open = serializers.BooleanField(read_only=True)
     total_products = serializers.IntegerField(read_only=True)
+    sponsored = serializers.SerializerMethodField()
     
     class Meta:
         model = Store
@@ -27,8 +28,12 @@ class StoreListSerializer(serializers.ModelSerializer):
             'id', 'name', 'category', 'category_name', 'city', 'zone', 
             'phone', 'logo', 'is_active', 'is_open', 'total_products',
             'offers_delivery', 'delivery_fee', 'min_order_amount', 'commission_rate',
-            'subscription_plan'
+            'subscription_plan', 'sponsored'
         ]
+
+    def get_sponsored(self, obj):
+        # Annoté par la liste publique ; ailleurs, pas de mention « Sponsorisé ».
+        return bool(getattr(obj, 'sponsored_now', False))
 
 class StoreDetailSerializer(serializers.ModelSerializer):
     """Serializer détaillé pour un magasin spécifique"""

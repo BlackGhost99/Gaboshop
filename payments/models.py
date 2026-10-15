@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 import re
 import unicodedata
 from orders.models import Order
@@ -590,26 +591,34 @@ class StoreSubscription(models.Model):
 
 class SponsoredProduct(models.Model):
 	"""
-	Produits sponsorisés / mises en avant payantes
+	Mises en avant payantes : un produit ou tout le commerce passe en tête des listes, avec la mention « Sponsorisé ».
+	Achetées par le commerce (Mobile Money via SingPay) ou créées par l'admin.
 	"""
 	SPONSOR_STATUS_CHOICES = (
+		('pending_payment', 'En attente du paiement'),
 		('active', 'Actif'),
 		('expired', 'Expiré'),
 		('paused', 'Suspendu'),
+		('cancelled', 'Annulé'),
 	)
-	
-	product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='sponsorships')
+	TARGET_PRODUCT = 'product'
+	TARGET_STORE = 'store'
+
+	# Vide quand c'est tout le commerce qui est mis en avant (sponsor_type « store »).
+	product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='sponsorships', null=True, blank=True)
 	store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='sponsored_products')
 	
 	# Détails sponsoring
-	sponsor_type = models.CharField(max_length=50, default='featured',
-									help_text="Type: featured, banner, top_search, etc.")
+	sponsor_type = models.CharField(max_length=50, default='product',
+									help_text="product (un produit), store (tout le commerce) ; featured = ancien type produit")
 	price_paid = models.DecimalField(max_digits=10, decimal_places=2)
 	status = models.CharField(max_length=20, choices=SPONSOR_STATUS_CHOICES, default='active')
+	weeks = models.PositiveSmallIntegerField(default=1)
+	payment_reference = models.CharField(max_length=100, blank=True, default='')
 	
-	# Durée
-	start_date = models.DateTimeField(auto_now_add=True)
-	end_date = models.DateTimeField()
+	# Durée : fixée à l'activation (paiement confirmé)
+	start_date = models.DateTimeField(null=True, blank=True, default=timezone.now)
+	end_date = models.DateTimeField(null=True, blank=True)
 	
 	# Analytics
 	impressions = models.PositiveIntegerField(default=0)
@@ -623,7 +632,8 @@ class SponsoredProduct(models.Model):
 		ordering = ['-end_date']
 	
 	def __str__(self):
-		return f"Sponsoring {self.product.name}"
+		target = self.product.name if self.product_id else f"commerce {self.store.name}"
+		return f"Sponsoring {target}"
 
 
 class ClientCredit(models.Model):

@@ -134,7 +134,8 @@ class PaymentInitView(APIView):
                         })
 
                 real_fee_rate = self._get_mobile_money_fee_rate(payment_method)
-                order.payment_fees = Decimal('0.00')
+                # payment_fees = frais petit panier, figé à la commande (orders/serializers.py).
+                order.payment_fees = Decimal(order.payment_fees or 0)
                 # Montants figés à la commande : livraison et commission ne sont pas recalculées au paiement
                 # (un commerce ne peut pas augmenter ses frais après coup). Seuls les frais opérateur changent.
                 total_mobile_money_fees = (

@@ -74,6 +74,9 @@ def _activate_subscription_from_intent(intent):
     meta = intent.metadata or {}
     if meta.get('purpose') == 'client_forfait':
         return _activate_client_forfait_from_intent(intent)
+    if meta.get('purpose') == 'sponsoring':
+        from .sponsoring import activate_from_intent
+        return activate_from_intent(intent)
     if meta.get('purpose') != 'store_subscription':
         return None
     if meta.get('subscription_activated'):
@@ -164,7 +167,7 @@ def _activate_subscription_from_intent(intent):
 
 RESERVED_INTENT_METADATA = {
     'purpose', 'plan', 'plan_id', 'store_id', 'subscription_kind', 'subscription_activated',
-    'forfait_id', 'client_forfait_id',
+    'forfait_id', 'client_forfait_id', 'sponsorship_id',
 }
 
 
@@ -582,6 +585,9 @@ def _process_intent_outcome_locked(intent, provider_tx_id, outcome, raw):
     tx.save()
     intent.status = "FAILED"
     intent.save()
+    if (intent.metadata or {}).get('purpose') == 'sponsoring':
+        from .sponsoring import cancel_from_intent
+        cancel_from_intent(intent)
     return Response({"detail": "Payment failed"}, status=status.HTTP_200_OK)
 
 

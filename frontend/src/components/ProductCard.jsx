@@ -28,6 +28,13 @@ const ProductCard = ({ product, onAddToCart, onViewDetails }) => {
           }}
         />
 
+        {/* Mise en avant payée : toujours signalée au client */}
+        {product.sponsored && (
+          <div className="absolute top-3 left-3 bg-white/90 text-gray-700 px-2 py-0.5 rounded-full text-[11px] font-semibold shadow-sm">
+            Sponsorisé
+          </div>
+        )}
+
         {/* Badge */}
         {discount > 0 && (
           <div className="absolute top-3 right-3 bg-cta-600 text-white px-3 py-1 rounded-full text-xs font-bold">

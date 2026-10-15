@@ -39,6 +39,7 @@ from .notifications import (
 )
 from . import delivery_admin
 from . import client_forfaits
+from .sponsoring import StoreSponsoringView
 from .delivery import (
     DeliveryProfileUpdateView, DeliveryAcceptAssignmentView, 
     DeliveryRejectAssignmentView, DeliveryStartView, DeliveryCompleteView,
@@ -375,6 +376,7 @@ urlpatterns = [
     path('b2b/', include('b2b.urls')),
     
     # Store Finance Module (Store-level financial management)
+    path('store/sponsoring/', StoreSponsoringView.as_view(), name='store-sponsoring'),
     path('store/finance/', include('finance.urls')),
     
     # AI Module

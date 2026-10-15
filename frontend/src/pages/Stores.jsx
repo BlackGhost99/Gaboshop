@@ -151,11 +151,16 @@ const Stores = () => {
               </p>
             </div>
           </div>
-          {store.subscription_plan && (
-            <span className="text-[11px] font-semibold uppercase px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
-              {formatPlanLabel(store.subscription_plan)}
-            </span>
-          )}
+          <div className="flex flex-col items-end gap-1">
+            {store.sponsored && (
+              <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">Sponsorisé</span>
+            )}
+            {store.subscription_plan && (
+              <span className="text-[11px] font-semibold uppercase px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                {formatPlanLabel(store.subscription_plan)}
+              </span>
+            )}
+          </div>
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
           <span>{store.total_products || 0} produits</span>

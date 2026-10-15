@@ -122,6 +122,16 @@ def simulate(p):
     }
 
 
+def small_order_fee(items_total):
+    """Frais petit panier réel d'une commande payée en ligne (réglage admin ; 0 si éteint ou panier au-dessus du seuil)."""
+    from api.models import SystemSettings
+    s = SystemSettings.get_settings()
+    fee = _franc(s.small_order_fee or 0)
+    if fee <= 0 or Decimal(items_total or 0) >= Decimal(s.small_order_threshold or 0):
+        return Decimal('0')
+    return fee
+
+
 def default_inputs():
     """Valeurs de départ : les réglages actuels de l'admin."""
     from api.models import SystemSettings
@@ -136,8 +146,8 @@ def default_inputs():
         'singpay_payout_fee_percent': str(s.singpay_payout_fee_percent),
         'forfait_discount_percent': '0',
         'debt_recovery_percent': '100',
-        'small_order_fee': '0',
-        'small_order_threshold': '5000',
+        'small_order_fee': str(_franc(s.small_order_fee or 0)),
+        'small_order_threshold': str(_franc(s.small_order_threshold or 0)),
         'flow': 'online',
         'store_delivers': False,
         'direct_delivery_margin': bool(s.direct_delivery_margin),

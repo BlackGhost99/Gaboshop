@@ -88,6 +88,9 @@ const ClientDashboard = () => {
   // Prix de livraison calculé par le serveur, exactement comme à la commande (prix affiché = prix payé).
   const [quotes, setQuotes] = useState({});
   const quoteFor = (storeName) => quotes[storeName] || {};
+  // Frais petit panier : seulement en paiement en ligne (réglage admin, 0 = éteint).
+  const smallFeeFor = (storeName) => (storeForms[storeName]?.payment_flow === 'platform_online'
+    ? Number(quoteFor(storeName).small_order_fee_online) || 0 : 0);
   const zonesForCity = (city) => zones.filter((z) => (z.city || '').toLowerCase() === (city || 'Libreville').trim().toLowerCase());
 
   const groupByStore = (items) => {
@@ -242,10 +245,11 @@ const ClientDashboard = () => {
       Object.entries(cartByStore).forEach(async ([storeName, group]) => {
         const storeId = group.items?.[0]?.store_id;
         const form = storeForms[storeName] || {};
-        if (!storeId || form.delivery_requested === false) return;
+        if (!storeId) return;
         try {
           const res = await api.post('/orders/delivery-quote/', {
             store: storeId,
+            delivery_requested: form.delivery_requested !== false,
             city: form.city || 'Libreville',
             delivery_zone: form.zone || '',
             items: group.items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
@@ -881,14 +885,21 @@ const ClientDashboard = () => {
                         </div>
                       )}
                       
+                      {storeForms[storeName]?.payment_flow === 'platform_online' && Number(quoteFor(storeName).small_order_fee_online) > 0 && (
+                        <div className="flex justify-between text-gray-700">
+                          <span>Frais petit panier (paiement en ligne)</span>
+                          <span className="font-semibold">{formatCurrency(Number(quoteFor(storeName).small_order_fee_online))}</span>
+                        </div>
+                      )}
+
                       {/* TOTAL */}
                       <div className="pt-2 border-t border-gray-300 flex justify-between font-bold text-gray-900 text-sm">
                         <span>TOTAL A PAYER</span>
                         <span className="text-base text-indigo-600">
                           {storeForms[storeName]?.delivery_requested === false
-                            ? formatCurrency(data.total)
+                            ? formatCurrency(data.total + smallFeeFor(storeName))
                             : quoteFor(storeName).delivery_fee != null
-                              ? formatCurrency(calculateTotal(data.total, Number(quoteFor(storeName).delivery_fee)))
+                              ? formatCurrency(calculateTotal(data.total, Number(quoteFor(storeName).delivery_fee)) + smallFeeFor(storeName))
                               : 'Calcul...'}
                         </span>
                       </div>

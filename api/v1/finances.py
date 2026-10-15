@@ -305,8 +305,8 @@ class SponsoredProductsView(APIView):
 			{
 				"id": s.id,
 				"store_name": s.store.name,
-				"product_name": s.product.name,
-				"duration": f"{(s.end_date - s.start_date).days} jours",
+				"product_name": s.product.name if s.product_id else "Tout le commerce",
+				"duration": f"{(s.end_date - s.start_date).days} jours" if s.start_date and s.end_date else f"{s.weeks * 7} jours",
 				"price_paid": float(s.price_paid),
 				"status": s.get_status_display(),
 				"impressions": s.impressions,
