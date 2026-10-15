@@ -352,6 +352,7 @@ class ProductActivateView(APIView):
         try:
             product = get_object_or_404(Product, id=product_id)
             product.is_available = True
+            product.blocked_by_admin = False
             product.save()
             
             return Response({
@@ -371,6 +372,7 @@ class ProductDeactivateView(APIView):
         try:
             product = get_object_or_404(Product, id=product_id)
             product.is_available = False
+            product.blocked_by_admin = True
             product.save()
             
             return Response({

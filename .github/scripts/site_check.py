@@ -46,6 +46,7 @@ MARKERS = {
     'Commerces validés et argent en sécurité (13 oct.)': 'Votre argent en sécurité chez Gaboshop',
     'Client : signaler un problème, versement à 48 h (15 oct.)': 'Signaler un problème',
     'Forfaits clients (15 oct.)': 'Payez moins cher la livraison en vous abonnant',
+    'Gardien anti-fraude (15 oct.)': 'le Gardien a seulement mis en pause',
 }
 
 

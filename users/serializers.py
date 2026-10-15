@@ -105,6 +105,14 @@ class RegisterSerializer(serializers.ModelSerializer):
                     'phone': _('Le numéro doit être au format Gabon: +241... ou 0...')
                 })
         
+        # Un vrai numéro gabonais : +241 puis 7 à 9 chiffres. Le même numéro écrit avec ou sans le 0
+        # (+24107… / +2417…) ne peut pas ouvrir deux comptes.
+        digits = phone[4:]
+        if not digits.isdigit() or len(digits) not in (7, 8, 9):
+            raise serializers.ValidationError({'phone': _('Numéro invalide : indiquez un numéro gabonais (ex. 077 12 34 56).')})
+        core = digits.lstrip('0')
+        if User.objects.filter(phone__in=('+241' + core, '+2410' + core)).exists():
+            raise serializers.ValidationError({'phone': _('Ce numéro a déjà un compte. Connectez-vous ou utilisez « mot de passe oublié ».')})
         attrs['phone'] = phone
         
         # Validation mot de passe

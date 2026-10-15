@@ -51,9 +51,14 @@ def _refresh_status(obligation):
 
 def ensure_credit_limit(store, additional_commission=Decimal('0')):
     policy = get_payment_policy(store)
+    # Verrou sur le commerce : deux commandes simultanées ne dépassent pas ensemble le plafond.
+    from stores.models import Store
+    list(Store.objects.select_for_update().filter(pk=store.pk).values_list('pk', flat=True))
+    # Seules les commissions exigibles (commande livrée) comptent : des commandes passées puis jamais
+    # livrées (par un concurrent malveillant, par exemple) ne bloquent plus le commerce.
     debts = PaymentObligation.objects.filter(
         arrangement__store=store, kind='commission'
-    ).exclude(status__in=['paid', 'cancelled', 'waived']).prefetch_related('receipts', 'adjustments')
+    ).exclude(status__in=['paid', 'cancelled', 'waived', 'not_due']).prefetch_related('receipts', 'adjustments')
     outstanding = sum((debt.remaining_amount for debt in debts), Decimal('0'))
     if outstanding + Decimal(additional_commission) > Decimal(policy['merchant_debt_limit']):
         raise ValidationError('Plafond de commissions dues atteint pour ce commerce.')

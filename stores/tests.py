@@ -321,6 +321,14 @@ class AssistantTests(TestCase):
 		self.assertNotIn('platform_stats', tools_for('store_manager'))
 		self.assertIn('add_to_cart', tools_for('visitor'))
 
+	def _admin_api(self):
+		from rest_framework.test import APIClient
+		admin = User.objects.filter(phone='+24107999999').first() or User.objects.create_user(
+			phone='+24107999999', password='x', user_type='admin', is_staff=True)
+		api = APIClient()
+		api.force_authenticate(admin)
+		return api
+
 	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='test-key')
 	def test_llm_agent_calls_tools(self):
 		from unittest import mock
@@ -336,9 +344,12 @@ class AssistantTests(TestCase):
 			data = self.ask('je prends les adidas', user=self.client_user)
 		self.assertEqual(data['provider'], 'groq')
 		self.assertEqual(data['actions'][0]['type'], 'add_to_cart')
-		status = self.client.get('/api/v1/ai/assistant/status/').json()['data']
+		status = self._admin_api().get('/api/v1/ai/assistant/status/').json()['data']
 		self.assertTrue(status['key_present'])
 		self.assertTrue(status['last_call']['ok'])
+		public = self.client.get('/api/v1/ai/assistant/status/').json()['data']
+		self.assertEqual(set(public), {'provider', 'key_present', 'last_ok'})
+		self.assertTrue(public['last_ok'])
 
 	@override_settings(AI_PROVIDER='groq', GROQ_API_KEY='bad-key')
 	def test_llm_failure_falls_back_and_is_reported(self):
@@ -348,7 +359,7 @@ class AssistantTests(TestCase):
 		with mock.patch('api.v1.ai.assistant._client', return_value=fake):
 			data = self.ask('bonjour')
 		self.assertEqual(data['provider'], 'local')
-		status = self.client.get('/api/v1/ai/assistant/status/').json()['data']
+		status = self._admin_api().get('/api/v1/ai/assistant/status/').json()['data']
 		self.assertFalse(status['last_call']['ok'])
 		self.assertIn('invalid api key', status['last_call']['error'])
 
@@ -362,10 +373,12 @@ class AssistantTests(TestCase):
 		fake = mock.MagicMock()
 		fake.chat.completions.create.return_value = NS(choices=[NS(message=NS(content='OK'))])
 		with mock.patch('api.v1.ai.assistant._client', return_value=fake):
-			data = self.client.get('/api/v1/ai/assistant/status/?test=1').json()['data']
+			admin_api = self._admin_api()
+			self.assertNotIn('test', self.client.get('/api/v1/ai/assistant/status/?test=1').json()['data'])
+			data = admin_api.get('/api/v1/ai/assistant/status/?test=1').json()['data']
 			self.assertTrue(data['test']['ok'])
 			self.assertTrue(data['last_call']['ok'])
-			again = self.client.get('/api/v1/ai/assistant/status/?test=1').json()['data']
+			again = admin_api.get('/api/v1/ai/assistant/status/?test=1').json()['data']
 		self.assertIn('skipped', again['test'])
 
 

@@ -33,7 +33,7 @@ def ai_chat(request):
     """
     try:
         user = request.user
-        message = request.data.get('message', '').strip()
+        message = str(request.data.get('message', '') or '').strip()[:600]
         frontend_context = request.data.get('frontend_context', {})
         last_error = frontend_context.get('last_api_error')
         

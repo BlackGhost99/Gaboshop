@@ -277,10 +277,11 @@ class SubscriptionChecker:
             from django.utils import timezone
             from orders.models import Order
             month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            # Les commandes annulées ne comptent pas : sinon n'importe qui épuiserait le quota d'un commerce.
             order_count = Order.objects.filter(
                 store=store,
                 created_at__gte=month_start
-            ).count()
+            ).exclude(status__in=('cancelled', 'refunded')).count()
             if order_count >= monthly_limit:
                 raise PermissionDenied(
                     f"Vous avez atteint la limite de {monthly_limit} commandes/mois "

@@ -177,7 +177,8 @@ def t_search_products(ctx, query='', max_price=None, min_price=None, brand=None,
 
 def t_get_product(ctx, product_id):
     p = Product.objects.select_related('store', 'category').filter(
-        id=product_id, is_available=True, store__is_active=True, store__is_verified=True).first()
+        id=product_id, is_available=True, store__is_active=True, store__is_verified=True,
+        market_type__in=['b2c', 'both']).first()
     if not p:
         return {'error': 'Produit introuvable ou indisponible.'}
     ctx.show([p])
@@ -192,7 +193,8 @@ def t_get_product(ctx, product_id):
 
 def t_add_to_cart(ctx, product_id, quantity=1, size=None):
     p = Product.objects.select_related('store').filter(
-        id=product_id, is_available=True, store__is_active=True, store__is_verified=True).first()
+        id=product_id, is_available=True, store__is_active=True, store__is_verified=True,
+        market_type__in=['b2c', 'both']).first()
     if not p:
         return {'error': 'Produit introuvable ou indisponible.'}
     try:
@@ -335,6 +337,8 @@ def t_update_product(ctx, product_id, price=None, stock=None, visible=None):
         changes['stock'] = value
         summary.append(f"stock {p.stock} → {value}")
     if visible is not None:
+        if visible and p.blocked_by_admin:
+            return {'error': "Ce produit a été retiré par Gaboshop : seul l'administrateur peut le remettre en vente."}
         changes['is_available'] = bool(visible)
         summary.append('visible en boutique' if visible else 'masqué de la boutique')
     if not changes:
@@ -377,7 +381,7 @@ def t_set_order_status(ctx, order_number, status_value):
 
 def _store_categories(store):
     from products.models import ProductCategory
-    return ProductCategory.objects.filter(Q(store=store) | Q(store_category_id=store.category_id)).order_by('order', 'name')
+    return ProductCategory.objects.filter(Q(store=store) | Q(store__isnull=True, store_category_id=store.category_id)).order_by('order', 'name')
 
 
 def t_store_categories(ctx):
@@ -1284,7 +1288,7 @@ def ai_assistant_confirm(request):
             p.price = Decimal(changes['price'])
         if 'stock' in changes:
             p.stock = int(changes['stock'])
-        if 'is_available' in changes:
+        if 'is_available' in changes and not (changes['is_available'] and p.blocked_by_admin):
             p.is_available = bool(changes['is_available'])
         p.save()
         return Response({'success': True, 'data': {'message': f"C'est fait : {p.name} mis à jour."}})
@@ -1309,7 +1313,7 @@ def ai_assistant_status(request):
         'last_call': last or (dict(_LAST_STATUS) if _LAST_STATUS else None),
     }
     # ?test=1 : essai réel, limité à une fois par minute pour ne pas gaspiller le quota gratuit
-    if request.query_params.get('test') and config.get('available') and config.get('name') != 'local':
+    if request.query_params.get('test') and _is_platform_admin(request.user) and config.get('available') and config.get('name') != 'local':
         now = timezone.now()
         last_test = _LAST_STATUS.get('_tested_at')
         if last_test and (now - last_test).total_seconds() < 60:
@@ -1322,4 +1326,12 @@ def ai_assistant_status(request):
     data['failed_models'] = {m: err for m, (_, err) in _MODEL_STATE['failed'].items()}
     if isinstance(data['last_call'], dict):
         data['last_call'] = {k: v for k, v in data['last_call'].items() if not str(k).startswith('_')}
+    if not _is_platform_admin(request.user):
+        # Public : seulement « configurée ou non ». Détails techniques et essai réel réservés à l'admin.
+        last_call = data.get('last_call') if isinstance(data.get('last_call'), dict) else {}
+        data = {'provider': data['provider'], 'key_present': data['key_present'], 'last_ok': last_call.get('ok')}
     return Response({'success': True, 'data': data})
+
+
+def _is_platform_admin(user):
+    return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser or user.user_type == 'admin'))

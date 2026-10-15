@@ -598,56 +598,6 @@ class ClientForfaitListView(APIView):
 			})
 
 
-class ClientForfaitUpdateView(APIView):
-	"""Update/change user's forfait"""
-	permission_classes = [permissions.IsAuthenticated]
-	
-	def patch(self, request):
-		try:
-			forfait_id = request.data.get('forfait_id')
-			if not forfait_id:
-				return Response({
-					'success': False,
-					'error': 'forfait_id is required'
-				}, status=status.HTTP_400_BAD_REQUEST)
-			
-			forfait = Forfait.objects.get(id=forfait_id, is_active=True)
-			
-			# Deactivate current forfait if exists
-			ClientForfait.objects.filter(
-				user=request.user,
-				status='active'
-			).update(status='cancelled')
-			
-			# Create new forfait subscription
-			from datetime import timedelta
-			client_forfait = ClientForfait.objects.create(
-				user=request.user,
-				forfait=forfait,
-				start_date=timezone.now().date(),
-				expiry_date=timezone.now().date() + timedelta(days=subscription_days()),
-				status='active'
-			)
-			
-			serializer = ClientForfaitSerializer(client_forfait)
-			return Response({
-				'success': True,
-				'data': serializer.data,
-				'message': f'Forfait {forfait.name} activé avec succès'
-			}, status=status.HTTP_201_CREATED)
-		
-		except Forfait.DoesNotExist:
-			return Response({
-				'success': False,
-				'error': 'Forfait not found'
-			}, status=status.HTTP_404_NOT_FOUND)
-		except Exception as e:
-			return Response({
-				'success': False,
-				'error': str(e)
-			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 class PayoutListView(APIView):
 	"""Get payouts for delivery agents and merchants"""
 	permission_classes = [permissions.IsAuthenticated]

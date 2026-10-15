@@ -30,7 +30,11 @@ def get_ai_context(request):
         if user.user_type == 'store_manager':
             store = user.managed_stores.filter(is_active=True).first()
         
-        alerts = AlertMonitor.get_all_alerts(store=store, user_role=user.user_type)
+        # Gérant sans commerce actif : aucune alerte (sinon elles porteraient sur tous les commerces).
+        if user.user_type == 'store_manager' and store is None:
+            alerts = []
+        else:
+            alerts = AlertMonitor.get_all_alerts(store=store, user_role=user.user_type)
         context["alerts"] = [alert.get("type") for alert in alerts]
         context["alerts_details"] = alerts
         

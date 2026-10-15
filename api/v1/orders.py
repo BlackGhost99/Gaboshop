@@ -45,12 +45,32 @@ logger = logging.getLogger(__name__)
 
 class OrderCreateView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
+	MAX_OPEN_ORDERS = 5
+
+	def get_throttles(self):
+		from users.throttles import OrderCreateThrottle
+		return [OrderCreateThrottle()]
     
 	def post(self, request):
 		from core import guardian
 		paused = guardian.pause_refusal(request.user)
 		if paused:
 			return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
+		# Trop de commandes ouvertes (pas encore prêtes) : on bloque le sabotage de stock et de quota des commerces.
+		open_orders = Order.objects.filter(
+			client=request.user, status__in=('created', 'pending_payment', 'confirmed', 'preparing'),
+		).count()
+		if open_orders >= self.MAX_OPEN_ORDERS and not (
+			request.headers.get('Idempotency-Key')
+			and Order.objects.filter(client=request.user, client_request_id=str(request.headers.get('Idempotency-Key')).strip()[:64]).exists()
+		):
+			return Response({'success': False, 'error': {
+				'code': 'trop_de_commandes_ouvertes',
+				'message': f'Vous avez déjà {open_orders} commandes en cours de traitement.',
+				'reason': 'Pour protéger les commerces, une même personne ne peut pas avoir plus de '
+				          f'{self.MAX_OPEN_ORDERS} commandes en attente à la fois.',
+				'next_step': 'Payez ou annulez une commande en attente, ou attendez qu’elle soit prête.',
+			}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 		# Même panier renvoyé (réponse perdue, connexion coupée) : on rend la commande déjà créée.
 		request_id = str(request.headers.get('Idempotency-Key') or '').strip()[:64]
 		if request_id:

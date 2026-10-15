@@ -26,7 +26,7 @@ from .orders import (
 )
 from .payments import (
     PaymentInitView, PaymentDetailView, PaymentWebhookView, PaymentVerifyView,
-    ClientForfaitListView, ClientForfaitUpdateView, ForfaitListView,
+    ClientForfaitListView, ForfaitListView,
     PayoutListView
 )
 from .webhooks import WhatsAppWebhookView

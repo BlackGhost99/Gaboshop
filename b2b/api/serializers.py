@@ -232,6 +232,10 @@ class B2BOrderCreateSerializer(serializers.Serializer):
 		"""Validation globale"""
 		wholesaler_id = attrs.get('wholesaler_id')
 		items = attrs.get('items', [])
+		# Entre commerces, pas de paiement en ligne : la commande B2B est confirmée tout de suite et ne passe
+		# jamais par SingPay, la commission serait marquée payée sans aucun paiement.
+		if attrs.get('payment_flow') == 'platform_online':
+			raise serializers.ValidationError({'payment_flow': 'Le paiement en ligne n’est pas encore ouvert aux commandes entre commerces.'})
 		
 		# Vérifier que le grossiste existe
 		try:

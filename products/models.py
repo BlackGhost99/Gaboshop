@@ -94,6 +94,8 @@ class Product(models.Model):
     
 	# Statut et visibilité
 	is_available = models.BooleanField(default=True)
+	# Retiré par l'admin : le commerce ne peut pas le remettre en vente lui-même.
+	blocked_by_admin = models.BooleanField(default=False)
 	is_featured = models.BooleanField(default=False)
 	
 	# Type de marché

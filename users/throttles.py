@@ -43,6 +43,17 @@ class AuthIPThrottle(_SafeThrottle):
 		return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}
 
 
+class OrderCreateThrottle(_SafeThrottle):
+	"""Par compte : 20 commandes par heure au plus (au-delà, c'est un robot ou un sabotage de stock)."""
+	scope = 'order_create'
+	rate = '20/hour'
+
+	def get_cache_key(self, request, view):
+		if not request.user or not request.user.is_authenticated:
+			return None
+		return self.cache_format % {'scope': self.scope, 'ident': request.user.pk}
+
+
 class LoginPhoneThrottle(_SafeThrottle):
 	"""Par numéro de téléphone visé : 10 essais par quart d'heure."""
 	scope = 'login_phone'

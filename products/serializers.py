@@ -110,6 +110,33 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     variants = ProductVariantSerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
 
+def category_allowed(category, store):
+    """Catégorie de produit permise pour ce commerce.
+
+    Sa propre catégorie ou une catégorie générale de son type : toujours. Une catégorie d'un autre type
+    (une épicerie qui vend aussi des vêtements) : oui, sauf si elle sert à payer moins de commission,
+    c'est-à-dire une catégorie alimentaire pour un commerce non alimentaire (0 % en Business), ou un taux
+    plus bas que celui des catégories de son propre type."""
+    if category is None or store is None:
+        return True
+    if category.store_id:
+        return category.store_id == store.id
+    if category.store_category_id == store.category_id:
+        return True
+    from decimal import Decimal
+    from payments.subscription_check import SubscriptionChecker
+    from products.models import ProductCategory
+    if SubscriptionChecker._is_food_category(category) and not SubscriptionChecker._is_food_category(
+            ProductCategory(store_category=store.category) if store.category_id else None):
+        return False
+    own = ProductCategory.objects.filter(store__isnull=True, store_category_id=store.category_id) \
+        .exclude(commission_rate=None).values_list('commission_rate', flat=True)
+    floor = min(own, default=None)
+    if floor is None:
+        floor = store.commission_rate or Decimal('0')
+    return Decimal(category.commission_rate or 0) >= Decimal(floor)
+
+
 class ProductCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de produit"""
     attributes = ProductAttributesField(required=False)
@@ -123,11 +150,8 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, attrs):
-        request = self.context.get('request')
-        
-        if request and hasattr(request, 'user'):
-            # Dans le contexte d'une vue, le store sera défini par la vue
-            pass
+        if not category_allowed(attrs.get('category'), self.context.get('store')):
+            raise serializers.ValidationError({'category': _('Choisissez une catégorie de votre type de commerce.')})
         
         # Validation du prix
         if attrs.get('compare_price') and attrs['price'] >= attrs['compare_price']:
@@ -166,6 +190,16 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             'stock', 'sku', 'barcode', 'is_available', 'is_featured',
             'image', 'image_2', 'image_3', 'weight_kg', 'length_m', 'attributes'
         ]
+
+    def validate_category(self, value):
+        if self.instance is not None and not category_allowed(value, self.instance.store):
+            raise serializers.ValidationError(_('Choisissez une catégorie de votre type de commerce.'))
+        return value
+
+    def validate_is_available(self, value):
+        if value and self.instance is not None and self.instance.blocked_by_admin:
+            raise serializers.ValidationError(_('Ce produit a été retiré par Gaboshop : seul l’administrateur peut le remettre en vente.'))
+        return value
 
     def validate_length_m(self, value):
         if value is None:

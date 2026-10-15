@@ -265,7 +265,7 @@ class ProductCreateView(APIView):
 
         serializer = ProductCreateSerializer(
             data=request.data,
-            context={'request': request}
+            context={'request': request, 'store': store}
         )
 
         if serializer.is_valid():

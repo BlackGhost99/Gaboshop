@@ -56,7 +56,7 @@ def prepare_order(request):
             }
         }, status=status.HTTP_403_FORBIDDEN)
     
-    intent = request.data.get('intent', '').strip()
+    intent = str(request.data.get('intent', '') or '').strip()[:600]
     store_id = request.data.get('store_id')
     
     if not intent:

@@ -4,7 +4,7 @@ Recherche intelligente de produits avec interprétation IA
 import os
 import json
 import re
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.conf import settings
@@ -12,10 +12,12 @@ from django.db.models import Q
 from products.models import Product
 from .permissions import AIPermissionChecker
 from .providers import AIProvider
+from .shopping import ShopUserThrottle
 
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([ShopUserThrottle])  # appels IA payants : limite par utilisateur
 def ai_search_products(request):
     """
     GET /api/v1/ai/search/products?query=riz alimentaire moins de 2000 FCFA
@@ -38,7 +40,7 @@ def ai_search_products(request):
             }
         }, status=status.HTTP_403_FORBIDDEN)
     
-    query = request.query_params.get('query', '').strip()
+    query = request.query_params.get('query', '').strip()[:300]
     if not query:
         return Response({
             "success": False,

@@ -16,6 +16,14 @@ export const logout = (redirectTo = '/') => {
       // stockage indisponible
     }
   });
+  // Appareil partagé : le panier et le dernier message d'erreur ne restent pas pour la personne suivante.
+  [CART_KEY, PENDING_CART_KEY, 'last_api_error'].forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // stockage indisponible
+    }
+  });
   window.location.href = redirectTo;
 };
 

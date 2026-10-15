@@ -369,8 +369,9 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         operator = 'moov' if payment_method == 'moov_money' else 'airtel'
         order.calculate_totals(operator=operator, payment_method=payment_method)
 
-        # Forfait client : réduction sur la livraison, offerte par Gaboshop, seulement si Gaboshop encaisse (paiement en ligne).
-        if payment_flow == 'platform_online':
+        # Forfait client : réduction sur la livraison, offerte par Gaboshop, seulement si Gaboshop encaisse (paiement en ligne)
+        # et livre. Pas quand le commerce livre lui-même : il fixe son tarif et toucherait le prix plein payé par Gaboshop.
+        if payment_flow == 'platform_online' and delivery_payment_method != 'store':
             from payments.client_forfaits import delivery_discount
             discount = delivery_discount(request.user, order.delivery_fee)
             if discount > 0:

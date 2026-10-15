@@ -1088,6 +1088,8 @@ class SystemSettingsView(APIView):
         'ai_instructions': ('text_optional', None, 2000),
     }
 
+    ADMIN_ONLY = ('ai_instructions', 'ai_model', 'ai_provider')
+
     def get_permissions(self):
         if self.request.method == 'PATCH':
             return [IsPlatformAdmin()]
@@ -1130,6 +1132,10 @@ class SystemSettingsView(APIView):
         if IsPlatformAdmin().has_permission(request, self):
             data['technical_status'] = self._technical_status()
             data['legal_forms'] = list(SystemSettings.LEGAL_FORMS)
+        else:
+            # Réglages internes : invisibles pour le public (consignes de l'IA, modèle).
+            for name in self.ADMIN_ONLY:
+                data.pop(name, None)
         return Response({"success": True, "data": data})
 
     def _clean(self, name, raw):

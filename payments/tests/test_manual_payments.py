@@ -187,7 +187,11 @@ class ManualPaymentWorkflowTests(TestCase):
         settings = SystemSettings.get_settings()
         settings.payment_policy = {**DEFAULT_PAYMENT_POLICY, 'merchant_debt_limit': '1000'}
         settings.save()
-        create_arrangement(self.make_order(), 'courier_cash', 'cash', user=self.client)
+        first = self.make_order()
+        create_arrangement(first, 'courier_cash', 'cash', user=self.client)
+        # La commission devient une dette quand la commande est livrée (avant, elle n'est pas exigible).
+        first.status = 'delivered'
+        sync_on_order_status(first)
         with self.assertRaises(ValidationError):
             create_arrangement(self.make_order(), 'courier_cash', 'cash', user=self.client)
 
