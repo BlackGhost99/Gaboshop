@@ -375,6 +375,28 @@ class Order(models.Model):
 		# FCFA sans centimes : franc entier (montant réellement débité par SingPay)
 		return operator_fee.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
     
+	@staticmethod
+	def load_totals(pairs):
+		"""Poids total (kg), longueur totale (m) et nombre d'articles de (produit, quantité)."""
+		from decimal import Decimal
+		from delivery.services.delivery_rules import DeliveryRulesService
+		total_weight = Decimal('0.00')
+		total_length = Decimal('0.00')
+		items_count = 0
+		for product, quantity in pairs:
+			p_weight = product.weight_kg or product.estimated_weight_kg or Decimal('0.00')
+			p_length = getattr(product, 'length_m', None) or DeliveryRulesService.DEFAULT_LENGTH_PER_ITEM
+			qty = Decimal(quantity)
+			total_weight += (p_weight * qty)
+			total_length += (p_length * qty)
+			items_count += int(quantity or 0)
+		return total_weight, total_length, items_count
+
+	def quote_delivery(self, pairs):
+		"""Prix de livraison que paierait cette commande (non enregistrée) : même calcul qu'à la commande."""
+		total_weight, total_length, items_count = self.load_totals(pairs)
+		return self.calculate_dynamic_delivery_cost(total_weight, total_length, items_count)
+
 	def calculate_totals(self, operator='airtel', payment_method='mobile_money'):
 		"""Recalcule tous les totaux basés sur les OrderItems"""
 		from decimal import Decimal
@@ -382,17 +404,7 @@ class Order(models.Model):
 		self.items_total = sum(item.subtotal for item in self.items.all())
 
 		# Calcul du poids total (kg) et longueur totale (m)
-		total_weight = Decimal('0.00')
-		total_length = Decimal('0.00')
-		items_count = 0
-		from delivery.services.delivery_rules import DeliveryRulesService
-		for item in self.items.all():
-			p_weight = item.product.weight_kg or item.product.estimated_weight_kg or Decimal('0.00')
-			p_length = getattr(item.product, 'length_m', None) or DeliveryRulesService.DEFAULT_LENGTH_PER_ITEM
-			qty = Decimal(item.quantity)
-			total_weight += (p_weight * qty)
-			total_length += (p_length * qty)
-			items_count += int(item.quantity or 0)
+		total_weight, total_length, items_count = self.load_totals((item.product, item.quantity) for item in self.items.all())
 
 		# Calcul de la livraison dynamique si demandée
 		if self.delivery_requested:

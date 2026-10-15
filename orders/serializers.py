@@ -270,6 +270,13 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 'store': _('Les commandes sont ouvertes de %(o)s à %(c)s. Réessayez pendant cette plage.') % {'o': opening, 'c': closing}
             })
 
+        if attrs.get('delivery_requested', True):
+            from delivery.zones import resolve_zone
+            try:
+                attrs['delivery_zone'] = resolve_zone(attrs.get('city') or 'Libreville', attrs.get('delivery_zone'))
+            except ValueError as exc:
+                raise serializers.ValidationError({'delivery_zone': str(exc)})
+
         items = attrs['items']
         if any(item['product'].store_id != store.id for item in items):
             raise serializers.ValidationError({'items': _('Tous les produits doivent venir du magasin de la commande.')})

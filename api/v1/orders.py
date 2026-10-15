@@ -717,3 +717,42 @@ class OrderSelectVehicleView(APIView):
 				'success': False,
 				'error': f'Erreur: {str(e)}'
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeliveryQuoteView(APIView):
+	"""POST /orders/delivery-quote/ : prix de livraison exact avant de commander (même calcul que la commande).
+
+	Corps : {store, city, delivery_zone, items: [{product_id, quantity}]}. Rien n'est enregistré.
+	"""
+	permission_classes = [permissions.IsAuthenticated]
+
+	def post(self, request):
+		from decimal import Decimal
+		from products.models import Product
+		from stores.models import Store
+		from delivery.zones import active_zones, resolve_zone
+		store = Store.objects.filter(pk=request.data.get('store')).first()
+		if store is None:
+			return Response({'success': False, 'error': 'Commerce introuvable.'}, status=status.HTTP_400_BAD_REQUEST)
+		city = (request.data.get('city') or 'Libreville').strip()
+		zones = list(active_zones(city).values_list('name', flat=True))
+		try:
+			zone = resolve_zone(city, request.data.get('delivery_zone'))
+		except ValueError as exc:
+			return Response({'success': True, 'data': {'delivery_fee': None, 'zones': zones, 'message': str(exc)}})
+		pairs = []
+		for item in (request.data.get('items') or [])[:100]:
+			try:
+				quantity = max(1, min(1000, int(item.get('quantity') or 1)))
+			except (TypeError, ValueError, AttributeError):
+				continue
+			product = Product.objects.filter(pk=item.get('product_id'), store=store).first()
+			if product is not None:
+				pairs.append((product, quantity))
+		if not pairs:
+			return Response({'success': False, 'error': 'Panier vide.'}, status=status.HTTP_400_BAD_REQUEST)
+		order = Order(store=store, city=city, delivery_zone=zone, delivery_type='standard')
+		fee = order.quote_delivery(pairs)
+		return Response({'success': True, 'data': {
+			'delivery_fee': str(Decimal(fee)), 'vehicle_type': order.vehicle_type, 'zone': zone, 'zones': zones,
+		}})

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { notifyWarning } from '../../utils/feedback';
 import { formatCurrency } from '../../utils/helpers';
+import api from '../../services/api';
 
 /**
  * Formulaire de commande B2B
@@ -17,6 +18,15 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 	});
 
 	// Pré-remplir avec les données du store si disponibles
+	// Zones de livraison de la ville : à choisir dans la liste quand l'admin en a créé.
+	const [zones, setZones] = useState([]);
+	useEffect(() => {
+		api.get('/delivery/zones/', { params: { active: true } })
+			.then((res) => setZones(Array.isArray(res.data) ? res.data : res.data?.results || []))
+			.catch(() => setZones([]));
+	}, []);
+	const cityZones = zones.filter((z) => (z.city || '').toLowerCase() === (formData.city || 'Libreville').trim().toLowerCase());
+
 	useEffect(() => {
 		// On pourrait récupérer les données du store connecté ici
 		// Pour l'instant, on garde les valeurs par défaut
@@ -187,15 +197,28 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 			{/* Zone */}
 			<div>
 				<label className="block text-sm font-bold mb-2 text-black">Zone *</label>
-				<input
-					type="text"
-					name="delivery_zone"
-					value={formData.delivery_zone}
-					onChange={handleChange}
-					className="w-full border-2 border-gray-400 rounded px-3 py-2 text-black font-medium"
-					required
-					placeholder="Ex: Mont-Bouët, Louis, etc."
-				/>
+				{cityZones.length ? (
+					<select
+						name="delivery_zone"
+						value={formData.delivery_zone}
+						onChange={handleChange}
+						className="w-full border-2 border-gray-400 rounded px-3 py-2 text-black font-medium"
+						required
+					>
+						<option value="">Choisissez la zone</option>
+						{cityZones.map((z) => <option key={z.id} value={z.name}>{z.name}</option>)}
+					</select>
+				) : (
+					<input
+						type="text"
+						name="delivery_zone"
+						value={formData.delivery_zone}
+						onChange={handleChange}
+						className="w-full border-2 border-gray-400 rounded px-3 py-2 text-black font-medium"
+						required
+						placeholder="Ex: Mont-Bouët, Louis, etc."
+					/>
+				)}
 			</div>
 
 			{/* Ville */}

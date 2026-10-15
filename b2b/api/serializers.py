@@ -236,6 +236,11 @@ class B2BOrderCreateSerializer(serializers.Serializer):
 		# jamais par SingPay, la commission serait marquée payée sans aucun paiement.
 		if attrs.get('payment_flow') == 'platform_online':
 			raise serializers.ValidationError({'payment_flow': 'Le paiement en ligne n’est pas encore ouvert aux commandes entre commerces.'})
+		from delivery.zones import resolve_zone
+		try:
+			attrs['delivery_zone'] = resolve_zone(attrs.get('city') or 'Libreville', attrs.get('delivery_zone'))
+		except ValueError as exc:
+			raise serializers.ValidationError({'delivery_zone': str(exc)})
 		
 		# Vérifier que le grossiste existe
 		try:

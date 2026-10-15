@@ -22,7 +22,7 @@ from .products import (
 from .products import AllProductCategoryListView
 from .orders import (
     OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
-    ClientConfirmDeliveryView, OrderSelectVehicleView, ClientReportProblemView
+    ClientConfirmDeliveryView, OrderSelectVehicleView, ClientReportProblemView, DeliveryQuoteView
 )
 from .payments import (
     PaymentInitView, PaymentDetailView, PaymentWebhookView, PaymentVerifyView,
@@ -323,6 +323,7 @@ urlpatterns = [
     # Orders
     path('orders/', OrderListView.as_view(), name='order-list'),
     path('orders/create/', OrderCreateView.as_view(), name='order-create'),
+    path('orders/delivery-quote/', DeliveryQuoteView.as_view(), name='order-delivery-quote'),
     path('orders/<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
     path('orders/<int:order_id>/status/', OrderStatusUpdateView.as_view(), name='order-status-update'),
     path('orders/<int:order_id>/confirm-delivery/', ClientConfirmDeliveryView.as_view(), name='client-confirm-delivery'),

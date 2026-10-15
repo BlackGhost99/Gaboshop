@@ -10,12 +10,11 @@ import { createOrder } from '../../services/orderService';
 import { getPaymentOptions, initPayment } from '../../services/paymentService';
 import { getProductDetails } from '../../services/productService';
 import { METHOD_LABELS } from '../../components/payments/paymentLabels';
+import api from '../../services/api';
 
 const CART_KEY = 'gaboshop_cart';
 const envBase = import.meta.env.VITE_API_URL;
 const API_BASE = envBase ? `${envBase.replace(/\/$/, '')}/api/v1` : '/api/v1';
-const DEFAULT_WEIGHT_KG = 0.5;
-const DEFAULT_LENGTH_M = 0.5;
 
 const flattenApiErrors = (value, parentPath = '') => {
   if (Array.isArray(value)) {
@@ -80,68 +79,16 @@ const ClientDashboard = () => {
   const [storeAlerts, setStoreAlerts] = useState({});
   const [paymentOptions, setPaymentOptions] = useState({});
   const [zones, setZones] = useState([]);
-  const [zonesLoading, setZonesLoading] = useState(true);
 
   // Helper: Calculate total amount
   const calculateTotal = (subtotal, deliveryCost) => {
     return subtotal + deliveryCost;
   };
 
-  const selectVehicleType = (totalWeight, totalLength) => {
-    if (totalWeight <= 30 && totalLength <= 0.5) return 'MOTO';
-    if (totalWeight <= 80 && totalLength <= 1) return 'CAR';
-    if (totalWeight <= 150 && totalLength <= 2) return 'VAN';
-    return 'TRUCK';
-  };
-
-  const getTotals = (items) => {
-    const totals = items.reduce((acc, item) => {
-      const qty = item.quantity || 0;
-      const weight = parseFloat(item.weight_kg);
-      const length = parseFloat(item.length_m);
-      acc.totalWeight += (Number.isFinite(weight) ? weight : DEFAULT_WEIGHT_KG) * qty;
-      acc.totalLength += (Number.isFinite(length) ? length : DEFAULT_LENGTH_M) * qty;
-      return acc;
-    }, { totalWeight: 0, totalLength: 0 });
-    return totals;
-  };
-
-  // Helper: Calculate delivery cost based on zone and items
-  const calculateDeliveryCost = (zoneName, city, items) => {
-    try {
-      if (!items || !items.length) return 0;
-      
-      const normalizedZone = zoneName?.trim().toLowerCase();
-      let zoneForDelivery = normalizedZone
-        ? zones.find(z => z.name?.toLowerCase() === normalizedZone)
-        : null;
-
-      if (!zoneForDelivery && city) {
-        zoneForDelivery = zones.find(z => z.city?.toLowerCase() === city?.toLowerCase());
-      }
-
-      if (!zoneForDelivery || !zoneForDelivery.rates || !zoneForDelivery.rates.length) {
-        // Fallback: use a default estimate
-        return 3000; // Placeholder if zone not configured
-      }
-      
-      const { totalWeight, totalLength } = getTotals(items);
-      
-      // Select vehicle based on weight + length (same logic as backend)
-      const vehicleType = selectVehicleType(totalWeight, totalLength);
-      const selectedRate = zoneForDelivery.rates.find(r => r.vehicle_type === vehicleType);
-      
-      if (!selectedRate) {
-        return 3000; // Fallback
-      }
-      
-      const baseCost = parseFloat(selectedRate.base_price) || 0;
-      return Math.round(baseCost);
-    } catch (err) {
-      console.warn('Erreur calcul frais livraison', err);
-      return 3000;
-    }
-  };
+  // Prix de livraison calculé par le serveur, exactement comme à la commande (prix affiché = prix payé).
+  const [quotes, setQuotes] = useState({});
+  const quoteFor = (storeName) => quotes[storeName] || {};
+  const zonesForCity = (city) => zones.filter((z) => (z.city || '').toLowerCase() === (city || 'Libreville').trim().toLowerCase());
 
   const groupByStore = (items) => {
     return items.reduce((acc, item) => {
@@ -189,7 +136,6 @@ const ClientDashboard = () => {
   useEffect(() => {
     const fetchZones = async () => {
       try {
-        setZonesLoading(true);
         const response = await fetch(`${API_BASE}/delivery/zones/?active=true`);
         if (response.ok) {
           const data = await response.json();
@@ -199,8 +145,6 @@ const ClientDashboard = () => {
         }
       } catch (err) {
         console.warn('Impossible de charger les zones de livraison', err);
-      } finally {
-        setZonesLoading(false);
       }
     };
 
@@ -291,6 +235,29 @@ const ClientDashboard = () => {
     });
     return () => { active = false; };
   }, [cartByStore]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      Object.entries(cartByStore).forEach(async ([storeName, group]) => {
+        const storeId = group.items?.[0]?.store_id;
+        const form = storeForms[storeName] || {};
+        if (!storeId || form.delivery_requested === false) return;
+        try {
+          const res = await api.post('/orders/delivery-quote/', {
+            store: storeId,
+            city: form.city || 'Libreville',
+            delivery_zone: form.zone || '',
+            items: group.items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
+          });
+          if (active) setQuotes((prev) => ({ ...prev, [storeName]: res.data?.data || {} }));
+        } catch {
+          if (active) setQuotes((prev) => ({ ...prev, [storeName]: {} }));
+        }
+      });
+    }, 400);
+    return () => { active = false; clearTimeout(timer); };
+  }, [cartByStore, storeForms]);
 
   useEffect(() => {
     // Backfill store_id/weight/length for legacy cart items
@@ -829,12 +796,25 @@ const ClientDashboard = () => {
                       value={storeForms[storeName]?.city || ''}
                       onChange={(e) => handleChangeForm(storeName, 'city', e.target.value)}
                     />
-                    <input
-                      className="w-full border border-gray-200 rounded-md px-3 py-2"
-                      placeholder="Zone"
-                      value={storeForms[storeName]?.zone || ''}
-                      onChange={(e) => handleChangeForm(storeName, 'zone', e.target.value)}
-                    />
+                    {zonesForCity(storeForms[storeName]?.city).length ? (
+                      <select
+                        className="w-full border border-gray-200 rounded-md px-3 py-2"
+                        value={storeForms[storeName]?.zone || ''}
+                        onChange={(e) => handleChangeForm(storeName, 'zone', e.target.value)}
+                      >
+                        <option value="">Choisissez votre zone</option>
+                        {zonesForCity(storeForms[storeName]?.city).map((z) => (
+                          <option key={z.id} value={z.name}>{z.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="w-full border border-gray-200 rounded-md px-3 py-2"
+                        placeholder="Zone / quartier"
+                        value={storeForms[storeName]?.zone || ''}
+                        onChange={(e) => handleChangeForm(storeName, 'zone', e.target.value)}
+                      />
+                    )}
                     <input
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
                       placeholder="Adresse de livraison"
@@ -896,7 +876,7 @@ const ClientDashboard = () => {
                         <div className="flex justify-between text-amber-700">
                           <span>&#x1F69A; Frais de livraison</span>
                           <span className="font-semibold">
-                            {!zonesLoading ? formatCurrency(calculateDeliveryCost(storeForms[storeName]?.zone, storeForms[storeName]?.city || 'Libreville', data.items)) : 'Calcul...'}
+                            {quoteFor(storeName).delivery_fee != null ? formatCurrency(Number(quoteFor(storeName).delivery_fee)) : (quoteFor(storeName).message ? 'Choisissez la zone' : 'Calcul...')}
                           </span>
                         </div>
                       )}
@@ -905,12 +885,11 @@ const ClientDashboard = () => {
                       <div className="pt-2 border-t border-gray-300 flex justify-between font-bold text-gray-900 text-sm">
                         <span>TOTAL A PAYER</span>
                         <span className="text-base text-indigo-600">
-                          {!zonesLoading ? formatCurrency(
-                            calculateTotal(
-                              data.total,
-                              storeForms[storeName]?.delivery_requested !== false ? calculateDeliveryCost(storeForms[storeName]?.zone, storeForms[storeName]?.city || 'Libreville', data.items) : 0
-                            )
-                          ) : 'Calcul...'}
+                          {storeForms[storeName]?.delivery_requested === false
+                            ? formatCurrency(data.total)
+                            : quoteFor(storeName).delivery_fee != null
+                              ? formatCurrency(calculateTotal(data.total, Number(quoteFor(storeName).delivery_fee)))
+                              : 'Calcul...'}
                         </span>
                       </div>
                     </div>
