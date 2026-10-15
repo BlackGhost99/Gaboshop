@@ -196,11 +196,22 @@ class OrderStatusUpdateView(APIView):
 			serializer = OrderStatusUpdateSerializer(
 				order, 
 				data=request.data, 
-				partial=True
+				partial=True,
+				context={'request': request},
 			)
 			
 			if serializer.is_valid():
 				from payments.direct_service import store_delivers
+				# La course d'un livreur Gaboshop (assignée, en route, livrée) avance par le livreur, pas par le commerce :
+				# sinon une commande pourrait être « livrée » sans livreur, sans code PIN ni preuve.
+				if (request.user.is_store_manager() and request.data.get('status') in ('assigned', 'in_transit', 'delivered')
+						and not store_delivers(order)):
+					return Response({'success': False, 'error': {
+						'code': 409,
+						'message': 'Cette étape est faite par le livreur Gaboshop.',
+						'reason': 'La commande est livrée par un livreur Gaboshop : c’est lui qui la prend, la transporte et la remet au client.',
+						'next_step': 'Passez la commande à « Prête » : un livreur viendra la chercher.',
+					}}, status=status.HTTP_409_CONFLICT)
 				if request.data.get('status') == 'in_transit' and order.status == 'ready' and not store_delivers(order):
 					return Response({'success': False, 'error': {
 						'code': 409,

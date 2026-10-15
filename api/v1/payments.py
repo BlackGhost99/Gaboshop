@@ -47,7 +47,7 @@ class PaymentInitView(APIView):
     @staticmethod
     def _get_mobile_money_fee_rate(payment_method):
         """
-        Retourne le taux de frais mobile money (%) depuis les paramÃ¨tres systÃ¨me.
+        Retourne le taux de frais mobile money (%) depuis les paramètres système.
         """
         settings = SystemSettings.get_settings()
         if payment_method == 'airtel_money':
@@ -75,7 +75,7 @@ class PaymentInitView(APIView):
     
     def post(self, request, order_id):
         try:
-            # VÃ©rifier que la commande appartient au client
+            # Vérifier que la commande appartient au client
             order = Order.objects.get(
                 id=order_id,
                 client=request.user,
@@ -86,7 +86,7 @@ class PaymentInitView(APIView):
                     'success': False,
                     'error': {
                         'code': status.HTTP_400_BAD_REQUEST,
-                        'message': 'Cette commande ne peut plus Ãªtre payÃ©e.'
+                        'message': 'Cette commande ne peut plus être payée.'
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
@@ -102,11 +102,11 @@ class PaymentInitView(APIView):
                         'success': False,
                         'error': {
                             'code': status.HTTP_400_BAD_REQUEST,
-                            'message': 'Seuls les paiements Mobile Money (Airtel/Moov) sont autorisÃ©s.'
+                            'message': 'Seuls les paiements Mobile Money (Airtel/Moov) sont autorisés.'
                         }
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                # Normaliser le numÃ©ro payeur et appliquer les frais rÃ©els selon l'opÃ©rateur
+                # Normaliser le numéro payeur et appliquer les frais réels selon l'opérateur
                 try:
                     formatted_phone = PaymentService._format_gabon_phone(phone_number, operator)
                 except ValueError as exc:
@@ -145,7 +145,7 @@ class PaymentInitView(APIView):
                 )
                 order.save(update_fields=['payment_fees', 'operator_fee', 'total_amount', 'updated_at'])
 
-                # GÃ©nÃ©rer une rÃ©fÃ©rence transaction interne
+                # Générer une référence transaction interne
                 base_tx_id = f"PAY-{order.order_number}"
                 timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
 
@@ -240,7 +240,7 @@ class PaymentInitView(APIView):
                             }
                         }, status=status.HTTP_502_BAD_GATEWAY)
 
-                # Paiement cash = succÃ¨s immÃ©diat cÃ´tÃ© client
+                # Paiement cash = succès immédiat côté client
                 if payment_method == 'cash':
                     payment.status = 'success'
                     payment.completed_at = timezone.now()
@@ -262,14 +262,14 @@ class PaymentInitView(APIView):
                         reason=f'Paiement cash pour commande {order.order_number}'
                     )
                 else:
-                    # Mettre la commande en attente de paiement pour les autres mÃ©thodes
+                    # Mettre la commande en attente de paiement pour les autres méthodes
                     if order.status != 'pending_payment':
                         order.status = 'pending_payment'
                         order.save(update_fields=['status', 'updated_at'])
                 
                 return Response({
                     'success': True,
-                    'message': 'Paiement dÃ©jÃ  confirmÃ©.' if payment.status == 'success' else 'Paiement initialisÃ©.',
+                    'message': 'Paiement déjà confirmé.' if payment.status == 'success' else 'Paiement initialisé.',
                     'data': {
                         'payment': PaymentSerializer(payment).data,
                         'next_steps': next_steps,
@@ -283,7 +283,7 @@ class PaymentInitView(APIView):
                 'success': False,
                 'error': {
                     'code': status.HTTP_400_BAD_REQUEST,
-                    'message': 'DonnÃ©es invalides.',
+                    'message': 'Données invalides.',
                     'details': serializer.errors
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -293,7 +293,7 @@ class PaymentInitView(APIView):
                 'success': False,
                 'error': {
                     'code': status.HTTP_404_NOT_FOUND,
-                    'message': 'Commande non trouvÃ©e ou dÃ©jÃ  payÃ©e.'
+                    'message': 'Commande non trouvée ou déjà payée.'
                 }
             }, status=status.HTTP_404_NOT_FOUND)
 
@@ -519,7 +519,7 @@ class PaymentDetailView(APIView):
     
     def get(self, request, order_id):
         try:
-            # VÃ©rifier les permissions
+            # Vérifier les permissions
             if request.user.is_client():
                 payment = Payment.objects.get(
                     order_id=order_id,
@@ -547,7 +547,7 @@ class PaymentDetailView(APIView):
                 'success': False,
                 'error': {
                     'code': status.HTTP_404_NOT_FOUND,
-                    'message': 'Paiement non trouvÃ©.'
+                    'message': 'Paiement non trouvé.'
                 }
             }, status=status.HTTP_404_NOT_FOUND)
 
@@ -630,7 +630,7 @@ class ClientForfaitUpdateView(APIView):
 			return Response({
 				'success': True,
 				'data': serializer.data,
-				'message': f'Forfait {forfait.name} activÃ© avec succÃ¨s'
+				'message': f'Forfait {forfait.name} activé avec succès'
 			}, status=status.HTTP_201_CREATED)
 		
 		except Forfait.DoesNotExist:

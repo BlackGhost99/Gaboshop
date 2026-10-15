@@ -120,15 +120,33 @@ class AdminSummaryView(APIView):
                 "products": list(top_products),
                 "stores": list(top_stores)
             },
-            "system_status": {
-                "api_errors": 0,
-                "notifications": 0,
-                "last_sync": "OK",
-                "api_health": "OK"
-            }
+            "system_status": _system_status(),
         }
 
         return Response({"success": True, "data": data})
+
+
+def _system_status():
+    """Vrai état de la plateforme (au lieu d'un « OK » fixe) : minuteur, commandes et paiements bloqués."""
+    from datetime import timedelta
+    from core.models import ScheduledTaskRun
+    from payments.models import Payment
+    now = timezone.now()
+    last_tick = ScheduledTaskRun.objects.exclude(last_run_at=None).order_by('-last_run_at').values_list('last_run_at', flat=True).first()
+    failed_jobs = list(ScheduledTaskRun.objects.filter(last_ok=False).values_list('name', flat=True))
+    stuck_since = now - timedelta(minutes=30)
+    stuck_orders = Order.objects.filter(status='ready', updated_at__lt=stuck_since, delivery__delivery_agent__isnull=True).count()
+    stuck_payments = Payment.objects.filter(status__in=('pending', 'processing'), payment_method__in=('airtel_money', 'moov_money'), created_at__lt=stuck_since).count()
+    # Le minuteur passe toutes les 10 minutes de 6 h à 23 h (Libreville) : au-delà d'une heure sans passage, il est arrêté.
+    timer_ok = bool(last_tick and now - last_tick < timedelta(hours=1))
+    return {
+        "api_health": "OK",
+        "timer_ok": timer_ok,
+        "last_tick_at": last_tick,
+        "failed_jobs": failed_jobs,
+        "orders_without_driver_30min": stuck_orders,
+        "payments_pending_30min": stuck_payments,
+    }
 
 
 class AdminUsersView(APIView):

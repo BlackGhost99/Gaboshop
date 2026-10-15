@@ -430,7 +430,7 @@ const ClientOrders = () => {
       {/* PIN Modal */}
       {showPinModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm mx-4">
             <div className="text-center mb-6">
               <div className="text-4xl mb-2">📦</div>
               <h3 className="text-lg font-semibold text-gray-800">

@@ -355,6 +355,10 @@ class PhoneVerificationView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
 	throttle_classes = [AuthIPThrottle]
 
+	def get_throttles(self):
+		# Lire l'état (appelé à chaque page) ne doit pas consommer les essais de connexion de l'adresse IP.
+		return [] if self.request.method == 'GET' else super().get_throttles()
+
 	def get(self, request):
 		from users.password_reset import channels_available
 		return Response({'success': True, 'data': {

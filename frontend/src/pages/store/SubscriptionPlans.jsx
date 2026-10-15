@@ -10,7 +10,7 @@ const SubscriptionPlans = () => {
   const [subscribing, setSubscribing] = useState(null);
   const [toast, setToast] = useState(null);
   const [storeType, setStoreType] = useState(null);
-  const [paymentProvider, setPaymentProvider] = useState('cinetpay');
+  const [paymentProvider, setPaymentProvider] = useState('airtel');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [lastIntent, setLastIntent] = useState(null);
 
@@ -149,9 +149,9 @@ const SubscriptionPlans = () => {
                 onChange={(event) => setPaymentProvider(event.target.value)}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
               >
-                <option value="cinetpay">Carte bancaire</option>
                 <option value="airtel">Airtel Money</option>
                 <option value="moov">Moov Money</option>
+                <option value="cinetpay">Carte bancaire</option>
               </select>
               {(paymentProvider === 'airtel' || paymentProvider === 'moov') && (
                 <input

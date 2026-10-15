@@ -384,6 +384,11 @@ class OrdersCancelView(APIView):
     def post(self, request, order_id):
         try:
             order = Order.objects.get(id=order_id)
+            if order.status in ('delivered', 'cancelled', 'refunded'):
+                return Response({
+                    "success": False,
+                    "error": "Cette commande est déjà livrée, annulée ou remboursée : elle ne peut plus être annulée.",
+                }, status=409)
             reason = request.data.get('reason', 'Annulation admin')
             refund_amount = request.data.get('refund_amount')
             if refund_amount and hasattr(order, 'payment_arrangement'):

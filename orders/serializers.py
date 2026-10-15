@@ -28,7 +28,8 @@ class OrderItemCreateSerializer(serializers.Serializer):
         quantity = attrs['quantity']
         
         try:
-            product = Product.objects.get(id=product_id, is_available=True)
+            # Les articles réservés aux professionnels (B2B) ne se commandent pas au prix public.
+            product = Product.objects.get(id=product_id, is_available=True, market_type__in=['b2c', 'both'])
         except Product.DoesNotExist:
             raise serializers.ValidationError({
                 'product_id': _('Produit non disponible.')
@@ -338,9 +339,9 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 unit_price=item_data['unit_price']
             )
         
-        # Réduire les stocks
-        for item_data in items_data:
-            item_data['product'].reduce_stock(item_data['quantity'])
+        # Réserver le stock (refuse la commande si un article vient d'être épuisé)
+        from orders.stock import reserve_stock
+        reserve_stock([(item_data['product'], item_data['quantity']) for item_data in items_data])
         
         # Recalculate totals (commission depends on created OrderItems)
         operator = 'moov' if payment_method == 'moov_money' else 'airtel'

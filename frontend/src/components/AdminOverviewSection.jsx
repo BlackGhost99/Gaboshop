@@ -326,18 +326,31 @@ const AdminOverviewSection = ({ summary, loading }) => {
             ⚙️ État du Système
           </h3>
           <div className="space-y-4 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">API Health</span>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-gray-400">Serveur</span>
               <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-bold">OK</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Erreurs API (24h)</span>
-              <span className="font-mono">{system_status?.api_errors || 0}</span>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-gray-400">Tâches automatiques</span>
+              <span className={`px-2 py-1 rounded text-xs font-bold ${system_status?.timer_ok ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-300'}`}>
+                {system_status?.timer_ok ? 'OK' : 'Arrêtées'}
+              </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Sync Mobile Money</span>
-              <span className="text-xs text-gray-300">{system_status?.last_sync || 'N/A'}</span>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-gray-400">Dernier passage</span>
+              <span className="text-xs text-gray-300">{system_status?.last_tick_at ? new Date(system_status.last_tick_at).toLocaleString('fr-FR') : 'Jamais'}</span>
             </div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-gray-400">Commandes prêtes sans livreur (+30 min)</span>
+              <span className={`font-mono ${system_status?.orders_without_driver_30min ? 'text-amber-300' : ''}`}>{system_status?.orders_without_driver_30min || 0}</span>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-gray-400">Paiements Mobile Money en attente (+30 min)</span>
+              <span className={`font-mono ${system_status?.payments_pending_30min ? 'text-amber-300' : ''}`}>{system_status?.payments_pending_30min || 0}</span>
+            </div>
+            {system_status?.failed_jobs?.length > 0 && (
+              <p className="text-xs text-red-300">En échec : {system_status.failed_jobs.join(', ')}</p>
+            )}
           </div>
         </div>
 

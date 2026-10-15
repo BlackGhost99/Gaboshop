@@ -178,6 +178,25 @@ class OrderService:
         return base_transitions.get(current_status, [])
     
     @staticmethod
+    def frozen_commission(order):
+        """Commission telle que figée sur la commande (Order.calculate_commission).
+
+        C'est elle que le commerce voit, qui est retenue sur son versement et due à Gaboshop :
+        le relevé des commissions doit afficher exactement le même montant.
+        """
+        from api.models import SystemSettings
+        commission = Decimal(order.commission_amount or 0)
+        delivery_share = SystemSettings.courier_share(order.delivery_fee or 0)
+        platform_delivery_share = max(Decimal('0'), Decimal(order.delivery_fee or 0) - Decimal(delivery_share))
+        return {
+            'commission_rate': Decimal(order.commission_rate or 0).quantize(Decimal('0.01')),
+            'commission_amount': commission.quantize(Decimal('0.01')),
+            'delivery_fee_share': platform_delivery_share.quantize(Decimal('0.01')),
+            'store_earnings': (Decimal(order.items_total or 0) - commission).quantize(Decimal('0.01')),
+            'agent_earnings': Decimal(delivery_share).quantize(Decimal('0.01')),
+        }
+
+    @staticmethod
     def calculate_order_commission(order):
         """
         Calculer la commission GABOSHOP sur une commande
@@ -246,14 +265,7 @@ class OrderService:
                 if order.status in ['delivered', 'refunded']:
                     raise ValueError("Impossible d'annuler cette commande.")
                 
-                # Restaurer les stocks
-                for item in order.items.all():
-                    product = item.product
-                    product.stock += item.quantity
-                    product.is_available = True
-                    product.save()
-                
-                # Marquer comme annulée
+                # Marquer comme annulée (le signal de commande remet les articles en stock)
                 order.status = 'cancelled'
                 order.save()
                 

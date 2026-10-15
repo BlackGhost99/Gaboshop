@@ -57,6 +57,11 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 		# Notifier le magasin
 		NotificationService.notify_new_order(order)
 	
+	# 1b. Commande annulée : les articles retournent en stock (une seule fois, au passage à « annulée »).
+	if hasattr(order, '_old_status') and order._old_status not in (None, 'cancelled') and order.status == 'cancelled':
+		from orders.stock import restock_order
+		restock_order(order)
+
 	# 2. Notifications sur changement de statut
 	if hasattr(order, '_old_status') and order._old_status != order.status:
 		# Notifier le client
@@ -71,8 +76,8 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 	
 	# 3. Créer Commission quand commande est payée
 	if order.status == 'paid' and not hasattr(order, 'commission'):
-		# Use OrderService to calculate commission with per-category rules
-		commission_calc = OrderService.calculate_order_commission(order)
+		# Montants figés sur la commande : les mêmes que ceux retenus au commerce et dus à Gaboshop.
+		commission_calc = OrderService.frozen_commission(order)
 		if commission_calc:
 			Commission.objects.create(
 				order=order,

@@ -59,24 +59,6 @@ const StoreDashboard = () => {
     }
   };
 
-  const fetchWholesalers = async () => {
-    try {
-      setLoadingWholesalers(true);
-      const response = await getWholesalers();
-      if (response.success) {
-        setWholesalers(response.data || []);
-      } else {
-        setWholesalers([]);
-        console.error("Erreur chargement grossistes", response.error);
-      }
-    } catch (err) {
-      console.error("Erreur chargement grossistes", err);
-      setWholesalers([]);
-    } finally {
-      setLoadingWholesalers(false);
-    }
-  };
-
   useEffect(() => {
     fetchDashboard();
   }, []);
@@ -143,18 +125,10 @@ const StoreDashboard = () => {
     );
   }
 
-  // Chart data: prefer weekly_revenue from API, otherwise fallback to demo
-  const chartData = (dashboardData?.weekly_revenue && Array.isArray(dashboardData.weekly_revenue))
+  // Ventes réelles de la semaine (jamais de chiffres inventés)
+  const chartData = Array.isArray(dashboardData?.weekly_revenue)
     ? dashboardData.weekly_revenue.map(d => ({ name: d.name, vente: d.revenue }))
-    : [
-        { name: 'Lun', vente: 15000 },
-        { name: 'Mar', vente: 23000 },
-        { name: 'Mer', vente: 18000 },
-        { name: 'Jeu', vente: 32000 },
-        { name: 'Ven', vente: 21000 },
-        { name: 'Sam', vente: 45000 },
-        { name: 'Dim', vente: dashboardData?.stats?.daily_revenue || 12000 },
-      ];
+    : [];
 
   return (
     <>
@@ -334,40 +308,6 @@ const StoreDashboard = () => {
         {activeTab === 'overview' && (
           <>
             <PendingPayments />
-            <StorePaymentSettings />
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-              <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">📊</span>
-                  Évolution des ventes (Semaine)
-                </h3>
-                <div className="h-64 w-full">
-                  {chartData && chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={256}>
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} tickFormatter={formatFcfaAxis} width={56} allowDecimals={false} />
-                        <Tooltip
-                          formatter={(value) => [`${Math.round(Number(value) || 0).toLocaleString('fr-FR')} FCFA`, 'Ventes']}
-                          cursor={{ fill: '#f3f4f6' }}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                        />
-                        <Bar dataKey="vente" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={40} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      Aucune donnée disponible
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Goal card removed per request */}
-            </div>
-
             <HeldFundsCard funds={dashboardData?.held_funds} />
 
             {/* Statistiques principales */}
@@ -413,6 +353,40 @@ const StoreDashboard = () => {
                 }
                 bgColor="bg-amber-500"
               />
+            </div>
+
+            <StorePaymentSettings />
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                  <span className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">📊</span>
+                  Évolution des ventes (Semaine)
+                </h3>
+                <div className="h-64 w-full">
+                  {chartData && chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={256}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} tickFormatter={formatFcfaAxis} width={56} allowDecimals={false} />
+                        <Tooltip
+                          formatter={(value) => [`${Math.round(Number(value) || 0).toLocaleString('fr-FR')} FCFA`, 'Ventes']}
+                          cursor={{ fill: '#f3f4f6' }}
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                        />
+                        <Bar dataKey="vente" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      Aucune donnée disponible
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Goal card removed per request */}
             </div>
 
             {/* Forfait / abonnement */}

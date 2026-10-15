@@ -491,7 +491,7 @@ const DeliveryDashboard = () => {
               aria-label={isAvailable ? 'Rendre indisponible' : 'Se rendre disponible'}
               aria-pressed={isAvailable}
               title={isAvailable ? 'Rendre indisponible' : 'Se rendre disponible'}
-              className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${isAvailable ? 'bg-green-500' : 'bg-gray-300'
+              className={`relative inline-flex h-10 w-20 shrink-0 items-center rounded-full transition-colors ${isAvailable ? 'bg-green-500' : 'bg-gray-300'
                 }`}
             >
               <span className="sr-only">Basculer la disponibilité</span>

@@ -425,7 +425,7 @@ class PaymentService:
             from orders.services import OrderService
             
             # Calculer la commission
-            commission_calc = OrderService.calculate_order_commission(order)
+            commission_calc = OrderService.frozen_commission(order)
             
             if commission_calc:
                 commission = Commission.objects.create(

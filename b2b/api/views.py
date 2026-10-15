@@ -603,9 +603,10 @@ class B2BOrderCreateView(APIView):
 					quantity=item['quantity'],
 					unit_price=item['unit_price']
 				)
-				
-				# Réduire le stock
-				item['product'].reduce_stock(item['quantity'])
+
+			# Réserver le stock (refuse la commande si un article vient d'être épuisé)
+			from orders.stock import reserve_stock
+			reserve_stock([(item['product'], item['quantity']) for item in totals['items']])
 			
 			# Calculer la commission
 			order.calculate_commission()
