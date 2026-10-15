@@ -44,6 +44,8 @@ MARKERS = {
     'Plusieurs photos par produit (12 oct.)': 'Montrez le produit sous plusieurs angles',
     'Fiabilité lot 1 : note du livreur (12 oct.)': 'Notez la livraison (facultatif)',
     'Commerces validés et argent en sécurité (13 oct.)': 'Votre argent en sécurité chez Gaboshop',
+    'Client : signaler un problème, versement à 48 h (15 oct.)': 'Signaler un problème',
+    'Forfaits clients (15 oct.)': 'Payez moins cher la livraison en vous abonnant',
 }
 
 
@@ -117,6 +119,8 @@ def check(site):
     res = fetch(f'{api}/api/v1/health/')
     try:
         data = json.loads(res['body']).get('data', {})
+        for name, job in sorted((data.get('jobs') or {}).items()):
+            lines.append(f"  - tâche `{name}` : ok `{job.get('ok')}`, dernier passage `{job.get('last_run_at')}`, message : {str(job.get('message') or '')[:120]}")
         lines.append(
             f"- Minuteur configuré : `{data.get('scheduler_configured')}`, dernier passage : `{data.get('last_tick_at')}`, "
             f"commandes prêtes sans livreur depuis 30 min : `{data.get('orders_ready_without_driver_30min')}`, "
@@ -132,6 +136,14 @@ def check(site):
         if scripts:
             js = fetch(web + scripts[0].decode(), attempts=1, max_bytes=20_000_000)
             lines.append(f"- Fichier du site : `{scripts[0].decode()}`")
+            # Depuis le 15 oct. chaque espace (client, commerce, livreur, admin) est un fichier à part.
+            chunks = sorted(set(re.findall(rb'assets/[A-Za-z0-9_.-]+\.js', js['body'] or b'')))
+            body = js['body'] or b''
+            for chunk in chunks:
+                part = fetch(f"{web}/{chunk.decode()}", attempts=1, max_bytes=20_000_000)
+                body += part['body'] or b''
+            lines.append(f"- Morceaux du site chargés à la demande : {len(chunks)}")
+            js = dict(js, body=body)
             for label, text in MARKERS.items():
                 present = text.encode() in (js['body'] or b'')
                 lines.append(f"- {label} : {'présente' if present else 'ABSENTE'}")
