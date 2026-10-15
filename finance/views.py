@@ -4,6 +4,7 @@ Finance views - API endpoints for sales, expenses, and summary
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from orders.models import Order
@@ -278,6 +279,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             store=store,
             created_by=self.request.user
         )
+
+    @action(detail=True, methods=['get'], url_path='attachment')
+    def attachment(self, request, pk=None):
+        """Justificatif d'une dépense : seulement pour le commerce (fichier privé, pas de lien public)."""
+        from core.storage import private_file_response
+        return private_file_response(self.get_object().attachment)
 
 
 class ExpensesExportBaseView(APIView):

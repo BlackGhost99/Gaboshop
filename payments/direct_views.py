@@ -316,3 +316,28 @@ class FinancialControlView(APIView):
             limit = min(configured_limits) if configured_limits else Decimal('0')
             couriers.append({'courier_id': courier.id, 'courier_phone': courier.phone, 'cash_held': str(held), 'cash_committed': str(exposure), 'cash_limit': str(limit), 'remaining_capacity': str(max(Decimal('0'), limit - exposure))})
         return Response({'success': True, 'data': {'stores': stores, 'couriers': couriers, 'pending_cash_receipts': PaymentReceipt.objects.filter(method='cash', status='pending').count(), 'rejected_receipts': PaymentReceipt.objects.filter(status='rejected').count(), 'overdue_obligations': commissions.filter(status='overdue').count(), 'incomplete_settlements': CommissionSettlement.objects.filter(status='pending_confirmation').count()}})
+
+
+class ReceiptProofView(APIView):
+    """Capture jointe à un paiement déclaré : pour le payeur, celui qui vérifie et l'admin seulement."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, receipt_id):
+        from core.storage import private_file_response
+        receipt = get_object_or_404(PaymentReceipt.objects.select_related('obligation__arrangement__order', 'obligation__arrangement__store'), pk=receipt_id)
+        user = request.user
+        if not (_is_admin(user) or receipt.actor_id == user.id or _can_review_obligation(user, receipt.obligation)):
+            self.permission_denied(request)
+        return private_file_response(receipt.proof)
+
+
+class SettlementProofView(APIView):
+    """Justificatif d'un règlement de commission : pour le commerce et l'admin seulement."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, settlement_id):
+        from core.storage import private_file_response
+        settlement = get_object_or_404(CommissionSettlement.objects.select_related('store'), pk=settlement_id)
+        if not (_is_admin(request.user) or settlement.store.manager_id == request.user.id):
+            self.permission_denied(request)
+        return private_file_response(settlement.proof)

@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
+from core.storage import expense_attachment_path, private_storage
 from core.validators import validate_proof_file
 
 
@@ -71,7 +72,7 @@ class Expense(models.Model):
     payment_status = models.CharField(max_length=20, default='PAID', choices=PAYMENT_STATUS_CHOICES)
     
     notes = models.TextField(blank=True)
-    attachment = models.FileField(upload_to='expenses/%Y/%m/', blank=True, null=True, validators=[validate_proof_file])
+    attachment = models.FileField(upload_to=expense_attachment_path, storage=private_storage, blank=True, null=True, validators=[validate_proof_file])
     
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='expenses_created')
     created_at = models.DateTimeField(auto_now_add=True)

@@ -79,7 +79,8 @@ class DatabaseStorage(Storage):
         return f"{settings.MEDIA_URL}{name}"
 
 
-PRIVATE_PREFIXES = ('delivery_proofs/', 'delivery_signatures/', 'private/')
+# Justificatifs de paiement et de dépenses aussi (captures Mobile Money : noms, numéros, ID de transaction).
+PRIVATE_PREFIXES = ('delivery_proofs/', 'delivery_signatures/', 'private/', 'payments/', 'expenses/')
 
 
 def private_storage():
@@ -100,6 +101,46 @@ def _private_name(folder, filename):
     import uuid
     ext = os.path.splitext(filename or '')[1].lower()[:5] or '.jpg'
     return f"delivery_proofs/{folder}/{uuid.uuid4().hex}{ext}"
+
+
+def _private_doc_name(folder, filename):
+    import os
+    import uuid
+    ext = os.path.splitext(filename or '')[1].lower()[:5] or '.jpg'
+    return f"private/{folder}/{uuid.uuid4().hex}{ext}"
+
+
+def receipt_proof_path(instance, filename):
+    return _private_doc_name('receipt_proofs', filename)
+
+
+def settlement_proof_path(instance, filename):
+    return _private_doc_name('settlement_proofs', filename)
+
+
+def expense_attachment_path(instance, filename):
+    return _private_doc_name('expenses', filename)
+
+
+def private_file_response(field_file):
+    """Réponse HTTP d'un justificatif privé (après contrôle d'accès par la vue appelante)."""
+    import mimetypes
+    from django.http import Http404, HttpResponse
+    if not field_file:
+        raise Http404
+    try:
+        with field_file.open('rb') as handle:
+            data = handle.read()
+    except Exception:
+        raise Http404
+    content_type = mimetypes.guess_type(field_file.name)[0] or 'application/octet-stream'
+    if content_type not in ('image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'):
+        content_type = 'application/octet-stream'
+    response = HttpResponse(data, content_type=content_type)
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
+    response['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    return response
 
 
 def delivery_photo_path(instance, filename):

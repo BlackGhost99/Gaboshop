@@ -23,6 +23,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
     supplier_display = serializers.CharField(source='get_supplier_display', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     b2b_order_number = serializers.CharField(source='b2b_order.order_number', read_only=True)
+    attachment = serializers.FileField(write_only=True, required=False, allow_null=True)
+    attachment_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Expense
@@ -30,11 +32,15 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'id', 'expense_type', 'supplier', 'supplier_name', 'supplier_display',
             'reference', 'b2b_order', 'b2b_order_number', 'amount', 'currency',
             'expense_date', 'payment_method', 'payment_status', 'notes',
-            'attachment', 'created_by', 'created_by_name',
+            'attachment', 'attachment_url', 'created_by', 'created_by_name',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'b2b_order', 'created_by', 'created_at', 'updated_at']
     
+    def get_attachment_url(self, obj):
+        # Justificatif privé : téléchargé par la route protégée, jamais par /media/.
+        return f'/api/v1/store/finance/expenses/{obj.pk}/attachment/' if obj.attachment else None
+
     def get_created_by_name(self, obj):
         if obj.created_by:
             return f"{obj.created_by.first_name} {obj.created_by.last_name}"

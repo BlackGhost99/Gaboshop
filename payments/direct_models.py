@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from core.storage import private_storage, receipt_proof_path, settlement_proof_path
 from core.validators import validate_proof_file
 
 
@@ -103,7 +104,7 @@ class CommissionSettlement(models.Model):
     method = models.CharField(max_length=30)
     reference = models.CharField(max_length=150, blank=True)
     comment = models.TextField(blank=True)
-    proof = models.FileField(upload_to='payments/settlement_proofs/', blank=True, null=True, validators=[validate_proof_file])
+    proof = models.FileField(upload_to=settlement_proof_path, storage=private_storage, blank=True, null=True, validators=[validate_proof_file])
     collected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='collected_settlements')
     confirmed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='confirmed_settlements', null=True, blank=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending_confirmation')
@@ -138,7 +139,7 @@ class PaymentReceipt(models.Model):
     method = models.CharField(max_length=30)
     reference = models.CharField(max_length=150)
     receipt_number = models.CharField(max_length=40, unique=True, editable=False)
-    proof = models.FileField(upload_to='payments/receipt_proofs/', blank=True, null=True, validators=[validate_proof_file])
+    proof = models.FileField(upload_to=receipt_proof_path, storage=private_storage, blank=True, null=True, validators=[validate_proof_file])
     comment = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     confirmed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+', null=True, blank=True)
