@@ -418,8 +418,10 @@ class PasswordResetConfirmView(APIView):
 	def post(self, request):
 		from users.password_reset import reset_password
 		password = str(request.data.get('password') or '')
-		if len(password) < 6:
-			return Response({'success': False, 'error': {'code': 400, 'message': 'Le mot de passe doit faire au moins 6 caractères.'}}, status=status.HTTP_400_BAD_REQUEST)
+		from users.password_policy import password_problem
+		problem = password_problem(password, request.data.get('phone'))
+		if problem:
+			return Response({'success': False, 'error': {'code': 400, 'message': problem}}, status=status.HTTP_400_BAD_REQUEST)
 		ok, reason = reset_password(request.data.get('phone'), request.data.get('code'), password)
 		if not ok:
 			return Response({'success': False, 'error': {'code': 400, 'message': reason}}, status=status.HTTP_400_BAD_REQUEST)

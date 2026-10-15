@@ -19,7 +19,7 @@ class StoreSignupCategoryTests(TestCase):
 
     def payload(self, phone, **extra):
         data = {
-            'phone': phone, 'password': 'motdepasse', 'password_confirm': 'motdepasse',
+            'phone': phone, 'password': 'Mapeto88d', 'password_confirm': 'Mapeto88d',
             'user_type': 'store_manager', 'store_name': 'Ma boutique',
             'store_address': 'Rue 1', 'store_zone': 'Centre', 'store_city': 'Libreville',
         }

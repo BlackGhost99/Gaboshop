@@ -246,8 +246,10 @@ const Register = () => {
                   value={form.password}
                   onChange={(e) => updateField('password', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                  minLength={8}
                   required
                 />
+                <p className="mt-1 text-xs text-gray-500">Au moins 8 caractères, avec au moins une lettre et un chiffre. Pas de suite comme 12345678.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Confirmer</label>

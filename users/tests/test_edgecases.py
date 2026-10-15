@@ -23,8 +23,8 @@ class UserEdgeCaseTests(TestCase):
         # First registration with an email
         payload1 = {
             'phone': '07000001',
-            'password': 'secret123',
-            'password_confirm': 'secret123',
+            'password': 'Mapeto88s',
+            'password_confirm': 'Mapeto88s',
             'user_type': 'client',
             'email': 'dup@example.com'
         }
@@ -34,8 +34,8 @@ class UserEdgeCaseTests(TestCase):
         # Second registration with a different phone but same email should be rejected
         payload2 = {
             'phone': '07000002',
-            'password': 'secret123',
-            'password_confirm': 'secret123',
+            'password': 'Mapeto88s',
+            'password_confirm': 'Mapeto88s',
             'user_type': 'client',
             'email': 'dup@example.com'
         }

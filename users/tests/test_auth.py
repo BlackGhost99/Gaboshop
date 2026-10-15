@@ -16,8 +16,8 @@ class AuthFlowTests(TestCase):
         # Register a store manager
         payload = {
             'phone': '01234567',
-            'password': 'strongpassword',
-            'password_confirm': 'strongpassword',
+            'password': 'Mapeto88x',
+            'password_confirm': 'Mapeto88x',
             'user_type': 'store_manager',
             'store_name': 'Test Store',
             'store_address': '1 Rue Principale',
@@ -44,8 +44,8 @@ class AuthFlowTests(TestCase):
         # Register client
         payload_client = {
             'phone': '07654321',
-            'password': 'clientpass',
-            'password_confirm': 'clientpass',
+            'password': 'Mapeto88c',
+            'password_confirm': 'Mapeto88c',
             'user_type': 'client'
         }
         r = self.client.post(self.register_url, payload_client, format='json')
@@ -60,8 +60,8 @@ class AuthFlowTests(TestCase):
         # Register store manager
         payload_mgr = {
             'phone': '07881234',
-            'password': 'mgrpass123',
-            'password_confirm': 'mgrpass123',
+            'password': 'Mapeto88m',
+            'password_confirm': 'Mapeto88m',
             'user_type': 'store_manager',
             'store_name': 'MGR Store',
             'store_address': 'Addr',

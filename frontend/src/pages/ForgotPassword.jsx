@@ -116,11 +116,11 @@ export default function ForgotPassword() {
             </label>
             <label className="block text-sm font-medium text-gray-700">
               Nouveau mot de passe
-              <input type="password" autoComplete="new-password" minLength={6} required className={input} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input type="password" autoComplete="new-password" minLength={8} required className={input} value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
             <label className="block text-sm font-medium text-gray-700">
               Confirmer le mot de passe
-              <input type="password" autoComplete="new-password" minLength={6} required className={input} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <input type="password" autoComplete="new-password" minLength={8} required className={input} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </label>
             <button type="submit" disabled={loading} className={button}>{loading ? 'Enregistrement…' : 'Changer le mot de passe'}</button>
             <button type="button" onClick={() => { setStep('phone'); setCode(''); setError(''); }} className="w-full text-sm text-indigo-600">Renvoyer un code</button>

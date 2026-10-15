@@ -47,8 +47,9 @@ class UserSerializer(serializers.ModelSerializer):
         return data
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
-    password_confirm = serializers.CharField(write_only=True, min_length=6)
+    # Longueur et difficulté vérifiées dans validate() (users/password_policy.py), avec un message en français.
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
     
     # Champs pour le profil
     address = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -122,6 +123,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'password': _('Les mots de passe ne correspondent pas.')
             })
+        from users.password_policy import password_problem
+        problem = password_problem(attrs['password'], phone)
+        if problem:
+            raise serializers.ValidationError({'password': problem})
         
         # Validation type utilisateur
         user_type = attrs.get('user_type')

@@ -48,7 +48,7 @@ class RegisterMessageTests(TestCase):
 
     def test_duplicate_number_is_explained(self):
         api = APIClient()
-        payload = {'phone': '077600201', 'password': 'strongpassword', 'password_confirm': 'strongpassword',
+        payload = {'phone': '077600201', 'password': 'Mapeto88x', 'password_confirm': 'Mapeto88x',
                    'user_type': 'client'}
         self.assertEqual(api.post('/api/v1/auth/register/', payload, format='json').status_code, 201)
         res = api.post('/api/v1/auth/register/', dict(payload, phone='+24177600201'), format='json')

@@ -260,6 +260,15 @@ class DeliveryAgentSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     daily_deliveries = serializers.SerializerMethodField()
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    def validate_password(self, value):
+        # Vide : mot de passe aléatoire généré. Sinon, même règle que l'inscription.
+        if value:
+            from users.password_policy import password_problem
+            problem = password_problem(value, self.initial_data.get('phone', ''))
+            if problem:
+                raise serializers.ValidationError(problem)
+        return value
     
     class Meta:
         model = User

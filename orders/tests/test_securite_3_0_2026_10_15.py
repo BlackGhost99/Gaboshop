@@ -88,7 +88,7 @@ class Securite30Tests(base.DecisionsTests.__mro__[1]):
 
     def test_same_number_cannot_open_two_accounts(self):
         api = APIClient()
-        payload = {'phone': '077123456', 'password': 'strongpassword', 'password_confirm': 'strongpassword',
+        payload = {'phone': '077123456', 'password': 'Mapeto88x', 'password_confirm': 'Mapeto88x',
                    'user_type': 'client'}
         self.assertEqual(api.post('/api/v1/auth/register/', payload, format='json').status_code, 201)
         again = dict(payload, phone='+241077123456')

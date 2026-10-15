@@ -307,6 +307,11 @@ class AdminUsersView(APIView):
         if not raw_password:
             from users.password_reset import generate_password
             generated_password = raw_password = generate_password()
+        else:
+            from users.password_policy import password_problem
+            problem = password_problem(raw_password, phone)
+            if problem:
+                return Response({"success": False, "message": problem}, status=status.HTTP_400_BAD_REQUEST)
         if not phone:
             return Response({"success": False, "message": "phone requis"}, status=status.HTTP_400_BAD_REQUEST)
         if user_type not in dict(User.USER_TYPE_CHOICES):
@@ -373,6 +378,11 @@ class AdminUsersView(APIView):
         delivery_profile_data = request.data.get('delivery_profile')
         is_available = request.data.get('is_available')
         raw_password = request.data.get('password')
+        if raw_password:
+            from users.password_policy import password_problem
+            problem = password_problem(raw_password, phone or '')
+            if problem:
+                return Response({"success": False, "message": problem}, status=status.HTTP_400_BAD_REQUEST)
 
         if user_type and user_type not in dict(User.USER_TYPE_CHOICES):
             return Response({"success": False, "message": "user_type invalide"}, status=status.HTTP_400_BAD_REQUEST)
