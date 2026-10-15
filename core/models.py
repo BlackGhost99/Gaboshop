@@ -166,3 +166,75 @@ class ScheduledTaskRun(models.Model):
 
 	def __str__(self):
 		return self.name
+
+
+class FraudSignal(models.Model):
+	"""Indice de fraude relevé au fil de l'eau (essai d'ID déjà utilisé, code PIN faux, annulation…).
+
+	Ces essais sont souvent refusés (la requête échoue) : on les garde ici pour que le Gardien les compte."""
+	KINDS = (
+		('receipt_reused', 'ID de transaction déjà utilisé'),
+		('receipt_order_number', 'Numéro de commande donné comme ID de transaction'),
+		('pin_failure', 'Code PIN de livraison faux'),
+		('store_cancel', 'Commande annulée par le commerce'),
+	)
+	kind = models.CharField(max_length=40, choices=KINDS, db_index=True)
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='fraud_signals')
+	order_id = models.IntegerField(null=True, blank=True)
+	delivery_id = models.IntegerField(null=True, blank=True)
+	store_id = models.IntegerField(null=True, blank=True)
+	detail = models.CharField(max_length=255, blank=True)
+	created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+	class Meta:
+		verbose_name = "Indice de fraude"
+		verbose_name_plural = "Indices de fraude"
+		indexes = [models.Index(fields=['user', 'kind', 'created_at'])]
+
+	def __str__(self):
+		return f'{self.get_kind_display()} — {self.user_id}'
+
+
+class RiskHold(models.Model):
+	"""Mesure prise seule par le Gardien anti-fraude : toujours réversible, en attente de l'admin.
+
+	- pause : le compte reste ouvert (connexion, lecture, assistant) mais ne peut plus commander,
+	  déclarer de paiement, prendre de course ni signaler de problème ;
+	- cash_block : le client ne peut plus payer en espèces ;
+	- payout_freeze : les versements du commerce sont retenus ;
+	- alert : rien n'est bloqué, l'admin est prévenu.
+	La sanction définitive (désactivation) n'est prise que par l'admin."""
+	KINDS = (
+		('pause', 'Compte en pause'),
+		('cash_block', 'Espèces bloquées'),
+		('payout_freeze', 'Versements retenus'),
+		('alert', 'Alerte seulement'),
+	)
+	STATUSES = (
+		('active', 'Active'),
+		('lifted', 'Levée par l’admin'),
+		('sanctioned', 'Sanction confirmée'),
+	)
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='risk_holds')
+	store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, null=True, blank=True, related_name='risk_holds')
+	kind = models.CharField(max_length=20, choices=KINDS)
+	rule = models.CharField(max_length=60, db_index=True)
+	status = models.CharField(max_length=20, choices=STATUSES, default='active', db_index=True)
+	reason = models.TextField()
+	evidence = models.JSONField(default=dict, blank=True)
+	previous = models.JSONField(default=dict, blank=True)
+	created_at = models.DateTimeField(default=timezone.now, db_index=True)
+	decided_at = models.DateTimeField(null=True, blank=True)
+	decided_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='risk_decisions')
+	admin_note = models.TextField(blank=True)
+
+	class Meta:
+		verbose_name = "Mesure du Gardien anti-fraude"
+		verbose_name_plural = "Mesures du Gardien anti-fraude"
+		ordering = ['-created_at']
+		constraints = [
+			models.UniqueConstraint(fields=['user', 'rule'], condition=models.Q(status='active'), name='one_active_hold_per_rule'),
+		]
+
+	def __str__(self):
+		return f'{self.get_kind_display()} ({self.rule}) — {self.user_id}'

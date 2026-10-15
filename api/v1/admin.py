@@ -185,7 +185,54 @@ def _system_status():
         "failed_jobs": failed_jobs,
         "orders_without_driver_30min": stuck_orders,
         "payments_pending_30min": stuck_payments,
+        "guardian": _guardian_holds(),
     }
+
+
+def _guardian_holds():
+    """Mesures du Gardien anti-fraude qui attendent la décision de l'admin."""
+    from core.guardian import holds_payload
+    from core.models import RiskHold
+    return holds_payload(RiskHold.objects.filter(status='active').order_by('-created_at')[:30])
+
+
+class AdminGuardianView(APIView):
+    """GET /admin/guardian/ : mesures du Gardien (actives, puis décidées récemment)."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from core.guardian import holds_payload
+        from core.models import RiskHold
+        active = RiskHold.objects.filter(status='active').order_by('-created_at')[:100]
+        decided = RiskHold.objects.exclude(status='active').order_by('-decided_at')[:30]
+        return Response({'success': True, 'data': {'active': holds_payload(active), 'decided': holds_payload(decided)}})
+
+
+class AdminGuardianDecisionView(APIView):
+    """POST /admin/guardian/<id>/decision/ {decision: lift|sanction, note} : Débloquer ou Sanctionner."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, hold_id):
+        from core import guardian
+        from core.models import RiskHold
+        hold = RiskHold.objects.select_related('user').filter(pk=hold_id).first()
+        if hold is None:
+            return Response({'success': False, 'error': {'code': 404, 'message': 'Mesure introuvable.'}}, status=status.HTTP_404_NOT_FOUND)
+        decision = str(request.data.get('decision') or '')
+        note = str(request.data.get('note') or '').strip()
+        if hold.status != 'active':
+            return Response({'success': False, 'error': {'code': 409, 'message': 'Cette mesure a déjà été tranchée.'}}, status=status.HTTP_409_CONFLICT)
+        if decision == 'lift':
+            guardian.lift(hold, request.user, note)
+            return Response({'success': True, 'message': 'Mesure levée : le compte est rétabli et la personne prévenue.'})
+        if decision == 'sanction':
+            if not _can_manage(request.user, hold.user) or hold.user.is_staff or hold.user.is_superuser:
+                return Response({'success': False, 'error': {'code': 403, 'message': 'Ce compte ne peut pas être sanctionné ici.'}}, status=status.HTTP_403_FORBIDDEN)
+            if not note:
+                return Response({'success': False, 'error': {'code': 400, 'message': 'Indiquez la raison de la sanction.'}}, status=status.HTTP_400_BAD_REQUEST)
+            guardian.sanction(hold, request.user, note)
+            return Response({'success': True, 'message': 'Compte désactivé (et son commerce s’il en a un). Ses sessions sont coupées.'})
+        return Response({'success': False, 'error': {'code': 400, 'message': 'Décision attendue : lift ou sanction.'}}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AdminUsersView(APIView):

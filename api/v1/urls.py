@@ -56,7 +56,7 @@ from .subscription import (
 from .admin import (
     AdminSummaryView, AdminUsersView, AdminOrdersView, AdminFinancialsView,
     AdminStoreCategoriesView, AdminProductCategoriesView, AdminPaymentsView, AdminDeliveriesView,
-    AdminStoresView, AdminProductsView, SystemSettingsView
+    AdminStoresView, AdminProductsView, SystemSettingsView, AdminGuardianView, AdminGuardianDecisionView
 )
 from .finances import (
     FinanceDashboardView, TransactionsListView, CommissionsByStoreView,
@@ -171,6 +171,8 @@ urlpatterns = [
     # Admin (plateforme)
     path('admin/summary/', AdminSummaryView.as_view(), name='admin-summary'),
     path('admin/users/', AdminUsersView.as_view(), name='admin-users'),
+    path('admin/guardian/', AdminGuardianView.as_view(), name='admin-guardian'),
+    path('admin/guardian/<int:hold_id>/decision/', AdminGuardianDecisionView.as_view(), name='admin-guardian-decision'),
     path('admin/orders/', AdminOrdersView.as_view(), name='admin-orders'),
     path('admin/delivery/tariff-analytics/', DeliveryTariffAnalyticsView.as_view(), name='delivery-tariff-analytics'),
     path('admin/delivery/tariffs/', delivery_admin.DeliveryTariffsView.as_view(), name='admin-delivery-tariffs'),

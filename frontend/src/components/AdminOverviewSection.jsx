@@ -38,6 +38,61 @@ const ClientProblems = ({ problems }) => {
   );
 };
 
+// Gardien anti-fraude : mesures réversibles prises seules, en attente de la décision de l'admin.
+const FraudGuardian = ({ holds }) => {
+  const [done, setDone] = useState({});
+  const [busy, setBusy] = useState(null);
+  if (!holds?.length) return null;
+  const decide = async (hold, decision) => {
+    let note = '';
+    if (decision === 'sanction') {
+      note = window.prompt(`Raison de la sanction pour ${hold.user} (le compte sera désactivé) :`) || '';
+      if (!note.trim()) return;
+    }
+    setBusy(hold.id);
+    try {
+      const res = await api.post(`/admin/guardian/${hold.id}/decision/`, { decision, note });
+      notifySuccess(decision === 'lift' ? 'Compte débloqué' : 'Compte sanctionné', res.data?.message);
+      setDone((prev) => ({ ...prev, [hold.id]: true }));
+    } catch (err) {
+      notifyError(err, { action: decision === 'lift' ? 'Débloquer' : 'Sanctionner' });
+    } finally {
+      setBusy(null);
+    }
+  };
+  const visible = holds.filter((h) => !done[h.id]);
+  if (!visible.length) return null;
+  return (
+    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+      <h3 className="font-semibold text-red-900 mb-1">🛡️ Gardien anti-fraude</h3>
+      <p className="text-xs text-red-800 mb-3">
+        Comptes suspects : le Gardien a seulement mis en pause ou retenu, rien n’est définitif. À vous de trancher.
+      </p>
+      <ul className="space-y-3">
+        {visible.map((h) => (
+          <li key={h.id} className="bg-white rounded p-3 text-sm flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 break-words">
+                {h.user} · {h.role}{h.store ? ` · ${h.store}` : ''} <span className="text-gray-500">({h.phone})</span>
+              </p>
+              <p className="text-gray-700 break-words">{h.why}</p>
+              <p className="text-xs text-red-700">Mesure : {h.kind_label}</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button disabled={busy === h.id} onClick={() => decide(h, 'lift')} className="px-3 py-2 rounded-md bg-green-600 text-white text-xs font-medium disabled:opacity-50">
+                Débloquer
+              </button>
+              <button disabled={busy === h.id} onClick={() => decide(h, 'sanction')} className="px-3 py-2 rounded-md bg-red-600 text-white text-xs font-medium disabled:opacity-50">
+                Sanctionner
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
 const AdminOverviewSection = ({ summary, loading }) => {
   if (loading) {
     return (
@@ -60,6 +115,7 @@ const AdminOverviewSection = ({ summary, loading }) => {
 
   return (
     <div className="space-y-8">
+      <FraudGuardian holds={system_status?.guardian} />
       <ClientProblems problems={system_status?.client_problems} />
       {/* 1. KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

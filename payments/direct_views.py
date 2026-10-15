@@ -41,7 +41,7 @@ class PaymentOptionsView(APIView):
         store = get_object_or_404(Store, pk=request.query_params.get('store_id'))
         delivery = str(request.query_params.get('delivery_requested', 'true')).lower() != 'false'
         b2b = str(request.query_params.get('b2b', 'false')).lower() == 'true'
-        policy, options = available_payment_options(store, delivery, b2b=b2b)
+        policy, options = available_payment_options(store, delivery, b2b=b2b, user=request.user)
         return Response({'success': True, 'data': {'policy': policy, 'options': options}})
 
 
@@ -92,11 +92,27 @@ class ReceiptCreateView(APIView):
     MAX_REJECTED = 3
     REJECTED_WINDOW_DAYS = 30
 
-    @transaction.atomic
     def post(self, request):
+        # Les essais refusés (ID déjà utilisé…) annulent la transaction : le Gardien les note après coup.
+        try:
+            return self._declare(request)
+        except ValidationError as exc:
+            signal = getattr(exc, 'fraud_signal', None)
+            if signal:
+                from core import guardian
+                guardian.record_signal(signal[0], request.user, detail=signal[1])
+            raise
+
+    @transaction.atomic
+    def _declare(self, request):
         obligation = get_object_or_404(PaymentObligation.objects.select_related('arrangement__order', 'arrangement__store'), pk=request.data.get('obligation_id'))
         if not _can_declare_obligation(request.user, obligation):
             self.permission_denied(request)
+        if obligation.payer == 'client':
+            from core import guardian
+            paused = guardian.pause_refusal(request.user)
+            if paused:
+                return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
         try:
             amount = Decimal(str(request.data.get('amount')))
         except (InvalidOperation, TypeError):
@@ -136,15 +152,15 @@ class ReceiptCreateView(APIView):
                 .filter(ref_norm=normalized)
             )
             if used.exists():
-                raise ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'})
+                raise _flagged(ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'}), 'receipt_reused', normalized)
         if method != 'cash':
             # Le numéro de commande (CMD…) est le motif à écrire, pas l'ID de transaction du SMS.
             order_number = (obligation.arrangement.order.order_number or '').replace(' ', '').upper()
             if normalized.startswith('CMD') or (order_number and order_number in normalized):
-                raise ValidationError({'reference': (
+                raise _flagged(ValidationError({'reference': (
                     'Ceci est le numéro de la commande. Indiquez l’ID de transaction du SMS de confirmation '
                     'Airtel Money ou Moov Money.'
-                )})
+                )}), 'receipt_order_number', normalized)
         if PaymentReceipt.objects.filter(obligation=obligation, reference=reference).exists():
             raise ValidationError({'reference': 'Cet ID a déjà été déclaré pour ce paiement.'})
         if not is_payee and not _is_admin(user):
@@ -167,6 +183,12 @@ class ReceiptCreateView(APIView):
         else:
             _notify_payee(obligation, receipt)
         return Response({'success': True, 'data': receipt_payload(receipt), 'created': True}, status=status.HTTP_201_CREATED)
+
+
+def _flagged(exc, kind, detail):
+    """Marque une erreur comme indice de fraude, enregistré par le Gardien hors de la transaction annulée."""
+    exc.fraud_signal = (kind, detail)
+    return exc
 
 
 def _checked_proof(request):

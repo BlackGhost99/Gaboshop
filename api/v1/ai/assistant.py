@@ -501,6 +501,15 @@ def t_admin_stores(ctx, unverified_only=False, query=''):
                         'products': s.n_products} for s in qs[:10]]}
 
 
+def t_fraud_alerts(ctx):
+    """Admin : mesures du Gardien anti-fraude qui attendent une décision (Débloquer ou Sanctionner)."""
+    from core.guardian import holds_payload
+    from core.models import RiskHold
+    holds = holds_payload(RiskHold.objects.filter(status='active').order_by('-created_at')[:15])
+    return {'alerts': [{k: h[k] for k in ('user', 'phone', 'role', 'store', 'kind_label', 'why')} for h in holds],
+            'note': 'Décider dans le tableau de bord admin, rubrique « Gardien anti-fraude ».'}
+
+
 def t_recent_orders(ctx, status_filter=''):
     from orders.models import Order
     qs = Order.objects.select_related('store').prefetch_related('items__product').order_by('-created_at')
@@ -518,6 +527,15 @@ def t_my_problems(ctx):
     if ctx.problem:
         problems.append({'source': "message affiché à l'instant dans l'application", **ctx.problem})
     if ctx.user is not None:
+        # Mesures du Gardien anti-fraude en cours sur ce compte : l'IA explique pourquoi et que faire.
+        from core.guardian import KIND_EFFECTS, SUPPORT_STEP, active_holds
+        for hold in active_holds(ctx.user).exclude(kind='alert'):
+            problems.append({
+                'source': 'Gardien anti-fraude (mesure en attente de vérification par un administrateur)',
+                'title': hold.get_kind_display(), 'detail': KIND_EFFECTS.get(hold.kind, ''),
+                'reason': hold.reason, 'next_step': SUPPORT_STEP,
+                'date': timezone.localtime(hold.created_at).strftime('%d/%m %H:%M'),
+            })
         from notifications.models import Notification
         since = timezone.now() - timedelta(days=3)
         for n in Notification.objects.filter(user=ctx.user, created_at__gte=since).order_by('-created_at')[:30]:
@@ -610,6 +628,9 @@ TOOLS = {
         {'include_available': _BOOL})),
     'platform_stats': (('admin',), t_platform_stats, _schema(
         'platform_stats', 'Chiffres de la plateforme sur une période (jours).', {'days': _INT})),
+    'fraud_alerts': (('admin',), t_fraud_alerts, _schema(
+        'fraud_alerts', "Comptes suspects repérés par le Gardien anti-fraude et la mesure prise seule "
+                        "(pause, espèces bloquées, versements retenus), en attente de décision de l'admin.")),
     'admin_stores': (('admin',), t_admin_stores, _schema(
         'admin_stores', 'Liste des commerces (filtrer les non vérifiés).', {'unverified_only': _BOOL, 'query': _STR})),
     'recent_orders': (('admin',), t_recent_orders, _schema(
@@ -655,7 +676,7 @@ ROLE_GUIDE = {
     'delivery_agent': "C'est un livreur. Aide-le à organiser ses livraisons : adresses, contacts, ordre de passage, "
                       "livraisons disponibles.",
     'admin': "C'est l'administrateur de Gaboshop. Donne des chiffres précis, repère les problèmes (commerces non "
-             "vérifiés, commandes bloquées) et propose des actions.",
+             "vérifiés, commandes bloquées, comptes suspects du Gardien anti-fraude via fraud_alerts) et propose des actions.",
 }
 
 
@@ -1205,8 +1226,11 @@ def ai_assistant_confirm(request):
             if not can_dispatch(order):
                 return Response({'success': False, 'error': {'message': "Le paiement requis avant l'expédition n'est pas confirmé."}},
                                 status=status.HTTP_409_CONFLICT)
+        previous_status = order.status
         serializer.save()
         order.refresh_from_db()
+        from api.v1.orders import note_store_cancel
+        note_store_cancel(request.user, order, previous_status)
         if order.status == 'ready':
             try:
                 from api.v1.orders import auto_assign_delivery

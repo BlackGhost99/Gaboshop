@@ -210,12 +210,19 @@ def release_unconfirmed_payouts():
 	return f'{stores} versement(s) commerce et {drivers} versement(s) livreur après 48 h sans confirmation'
 
 
+def guard_against_fraud():
+	"""Gardien anti-fraude : réexamine les comptes à l'activité suspecte récente (core/guardian.py)."""
+	from core.guardian import scan_recent
+	return scan_recent()
+
+
 JOBS = (
 	('livraisons', timedelta(minutes=2), advance_deliveries),
 	('paiements_en_ligne', timedelta(minutes=2), check_online_payments),
 	('commandes_abandonnees', timedelta(hours=1), cancel_abandoned_orders),
 	('abonnements_expires', timedelta(hours=12), expire_subscriptions),
 	('versements_sans_confirmation', timedelta(hours=1), release_unconfirmed_payouts),
+	('gardien_antifraude', timedelta(minutes=30), guard_against_fraud),
 )
 
 

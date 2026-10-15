@@ -63,7 +63,7 @@ def ensure_credit_limit(store, additional_commission=Decimal('0')):
 def create_arrangement(order, flow, method, delivery_method=None, user=None):
     if hasattr(order, 'payment_arrangement'):
         return order.payment_arrangement
-    policy, options = available_payment_options(order.store, order.delivery_requested, b2b=getattr(order, 'is_b2b', False))
+    policy, options = available_payment_options(order.store, order.delivery_requested, b2b=getattr(order, 'is_b2b', False), user=order.client)
     if flow == 'platform_online':
         delivery_method = STORE_DELIVERY if delivery_method == STORE_DELIVERY else GABOSHOP_DELIVERY
     if not matching_option(options, flow, method, delivery_method if flow == 'platform_online' else ''):
@@ -258,6 +258,9 @@ def reject_receipt(receipt, user, reason):
     receipt.rejected_at = timezone.now()
     receipt.rejection_reason = reason.strip()
     receipt.save(update_fields=['status', 'rejected_by', 'rejected_at', 'rejection_reason'])
+    from core import guardian
+    actor = receipt.actor
+    transaction.on_commit(lambda: guardian.check(actor))
     return receipt
 
 

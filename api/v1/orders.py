@@ -47,6 +47,10 @@ class OrderCreateView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
     
 	def post(self, request):
+		from core import guardian
+		paused = guardian.pause_refusal(request.user)
+		if paused:
+			return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
 		# Même panier renvoyé (réponse perdue, connexion coupée) : on rend la commande déjà créée.
 		request_id = str(request.headers.get('Idempotency-Key') or '').strip()[:64]
 		if request_id:
@@ -217,8 +221,10 @@ class OrderStatusUpdateView(APIView):
 					from payments.direct_service import can_dispatch
 					if not can_dispatch(order):
 						return Response({'success': False, 'error': {'code': 409, 'message': 'Le paiement requis avant expédition n’est pas confirmé.'}}, status=status.HTTP_409_CONFLICT)
+				previous_status = order.status
 				serializer.save()
 				order.refresh_from_db()
+				note_store_cancel(request.user, order, previous_status)
 
 				# Auto-assigner dès que le statut passe à "ready" (sauf si le commerce livre lui-même)
 				if order.status == 'ready' and not getattr(getattr(order, 'payment_arrangement', None), 'delivery_method', '') == 'store':
@@ -286,6 +292,13 @@ def store_can_cancel(order):
 	return not (_client_has_paid(order) or _store_payout_started(order))
 
 
+def note_store_cancel(user, order, previous_status):
+	"""Une annulation par le commerce est un indice pour le Gardien anti-fraude (trop d'annulations ?)."""
+	if order.status == 'cancelled' and previous_status != 'cancelled' and user.is_store_manager():
+		from core import guardian
+		guardian.record_signal('store_cancel', user, order=order, store=order.store, detail=order.order_number)
+
+
 def store_status_refusal(user, order, new_status, pin_code=None):
 	"""Règles du commerce sur sa commande, communes à l'écran « Commandes » et à l'assistant IA.
 	Renvoie None si le changement est permis, sinon le message d'erreur (avec raison et solution)."""
@@ -318,7 +331,7 @@ def store_status_refusal(user, order, new_status, pin_code=None):
 			return {'code': 429, 'http': status.HTTP_429_TOO_MANY_REQUESTS, 'message': pin_guard.locked_message()}
 		if not pin_code or str(pin_code).strip() != delivery.delivery_code.strip():
 			if pin_code:
-				pin_guard.record_failure(delivery)
+				pin_guard.record_failure(delivery, user)
 			return {
 				'code': 400, 'http': status.HTTP_400_BAD_REQUEST,
 				'message': 'Code PIN du client manquant ou incorrect.',
@@ -536,6 +549,10 @@ class ClientReportProblemView(APIView):
 		order = Order.objects.filter(id=order_id, client=request.user).first()
 		if order is None:
 			return Response({'success': False, 'error': {'code': 404, 'message': 'Commande non trouvée.'}}, status=status.HTTP_404_NOT_FOUND)
+		from core import guardian
+		paused = guardian.pause_refusal(request.user)
+		if paused:
+			return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
 		problem = str(request.data.get('problem') or '').strip()[:1000]
 		if not problem:
 			return Response({'success': False, 'error': {'code': 400, 'message': 'Décrivez le problème en quelques mots.'}}, status=status.HTTP_400_BAD_REQUEST)
@@ -559,6 +576,13 @@ class ClientReportProblemView(APIView):
 			ip_address=request.META.get('REMOTE_ADDR'), user_agent=request.META.get('HTTP_USER_AGENT', ''),
 			reason=f'Problème signalé par le client : {problem}',
 		)
+		# Le Gardien regarde le client (trop de réclamations ?), le commerce et le livreur (trop de litiges ?).
+		guardian.check(request.user)
+		if order.store.manager_id:
+			guardian.check(order.store.manager)
+		agent = getattr(getattr(order, 'delivery', None), 'delivery_agent', None)
+		if agent is not None:
+			guardian.check(agent)
 		return Response({'success': True, 'message': 'Problème transmis à Gaboshop. Le paiement du commerce est suspendu le temps de vérifier.'})
 
 

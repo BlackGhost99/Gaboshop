@@ -107,7 +107,7 @@ def check(site):
     old_proof = fetch(f'{api}/media/payments/receipt_proofs/test.png', attempts=1)['status']
     new_view = fetch(f'{api}/api/v1/payments/receipts/1/proof/', attempts=1)['status']
     lines.append(f"- Ancienne adresse de justificatif sans connexion : **{old_proof}** (attendu 404) ; "
-                 f"téléchargement réservé sans connexion : **{new_view}** (attendu 401)")
+                 f"téléchargement réservé sans connexion : **{new_view}** (attendu 401 ou 403)")
     lines.append(f"- Autorisation CORS pour {web} : `{cors}`")
     if res['status'] != 200:
         lines.append(f"  - Réponse : `{short(res['body'])}`")

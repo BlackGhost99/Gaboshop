@@ -26,12 +26,16 @@ def is_locked(delivery):
 		return False
 
 
-def record_failure(delivery):
+def record_failure(delivery, user=None):
 	try:
 		count = (cache.get(_key(delivery)) or 0) + 1
 		cache.set(_key(delivery), count, lock_minutes() * 60)
 	except Exception:
 		pass
+	if user is not None:
+		# Le Gardien anti-fraude compte les PIN faux par compte, sur toutes les commandes.
+		from core import guardian
+		guardian.record_signal('pin_failure', user, delivery=delivery, detail=getattr(delivery.order, 'order_number', ''))
 
 
 def reset(delivery):

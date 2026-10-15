@@ -136,6 +136,12 @@ class DeliveryAvailabilityView(APIView):
 		else:
 			is_available = str(raw_value).strip().lower() in ['true', '1', 'yes', 'y', 'on']
 
+		if is_available:
+			from core import guardian
+			paused = guardian.pause_refusal(user)
+			if paused:
+				return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
+
 		# Compte livreur créé sans profil (ajout par l'admin) : le profil est créé à la volée.
 		from users.models import LivreurProfile
 		profile, _ = LivreurProfile.objects.get_or_create(user=user)
@@ -380,6 +386,9 @@ def available_deliveries_for(user):
 	"""Courses qu'un livreur peut voir et prendre lui-même (liste et prise utilisent la même règle)."""
 	if not user.is_delivery_agent():
 		return Delivery.objects.none()
+	from core import guardian
+	if guardian.pause_refusal(user):
+		return Delivery.objects.none()
 	# Filter waiting deliveries and only show those open to all or not in auto-assignment
 	qs = Delivery.objects.filter(status='waiting', delivery_agent__isnull=True)
 	qs = qs.filter(order__status__in=['ready', 'paid', 'confirmed'])
@@ -404,6 +413,10 @@ class DeliveryClaimView(APIView):
 		user = request.user
 		if not user.is_delivery_agent():
 			return Response({'success': False, 'error': 'Accès réservé aux livreurs'}, status=status.HTTP_403_FORBIDDEN)
+		from core import guardian
+		paused = guardian.pause_refusal(user)
+		if paused:
+			return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
 
 		try:
 			with transaction.atomic():
@@ -495,6 +508,10 @@ class DeliveryAcceptAssignmentView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
 
 	def post(self, request, delivery_id):
+		from core import guardian
+		paused = guardian.pause_refusal(request.user)
+		if paused:
+			return Response({'success': False, 'error': paused}, status=status.HTTP_403_FORBIDDEN)
 		try:
 			delivery = Delivery.objects.get(id=delivery_id)
 			
@@ -841,7 +858,7 @@ class DeliveryProofUploadView(APIView):
 					pin_guard.reset(delivery)
 					delivery.code_verified = True
 				else:
-					pin_guard.record_failure(delivery)
+					pin_guard.record_failure(delivery, request.user)
 					return Response({
 						'success': False,
 						'error': {
@@ -1044,7 +1061,7 @@ class DeliveryVerifyPINView(APIView):
 					}
 				})
 			else:
-				pin_guard.record_failure(delivery)
+				pin_guard.record_failure(delivery, request.user)
 				# Log tentative échouée
 				AuditLog.log_action(
 					action_type='delivery_pin_failed',

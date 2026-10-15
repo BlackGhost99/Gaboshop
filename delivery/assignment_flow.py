@@ -355,6 +355,9 @@ def _rank_candidates(order, exclude_ids, same_city_only=True):
 
     if exclude_ids:
         qs = qs.exclude(user_id__in=exclude_ids)
+    # Livreur mis en pause par le Gardien anti-fraude : plus aucune course.
+    from core.guardian import paused_user_ids
+    qs = qs.exclude(user_id__in=paused_user_ids())
 
     # Réglage admin : un livreur déjà chargé de N livraisons en cours n'en reçoit pas d'autre.
     from api.models import SystemSettings

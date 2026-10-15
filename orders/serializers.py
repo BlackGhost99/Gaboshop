@@ -274,9 +274,18 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         if any(item['product'].store_id != store.id for item in items):
             raise serializers.ValidationError({'items': _('Tous les produits doivent venir du magasin de la commande.')})
         from payments.configuration import available_payment_options, matching_option
-        _policy, options = available_payment_options(store, attrs.get("delivery_requested", True))
+        request = self.context.get('request')
+        _policy, options = available_payment_options(store, attrs.get("delivery_requested", True),
+                                                     user=getattr(request, 'user', None))
         if not matching_option(options, attrs.get('payment_flow'), attrs.get('payment_method'),
                                attrs.get('delivery_payment_method') or ''):
+            from core import guardian
+            if (attrs.get('payment_method') == 'cash' or attrs.get('payment_flow') == 'courier_cash') \
+                    and guardian.cash_blocked(getattr(request, 'user', None)):
+                raise serializers.ValidationError({'payment_method': _(
+                    'Le paiement en espèces est suspendu sur votre compte : plusieurs livraisons payables en espèces '
+                    'n’ont pas pu être remises. Payez par Mobile Money, ou demandez à l’assistant comment lever la mesure.'
+                )})
             raise serializers.ValidationError({'payment_method': _('Ce circuit ou moyen de paiement n’est pas autorisé.')})
 
         from payments.subscription_check import SubscriptionChecker

@@ -104,7 +104,17 @@ def get_payment_policy(store=None):
 ONLINE_METHODS = ('airtel_money', 'moov_money')
 
 
-def available_payment_options(store, delivery_requested=True, b2b=False):
+def available_payment_options(store, delivery_requested=True, b2b=False, user=None):
+    policy, options = _available_payment_options(store, delivery_requested, b2b)
+    # Client dont les livraisons en espèces échouent : le Gardien anti-fraude bloque les espèces.
+    if user is not None and not b2b:
+        from core import guardian
+        if guardian.cash_blocked(user):
+            options = [o for o in options if o['method'] != 'cash' and o['flow'] != 'courier_cash']
+    return policy, options
+
+
+def _available_payment_options(store, delivery_requested=True, b2b=False):
     """Choix de paiement proposés au client pour ce commerce.
 
     Dès que le paiement en ligne Gaboshop (SingPay) est prêt et autorisé, seuls Airtel Money et Moov Money
