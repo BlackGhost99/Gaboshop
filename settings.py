@@ -103,6 +103,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party
     'rest_framework',
+    # Liste noire des jetons de rafraîchissement (BLACKLIST_AFTER_ROTATION, mot de passe réinitialisé)
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     # celery integration apps temporarily disabled for unit tests to avoid
     # importing celery during Django app registry setup because this
@@ -128,6 +130,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Refuse tout envoi de plus de 15 Mo avant de le lire (413)
+    'core.middleware_upload.MaxUploadSizeMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -136,6 +140,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Force brute sur /admin/login/ : 10 échecs par IP et par identifiant en 15 min, puis 429
+    'core.middleware_admin_login.AdminLoginThrottleMiddleware',
 ]
 
 ROOT_URLCONF = 'urls'
@@ -348,7 +354,8 @@ if env_bool("DJANGO_BEHIND_PROXY", False):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", SECURE_SSL_REDIRECT)
 CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", SECURE_SSL_REDIRECT)
-SECURE_HSTS_SECONDS = int(env("DJANGO_SECURE_HSTS_SECONDS", "0"))
+# HSTS 30 jours par défaut hors DEBUG (surcharge possible par la variable d'environnement)
+SECURE_HSTS_SECONDS = int(env("DJANGO_SECURE_HSTS_SECONDS", "0" if DEBUG else "2592000"))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
 SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
 
@@ -425,7 +432,8 @@ WHATSAPP_PHONE_ID = env('WHATSAPP_PHONE_ID', default='')
 WHATSAPP_BUSINESS_API_URL = env('WHATSAPP_BUSINESS_API_URL', default='https://graph.facebook.com/v17.0')
 WHATSAPP_PHONE_ID = env('WHATSAPP_PHONE_ID', default='')
 WHATSAPP_ACCESS_TOKEN = env('WHATSAPP_ACCESS_TOKEN', default='')
-WHATSAPP_VERIFY_TOKEN = env('WHATSAPP_VERIFY_TOKEN', default='gaboshop_webhook_2024')
+# Vide par défaut : sans jeton configuré, la vérification du webhook est refusée.
+WHATSAPP_VERIFY_TOKEN = env('WHATSAPP_VERIFY_TOKEN', default='')
 # Clé secrète de l'app Meta : vérifie que les webhooks viennent bien de Meta.
 WHATSAPP_APP_SECRET = env('WHATSAPP_APP_SECRET', default='')
 # Modèle Meta « Authentification » utilisé pour les codes (mot de passe oublié).
@@ -558,7 +566,7 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # Cache Configuration
-# Sans REDIS_URL (environnement de test sur Render, poste local), cache en mémoire du processus.
+# Sans REDIS_URL : table de cache dans la base en ligne, cache en mémoire du processus sur un poste local.
 if env('REDIS_URL', default=''):
     CACHES = {
         'default': {
@@ -569,6 +577,10 @@ if env('REDIS_URL', default=''):
             }
         }
     }
+elif not DEBUG:
+    # En ligne sans Redis : cache dans la base, partagé par tous les processus gunicorn. Sinon chaque
+    # processus comptait à part les essais de code PIN et de connexion (limites multipliées par 3).
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.db.DatabaseCache', 'LOCATION': 'gaboshop_cache'}}
 else:
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'gaboshop'}}
 

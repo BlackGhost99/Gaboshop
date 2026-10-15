@@ -40,6 +40,17 @@ class ExpenseSerializer(serializers.ModelSerializer):
             return f"{obj.created_by.first_name} {obj.created_by.last_name}"
         return None
 
+    def validate_supplier(self, supplier):
+        # Le fournisseur doit appartenir au commerce de l'utilisateur (pas à un autre commerce).
+        if supplier is None:
+            return supplier
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        store = user.managed_stores.first() if user is not None and user.is_authenticated else None
+        if store is None or supplier.store_id != store.id:
+            raise serializers.ValidationError("Ce fournisseur n'appartient pas à votre commerce.")
+        return supplier
+
 
 class SalesSerializer(serializers.ModelSerializer):
     """Serializer pour les ventes (Orders)"""

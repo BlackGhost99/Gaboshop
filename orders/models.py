@@ -2,7 +2,7 @@ from django.db import models
 from users.models import User
 from stores.models import Store
 from products.models import Product
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class Order(models.Model):
@@ -223,8 +223,8 @@ class Order(models.Model):
 			if (not (hasattr(self, 'city') and self.city and self.store and self.store.city and self.store.city == self.city)):
 				cost += intercity_surcharge_default()
 		
-		# Arrondir à 0.01
-		cost = cost.quantize(Decimal('0.01'))
+		# FCFA sans centimes : franc entier
+		cost = cost.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 		self.vehicle_type = vehicle
 		self.delivery_cost = cost
 		return cost
@@ -372,7 +372,8 @@ class Order(models.Model):
 		# Calculer les frais
 		operator_fee = (base_amount * fee_rate) / Decimal('100')
 		
-		return operator_fee.quantize(Decimal('0.01'))
+		# FCFA sans centimes : franc entier (montant réellement débité par SingPay)
+		return operator_fee.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
     
 	def calculate_totals(self, operator='airtel', payment_method='mobile_money'):
 		"""Recalcule tous les totaux basés sur les OrderItems"""
@@ -416,7 +417,7 @@ class Order(models.Model):
 
 		# Le total inclut désormais tous les frais
 		self.total_amount = (self.items_total + self.delivery_fee + self.operator_fee + self.tax_amount
-			+ self.payment_fees - self.applied_forfait_discount())
+			+ self.payment_fees - self.applied_forfait_discount()).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 		self.save()
 
 	def applied_forfait_discount(self):

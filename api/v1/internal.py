@@ -52,7 +52,13 @@ class HealthView(APIView):
 		}
 		last_tick = max((j['last_run_at'] for j in jobs.values() if j['last_run_at']), default=None)
 		stuck_since = now - timedelta(minutes=30)
+		# D'où vient l'adresse IP utilisée par les limites d'essais (sans afficher d'adresse).
+		meta = request.META
+		xff = [p for p in (meta.get('HTTP_X_FORWARDED_FOR') or '').split(',') if p.strip()]
+		ip_source = 'cloudflare' if meta.get('HTTP_CF_CONNECTING_IP') else ('x-forwarded-for' if xff else 'remote_addr')
 		return Response({'success': True, 'data': {
+			'ip_source': ip_source,
+			'forwarded_hops': len(xff),
 			'database': database,
 			'scheduler_configured': bool(getattr(settings, 'CRON_TOKEN', '')),
 			'last_tick_at': last_tick,

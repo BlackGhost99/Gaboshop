@@ -98,8 +98,9 @@ export function onFeedback(handler) {
 }
 
 // Réussite : dire précisément ce qui a été fait.
-export function notifySuccess(title, details = '') {
-  emit({ level: 'success', title, message: details });
+// `persist: true` : le message reste affiché jusqu'à ce qu'on le ferme (ex. mot de passe à recopier).
+export function notifySuccess(title, details = '', { persist = false } = {}) {
+  emit({ level: 'success', title, message: details, persist });
 }
 
 export function notifyInfo(title, details = '') {

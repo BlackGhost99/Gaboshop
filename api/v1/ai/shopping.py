@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from products.models import Product
+from users.throttles import ClientIPMixin
 from .providers import AIProvider
 
 MAX_RESULTS = 6
@@ -266,11 +267,11 @@ class _SafeThrottleMixin:
             return True
 
 
-class ShopAnonThrottle(_SafeThrottleMixin, AnonRateThrottle):
+class ShopAnonThrottle(ClientIPMixin, _SafeThrottleMixin, AnonRateThrottle):
     rate = '20/min'
 
 
-class ShopUserThrottle(_SafeThrottleMixin, UserRateThrottle):
+class ShopUserThrottle(ClientIPMixin, _SafeThrottleMixin, UserRateThrottle):
     rate = '30/min'
 
 

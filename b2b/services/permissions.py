@@ -87,6 +87,10 @@ def can_purchase_from_wholesaler(buyer_store, wholesaler_store):
 	"""
 	if not buyer_store or not wholesaler_store:
 		return False, "Magasin invalide"
+
+	# Prix pro et commandes B2B réservés aux commerces validés par Gaboshop (pas aux faux commerces).
+	if not getattr(buyer_store, 'is_verified', True):
+		return False, "Votre commerce doit d'abord être validé par Gaboshop pour acheter en gros"
 	
 	# Vérifier que le magasin acheteur a accès au B2B (plan business)
 	from payments.subscription_check import SubscriptionChecker

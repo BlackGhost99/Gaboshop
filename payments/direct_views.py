@@ -2,7 +2,9 @@ from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum
+from django.db import transaction
+from django.db.models import Sum, Value
+from django.db.models.functions import Replace, Upper
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
@@ -11,6 +13,7 @@ from rest_framework.views import APIView
 
 from stores.models import Store
 from .configuration import available_payment_options, get_payment_policy, validate_store_preferences
+from core.validators import validate_proof_file
 from .direct_models import PaymentArrangement, PaymentObligation, PaymentReceipt, CommissionSettlement
 from .direct_service import can_declare, can_review, receipt_payload, role_user_id, payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure
 
@@ -89,6 +92,7 @@ class ReceiptCreateView(APIView):
     MAX_REJECTED = 3
     REJECTED_WINDOW_DAYS = 30
 
+    @transaction.atomic
     def post(self, request):
         obligation = get_object_or_404(PaymentObligation.objects.select_related('arrangement__order', 'arrangement__store'), pk=request.data.get('obligation_id'))
         if not _can_declare_obligation(request.user, obligation):
@@ -99,8 +103,9 @@ class ReceiptCreateView(APIView):
             raise ValidationError({'amount': 'Montant invalide.'})
         if amount <= 0 or amount > obligation.remaining_amount:
             raise ValidationError({'amount': 'Le montant doit être positif et ne pas dépasser le solde.'})
-        method = (request.data.get('method') or obligation.arrangement.method or '').strip()
-        reference = (request.data.get('reference') or '').strip()
+        # Le moyen de paiement est celui de l'arrangement, jamais celui envoyé par le client.
+        method = (obligation.arrangement.method or '').strip()
+        reference = (request.data.get('reference') or '').strip().replace(' ', '').upper()
         idem = (request.data.get('idempotency_key') or '').strip()
         if not idem:
             raise ValidationError('Une clé d’idempotence est obligatoire.')
@@ -109,13 +114,30 @@ class ReceiptCreateView(APIView):
             return Response({'success': True, 'data': receipt_payload(existing), 'created': False}, status=status.HTTP_200_OK)
 
         user = request.user
+        # Verrous : obligation (solde, reçu en attente) et réglages (unicité des ID sur toute la plateforme).
+        from api.models import SystemSettings
+        SystemSettings.get_settings()
+        list(SystemSettings.objects.select_for_update().filter(pk=1))
+        obligation = PaymentObligation.objects.select_for_update().select_related('arrangement__order', 'arrangement__store').get(pk=obligation.pk)
+        if amount > obligation.remaining_amount:
+            raise ValidationError({'amount': 'Le montant doit être positif et ne pas dépasser le solde.'})
         is_payee = user.id == role_user_id(obligation, obligation.payee)
-        if method == 'cash' and not reference:
+        generated = method == 'cash' and not reference
+        if generated:
             reference = f'ESPECES-{timezone.now():%Y%m%d%H%M%S}-{user.id}'
         if not reference:
             raise ValidationError({'reference': 'Indiquez l’ID de transaction reçu par SMS.'})
+        normalized = reference
+        if not generated:
+            # Un même ID de transaction ne sert qu'une fois, sur toute la plateforme et quel que soit le moyen.
+            used = (
+                PaymentReceipt.objects.exclude(status='rejected')
+                .annotate(ref_norm=Replace(Upper('reference'), Value(' '), Value('')))
+                .filter(ref_norm=normalized)
+            )
+            if used.exists():
+                raise ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'})
         if method != 'cash':
-            normalized = reference.replace(' ', '').upper()
             # Le numéro de commande (CMD…) est le motif à écrire, pas l'ID de transaction du SMS.
             order_number = (obligation.arrangement.order.order_number or '').replace(' ', '').upper()
             if normalized.startswith('CMD') or (order_number and order_number in normalized):
@@ -123,10 +145,6 @@ class ReceiptCreateView(APIView):
                     'Ceci est le numéro de la commande. Indiquez l’ID de transaction du SMS de confirmation '
                     'Airtel Money ou Moov Money.'
                 )})
-            # Un même ID de transaction Mobile Money ne sert qu'une fois, sur toute la plateforme.
-            used = PaymentReceipt.objects.filter(method=method).exclude(status='rejected').values_list('reference', flat=True)
-            if any(r.replace(' ', '').upper() == normalized for r in used):
-                raise ValidationError({'reference': 'Cet ID de transaction a déjà été utilisé.'})
         if PaymentReceipt.objects.filter(obligation=obligation, reference=reference).exists():
             raise ValidationError({'reference': 'Cet ID a déjà été déclaré pour ce paiement.'})
         if not is_payee and not _is_admin(user):
@@ -138,9 +156,10 @@ class ReceiptCreateView(APIView):
             if obligation.receipts.filter(status='pending').exists():
                 raise ValidationError('Un paiement déclaré attend déjà la confirmation du bénéficiaire.')
 
+        proof = _checked_proof(request)
         receipt = PaymentReceipt.objects.create(
             idempotency_key=idem, obligation=obligation, actor=user, amount=amount, method=method,
-            reference=reference, comment=(request.data.get('comment') or '')[:500], proof=request.FILES.get('proof'),
+            reference=reference, comment=(request.data.get('comment') or '')[:500], proof=proof,
         )
         if is_payee and obligation.payee != 'platform':
             confirm_receipt(receipt, user, payee_acknowledgement=True)
@@ -148,6 +167,19 @@ class ReceiptCreateView(APIView):
         else:
             _notify_payee(obligation, receipt)
         return Response({'success': True, 'data': receipt_payload(receipt), 'created': True}, status=status.HTTP_201_CREATED)
+
+
+def _checked_proof(request):
+    """Justificatif envoyé : photo (JPG, PNG, WEBP, HEIC) ou PDF de 5 Mo au plus, sinon 400."""
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    proof = request.FILES.get('proof')
+    if proof is None:
+        return None
+    try:
+        validate_proof_file(proof)
+    except DjangoValidationError as exc:
+        raise ValidationError({'proof': exc.messages})
+    return proof
 
 
 def _notify_payee(obligation, receipt):
@@ -240,7 +272,7 @@ class SettlementListCreateView(APIView):
         store = get_object_or_404(Store, pk=request.data.get('store_id'))
         if not (_is_admin(request.user) or store.manager_id == request.user.id):
             self.permission_denied(request)
-        settlement = create_settlement(store, request.data.get('amount'), request.data.get('method'), request.user, request.data.get('reference', ''), request.data.get('comment', ''), request.FILES.get('proof'))
+        settlement = create_settlement(store, request.data.get('amount'), request.data.get('method'), request.user, request.data.get('reference', ''), request.data.get('comment', ''), _checked_proof(request))
         return Response({'success': True, 'data': {'id': settlement.id, 'receipt_number': settlement.receipt_number, 'status': settlement.status}}, status=status.HTTP_201_CREATED)
 
 

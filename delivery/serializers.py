@@ -166,6 +166,19 @@ class CityDistanceSerializer(serializers.ModelSerializer):
 		read_only_fields = ['id']
 
 
+def _visible_order(request, order_id):
+	"""Seulement une commande du client, du commerce ou d'un admin (sinon on devinait les commandes des autres)."""
+	from django.db.models import Q
+	from orders.models import Order
+	user = getattr(request, 'user', None)
+	qs = Order.objects.filter(id=order_id)
+	if user is None or not user.is_authenticated:
+		return qs.none().get()
+	if not (user.is_staff or getattr(user, 'user_type', '') == 'admin'):
+		qs = qs.filter(Q(client=user) | Q(store__manager=user))
+	return qs.get()
+
+
 class DeliveryCalculatePriceSerializer(serializers.Serializer):
 	"""Serializer pour calculer le prix de livraison"""
 	order_id = serializers.IntegerField()
@@ -177,7 +190,7 @@ class DeliveryCalculatePriceSerializer(serializers.Serializer):
 		from delivery.models import VehicleType
 		
 		try:
-			order = Order.objects.get(id=attrs['order_id'])
+			order = _visible_order(self.context.get('request'), attrs['order_id'])
 		except Order.DoesNotExist:
 			raise serializers.ValidationError({'order_id': 'Commande introuvable'})
 		
@@ -209,7 +222,7 @@ class DeliveryValidateVehicleSerializer(serializers.Serializer):
 		from delivery.models import VehicleType
 		
 		try:
-			order = Order.objects.get(id=attrs['order_id'])
+			order = _visible_order(self.context.get('request'), attrs['order_id'])
 		except Order.DoesNotExist:
 			raise serializers.ValidationError({'order_id': 'Commande introuvable'})
 		
@@ -246,12 +259,20 @@ class DeliveryAgentSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
     daily_deliveries = serializers.SerializerMethodField()
-    password = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
     class Meta:
         model = User
         fields = ['id', 'phone', 'email', 'first_name', 'last_name', 'name', 'city', 'profile_picture', 'is_active', 'profile', 'delivery_profile', 'daily_deliveries', 'password']
         
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Affiché une seule fois, juste après la création, pour que l'admin le transmette au livreur.
+        generated = getattr(instance, '_generated_password', None)
+        if generated:
+            data['generated_password'] = generated
+        return data
+
     def get_profile(self, obj):
         if hasattr(obj, 'delivery_profile'):
             return DeliveryProfileSerializer(obj.delivery_profile).data
@@ -270,12 +291,18 @@ class DeliveryAgentSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         profile_data = validated_data.pop('delivery_profile', {})
-        password = validated_data.pop('password', '123456') # Default password
+        password = validated_data.pop('password', None)
+        # Sans mot de passe fourni : mot de passe aléatoire, renvoyé une seule fois à l'admin.
+        generated_password = None
+        if not password:
+            from users.password_reset import generate_password
+            generated_password = password = generate_password()
         
         # Force user_type
         validated_data['user_type'] = 'delivery_agent'
         
         user = User.objects.create_user(password=password, **validated_data)
+        user._generated_password = generated_password
         
         # Create profile
         DeliveryProfile.objects.create(user=user, **profile_data)
@@ -285,9 +312,14 @@ class DeliveryAgentSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('delivery_profile', {})
         
+        password = validated_data.pop('password', None)
+        
         # Update User fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        # Mot de passe toujours haché, jamais enregistré en clair
+        if password:
+            instance.set_password(password)
         instance.save()
         
         # Update or Create Profile

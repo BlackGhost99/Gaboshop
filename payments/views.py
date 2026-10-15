@@ -162,6 +162,12 @@ def _activate_subscription_from_intent(intent):
     return subscription
 
 
+RESERVED_INTENT_METADATA = {
+    'purpose', 'plan', 'plan_id', 'store_id', 'subscription_kind', 'subscription_activated',
+    'forfait_id', 'client_forfait_id',
+}
+
+
 class CreatePaymentAPIView(APIView):
     """
     Créer un PaymentIntent et initialiser un paiement provider
@@ -177,7 +183,11 @@ class CreatePaymentAPIView(APIView):
         provider = serializer.validated_data.get("provider", "cinetpay")
         channels = serializer.validated_data.get("channels", "ALL")
         lang = serializer.validated_data.get("lang", "FR")
-        metadata = serializer.validated_data.get("metadata", {})
+        # Clés réservées au serveur (objet du paiement, plan, forfait...) : jamais reprises du client.
+        metadata = {
+            k: v for k, v in (serializer.validated_data.get("metadata") or {}).items()
+            if k not in RESERVED_INTENT_METADATA and 'activated' not in str(k)
+        }
 
         # Vérifier la commande
         try:
@@ -504,6 +514,17 @@ def process_intent_outcome(intent, provider_tx_id, outcome, raw):
     outcome : 'success', 'failed', 'pending' ou 'mismatch' (montant/référence incohérents).
     Idempotent : une transaction déjà traitée n'est jamais rejouée.
     """
+    from django.db import transaction
+    # Verrou sur l'intent : deux notifications simultanées n'activent l'abonnement qu'une fois
+    # (le drapeau « activé » est relu sous verrou).
+    with transaction.atomic():
+        locked = PaymentIntent.objects.select_for_update().get(pk=intent.pk)
+        response = _process_intent_outcome_locked(locked, provider_tx_id, outcome, raw)
+    intent.status, intent.metadata = locked.status, locked.metadata
+    return response
+
+
+def _process_intent_outcome_locked(intent, provider_tx_id, outcome, raw):
     status_label = {'success': 'SUCCESS', 'pending': 'PENDING'}.get(outcome, 'FAILED')
     tx, _ = PaymentTransaction.objects.get_or_create(
         intent=intent,
@@ -661,12 +682,15 @@ class ProviderCallbackAPIView(APIView):
             or (payload.get('data') or {}).get('api_response_id')
             or f"{provider}-{reference}"
         )
-        amount = int(float((
+        raw_amount = (
             payload.get("amount")
             or (payload.get("data") or {}).get("amount")
             or transaction.get("amount")
-            or 0
-        )))
+        )
+        try:
+            amount = Decimal(str(raw_amount)) if raw_amount not in (None, '') else None
+        except Exception:
+            amount = None
         status_str = (
             (payload.get('status')
              or (payload.get('data') or {}).get('status')
@@ -690,7 +714,11 @@ class ProviderCallbackAPIView(APIView):
             or status_payload.get('success') is True
             or (payload.get('message') and "CREATED" in str(payload.get('message')).upper())
         )
-        if amount and amount != intent.amount:
+        from .online_verification import amount_matches
+        if amount is not None and not amount_matches(amount, intent.amount):
+            outcome = 'mismatch'
+        elif is_success and not amount:
+            # Succès sans montant : refusé, le montant doit toujours être vérifié.
             outcome = 'mismatch'
         elif is_success:
             outcome = 'success'

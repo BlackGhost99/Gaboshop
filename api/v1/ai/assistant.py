@@ -360,7 +360,11 @@ def t_set_order_status(ctx, order_number, status_value):
         return {'error': f"Commande {order_number} introuvable dans votre commerce."}
     if status_value not in STORE_ORDER_STEPS:
         return {'error': 'Statut possible : confirmed, preparing, ready ou cancelled.'}
+    from api.v1.orders import store_status_refusal
     from orders.serializers import OrderStatusUpdateSerializer
+    refusal = store_status_refusal(ctx.user, order, status_value)
+    if refusal:
+        return {'error': refusal.get('message'), 'next_step': refusal.get('next_step', '')}
     check = OrderStatusUpdateSerializer(order, data={'status': status_value}, partial=True)
     if not check.is_valid():
         return {'error': f"Impossible de passer de « {ORDER_STATUS_FR.get(order.status, order.status)} » à "
@@ -1170,12 +1174,28 @@ def ai_assistant_confirm(request):
         return Response({'success': False, 'error': {'message': 'Action invalide.'}}, status=status.HTTP_400_BAD_REQUEST)
     if data.get('u') != request.user.id:
         return Response({'success': False, 'error': {'message': 'Action non autorisée.'}}, status=status.HTTP_403_FORBIDDEN)
+    if data.get('a') in ('order_status', 'update_product'):
+        # Chaque bouton « Confirmer » ne sert qu'une fois (sinon on pourrait rejouer un ancien prix).
+        once_key = 'ai_confirm_used:' + hashlib.sha256(str(request.data.get('token')).encode()).hexdigest()
+        if _USED_TOKENS.get(once_key) or _cache_get(once_key):
+            return Response({'success': False, 'error': {'message': 'Cette action a déjà été faite.'}},
+                            status=status.HTTP_400_BAD_REQUEST)
+        _USED_TOKENS[once_key] = True
+        try:
+            cache.set(once_key, True, CONFIRM_MAX_AGE)
+        except Exception:
+            pass
     if data.get('a') == 'order_status':
         from orders.models import Order
         from orders.serializers import OrderStatusUpdateSerializer
         order = Order.objects.filter(id=data.get('o'), store__manager=request.user).first()
         if not order:
             return Response({'success': False, 'error': {'message': 'Commande introuvable.'}}, status=status.HTTP_404_NOT_FOUND)
+        from api.v1.orders import store_status_refusal
+        refusal = store_status_refusal(request.user, order, data.get('st'))
+        if refusal:
+            refusal.pop('http', None)
+            return Response({'success': False, 'error': refusal}, status=status.HTTP_409_CONFLICT)
         serializer = OrderStatusUpdateSerializer(order, data={'status': data.get('st')}, partial=True)
         if not serializer.is_valid():
             return Response({'success': False, 'error': {'message': "Ce changement n'est plus possible (la commande a changé)."}},

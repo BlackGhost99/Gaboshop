@@ -187,7 +187,10 @@ def release_unconfirmed_payouts():
 		Order.objects.filter(status='delivered', is_b2b=False, payment__status__in=('success', 'completed'))
 		.annotate(done_at=Coalesce('delivery__delivered_at', 'delivered_at', 'updated_at'))
 		.filter(done_at__lte=limit, client_problem_reported_at__isnull=True)
-		.exclude(store_payout__status__in=('processing', 'paid', 'skipped'))
+		# Remise prouvée par le code PIN du client (ou réception confirmée par le client) : une simple
+		# « signature » photographiée par le livreur ne suffit pas à payer sans l'accord du client.
+		.filter(Q(delivery__code_verified=True) | Q(delivery__proof__client_received_status=True))
+		.exclude(store_payout__status__in=('processing', 'paid', 'skipped', 'failed'))
 		.select_related('delivery', 'store')
 		.distinct()[:50]
 	)

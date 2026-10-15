@@ -22,6 +22,15 @@ MAX_ATTEMPTS = 5
 MAX_CODES_PER_HOUR = 3
 
 
+# Sans caractères ambigus (0/O, 1/l/I) : le mot de passe est dicté ou recopié à la main.
+_PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+
+def generate_password(length=10):
+	"""Mot de passe aléatoire pour un compte créé par l'admin sans mot de passe."""
+	return ''.join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
+
+
 def normalize_phone(raw):
 	"""Mêmes formats que la connexion : +241…, 241…, 0…, ou 8 chiffres."""
 	phone = str(raw or '').strip().replace(' ', '')
@@ -148,7 +157,18 @@ def reset_password(phone, code, new_password):
 		return False, reason
 	user.set_password(new_password)
 	user.save(update_fields=['password'])
+	revoke_refresh_tokens(user)
 	return True, ''
+
+
+def revoke_refresh_tokens(user):
+	"""Coupe les sessions ouvertes ailleurs : les jetons de rafraîchissement du compte sont mis en liste noire."""
+	try:
+		from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+		for token in OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False):
+			BlacklistedToken.objects.get_or_create(token=token)
+	except Exception:
+		logger.exception('Révocation des jetons impossible pour %s', user.pk)
 
 
 def send_phone_verification(user):

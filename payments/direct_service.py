@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -233,7 +234,9 @@ def confirm_receipt(receipt, user, payee_acknowledgement=False):
         raise ValidationError('Un reçu refusé ne peut pas être confirmé.')
     if receipt.actor_id == user.id and not payee_acknowledgement:
         raise ValidationError('Le déclarant ne peut pas confirmer son propre mouvement.')
-    if receipt.obligation.received_amount + receipt.amount > receipt.obligation.amount:
+    # Verrou sur l'obligation : deux confirmations simultanées ne dépassent jamais le solde dû.
+    receipt.obligation = PaymentObligation.objects.select_for_update().get(pk=receipt.obligation_id)
+    if receipt.amount > receipt.obligation.remaining_amount:
         raise ValidationError('Le montant confirmé dépasserait le solde dû.')
     receipt.status, receipt.confirmed_by, receipt.confirmed_at = 'confirmed', user, timezone.now()
     receipt.save(update_fields=['status', 'confirmed_by', 'confirmed_at'])
@@ -306,7 +309,9 @@ def create_settlement(store, amount, method, user, reference='', comment='', pro
     remaining = amount
     debts = PaymentObligation.objects.select_for_update().filter(arrangement__store=store, kind='commission').exclude(status__in=['paid', 'cancelled', 'waived']).order_by('due_at', 'id')
     for debt in debts:
-        allocation = min(remaining, debt.remaining_amount)
+        # Déjà réservé par un autre règlement encore à confirmer : pas alloué deux fois.
+        reserved = SettlementAllocation.objects.filter(obligation=debt, settlement__status='pending_confirmation').exclude(settlement=settlement).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        allocation = min(remaining, max(Decimal('0'), debt.remaining_amount - reserved))
         if allocation > 0:
             SettlementAllocation.objects.create(settlement=settlement, obligation=debt, amount=allocation)
             remaining -= allocation
@@ -322,9 +327,18 @@ def confirm_settlement(settlement, user):
     settlement = CommissionSettlement.objects.select_for_update().get(pk=settlement.pk)
     if settlement.status == 'confirmed':
         return settlement
+    if settlement.status != 'pending_confirmation':
+        raise ValidationError('Seul un règlement en attente de confirmation peut être confirmé.')
     if settlement.collected_by_id == user.id:
         raise ValidationError('Le déclarant ne peut pas confirmer son propre règlement cash.')
-    for allocation in settlement.allocations.select_related('obligation'):
+    allocations = list(settlement.allocations.order_by('id'))
+    # Verrou sur les dettes puis nouvelle vérification du solde restant au moment de confirmer.
+    locked = {o.pk: o for o in PaymentObligation.objects.select_for_update().filter(pk__in=[a.obligation_id for a in allocations])}
+    for allocation in allocations:
+        allocation.obligation = locked[allocation.obligation_id]
+        if allocation.amount > allocation.obligation.remaining_amount:
+            raise ValidationError('Ce règlement dépasse désormais la commission restant due.')
+    for allocation in allocations:
         PaymentReceipt.objects.create(obligation=allocation.obligation, actor=settlement.collected_by, amount=allocation.amount, method=settlement.method, reference=f'{settlement.receipt_number}-{allocation.id}', idempotency_key=f'settlement:{settlement.id}:{allocation.id}', status='confirmed', confirmed_by=user, confirmed_at=timezone.now())
         _refresh_status(allocation.obligation)
     settlement.status, settlement.confirmed_by, settlement.confirmed_at = 'confirmed', user, timezone.now()

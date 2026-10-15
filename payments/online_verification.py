@@ -74,8 +74,8 @@ def amount_matches(amount, expected):
     if amount in (None, ''):
         return True
     try:
-        received = Decimal(str(amount)).quantize(Decimal('0.01'))
-        return received == Decimal(str(expected)).quantize(Decimal('0.01'))
+        # FCFA sans centimes : SingPay débite en francs entiers, seul un écart de moins d'un franc est toléré.
+        return abs(Decimal(str(amount)) - Decimal(str(expected))) < Decimal('1')
     except (InvalidOperation, TypeError, ValueError):
         return False
 

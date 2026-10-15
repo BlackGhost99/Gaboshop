@@ -122,8 +122,12 @@ class StorePayoutTests(TestCase):
         with mock.patch(TRANSFER, side_effect=RuntimeError('réseau coupé')):
             failed_again = release_store_payment(order.id)
         self.assertEqual(failed_again.status, 'failed')
-        with mock.patch(TRANSFER, return_value={'status': 'ok'}):
-            paid = release_store_payment(order.id)
+        # Issue inconnue : jamais renvoyé automatiquement, seul l'admin relance après vérification SingPay.
+        lookup = 'payments.utils.call_singpay_transfers_by_reference'
+        with mock.patch(lookup, return_value={'transfers': []}), mock.patch(TRANSFER, return_value={'status': 'ok'}) as transfer:
+            self.assertEqual(release_store_payment(order.id).status, 'failed')
+            transfer.assert_not_called()
+            paid = release_store_payment(order.id, admin_retry=True)
         self.assertEqual(paid.status, 'paid')
         self.assertEqual(paid.attempts, 3)
 

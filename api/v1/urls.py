@@ -20,7 +20,6 @@ from .products import (
     StoreProductCategoryCreateView, StoreManagerProductsView
 )
 from .products import AllProductCategoryListView
-from products.views import ProductViewSet
 from .orders import (
     OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
     ClientConfirmDeliveryView, OrderSelectVehicleView, ClientReportProblemView
@@ -118,7 +117,7 @@ from .products_admin import (
 )
 
 router = DefaultRouter()
-router.register(r'products-api', ProductViewSet, basename='product')
+# Ancienne route products-api retirée (15/10) : sans filtres (articles pro et masqués visibles) ni limites de forfait.
 
 urlpatterns = [
     # Users / Auth

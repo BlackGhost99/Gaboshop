@@ -24,7 +24,9 @@ class WhatsAppWebhookView(APIView):
     authentication_classes = []
 
     def get(self, request):
-        # Vérification du webhook
+        # Vérification du webhook : refusée tant qu'aucun jeton n'est configuré (jeton vide = devinable)
+        if not getattr(settings, 'WHATSAPP_VERIFY_TOKEN', ''):
+            return HttpResponse('Verification failed', status=403, content_type='text/plain')
         challenge = WhatsAppService.verify_webhook(request)
         if challenge:
             return HttpResponse(challenge, content_type='text/plain')
@@ -32,10 +34,12 @@ class WhatsAppWebhookView(APIView):
 
     @staticmethod
     def _signature_ok(request):
-        """Avec WHATSAPP_APP_SECRET (clé secrète de l'app Meta, dans Render), on refuse les faux envois."""
+        """Avec WHATSAPP_APP_SECRET (clé secrète de l'app Meta, dans Render), on refuse les faux envois.
+        Sans clé configurée, tout envoi est refusé : impossible de vérifier qu'il vient de Meta."""
         secret = getattr(settings, 'WHATSAPP_APP_SECRET', '')
         if not secret:
-            return True
+            logger.warning("Webhook WhatsApp refusé : WHATSAPP_APP_SECRET n'est pas configuré.")
+            return False
         expected = 'sha256=' + hmac.new(secret.encode(), request.body, hashlib.sha256).hexdigest()
         return hmac.compare_digest(expected, request.headers.get('X-Hub-Signature-256', ''))
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
+import { notifySuccess } from '../../utils/feedback';
 import B2CCategoryModal from '../../components/B2CCategoryModal';
 import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import AdminSettingsSection from '../../components/AdminSettingsSection';
@@ -270,9 +271,20 @@ const AdminDashboard = () => {
       setActionError('');
       const res = await createAdminUser(newUser);
       if (!res?.success) throw new Error(res?.message || 'Création échouée');
-      setUsers((prev) => [res.data, ...prev]);
+      const { generated_password: generatedPassword, ...created } = res.data || {};
+      setUsers((prev) => [created, ...prev]);
       setNewUser({ phone: '', user_type: 'client', first_name: '', last_name: '', email: '', city: 'Libreville', password: '' });
       setShowAddUser(false);
+      if (generatedPassword) {
+        // Affiché une seule fois : l'admin le note et le transmet à la personne.
+        notifySuccess(
+          `Compte créé pour ${created.phone}`,
+          `Mot de passe provisoire : ${generatedPassword} — notez-le maintenant, il ne sera plus affiché. La personne pourra le changer avec « Mot de passe oublié ».`,
+          { persist: true },
+        );
+      } else {
+        notifySuccess(`Compte créé pour ${created.phone}`, 'La personne peut se connecter avec le mot de passe choisi.');
+      }
     } catch (err) {
       setActionError(err?.message || 'Création échouée');
     }
@@ -2249,7 +2261,7 @@ const AdminDashboard = () => {
                   value={newUser.password}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, password: e.target.value }))}
                   className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Par défaut: téléphone"
+                  placeholder="Vide : un mot de passe aléatoire sera généré et affiché"
                 />
               </div>
               <div>

@@ -4,7 +4,7 @@ Préparation et confirmation d'actions IA
 import os
 import json
 import time
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.conf import settings
@@ -14,12 +14,14 @@ from orders.models import Order, OrderItem
 from stores.models import Store
 from .permissions import AIPermissionChecker
 from .providers import AIProvider
+from .shopping import ShopUserThrottle
 from api.models import AIActionLog
 from core.models import AuditLog
 
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([ShopUserThrottle])  # appels IA payants : limite par utilisateur
 def prepare_order(request):
     """
     POST /api/v1/ai/prepare-order

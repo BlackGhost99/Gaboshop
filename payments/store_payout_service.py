@@ -13,7 +13,7 @@ Garanties :
 - aucune exception ne remonte à l'appelant : une commande ne doit jamais échouer à cause d'un versement.
 """
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.db import transaction
@@ -47,7 +47,8 @@ def compute_store_share(order):
     from .direct_service import store_delivers
     delivery = Decimal(order.delivery_fee) if store_delivers(order) else Decimal('0')
     amount = max(Decimal('0'), products - commission) + delivery
-    return products, commission, delivery, amount.quantize(Decimal('0.01'))
+    # FCFA sans centimes : franc entier
+    return products, commission, delivery, amount.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
 def _provider_amount(amount):
@@ -55,17 +56,124 @@ def _provider_amount(amount):
 
 
 FROZEN_NOTE = 'Versements gelés par Gaboshop'
+# Issue inconnue (délai dépassé, coupure réseau...) : le transfert a pu partir, on ne relance pas à l'aveugle.
+VERIFY_NOTE = 'Issue inconnue, à vérifier auprès de SingPay avant toute relance'
+PROBLEM_NOTE = 'Problème signalé par le client : versement retenu'
 
 
-def release_store_payment(order_id):
-    """Crée (ou relance) le versement du commerce pour une commande. Idempotent."""
+def needs_verification(payout):
+    return payout.status == 'failed' and (payout.note or '').startswith(VERIFY_NOTE)
+
+
+def payout_blocked(order, admin_override=False):
+    """Raison de ne pas verser (commande annulée ou litige client), sinon ''."""
+    if order.status in ('cancelled', 'refunded'):
+        return 'Commande annulée ou remboursée'
+    if order.client_problem_reported_at and not admin_override:
+        return PROBLEM_NOTE
+    return ''
+
+
+def transfer_error_is_certain(response, exc=None):
+    """Vrai si SingPay a clairement refusé (aucun argent parti) ; faux si l'issue est inconnue."""
+    if exc is not None or not isinstance(response, dict):
+        return False
+    error = str(response.get('error') or '')
+    if 'request failed' in error.lower():  # délai dépassé, réseau
+        return False
+    if error.startswith('SingPay HTTP '):
+        try:
+            return int(error.split()[2]) < 500
+        except (IndexError, ValueError):
+            return False
+    return True
+
+
+_SUCCESS = {'success', 'successful', 'succeeded', 'completed', 'complete', 'done', 'ok', 'paid', 'terminated', 'terminee', 'terminée'}
+_FAILURE = {'failed', 'failure', 'error', 'refused', 'rejected', 'cancelled', 'canceled', 'echec', 'échec', 'expired'}
+
+
+def _walk(node):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk(value)
+
+
+def find_transfer(reference, disbursement, amount):
+    """Cherche chez SingPay un transfert déjà fait : 'paid', 'absent' ou 'unknown'."""
+    from . import utils
+    try:
+        data = utils.call_singpay_transfers_by_reference(reference)
+    except Exception:
+        logger.exception('Vérification du transfert %s impossible', reference)
+        return 'unknown'
+    if not isinstance(data, dict):
+        return 'unknown'
+    if data.get('error'):
+        return 'absent' if str(data.get('error')).startswith('SingPay HTTP 404') else 'unknown'
+    try:
+        wanted = Decimal(str(amount)).quantize(Decimal('1'))
+    except Exception:
+        return 'unknown'
+    verdict = 'absent'
+    for item in _walk(data):
+        target = item.get('disbursement') or item.get('disbursementId') or item.get('disbursement_id')
+        if isinstance(target, dict):
+            target = target.get('id') or target.get('_id')
+        if str(target or '').strip() != str(disbursement).strip():
+            continue
+        try:
+            same_amount = Decimal(str(item.get('amount'))).quantize(Decimal('1')) == wanted
+        except Exception:
+            same_amount = False
+        if not same_amount:
+            continue
+        state = str(item.get('status') or item.get('result') or item.get('state') or '').strip().lower()
+        if state in _SUCCESS:
+            return 'paid'
+        if state not in _FAILURE:
+            verdict = 'unknown'  # transfert trouvé mais encore en cours : on attend
+    return verdict
+
+
+def release_store_payment(order_id, admin_override=False, admin_retry=False):
+    """Crée (ou relance) le versement du commerce pour une commande. Idempotent.
+
+    ``admin_override`` : l'admin a vérifié le litige signalé par le client.
+    ``admin_retry`` : l'admin relance un versement à l'issue inconnue (après vérification SingPay).
+    """
+    verify = None
     try:
         with transaction.atomic():
             order = Order.objects.select_for_update().select_related('store').get(pk=order_id)
-            if not collected_by_platform(order):
+            if not collected_by_platform(order) or payout_blocked(order, admin_override):
                 return None
             payout = StorePayout.objects.select_for_update().filter(order=order).first()
             if payout and payout.status in FINAL_STATUSES:
+                return payout
+            if payout and needs_verification(payout):
+                # Jamais renvoyé automatiquement : on regarde d'abord si SingPay a déjà versé.
+                verify = (payout.pk, payout.agent_code, payout.amount)
+    except Exception:
+        logger.exception('Versement commerce : préparation impossible (commande %s)', order_id)
+        return None
+
+    if verify is not None:
+        payout = _reconcile_store_payout(order_id, verify, admin_retry)
+        if payout is not None:
+            return payout
+
+    try:
+        with transaction.atomic():
+            order = Order.objects.select_for_update().select_related('store').get(pk=order_id)
+            if not collected_by_platform(order) or payout_blocked(order, admin_override):
+                return None
+            payout = StorePayout.objects.select_for_update().filter(order=order).first()
+            if payout and (payout.status in FINAL_STATUSES or needs_verification(payout)):
                 return payout
 
             products, commission, delivery, amount = compute_store_share(order)
@@ -117,6 +225,7 @@ def release_store_payment(order_id):
         return None
 
     # Appel fournisseur hors transaction : l'état "processing" est déjà validé en base.
+    exc = None
     try:
         response = call_singpay_transfer(
             reference=reference,
@@ -125,20 +234,46 @@ def release_store_payment(order_id):
             portefeuille=getattr(settings, 'SINGPAY_WALLET_ID', ''),
         )
         error = response.get('error') if isinstance(response, dict) else 'Réponse invalide'
-    except Exception as exc:  # réseau, configuration...
-        response, error = {}, str(exc)
+    except Exception as e:  # réseau, configuration...
+        response, error, exc = {}, str(e), e
 
     with transaction.atomic():
         payout = StorePayout.objects.select_for_update().get(pk=payout.pk)
         payout.provider_response = response if isinstance(response, dict) else {}
-        if error:
+        if error and transfer_error_is_certain(response, exc):
             payout.status, payout.note = 'failed', str(error)[:255]
-            logger.error('Versement commerce %s échoué : %s', payout.reference, error)
+            logger.error('Versement commerce %s refusé : %s', payout.reference, error)
+        elif error:
+            payout.status, payout.note = 'failed', f'{VERIFY_NOTE} ({error})'[:255]
+            logger.error('Versement commerce %s : issue inconnue, à vérifier : %s', payout.reference, error)
         else:
             payout.status, payout.note, payout.paid_at = 'paid', '', timezone.now()
         payout.save()
     _notify_store(payout)
     return payout
+
+
+def _reconcile_store_payout(order_id, verify, admin_retry):
+    """Versement à l'issue inconnue : rapproché avec SingPay. Renvoie le versement, ou None pour relancer."""
+    payout_id, disbursement_id, amount = verify
+    paid = Payment.objects.filter(order_id=order_id, status__in=ONLINE_SUCCESS).first()
+    if paid is None:
+        return StorePayout.objects.get(pk=payout_id)
+    found = find_transfer(paid_reference(paid), disbursement_id, amount)
+    with transaction.atomic():
+        payout = StorePayout.objects.select_for_update().get(pk=payout_id)
+        if not needs_verification(payout):
+            return payout
+        if found == 'paid':
+            payout.status, payout.note, payout.paid_at = 'paid', 'Transfert retrouvé chez SingPay', timezone.now()
+            payout.save()
+            return payout
+        if found == 'absent' and admin_retry:
+            # Aucun transfert chez SingPay : l'admin peut relancer.
+            payout.note = 'Aucun transfert trouvé chez SingPay : relance par l’admin'
+            payout.save(update_fields=['note', 'updated_at'])
+            return None
+        return payout
 
 
 def _notify_store(payout):

@@ -202,24 +202,10 @@ class OrderStatusUpdateView(APIView):
 			
 			if serializer.is_valid():
 				from payments.direct_service import store_delivers
-				# La course d'un livreur Gaboshop (assignée, en route, livrée) avance par le livreur, pas par le commerce :
-				# sinon une commande pourrait être « livrée » sans livreur, sans code PIN ni preuve.
-				if (request.user.is_store_manager() and request.data.get('status') in ('assigned', 'in_transit', 'delivered')
-						and not store_delivers(order)):
-					return Response({'success': False, 'error': {
-						'code': 409,
-						'message': 'Cette étape est faite par le livreur Gaboshop.',
-						'reason': 'La commande est livrée par un livreur Gaboshop : c’est lui qui la prend, la transporte et la remet au client.',
-						'next_step': 'Passez la commande à « Prête » : un livreur viendra la chercher.',
-					}}, status=status.HTTP_409_CONFLICT)
-				if (request.user.is_store_manager() and request.data.get('status') == 'cancelled'
-						and order.status in ('assigned', 'in_transit') and _client_has_paid(order)):
-					return Response({'success': False, 'error': {
-						'code': 409,
-						'message': 'Cette commande est payée et en route vers le client : vous ne pouvez plus l’annuler.',
-						'reason': 'Le client a déjà payé et la commande est en cours de livraison.',
-						'next_step': 'En cas de problème, contactez Gaboshop : seul l’administrateur peut annuler et rembourser le client.',
-					}}, status=status.HTTP_409_CONFLICT)
+				refusal = store_status_refusal(request.user, order, request.data.get('status'), request.data.get('pin_code'))
+				if refusal:
+					http_status = refusal.pop('http', status.HTTP_409_CONFLICT)
+					return Response({'success': False, 'error': refusal}, status=http_status)
 				if request.data.get('status') == 'in_transit' and order.status == 'ready' and not store_delivers(order):
 					return Response({'success': False, 'error': {
 						'code': 409,
@@ -267,16 +253,82 @@ class OrderStatusUpdateView(APIView):
 
 
 def _client_has_paid(order):
-	"""Le client a payé : paiement en ligne réussi, ou paiement des articles confirmé (Mobile Money au commerce)."""
-	from payments.models import Payment
-	if Payment.objects.filter(order=order, status__in=('success', 'completed')).exists():
-		return True
+	"""Le client a payé : paiement en ligne réussi, ou paiement des articles confirmé (Mobile Money au commerce).
+	Lit les relations déjà chargées par la liste des commandes (pas de requête par commande)."""
+	from django.core.exceptions import ObjectDoesNotExist
+	try:
+		if order.payment.status in ('success', 'completed'):
+			return True
+	except ObjectDoesNotExist:
+		pass
 	arrangement = getattr(order, 'payment_arrangement', None)
 	if arrangement is None:
 		return False
 	from payments.direct_service import _refresh_status
-	products = arrangement.obligations.filter(kind='products').first()
+	products = next((o for o in arrangement.obligations.all() if o.kind == 'products'), None)
 	return bool(products and _refresh_status(products) == 'paid')
+
+
+def _store_payout_started(order):
+	"""La part du commerce est déjà partie (ou en cours d'envoi) : annuler ferait payer Gaboshop deux fois."""
+	payout = getattr(order, 'store_payout', None)
+	try:
+		return bool(payout and payout.status in ('processing', 'paid'))
+	except Exception:
+		return False
+
+
+def store_can_cancel(order):
+	"""Le commerce peut-il annuler ? Non dès que le client a payé ou que le commerce a été payé :
+	seul l'administrateur annule alors, et rembourse le client."""
+	if order.status in ('delivered', 'cancelled', 'refunded'):
+		return False
+	return not (_client_has_paid(order) or _store_payout_started(order))
+
+
+def store_status_refusal(user, order, new_status, pin_code=None):
+	"""Règles du commerce sur sa commande, communes à l'écran « Commandes » et à l'assistant IA.
+	Renvoie None si le changement est permis, sinon le message d'erreur (avec raison et solution)."""
+	if not user.is_store_manager():
+		return None
+	from payments.direct_service import store_delivers
+	# La course d'un livreur Gaboshop (assignée, en route, livrée) avance par le livreur, pas par le commerce :
+	# sinon une commande pourrait être « livrée » sans livreur, sans code PIN ni preuve.
+	if new_status in ('assigned', 'in_transit', 'delivered') and not store_delivers(order):
+		return {
+			'code': 409,
+			'message': 'Cette étape est faite par le livreur Gaboshop.',
+			'reason': 'La commande est livrée par un livreur Gaboshop : c’est lui qui la prend, la transporte et la remet au client.',
+			'next_step': 'Passez la commande à « Prête » : un livreur viendra la chercher.',
+		}
+	if new_status == 'cancelled' and not store_can_cancel(order):
+		return {
+			'code': 409,
+			'message': 'Cette commande est déjà payée : vous ne pouvez plus l’annuler vous-même.',
+			'reason': 'Le client a payé (ou votre part vous a été versée). Annuler sans remboursement serait une fraude.',
+			'next_step': 'En cas de problème, contactez Gaboshop : seul l’administrateur peut annuler et rembourser le client.',
+		}
+	if new_status == 'delivered':
+		# Le commerce qui livre lui-même prouve la remise avec le code PIN du client (comme un livreur).
+		delivery = getattr(order, 'delivery', None)
+		if delivery is None or not delivery.delivery_code:
+			return {'code': 409, 'message': 'Le client confirme lui-même la réception dans son application.'}
+		from delivery import pin_guard
+		if pin_guard.is_locked(delivery):
+			return {'code': 429, 'http': status.HTTP_429_TOO_MANY_REQUESTS, 'message': pin_guard.locked_message()}
+		if not pin_code or str(pin_code).strip() != delivery.delivery_code.strip():
+			if pin_code:
+				pin_guard.record_failure(delivery)
+			return {
+				'code': 400, 'http': status.HTTP_400_BAD_REQUEST,
+				'message': 'Code PIN du client manquant ou incorrect.',
+				'reason': 'Une commande n’est « livrée » qu’avec le code PIN que le client reçoit.',
+				'next_step': 'Demandez le code au client, ou laissez-le confirmer la réception dans son application.',
+			}
+		pin_guard.reset(delivery)
+		delivery.code_verified = True
+		delivery.save(update_fields=['code_verified'])
+	return None
 
 
 def _pay_store_after_confirmation(order):

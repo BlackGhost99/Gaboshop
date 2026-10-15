@@ -873,6 +873,7 @@ class StorePayoutAdmin(admin.ModelAdmin):
 		from .store_payout_service import release_store_payment
 		retried = 0
 		for payout in queryset.filter(status__in=['pending', 'failed']):
-			release_store_payment(payout.order_id)
+			# Issue inconnue : vérifiée auprès de SingPay avant tout nouvel envoi.
+			release_store_payment(payout.order_id, admin_retry=True)
 			retried += 1
 		self.message_user(request, f"{retried} versement(s) relancé(s).")

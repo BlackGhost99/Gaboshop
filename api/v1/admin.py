@@ -18,6 +18,20 @@ from payments.models import Payment
 from api.models import SystemSettings
 
 
+def _as_bool(value):
+    """Booléen envoyé en JSON ou en formulaire : 'false', '0', 'non'… valent False."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on', 'oui', 'vrai')
+
+
+def _can_manage(actor, target):
+    """Un admin qui n'est pas superutilisateur ne peut ni modifier ni supprimer un superutilisateur."""
+    return bool(actor.is_superuser or not target.is_superuser)
+
+
 class IsPlatformAdmin(permissions.BasePermission):
     """Allow access to staff or explicit admin user_type."""
 
@@ -144,6 +158,25 @@ def _system_status():
         .order_by('client_problem_reported_at')
         .values('id', 'order_number', 'client_problem', 'client_problem_reported_at', 'store__name')[:20]
     )
+    # Livrées sans code PIN ni confirmation du client depuis 48 h : pas de versement automatique, l'admin vérifie.
+    from core.scheduled import AUTO_RELEASE_AFTER
+    from django.db.models import Q
+    unproven = (
+        Order.objects.filter(status='delivered', is_b2b=False, client_problem_reported_at__isnull=True,
+                             payment__status__in=('success', 'completed'))
+        .filter(Q(delivery__delivered_at__lte=now - AUTO_RELEASE_AFTER)
+                | Q(delivery__delivered_at__isnull=True, updated_at__lte=now - AUTO_RELEASE_AFTER))
+        .exclude(Q(delivery__code_verified=True) | Q(delivery__proof__client_received_status=True))
+        .exclude(store_payout__status__in=('processing', 'paid', 'skipped'))
+        .distinct().order_by('updated_at')
+        .values('id', 'order_number', 'updated_at', 'store__name')[:20]
+    )
+    for row in unproven:
+        problems.append({
+            'id': row['id'], 'order_number': row['order_number'], 'store__name': row['store__name'],
+            'client_problem_reported_at': row['updated_at'],
+            'client_problem': 'Livrée sans code PIN ni confirmation du client : appelez le client avant de payer.',
+        })
     return {
         "api_health": "OK",
         "client_problems": problems,
@@ -219,9 +252,14 @@ class AdminUsersView(APIView):
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
         city = request.data.get('city', 'Libreville')
-        is_verified = bool(request.data.get('is_verified', False))
-        is_available = bool(request.data.get('is_available', True))
+        is_verified = _as_bool(request.data.get('is_verified', False))
+        is_available = _as_bool(request.data.get('is_available', True))
         raw_password = request.data.get('password')
+        # Sans mot de passe fourni : mot de passe aléatoire, renvoyé une seule fois à l'admin.
+        generated_password = None
+        if not raw_password:
+            from users.password_reset import generate_password
+            generated_password = raw_password = generate_password()
         if not phone:
             return Response({"success": False, "message": "phone requis"}, status=status.HTTP_400_BAD_REQUEST)
         if user_type not in dict(User.USER_TYPE_CHOICES):
@@ -231,7 +269,7 @@ class AdminUsersView(APIView):
             is_staff = user_type == 'admin'
             user = User.objects.create_user(
                 phone=phone,
-                password=raw_password or phone,
+                password=raw_password,
                 user_type=user_type,
                 email=email,
                 username=username,
@@ -247,24 +285,24 @@ class AdminUsersView(APIView):
         except Exception as exc:  # pragma: no cover
             return Response({"success": False, "message": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({
-            "success": True,
-            "data": {
-                "id": user.id,
-                "phone": user.phone,
-                "user_type": user.user_type,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "city": getattr(user, 'city', ''),
-                "is_active": user.is_active,
-                "is_staff": user.is_staff,
-                "is_verified": getattr(user, 'is_verified', False),
-                "phone_verified": bool(user.phone_verified_at),
-                "is_available": getattr(user, 'is_available', False),
-                "created_at": user.date_joined,
-            }
-        }, status=status.HTTP_201_CREATED)
+        data = {
+            "id": user.id,
+            "phone": user.phone,
+            "user_type": user.user_type,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "city": getattr(user, 'city', ''),
+            "is_active": user.is_active,
+            "is_staff": user.is_staff,
+            "is_verified": getattr(user, 'is_verified', False),
+            "phone_verified": bool(user.phone_verified_at),
+            "is_available": getattr(user, 'is_available', False),
+            "created_at": user.date_joined,
+        }
+        if generated_password:
+            data["generated_password"] = generated_password
+        return Response({"success": True, "data": data}, status=status.HTTP_201_CREATED)
 
     def patch(self, request):
         user_id = request.data.get('id')
@@ -274,6 +312,8 @@ class AdminUsersView(APIView):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"success": False, "message": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
+        if not _can_manage(request.user, user):
+            return Response({"success": False, "message": "Seul un superutilisateur peut modifier ce compte."}, status=status.HTTP_403_FORBIDDEN)
 
         phone = request.data.get('phone')
         user_type = request.data.get('user_type')
@@ -298,7 +338,7 @@ class AdminUsersView(APIView):
             user.user_type = user_type
             user.is_staff = user_type == 'admin'
         if is_active is not None:
-            user.is_active = bool(is_active)
+            user.is_active = _as_bool(is_active)
         if first_name is not None:
             user.first_name = first_name
         if last_name is not None:
@@ -308,9 +348,9 @@ class AdminUsersView(APIView):
         if city is not None:
             user.city = city
         if is_verified is not None:
-            user.is_verified = bool(is_verified)
+            user.is_verified = _as_bool(is_verified)
         if is_available is not None:
-            user.is_available = bool(is_available)
+            user.is_available = _as_bool(is_available)
         if raw_password:
             user.set_password(raw_password)
 
@@ -358,6 +398,8 @@ class AdminUsersView(APIView):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"success": False, "message": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
+        if not _can_manage(request.user, user):
+            return Response({"success": False, "message": "Seul un superutilisateur peut supprimer ce compte."}, status=status.HTTP_403_FORBIDDEN)
 
         user.delete()
         return Response({"success": True})

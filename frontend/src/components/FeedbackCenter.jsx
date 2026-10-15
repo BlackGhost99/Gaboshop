@@ -16,7 +16,7 @@ export default function FeedbackCenter() {
 
   useEffect(() => onFeedback((item) => {
     setItems((prev) => [...prev.slice(-2), item]);
-    const delay = AUTO_CLOSE_MS[item.level];
+    const delay = item.persist ? 0 : AUTO_CLOSE_MS[item.level];
     if (delay) setTimeout(() => setItems((prev) => prev.filter((i) => i.id !== item.id)), delay);
   }), []);
 

@@ -3,6 +3,11 @@ from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from .models import StoreCategory, Store
 
+# Frais de livraison du commerce : jamais négatifs, plafonnés (FCFA).
+DELIVERY_FEE_LIMITS = {
+    'delivery_fee': {'min_value': 0, 'max_value': 100000},
+}
+
 class StoreCategorySerializer(serializers.ModelSerializer):
     store_count = serializers.IntegerField(read_only=True)
     
@@ -44,6 +49,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'opening_time', 'closing_time', 'created_at'
         ]
         read_only_fields = ['created_at', 'is_verified']
+        extra_kwargs = DELIVERY_FEE_LIMITS
     
     def _can_see_manager_contact(self, obj):
         # Le téléphone du magasin reste public ; les coordonnées personnelles du gérant, non.
@@ -75,6 +81,7 @@ class StoreCreateSerializer(serializers.ModelSerializer):
             'address', 'zone', 'latitude', 'longitude', 'logo',
             'opening_time', 'closing_time', 'delivery_fee', 'min_order_amount'
         ]
+        extra_kwargs = DELIVERY_FEE_LIMITS
     
     def validate(self, attrs):
         user = self.context['request'].user
@@ -100,6 +107,7 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
             'opening_time', 'closing_time', 'offers_delivery', 'delivery_fee', 'min_order_amount',
             'agent_code', 'payout_phone'
         ]
+        extra_kwargs = DELIVERY_FEE_LIMITS
 
     def validate_agent_code(self, value):
         value = (value or '').strip()

@@ -2,17 +2,19 @@
 AI Gateway - Endpoint principal pour communiquer avec Claude API
 """
 import os
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.conf import settings
 from .services import AIContextService, AIGatewayService, ErrorAnalyzer
 from .local_ai import LocalAI
 from .providers import AIProvider
+from .shopping import ShopUserThrottle
 
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([ShopUserThrottle])  # appels IA payants : limite par utilisateur
 def ai_chat(request):
     """
     POST /api/v1/ai/chat

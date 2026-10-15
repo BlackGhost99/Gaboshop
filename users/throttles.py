@@ -2,7 +2,29 @@
 from rest_framework.throttling import SimpleRateThrottle
 
 
-class _SafeThrottle(SimpleRateThrottle):
+def client_ip(request):
+	"""Adresse IP du client, sans faire confiance à un X-Forwarded-For fabriqué par l'appelant.
+
+	Ordre : en-tête Cloudflare, sinon DERNIÈRE adresse de X-Forwarded-For (celle ajoutée par
+	notre proxy, l'appelant ne peut écrire que le début), sinon REMOTE_ADDR."""
+	meta = getattr(request, 'META', {}) or {}
+	cf = (meta.get('HTTP_CF_CONNECTING_IP') or '').strip()
+	if cf:
+		return cf
+	xff = meta.get('HTTP_X_FORWARDED_FOR') or ''
+	parts = [p.strip() for p in xff.split(',') if p.strip()]
+	if parts:
+		return parts[-1]
+	return (meta.get('REMOTE_ADDR') or '').strip()
+
+
+class ClientIPMixin:
+	# Remplace get_ident de DRF, qui croit tout X-Forwarded-For (contournement trop facile).
+	def get_ident(self, request):
+		return client_ip(request)
+
+
+class _SafeThrottle(ClientIPMixin, SimpleRateThrottle):
 	# Si le cache est indisponible, on laisse passer plutôt que de bloquer tout le monde.
 	def allow_request(self, request, view):
 		try:

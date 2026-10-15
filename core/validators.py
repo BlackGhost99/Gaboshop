@@ -342,3 +342,51 @@ def can_mark_as_delivered(delivery):
 			return False, "La signature ou le code PIN vérifié est requis"
 	
 	return True, "OK"
+
+
+# --- Justificatifs (preuves de paiement, reçus de dépenses) ---
+PROOF_MAX_BYTES = 5 * 1024 * 1024  # 5 Mo
+PROOF_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.pdf'}
+
+
+def _sniff_proof_kind(head: bytes):
+    """Type réel d'après les premiers octets (l'extension seule peut mentir)."""
+    if head.startswith(b'\xff\xd8\xff'):
+        return 'jpeg'
+    if head.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'png'
+    if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
+        return 'webp'
+    if head.startswith(b'%PDF-'):
+        return 'pdf'
+    if head[4:8] == b'ftyp' and head[8:12] in (b'heic', b'heix', b'hevc', b'hevx', b'heim', b'heis', b'mif1', b'msf1'):
+        return 'heic'
+    return None
+
+
+def validate_proof_file(f):
+    """Accepte seulement une photo (JPG, PNG, WEBP, HEIC) ou un PDF de 5 Mo au plus."""
+    import os
+    from django.core.exceptions import ValidationError
+    if not f:
+        return
+    size = getattr(f, 'size', None) or 0
+    if size > PROOF_MAX_BYTES:
+        raise ValidationError('Fichier trop lourd : 5 Mo au maximum.', code='file_too_large')
+    ext = os.path.splitext(getattr(f, 'name', '') or '')[1].lower()
+    if ext not in PROOF_EXTENSIONS:
+        raise ValidationError('Format refusé : envoyez une photo (JPG, PNG, WEBP, HEIC) ou un PDF.', code='invalid_extension')
+    # Fichier déjà enregistré (pas un nouvel envoi) : on ne relit pas son contenu.
+    if getattr(f, '_committed', False) and not hasattr(f, 'content_type'):
+        return
+    try:
+        pos = f.tell() if hasattr(f, 'tell') else 0
+        f.seek(0)
+        head = f.read(16)
+        f.seek(pos)
+    except Exception:
+        head = b''
+    if isinstance(head, str):
+        head = head.encode()
+    if _sniff_proof_kind(head or b'') is None:
+        raise ValidationError("Le contenu du fichier n'est pas une photo ou un PDF valide.", code='invalid_content')

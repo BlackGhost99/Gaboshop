@@ -62,6 +62,7 @@ class DecisionsTests(TestCase):
     def proof(self, order):
         from django.core.files.uploadedfile import SimpleUploadedFile
         photo = SimpleUploadedFile('id.gif', b'GIF89a\x01\x00\x01\x00\x00\x00\x00;', content_type='image/gif')
+        Delivery.objects.filter(pk=order.delivery.pk).update(code_verified=True)
         return DeliveryProof.objects.create(delivery=order.delivery, id_card_photo=photo, latitude=Decimal('0.4'),
                                             longitude=Decimal('9.45'), pin_code='123456', pin_verified=True,
                                             client_received_status=False)

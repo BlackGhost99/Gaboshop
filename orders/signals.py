@@ -61,6 +61,9 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 	if hasattr(order, '_old_status') and order._old_status not in (None, 'cancelled') and order.status == 'cancelled':
 		from orders.stock import restock_order
 		restock_order(order)
+		# La course s'arrête aussi : un livreur ne peut plus la faire passer « livrée » ni être payé.
+		from delivery.models import Delivery as _Delivery
+		_Delivery.objects.filter(order=order).exclude(status__in=('delivered', 'cancelled')).update(status='cancelled')
 
 	# 2. Notifications sur changement de statut
 	if hasattr(order, '_old_status') and order._old_status != order.status:

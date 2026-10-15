@@ -427,7 +427,8 @@ class OrderProblemResolveView(APIView):
         order = Order.objects.filter(id=order_id).first()
         if order is None:
             return Response({"success": False, "error": "Commande non trouvée"}, status=404)
-        if not order.client_problem_reported_at:
+        # Aussi pour une commande livrée sans code PIN ni confirmation du client (pas de versement automatique).
+        if not order.client_problem_reported_at and order.status != 'delivered':
             return Response({"success": False, "error": "Aucun problème signalé sur cette commande."}, status=400)
         from core.models import AuditLog
         AuditLog.log_action(
@@ -435,14 +436,15 @@ class OrderProblemResolveView(APIView):
             reason=f'Problème vérifié par l’admin : {order.client_problem}',
         )
         order.client_problem_reported_at = None
-        order.client_problem = f'[Vérifié par l’admin le {timezone.now():%d/%m/%Y}] {order.client_problem}'[:1000]
+        order.client_problem = f'[Vérifié par l’admin le {timezone.now():%d/%m/%Y}] {order.client_problem or "Livraison vérifiée"}'[:1000]
         order.save(update_fields=['client_problem_reported_at', 'client_problem', 'updated_at'])
         from payments.store_payout_service import release_store_payment
-        release_store_payment(order.pk)
+        # Litige vérifié par l’admin : versements autorisés explicitement.
+        release_store_payment(order.pk, admin_override=True)
         delivery = getattr(order, 'delivery', None)
         if delivery is not None and delivery.delivery_agent_id and delivery.status == 'delivered':
             from payments.services import PaymentService
-            PaymentService.payout_delivery_agent(delivery)
+            PaymentService.payout_delivery_agent(delivery, admin_override=True)
         return Response({"success": True, "message": "Problème levé : le commerce et le livreur sont payés."})
 
 

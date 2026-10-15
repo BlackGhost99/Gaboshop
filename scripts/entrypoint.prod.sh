@@ -12,6 +12,7 @@ PY
 
 # Ne pas arreter le conteneur en silence : afficher le code de sortie (137 = manque de memoire)
 python manage.py migrate --noinput --verbosity 2 2>&1 || echo "MIGRATE ECHEC (code $?)"
+python manage.py createcachetable 2>&1 || echo "CACHE ECHEC (code $?)"
 python manage.py collectstatic --noinput 2>&1 || echo "COLLECTSTATIC ECHEC (code $?)"
 
 # Site de test uniquement : copie (lecture seule) de la vraie base, une fois par demande

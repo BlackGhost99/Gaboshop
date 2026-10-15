@@ -551,6 +551,14 @@ class B2BOrderCreateView(APIView):
 			}, status=status.HTTP_403_FORBIDDEN)
 		
 		# Vérifier qu'il n'achète pas chez lui-même
+		if not getattr(buyer_store, 'is_verified', True):
+			return Response({
+				'success': False,
+				'error': {
+					'code': status.HTTP_403_FORBIDDEN,
+					'message': "Votre commerce doit d'abord être validé par Gaboshop pour acheter en gros"
+				}
+			}, status=status.HTTP_403_FORBIDDEN)
 		can_purchase, error_msg = can_purchase_from_self(buyer_store, wholesaler)
 		if not can_purchase:
 			return Response({

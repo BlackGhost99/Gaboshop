@@ -51,6 +51,9 @@ class ApiKeyAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed(_('Invalid API key.'))
 
         user = api.user
+        # Compte désactivé : la clé ne doit plus ouvrir de session.
+        if not user.is_active:
+            raise exceptions.AuthenticationFailed(_('Compte désactivé.'))
         if not getattr(user, 'is_delivery_agent', lambda: False)():
             raise exceptions.AuthenticationFailed(_('User is not a delivery agent.'))
 

@@ -126,6 +126,7 @@ def check(site):
             f"commandes prêtes sans livreur depuis 30 min : `{data.get('orders_ready_without_driver_30min')}`, "
             f"paiements en ligne en attente depuis 30 min : `{data.get('online_payments_pending_30min')}`"
         )
+        lines.append(f"- Adresse IP des limites d'essais : source `{data.get('ip_source')}`, relais X-Forwarded-For : `{data.get('forwarded_hops')}`")
     except Exception:
         lines.append(f"- Santé de l'API : **{res['status']}**")
 

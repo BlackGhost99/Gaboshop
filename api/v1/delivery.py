@@ -373,25 +373,25 @@ class AvailableDeliveriesView(ListAPIView):
 			logger.info(f"AvailableDeliveries requested by user_id={getattr(user,'id',None)} phone={getattr(user,'phone',None)} city={getattr(user,'city',None)}")
 		except Exception:
 			pass
-		# Only delivery agents can see available deliveries
-		if not user.is_delivery_agent():
-			return Delivery.objects.none()
+		return available_deliveries_for(user).order_by('created_at')
 
-		# Filter waiting deliveries and only show those open to all or not in auto-assignment
-		qs = Delivery.objects.filter(status='waiting', delivery_agent__isnull=True)
-		qs = qs.filter(order__status__in=['ready', 'paid', 'confirmed'])
-		if hasattr(user, 'city') and user.city:
-			qs = qs.filter(
-				Q(is_open_to_all=True) |
-				Q(auto_assignment_enabled=False, city=user.city)
-			)
-		else:
-			qs = qs.filter(
-				Q(is_open_to_all=True) |
-				Q(auto_assignment_enabled=False)
-			)
 
-		return qs.order_by('created_at')
+def available_deliveries_for(user):
+	"""Courses qu'un livreur peut voir et prendre lui-même (liste et prise utilisent la même règle)."""
+	if not user.is_delivery_agent():
+		return Delivery.objects.none()
+	# Filter waiting deliveries and only show those open to all or not in auto-assignment
+	qs = Delivery.objects.filter(status='waiting', delivery_agent__isnull=True)
+	qs = qs.filter(order__status__in=['ready', 'paid', 'confirmed'])
+	if hasattr(user, 'city') and user.city:
+		return qs.filter(
+			Q(is_open_to_all=True) |
+			Q(auto_assignment_enabled=False, city=user.city)
+		)
+	return qs.filter(
+		Q(is_open_to_all=True) |
+		Q(auto_assignment_enabled=False)
+	)
 
 
 class DeliveryClaimView(APIView):
@@ -414,7 +414,9 @@ class DeliveryClaimView(APIView):
 				if delivery.delivery_agent is not None or delivery.status != 'waiting':
 					return Response({'success': False, 'error': 'Livraison déjà prise ou non disponible'}, status=status.HTTP_400_BAD_REQUEST)
 
-				if delivery.auto_assignment_enabled and not delivery.is_open_to_all and delivery.assignment_started_at is not None:
+				# Seules les courses visibles dans « Courses disponibles » peuvent être prises :
+				# commande prête, ouverte aux livreurs, dans la ville du livreur.
+				if not available_deliveries_for(user).filter(id=delivery.id).exists():
 					return Response({'success': False, 'error': 'Livraison non ouverte aux livreurs'}, status=status.HTTP_400_BAD_REQUEST)
 
 				from payments.direct_service import can_courier_accept_collection, is_manual_order
@@ -467,6 +469,17 @@ class DeliveryClaimView(APIView):
 			return Response({'success': False, 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def closed_order_response(delivery):
+	"""Commande annulée ou remboursée : la course s'arrête (sinon elle pourrait repasser « livrée » et être payée)."""
+	order = getattr(delivery, 'order', None)
+	if order is not None and order.status in ('cancelled', 'refunded'):
+		return Response({'success': False, 'error': {
+			'code': 'order_closed',
+			'message': 'Cette commande a été annulée : la course est arrêtée.',
+		}}, status=status.HTTP_409_CONFLICT)
+	return None
+
+
 def get_client_ip(request):
 	"""Récupère l'IP du client pour l'audit"""
 	x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -505,6 +518,9 @@ class DeliveryAcceptAssignmentView(APIView):
 					'error': 'Vous ne pouvez accepter que vos propres commandes'
 				}, status=status.HTTP_403_FORBIDDEN)
 
+			closed = closed_order_response(delivery)
+			if closed:
+				return closed
 			from payments.direct_service import can_courier_accept_collection
 			if not can_courier_accept_collection(request.user, delivery.order):
 				return Response({
@@ -799,6 +815,9 @@ class DeliveryProofUploadView(APIView):
 					'error': f"Impossible d'uploader la preuve. Statut actuel: {delivery.get_status_display()}"
 				}, status=status.HTTP_400_BAD_REQUEST)
 			
+			closed = closed_order_response(delivery)
+			if closed:
+				return closed
 			# Extraire les données
 			id_card_photo = request.FILES.get('id_card_photo')  # OBLIGATOIRE
 			package_photo = request.FILES.get('package_photo')   # OPTIONNELLE
@@ -813,6 +832,24 @@ class DeliveryProofUploadView(APIView):
 			# sinon le commerce et le livreur ne seraient jamais payés par la confirmation du client.
 			client_received_status = False
 			
+			# Vérifier le PIN d'abord, avec la limite d'essais (sinon un PIN faux n'était jamais compté)
+			if pin_code:
+				from delivery import pin_guard
+				if pin_guard.is_locked(delivery):
+					return Response({'success': False, 'error': {'code': 'pin_locked', 'message': pin_guard.locked_message()}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+				if pin_code.strip() == delivery.delivery_code.strip():
+					pin_guard.reset(delivery)
+					delivery.code_verified = True
+				else:
+					pin_guard.record_failure(delivery)
+					return Response({
+						'success': False,
+						'error': {
+							'code': 'invalid_pin',
+							'message': 'Code PIN incorrect'
+						}
+					}, status=status.HTTP_400_BAD_REQUEST)
+			
 			# Préparer les données pour validation
 			proof_data = {
 				'id_card_photo': id_card_photo,  # OBLIGATOIRE
@@ -821,7 +858,7 @@ class DeliveryProofUploadView(APIView):
 				'longitude': longitude,
 				'signature': signature,
 				'pin_code': pin_code,
-				'pin_verified': False,
+				'pin_verified': bool(pin_code) and delivery.code_verified,
 				'client_received_status': client_received_status
 			}
 			
@@ -837,25 +874,6 @@ class DeliveryProofUploadView(APIView):
 						'details': errors
 					}
 				}, status=status.HTTP_400_BAD_REQUEST)
-			
-			# Vérifier le PIN si fourni
-			if pin_code:
-				from delivery import pin_guard
-				if pin_guard.is_locked(delivery):
-					return Response({'success': False, 'error': {'code': 'pin_locked', 'message': pin_guard.locked_message()}}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-				if pin_code.strip() == delivery.delivery_code.strip():
-					pin_guard.reset(delivery)
-					delivery.code_verified = True
-					proof_data['pin_verified'] = True
-				else:
-					pin_guard.record_failure(delivery)
-					return Response({
-						'success': False,
-						'error': {
-							'code': 'invalid_pin',
-							'message': 'Code PIN incorrect'
-						}
-					}, status=status.HTTP_400_BAD_REQUEST)
 			
 			# Enregistrer sur le modèle Delivery (rétrocompatibilité)
 			delivery.proof_latitude = latitude
@@ -1084,6 +1102,9 @@ class DeliveryStartView(APIView):
 					'error': 'Vous ne pouvez démarrer que vos propres livraisons'
 				}, status=status.HTTP_403_FORBIDDEN)
 			
+			closed = closed_order_response(delivery)
+			if closed:
+				return closed
 			# Vérifier que la transition de statut est valide
 			# Le livreur doit d'abord passer par 'picked_up' avant 'in_transit'
 			next_status = 'picked_up' if delivery.status == 'accepted' else 'in_transit'
@@ -1125,11 +1146,11 @@ class DeliveryStartView(APIView):
 			delivery.save()
 			
 			# Mettre à jour la commande en conséquence
-			if delivery.status == 'picked_up':
-				delivery.order.status = 'preparing'  # Le colis est récupéré mais pas encore en route
-			else:
+			# Colis récupéré ou en route : la commande reste « en route » (revenir à « en préparation »
+			# permettait au commerce de l'annuler alors que le livreur a déjà le colis).
+			if delivery.order.status != 'in_transit':
 				delivery.order.status = 'in_transit'
-			delivery.order.save()
+				delivery.order.save()
 			
 			# Message adapté selon le statut
 			if delivery.status == 'picked_up':
@@ -1219,6 +1240,9 @@ class DeliveryCompleteView(APIView):
 					'error': 'Vous ne pouvez confirmer que vos propres livraisons'
 				}, status=status.HTTP_403_FORBIDDEN)
 			
+			closed = closed_order_response(delivery)
+			if closed:
+				return closed
 			# Vérifier la preuve de livraison (OBLIGATOIRE)
 			can_deliver, reason = can_mark_as_delivered(delivery)
 			if not can_deliver:
@@ -1395,7 +1419,7 @@ class DeliveryCalculatePriceView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
 	
 	def post(self, request):
-		serializer = DeliveryCalculatePriceSerializer(data=request.data)
+		serializer = DeliveryCalculatePriceSerializer(data=request.data, context={'request': request})
 		
 		if not serializer.is_valid():
 			return Response({
@@ -1440,7 +1464,7 @@ class DeliveryValidateVehicleView(APIView):
 	permission_classes = [permissions.IsAuthenticated]
 	
 	def post(self, request):
-		serializer = DeliveryValidateVehicleSerializer(data=request.data)
+		serializer = DeliveryValidateVehicleSerializer(data=request.data, context={'request': request})
 		
 		if not serializer.is_valid():
 			return Response({

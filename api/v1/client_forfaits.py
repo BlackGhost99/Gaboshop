@@ -1,5 +1,6 @@
 """API des forfaits clients : catalogue, forfait en cours, souscription par Airtel Money / Moov Money."""
 from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -56,8 +57,12 @@ class ForfaitSubscribeView(APIView):
         forfait = Forfait.objects.filter(id=request.data.get('forfait_id'), is_active=True).first()
         if forfait is None:
             return _error('Forfait introuvable.', 404)
-        amount = int(forfait.monthly_price or 0)
-        if amount <= 0:
+        # FCFA sans centimes : arrondi au franc entier (jamais tronqué).
+        price = Decimal(str(forfait.monthly_price or 0))
+        amount = int(price.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+        if price > 0 and amount <= 0:
+            return _error('Prix du forfait invalide : contactez le support Gaboshop.')
+        if price <= 0:
             current = activate_forfait(request.user, forfait)
             return Response({'success': True, 'message': f'Forfait « {forfait.name} » activé.',
                              'data': {'expires_at': current.expiration_date}})

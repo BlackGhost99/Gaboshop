@@ -7,7 +7,7 @@ from django.utils.decorators import method_decorator
 from django.utils import timezone
 from django.conf import settings
 from django.db import transaction as db_transaction
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from payments.models import Payment
@@ -135,15 +135,17 @@ class PaymentInitView(APIView):
 
                 real_fee_rate = self._get_mobile_money_fee_rate(payment_method)
                 order.payment_fees = Decimal('0.00')
-                order.calculate_totals(operator=operator, payment_method='mobile_money')
+                # Montants figés à la commande : livraison et commission ne sont pas recalculées au paiement
+                # (un commerce ne peut pas augmenter ses frais après coup). Seuls les frais opérateur changent.
                 total_mobile_money_fees = (
                     (order.items_total + order.delivery_fee) * real_fee_rate / Decimal('100')
-                ).quantize(Decimal('0.01'))
+                ).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
                 order.operator_fee = total_mobile_money_fees
+                # FCFA sans centimes : SingPay débite un montant en francs entiers.
                 order.total_amount = (
-                    order.items_total + order.delivery_fee + order.operator_fee + order.tax_amount + order.payment_fees
-                    - order.applied_forfait_discount()
-                )
+                    order.items_total + order.delivery_fee + order.operator_fee + Decimal(order.tax_amount or 0)
+                    + order.payment_fees - order.applied_forfait_discount()
+                ).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
                 order.save(update_fields=['payment_fees', 'operator_fee', 'total_amount', 'updated_at'])
 
                 # Générer une référence transaction interne

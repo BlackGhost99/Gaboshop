@@ -3,7 +3,7 @@ import requests
 import json
 from django.db import transaction
 from django.utils import timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from payments.models import Payment, Commission, Reversement, DeliveryPayout
 from orders.models import Order
@@ -14,6 +14,14 @@ from payments.configuration import platform_online_ready
 from payments.references import base_reference
 
 logger = logging.getLogger(__name__)
+
+
+class PayoutProviderError(Exception):
+    """Erreur renvoyée par SingPay lors d'un transfert (réponse gardée pour juger l'issue)."""
+
+    def __init__(self, message, response=None):
+        super().__init__(message)
+        self.response = response
 
 
 def _build_singpay_error_message(response):
@@ -472,8 +480,7 @@ class PaymentService:
             return {'error': 'Paiement non trouvé'}
 
     @staticmethod
-    @transaction.atomic
-    def payout_delivery_agent(delivery):
+    def payout_delivery_agent(delivery, admin_override=False, admin_retry=False):
         """
         Verse au livreur sa part (SingPay /transfer) quand le client a confirmé la réception.
 
@@ -481,9 +488,24 @@ class PaymentService:
         part de ce paiement. Idempotent : un versement déjà lancé ou terminé n'est jamais relancé.
         Quand le versement ne peut pas partir (numéro Mobile Money pas encore activé, transferts
         automatiques coupés), il reste « en attente » avec la raison, et le livreur est prévenu.
+        L'état « processing » est validé en base avant l'appel SingPay (pas de transaction englobante).
+        Une issue inconnue (délai dépassé...) n'est jamais relancée automatiquement : elle est d'abord
+        rapprochée avec SingPay, et seul l'admin (``admin_retry``) peut renvoyer si aucun transfert n'existe.
+        ``admin_override`` : litige client vérifié par l'admin.
         """
         from payments.direct_service import store_delivers
         from payments.references import paid_reference
+        from payments.store_payout_service import (
+            VERIFY_NOTE, _provider_amount, find_transfer, payout_blocked, transfer_error_is_certain,
+        )
+
+        def to_verify(p):
+            return p.status == 'failed' and (p.note or '').startswith(VERIFY_NOTE)
+
+        def already(p):
+            return {'success': True, 'payment': p, 'amount': p.calculated_payout,
+                    'transaction_id': None, 'already_processed': True,
+                    'message': 'Paiement livreur déjà initié ou terminé'}
 
         order = delivery.order
         if delivery.status != 'delivered' or order.status in ('cancelled', 'refunded'):
@@ -499,13 +521,20 @@ class PaymentService:
         agent = delivery.delivery_agent
         if not agent:
             return {'success': False, 'error': 'Livreur non assigne'}
-        amount = delivery.agent_commission or Decimal('0')
+        # FCFA sans centimes : franc entier
+        amount = Decimal(delivery.agent_commission or 0).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
         if amount <= 0:
             logger.warning("Pas de commission pour livraison %s", delivery.id)
             return {'success': False, 'error': 'Aucune commission a payer'}
 
         disbursement_id = (agent.singpay_disbursement_id or '').strip()
+        reference = paid_reference(paid)
         with transaction.atomic():
+            # Verrou sur la commande : deux déclenchements simultanés ne créent qu'un seul versement.
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            blocked = payout_blocked(locked, admin_override)
+            if blocked:
+                return {'success': False, 'error': blocked}
             payout, created = DeliveryPayout.objects.select_for_update().get_or_create(
                 order=order, delivery_agent=agent,
                 defaults={
@@ -515,9 +544,34 @@ class PaymentService:
                 },
             )
             if payout.status in ('completed', 'processing'):
-                return {'success': True, 'payment': payout, 'amount': payout.calculated_payout,
-                        'transaction_id': None, 'already_processed': True,
-                        'message': 'Paiement livreur déjà initié ou terminé'}
+                return already(payout)
+            verify = to_verify(payout)
+
+        if verify:
+            # Le transfert a peut-être eu lieu : on demande d'abord à SingPay.
+            found = find_transfer(reference, disbursement_id, payout.calculated_payout)
+            with transaction.atomic():
+                payout = DeliveryPayout.objects.select_for_update().get(pk=payout.pk)
+                if not to_verify(payout):
+                    return already(payout)
+                if found == 'paid':
+                    payout.status, payout.note, payout.paid_at = 'completed', 'Transfert retrouvé chez SingPay', timezone.now()
+                    payout.save(update_fields=['status', 'note', 'paid_at'])
+                    return already(payout)
+                if not (found == 'absent' and admin_retry):
+                    return {'success': False, 'pending': True, 'payment': payout, 'amount': payout.calculated_payout,
+                            'transaction_id': None, 'message': payout.note}
+                payout.note = 'Aucun transfert trouvé chez SingPay : relance par l’admin'
+                payout.save(update_fields=['note'])
+
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            blocked = payout_blocked(locked, admin_override)
+            if blocked:
+                return {'success': False, 'error': blocked}
+            payout = DeliveryPayout.objects.select_for_update().get(pk=payout.pk)
+            if payout.status in ('completed', 'processing') or to_verify(payout):
+                return already(payout)
             if not disbursement_id:
                 note = 'Numéro Mobile Money du livreur pas encore activé pour les versements'
             elif not getattr(settings, 'SINGPAY_ENABLE_TRANSFER', False):
@@ -534,25 +588,35 @@ class PaymentService:
                         'transaction_id': None, 'message': note}
             payout.status, payout.note = 'processing', ''
             payout.save(update_fields=['status', 'note'])
+            amount_to_send = _provider_amount(Decimal(payout.calculated_payout))
 
-        # Appel fournisseur hors transaction : l'état « processing » bloque déjà un second versement.
+        # Appel fournisseur hors transaction : l'état « processing » est déjà validé en base.
         try:
             api_result = PaymentService._call_airtel_payout_api(
-                amount=float(amount), delivery=delivery, agent=agent,
-                disbursement_id=disbursement_id, reference=paid_reference(paid),
+                amount=amount_to_send, delivery=delivery, agent=agent,
+                disbursement_id=disbursement_id, reference=reference,
             )
-            payout.status, payout.note, payout.paid_at = 'completed', '', timezone.now()
-            payout.save(update_fields=['status', 'note', 'paid_at'])
-            NotificationService.notify_delivery_payout(payout, delivery)
-            return {'success': True, 'payment': payout, 'amount': amount, 'phone': agent.phone,
-                    'transaction_id': api_result.get('transaction_id'),
-                    'message': api_result.get('message', 'Payout SingPay initie')}
         except Exception as e:
             logger.error("Erreur payout livreur: %s", e)
-            payout.status, payout.note = 'failed', str(e)[:255]
-            payout.save(update_fields=['status', 'note'])
+            if isinstance(e, PayoutProviderError):
+                certain = transfer_error_is_certain(e.response)
+            else:
+                certain = transfer_error_is_certain(None, e)
+            with transaction.atomic():
+                payout = DeliveryPayout.objects.select_for_update().get(pk=payout.pk)
+                payout.status = 'failed'
+                payout.note = str(e)[:255] if certain else f'{VERIFY_NOTE} ({e})'[:255]
+                payout.save(update_fields=['status', 'note'])
             NotificationService.notify_delivery_payout(payout, delivery)
             return {'success': False, 'error': f'Erreur payout: {str(e)}'}
+        with transaction.atomic():
+            payout = DeliveryPayout.objects.select_for_update().get(pk=payout.pk)
+            payout.status, payout.note, payout.paid_at = 'completed', '', timezone.now()
+            payout.save(update_fields=['status', 'note', 'paid_at'])
+        NotificationService.notify_delivery_payout(payout, delivery)
+        return {'success': True, 'payment': payout, 'amount': amount, 'phone': agent.phone,
+                'transaction_id': api_result.get('transaction_id'),
+                'message': api_result.get('message', 'Payout SingPay initie')}
 
     @staticmethod
     def _call_airtel_payout_api(amount, delivery, agent, disbursement_id, reference=None):
@@ -571,8 +635,10 @@ class PaymentService:
                 portefeuille=getattr(settings, "SINGPAY_WALLET_ID", ""),
             )
 
+            if not isinstance(response, dict):
+                raise PayoutProviderError("Réponse invalide", None)
             if response.get("error"):
-                raise Exception(response["error"])
+                raise PayoutProviderError(response["error"], response)
 
             return {
                 'transaction_id': response.get('transaction_id') or reference,

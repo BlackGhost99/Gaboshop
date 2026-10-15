@@ -54,7 +54,7 @@ def with_order_display_relations(queryset):
     """
     return queryset.select_related(
         'store', 'client', 'delivery', 'delivery__proof',
-        'payment_arrangement', 'payment_arrangement__store',
+        'payment_arrangement', 'payment_arrangement__store', 'payment', 'store_payout',
     ).prefetch_related(
         'items__product',
         'payment_arrangement__obligations__receipts',
@@ -99,13 +99,9 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
 
     def get_store_can_cancel(self, obj):
-        """Le commerce ne peut plus annuler une commande payée qui est en route vers le client."""
-        if obj.status in ('delivered', 'cancelled', 'refunded'):
-            return False
-        if obj.status in ('assigned', 'in_transit'):
-            from api.v1.orders import _client_has_paid
-            return not _client_has_paid(obj)
-        return True
+        """Le commerce ne peut plus annuler une commande payée (seul l'admin annule et rembourse)."""
+        from api.v1.orders import store_can_cancel
+        return store_can_cancel(obj)
 
     def _get_delivery(self, obj):
         return getattr(obj, 'delivery', None)

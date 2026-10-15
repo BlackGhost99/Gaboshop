@@ -289,8 +289,9 @@ class Delivery(models.Model):
 			self.tracking_number = f"TRK{''.join(random.choices(string.ascii_uppercase + string.digits, k=10))}"
 		
 		if not self.delivery_code:
-			import random
-			self.delivery_code = ''.join(random.choices('0123456789', k=6))
+			import secrets
+			# Code PIN imprévisible (secrets, pas random) : c'est la preuve de remise au client.
+			self.delivery_code = ''.join(secrets.choice('0123456789') for _ in range(6))
         
 		super().save(*args, **kwargs)
 

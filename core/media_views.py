@@ -1,4 +1,6 @@
 """Sert les fichiers envoyés : d'abord depuis la base, sinon depuis le disque."""
+import posixpath
+
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.static import serve
@@ -20,8 +22,16 @@ def serve_media(request, path):
     from django.http import Http404
     from core.models import StoredFile
     from core.storage import PRIVATE_PREFIXES
+    # Chemin normalisé AVANT le contrôle : « ./delivery_proofs/… » ou « //delivery_proofs/… »
+    # ne doivent pas contourner le préfixe privé ; « .. » est refusé.
+    raw = (path or '').replace('\\', '/')
+    if '..' in raw.split('/') or '\x00' in raw:
+        raise Http404
+    path = posixpath.normpath(raw).lstrip('/')
+    if path in ('', '.') or path.startswith('..'):
+        raise Http404
     # Photos de preuve et pièces d'identité : jamais par lien public (voir ProofPhotoView).
-    if path.lstrip('/').startswith(PRIVATE_PREFIXES) or '..' in path:
+    if path.startswith(PRIVATE_PREFIXES):
         raise Http404
     obj = StoredFile.objects.filter(name=path).first()
     if obj is not None:
