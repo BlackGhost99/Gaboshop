@@ -93,6 +93,21 @@ def check(site):
     except Exception:
         pass
     lines.append(f"- API magasins : **{res['status']}** en {res['seconds']} s{count}")
+    # Images publiques (logos, photos) toujours servies ; justificatifs privés jamais (15 oct.).
+    try:
+        found = re.findall(r'"(?:logo|banner|image|cover_image)"\s*:\s*"([^"]+)"', res['body'].decode('utf-8', 'replace'))
+        image = next((u for u in found if '/media/' in u), None)
+        if image:
+            url = image if image.startswith('http') else api + image
+            lines.append(f"- Image publique d'un magasin : **{fetch(url, attempts=1)['status']}**")
+        else:
+            lines.append("- Image publique d'un magasin : aucune trouvée dans la liste")
+    except Exception as exc:
+        lines.append(f"- Image publique d'un magasin : erreur {exc}")
+    old_proof = fetch(f'{api}/media/payments/receipt_proofs/test.png', attempts=1)['status']
+    new_view = fetch(f'{api}/api/v1/payments/receipts/1/proof/', attempts=1)['status']
+    lines.append(f"- Ancienne adresse de justificatif sans connexion : **{old_proof}** (attendu 404) ; "
+                 f"téléchargement réservé sans connexion : **{new_view}** (attendu 401)")
     lines.append(f"- Autorisation CORS pour {web} : `{cors}`")
     if res['status'] != 200:
         lines.append(f"  - Réponse : `{short(res['body'])}`")
