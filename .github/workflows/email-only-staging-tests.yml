@@ -1,0 +1,43 @@
+name: E-mail gratuit (staging)
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'settings.py'
+      - 'users/password_reset.py'
+      - 'notifications/service.py'
+      - 'notifications/email.py'
+      - 'notifications/test_email_only_2026_10_16.py'
+      - 'frontend/src/pages/Register.jsx'
+      - '.github/workflows/email-only-staging-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DJANGO_SECRET_KEY: email-staging-ci-only-testing-2026
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py test notifications.test_email_only_2026_10_16 --noinput -v 2
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
