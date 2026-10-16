@@ -56,15 +56,38 @@ def invoice_context(order):
         lines.append(('Réduction forfait (offerte par Gaboshop)', '-' + _money(discount)))
 
     payment = []
+    payment_state = 'À confirmer'
+    payment_is_paid = False
     arrangement = getattr(order, 'payment_arrangement', None)
     if arrangement is not None:
-        payment.append(('Mode de paiement', arrangement.get_flow_display()))
+        payment.append(('Circuit de paiement', arrangement.get_flow_display()))
         payment.append(('Moyen', METHOD_LABELS.get(arrangement.method, arrangement.method)))
-        for obligation in arrangement.obligations.filter(payer='client'):
+        obligations = list(arrangement.obligations.filter(payer='client'))
+        for obligation in obligations:
             payment.append((obligation.get_kind_display(), f"{_money(obligation.amount)} — {obligation.get_status_display()}"))
+        # Ne jamais faire passer une facture de commande pour un reçu de paiement.
+        # Dans les circuits directs, plusieurs obligations distinctes peuvent rester impayées.
+        statuses = [o.status for o in obligations if o.amount > 0]
+        if statuses:
+            if all(s in ('paid', 'waived') for s in statuses):
+                payment_state, payment_is_paid = 'Règlement confirmé', True
+            elif any(s in ('partially_paid', 'paid') for s in statuses):
+                payment_state = 'Partiellement réglé'
+            elif all(s in ('refunded', 'partially_refunded', 'cancelled') for s in statuses):
+                payment_state = 'Annulé ou remboursé'
+            else:
+                payment_state = 'En attente de règlement'
     online = getattr(order, 'payment', None)
     if online is not None:
         payment.append(('Paiement en ligne', f"{_money(online.amount)} — {online.get_status_display()}"))
+        if online.status == 'success':
+            payment_state, payment_is_paid = 'Règlement confirmé', True
+        elif online.status == 'refunded':
+            payment_state, payment_is_paid = 'Remboursé', False
+        elif online.status in ('pending', 'processing'):
+            payment_state, payment_is_paid = 'En attente de confirmation', False
+        elif online.status in ('failed', 'cancelled'):
+            payment_state, payment_is_paid = 'Non réglé', False
         if online.transaction_id:
             payment.append(('Référence transaction', online.transaction_id))
         if online.operator_reference:
@@ -109,7 +132,9 @@ def invoice_context(order):
                   'category': store.category.name if store.category_id else ''},
         'client': {'name': client.get_full_name() or client.phone, 'phone': client.phone, 'email': client.email},
         'items': items, 'lines': lines, 'total': _money(order.total_amount),
-        'payment': payment, 'delivery': delivery, 'notes': order.notes,
+        'payment': payment, 'payment_state': payment_state, 'payment_is_paid': payment_is_paid,
+        'delivery_requested': order.delivery_requested,
+        'delivery': delivery, 'notes': order.notes,
         'problem': order.client_problem,
     }
 
