@@ -1,0 +1,32 @@
+name: Jour 1 — vérification du projet juridique
+on:
+  push:
+    branches: [audit/jour1-gaboshop-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  front-and-texts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérifier les anciennes affirmations contractuelles
+        run: |
+          if grep -q "n'encaisse pas l'argent des commandes" frontend/src/pages/legal/CGU.jsx; then
+            echo "::error::Ancienne clause paiement non corrigée"
+            exit 1
+          fi
+          if grep -q "CNPDCP" frontend/src/pages/legal/Confidentialite.jsx; then
+            echo "::error::Ancienne autorité de protection des données"
+            exit 1
+          fi
+          grep -q "n°025/2021" frontend/src/pages/legal/CGU.jsx
+          grep -q "n°025/2023" frontend/src/pages/legal/Confidentialite.jsx
+      - name: Installer les dépendances
+        run: npm ci --prefix frontend
+      - name: Compiler l'application
+        run: npm run build --prefix frontend
