@@ -1,9 +1,11 @@
 """Pointure/couleur choisies par le client et facture PDF Gaboshop (16 oct. 2026)."""
 from datetime import time
+from io import BytesIO
 from decimal import Decimal
 from unittest import mock
 
 from django.core.cache import cache
+from pypdf import PdfReader
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -70,11 +72,19 @@ class ChoixEtFactureTests(TestCase):
         self.assertEqual(pdf.status_code, 200, pdf.content[:300])
         self.assertEqual(pdf['Content-Type'], 'application/pdf')
         self.assertTrue(pdf.content.startswith(b'%PDF'))
+        # Une commande simple ne doit pas créer une deuxième page quasi vide.
+        reader = PdfReader(BytesIO(pdf.content))
+        self.assertEqual(len(reader.pages), 1, 'La facture simple doit tenir sur une page A4')
+        extracted = reader.pages[0].extract_text()
+        self.assertIn('72 000', extracted)
+        self.assertIn('Timberland', extracted)
 
         from orders.invoice import invoice_context
         ctx = invoice_context(order)
         self.assertEqual(ctx['number'], f'FAC-{order.order_number}')
         self.assertEqual(ctx['items'][0]['options'], 'Taille 42 · Marron')
+        self.assertFalse(ctx['payment_is_paid'], "Ne pas indiquer payé sans confirmation")
+        self.assertNotEqual(ctx['payment_state'], 'Règlement confirmé')
 
         store_api = APIClient()
         store_api.force_authenticate(self.manager)
