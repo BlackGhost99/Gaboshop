@@ -5,7 +5,7 @@
 <style>
   @page {
     size: A4;
-    margin: 12mm 13mm 15mm 13mm;
+    margin: 10mm 13mm 13mm 13mm;
     @frame footer { -pdf-frame-content: page_footer; bottom: 4mm; left: 13mm; right: 13mm; height: 9mm; }
   }
   body { font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #1e293b; }
@@ -19,7 +19,7 @@
   .title { font-size: 17pt; font-weight: bold; color: #0f172a; }
   .ref { font-weight: bold; color: #0f172a; font-size: 9.3pt; }
   .right { text-align: right; }
-  .section { color: #334155; font-size: 9.3pt; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin: 10px 0 5px; }
+  .section { color: #334155; font-size: 9.3pt; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin: 8px 0 4px; }
   .parties td { border: 1px solid #e2e8f0; padding: 8px 9px; width: 50%; }
   .partytitle { color: #4f46e5; font-size: 7.5pt; font-weight: bold; margin-bottom: 4px; }
   .name { font-size: 10pt; font-weight: bold; color: #0f172a; }
@@ -44,7 +44,11 @@
 <table class="plain">
   <tr>
     <td style="width: 57%;">
+      {% if logo_data_uri %}
+      <img src="{{ logo_data_uri }}" width="168" height="56" alt="Gaboshop" />
+      {% else %}
       <div class="brand">{{ brand|upper }}</div>
+      {% endif %}
       <div class="eyebrow">Marketplace &amp; livraison - Gabon</div>
       {% if company_name and company_name != brand %}<div class="small">{{ company_name }}</div>{% endif %}
       {% if company_ids %}<div class="small">{{ company_ids }}</div>{% endif %}
