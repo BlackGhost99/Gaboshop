@@ -62,6 +62,10 @@ services:
       # tout seul après quelques secondes ; un numéro finissant par 99 est refusé. Versements simulés aussi.
       - key: PAYMENTS_SIMULATED
         value: "1"
+      # Doit rester à 0 : une ancienne valeur « 1 » (époque « paiements coupés ») ferait passer la coupure
+      # avant la simulation, et l'abonnement à un plan échouerait. Jamais sur la production.
+      - key: PAYMENTS_DISABLED
+        value: "0"
       - key: SINGPAY_ENABLE_TRANSFER
         value: "False"
       # Adresse publique de l'API SingPay (pas un secret). Les clés SINGPAY_CLIENT_ID,
