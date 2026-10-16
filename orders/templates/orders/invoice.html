@@ -3,85 +3,154 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 1.4cm 1.3cm 1.6cm 1.3cm;
-          @frame footer { -pdf-frame-content: footer; bottom: 0.6cm; margin-left: 1.3cm; margin-right: 1.3cm; height: 0.8cm; } }
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 9.5pt; color: #1f2937; }
-  .brand { font-size: 22pt; font-weight: bold; color: #4f46e5; }
-  .muted { color: #6b7280; font-size: 8.5pt; }
-  h2 { font-size: 11pt; color: #111827; margin: 14px 0 4px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; }
+  @page {
+    size: A4;
+    margin: 12mm 13mm 15mm 13mm;
+    @frame footer { -pdf-frame-content: page_footer; bottom: 5mm; left: 13mm; right: 13mm; height: 6mm; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #1e293b; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #eef2ff; color: #3730a3; text-align: left; padding: 5px; font-size: 8.5pt; }
-  td { padding: 5px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  td, th { vertical-align: top; }
+  .plain td { border: none; padding: 0; }
+  .brand { color: #4338ca; font-size: 21pt; font-weight: bold; }
+  .eyebrow { font-size: 7pt; color: #64748b; }
+  .small { font-size: 7.7pt; }
+  .label { color: #64748b; font-size: 7pt; }
+  .title { font-size: 17pt; font-weight: bold; color: #0f172a; }
+  .ref { font-weight: bold; color: #0f172a; font-size: 9.3pt; }
   .right { text-align: right; }
-  .total td { font-size: 12pt; font-weight: bold; color: #111827; border-top: 2px solid #4f46e5; }
-  .box { border: 1px solid #e5e7eb; padding: 6px; }
-  .help { background: #fff7ed; border: 1px solid #fed7aa; padding: 8px; margin-top: 12px; }
+  .section { color: #334155; font-size: 9.3pt; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin: 10px 0 5px; }
+  .parties td { border: 1px solid #e2e8f0; padding: 8px 9px; width: 50%; }
+  .partytitle { color: #4f46e5; font-size: 7.5pt; font-weight: bold; margin-bottom: 4px; }
+  .name { font-size: 10pt; font-weight: bold; color: #0f172a; }
+  .status td { padding: 6px 8px; background: #f1f5f9; border: 1px solid #e2e8f0; }
+  .statusname { font-size: 7pt; color: #64748b; }
+  .statusvalue { font-size: 8.5pt; font-weight: bold; color: #0f172a; }
+  .items th { background: #1e293b; color: white; padding: 6px; font-size: 7.6pt; }
+  .items td { padding: 6px; border-bottom: 1px solid #e2e8f0; }
+  .items tbody tr:nth-child(even) { background: #f8fafc; }
+  .money td { padding: 3px 6px; border-bottom: 1px solid #f1f5f9; }
+  .money .grand td { padding: 9px 7px; background: #eef2ff; border-top: 2px solid #4f46e5; font-size: 11pt; font-weight: bold; color: #1e1b4b; }
+  .details td { padding: 3px 4px; border-bottom: 1px solid #f1f5f9; }
+  .details .key { width: 28%; color: #64748b; font-size: 7.7pt; }
+  .details .value { font-size: 8pt; }
+  .help { border: 1px solid #c7d2fe; background: #eef2ff; padding: 8px 10px; margin-top: 10px; font-size: 7.6pt; }
+  .help b { color: #3730a3; }
+  .footer { color: #64748b; font-size: 7pt; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 3px; }
+  .note { color: #64748b; font-size: 7.3pt; }
 </style>
 </head>
 <body>
-<table>
+<table class="plain">
   <tr>
-    <td style="border:none; width:55%;">
-      <div class="brand">{{ brand }}</div>
-      <div class="muted">{{ company_name }}{% if company_ids %} · {{ company_ids }}{% endif %}</div>
-      {% if company_address %}<div class="muted">{{ company_address }}</div>{% endif %}
-      {% if support %}<div class="muted">Support : {{ support }}</div>{% endif %}
+    <td style="width: 57%;">
+      <div class="brand">{{ brand|upper }}</div>
+      <div class="eyebrow">Marketplace &amp; livraison - Gabon</div>
+      {% if company_name and company_name != brand %}<div class="small">{{ company_name }}</div>{% endif %}
+      {% if company_ids %}<div class="small">{{ company_ids }}</div>{% endif %}
+      {% if company_address %}<div class="eyebrow">{{ company_address }}</div>{% endif %}
     </td>
-    <td style="border:none;" class="right">
-      <div style="font-size:15pt; font-weight:bold;">FACTURE</div>
-      <div><b>N° {{ number }}</b></div>
-      <div class="muted">Commande {{ order_number }} du {{ ordered_at }}</div>
-      <div class="muted">Émise le {{ issued_at }}</div>
-      <div class="muted">Statut : {{ status }}</div>
+    <td class="right" style="width: 43%;">
+      <div class="title">FACTURE</div>
+      <div class="ref">N° {{ number }}</div>
+      <div class="eyebrow">Commande {{ order_number }}</div>
+      <div class="eyebrow">Date de commande : {{ ordered_at }}</div>
+      <div class="eyebrow">Édition : {{ issued_at }}</div>
     </td>
   </tr>
 </table>
 
-<table style="margin-top:12px;">
+<table class="status" style="margin-top: 11px;">
   <tr>
-    <td class="box" style="width:50%;">
-      <b>Vendeur</b><br>{{ store.name }}{% if store.category %} ({{ store.category }}){% endif %}<br>
-      {% if store.address %}{{ store.address }}<br>{% endif %}{% if store.phone %}Tél. {{ store.phone }}{% endif %}
+    <td style="width: 50%;">
+      <div class="statusname">STATUT DE LA COMMANDE</div>
+      <div class="statusvalue">{{ status }}</div>
     </td>
-    <td class="box">
-      <b>Client</b><br>{{ client.name }}<br>Tél. {{ client.phone }}{% if client.email %}<br>{{ client.email }}{% endif %}
+    <td style="width: 50%;">
+      <div class="statusname">SITUATION DU PAIEMENT</div>
+      <div class="statusvalue">{{ payment_state }}</div>
     </td>
   </tr>
 </table>
 
-<h2>Articles</h2>
-<table>
-  <tr><th>Produit</th><th>Choix</th><th class="right">Qté</th><th class="right">Prix unitaire</th><th class="right">Total</th></tr>
-  {% for item in items %}
-  <tr><td>{{ item.name }}</td><td>{{ item.options|default:"—" }}</td><td class="right">{{ item.quantity }}</td>
-      <td class="right">{{ item.unit_price }}</td><td class="right">{{ item.subtotal }}</td></tr>
+<div class="section">Vendeur et client</div>
+<table class="parties">
+  <tr>
+    <td>
+      <div class="partytitle">VENDEUR</div>
+      <div class="name">{{ store.name }}</div>
+      {% if store.category %}<div class="note">{{ store.category }}</div>{% endif %}
+      {% if store.address %}<div>{{ store.address }}</div>{% endif %}
+      {% if store.phone %}<div class="small">Téléphone : {{ store.phone }}</div>{% endif %}
+    </td>
+    <td>
+      <div class="partytitle">CLIENT</div>
+      <div class="name">{{ client.name }}</div>
+      {% if client.phone %}<div class="small">Téléphone : {{ client.phone }}</div>{% endif %}
+      {% if client.email %}<div class="small">{{ client.email }}</div>{% endif %}
+    </td>
+  </tr>
+</table>
+
+<div class="section">Détail des articles</div>
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width: 35%;">Article</th>
+      <th style="width: 24%;">Taille / couleur / choix</th>
+      <th class="right" style="width: 8%;">Qté</th>
+      <th class="right" style="width: 16%;">Prix unitaire</th>
+      <th class="right" style="width: 17%;">Montant</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td><b>{{ item.name }}</b></td>
+      <td>{{ item.options|default:"-" }}</td>
+      <td class="right">{{ item.quantity }}</td>
+      <td class="right">{{ item.unit_price }}</td>
+      <td class="right"><b>{{ item.subtotal }}</b></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<table class="money" style="margin-top: 7px;">
+  {% for label, amount in lines %}
+    <tr><td style="width: 66%;">{{ label }}</td><td class="right">{{ amount }}</td></tr>
   {% endfor %}
+  <tr class="grand"><td>TOTAL DE LA COMMANDE</td><td class="right">{{ total }}</td></tr>
 </table>
-
-<table style="margin-top:6px;">
-  {% for label, amount in lines %}<tr><td style="width:70%;">{{ label }}</td><td class="right">{{ amount }}</td></tr>{% endfor %}
-  <tr class="total"><td>Total</td><td class="right">{{ total }}</td></tr>
-</table>
+{% if not payment_is_paid %}<p class="note" style="margin-top: 4px;">Ce total ne constitue pas une preuve de règlement. Consultez les statuts détaillés ci-dessous.</p>{% endif %}
 
 {% if payment %}
-<h2>Paiement</h2>
-<table>{% for label, value in payment %}<tr><td style="width:35%;" class="muted">{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}</table>
+<div class="section">Paiement</div>
+<table class="details">
+  {% for label, value in payment %}
+  <tr><td class="key">{{ label }}</td><td class="value">{{ value }}</td></tr>
+  {% endfor %}
+</table>
 {% endif %}
 
-<h2>Livraison</h2>
-<table>{% for label, value in delivery %}<tr><td style="width:35%;" class="muted">{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}</table>
-{% if notes %}<p class="muted">Instructions du client : {{ notes }}</p>{% endif %}
-{% if problem %}<p><b>Problème signalé :</b> {{ problem }}</p>{% endif %}
+<div class="section">{% if delivery_requested %}Livraison et suivi{% else %}Retrait de la commande{% endif %}</div>
+<table class="details">
+  {% for label, value in delivery %}
+  <tr><td class="key">{{ label }}</td><td class="value">{{ value }}</td></tr>
+  {% endfor %}
+</table>
+{% if notes %}<p class="small"><b>Instructions du client :</b> {{ notes }}</p>{% endif %}
+{% if problem %}<p class="small"><b>Problème signalé :</b> {{ problem }}</p>{% endif %}
 
 <div class="help">
-  <b>Un souci avec cette commande ?</b> Dans l'application, ouvrez la commande {{ order_number }} et touchez
-  « Signaler un problème » dans les 48 h après la livraison : le paiement du commerce est alors bloqué jusqu'à
-  vérification par Gaboshop.{% if support %} Vous pouvez aussi joindre le support : {{ support }}.{% endif %}
-  Gardez cette facture et les références de paiement ci-dessus.
+  <b>Besoin d'aide sur cette commande ?</b>
+  Ouvrez « Mes commandes » dans Gaboshop puis « Signaler un problème » sur la commande {{ order_number }}.
+  {% if support %}<br/>Assistance : {{ support }}{% endif %}
+  <br/><span class="note">Document généré à partir des informations enregistrées au moment de l'édition. Le vendeur est le commerce identifié ci-dessus.</span>
 </div>
 
-<div id="footer" class="muted" style="text-align:center;">
-  {{ brand }} · Facture {{ number }} · générée automatiquement, aucune signature requise
+<div id="page_footer" class="footer">
+  {{ brand }} &nbsp; | &nbsp; Commande {{ order_number }} &nbsp; | &nbsp; Page <pdf:pagenumber/>
 </div>
 </body>
 </html>
