@@ -21,6 +21,9 @@ services:
       # Aucun SMS ou WhatsApp sortant payant : e-mail uniquement.
       - key: NOTIFICATION_CHANNEL_MODE
         value: email_only
+      # Le paiement cash à la livraison est réservé aux boutiques qui livrent elles-mêmes.
+      - key: B2C_STORE_COURIER_CASH_ONLY
+        value: "1"
       # Clé API Brevo à configurer directement dans Render Environment.
       - key: BREVO_API_KEY
         sync: false
