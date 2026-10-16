@@ -380,7 +380,6 @@ class OrderStatusUpdateView(APIView):
 def _dispatch_cancel_blocker(order):
     """Empêcher toute annulation administrative silencieuse d'argent reçu ou de course engagée."""
     from payments.models import Payment, PaymentIntent
-    from django.db.models import Q
 
     if order.status in ('cancelled', 'refunded', 'delivered'):
         return 'Commande déjà terminée, annulée ou remboursée.'
@@ -390,6 +389,7 @@ def _dispatch_cancel_blocker(order):
     delivery = getattr(order, 'delivery', None)
     if delivery and (
         delivery.delivery_agent_id
+        or delivery.is_open_to_all
         or delivery.accepted_at
         or delivery.status not in ('waiting', 'pending', 'ready_for_assignment',
                                   'awaiting_delivery_payment', 'pending_vehicle_validation')
@@ -397,7 +397,7 @@ def _dispatch_cancel_blocker(order):
         return 'Un livreur ou un transport a déjà été engagé : vérification manuelle nécessaire.'
 
     payout = getattr(order, 'store_payout', None)
-    if payout and payout.status in ('processing', 'paid'):
+    if payout and payout.status in ('pending', 'processing', 'paid'):
         return 'Un reversement au commerçant existe : rapprochement financier nécessaire.'
 
     if Payment.objects.filter(order=order, status__in=('pending', 'processing', 'success')).exists():
@@ -445,7 +445,7 @@ class OrdersCancelView(APIView):
             blocker = _dispatch_cancel_blocker(order)
             if blocker:
                 return Response({'success': False, 'error': {
-                    'message': 'Annulation automatique refusée.',
+                    'message': 'Annulation refusée.',
                     'reason': blocker,
                     'next_step': 'Vérifiez le paiement et contactez le support Gaboshop avant toute restitution de fonds.',
                 }}, status=409)
