@@ -71,6 +71,9 @@ def send_code_whatsapp(phone, code):
 
 
 def email_available():
+	# Sur Render gratuit, l'e-mail est disponible uniquement via API HTTPS (Brevo).
+	if getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only':
+		return bool(getattr(settings, 'BREVO_API_KEY', ''))
 	return bool(getattr(settings, 'BREVO_API_KEY', '') or getattr(settings, 'EMAIL_HOST_USER', ''))
 
 
