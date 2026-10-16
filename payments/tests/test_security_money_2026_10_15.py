@@ -29,7 +29,9 @@ LOOKUP = 'payments.utils.call_singpay_transfers_by_reference'
 SINGPAY = dict(SINGPAY_CLIENT_ID='id', SINGPAY_CLIENT_SECRET='secret', SINGPAY_WALLET_ID='wallet')
 
 
-@override_settings(**SINGPAY)
+# Ces scénarios historiques couvrent aussi les règlements cash par les livreurs Gaboshop,
+# conservés pour tester la compatibilité des écritures anciennes, mais bloqués au nouveau panier B2C.
+@override_settings(B2C_STORE_COURIER_CASH_ONLY=False, **SINGPAY)
 class MoneyBase(TestCase):
     ONLINE = True
 
