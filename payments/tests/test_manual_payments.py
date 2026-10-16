@@ -16,6 +16,8 @@ from stores.models import Store, StoreCategory
 from users.models import User
 
 
+# Ces tests historiques vérifient des flux espèces hérités, non proposés au pilote B2C.
+@override_settings(B2C_STORE_COURIER_CASH_ONLY=False)
 class ManualPaymentWorkflowTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_user(phone='+24106000001', password='x', user_type='admin', is_staff=True)
