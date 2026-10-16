@@ -94,6 +94,11 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
     policy, options = available_payment_options(order.store, order.delivery_requested, b2b=getattr(order, 'is_b2b', False), user=order.client)
     if flow == 'platform_online':
         delivery_method = STORE_DELIVERY if delivery_method == STORE_DELIVERY else GABOSHOP_DELIVERY
+    # Pour les commandes livrées et payées en espèces, seule une boutique
+    # assurant elle-même les livraisons peut recevoir cet argent.
+    if (not order.is_b2b and flow == 'store_collects_all' and method == 'cash'
+            and order.delivery_requested and order.store.offers_delivery):
+        delivery_method = STORE_DELIVERY
     if not matching_option(options, flow, method, delivery_method if flow == 'platform_online' else ''):
         raise ValidationError('Ce circuit ou moyen de paiement n’est pas autorisé pour ce commerce.')
     if flow != 'platform_online':
@@ -115,7 +120,12 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
     if flow == 'direct_split':
         specs = [('products', 'client', 'store', order.items_total), ('delivery', 'client', 'courier', order.delivery_fee)]
     elif flow == 'store_collects_all':
-        specs = [('products', 'client', 'store', order.items_total), ('delivery_collection', 'client', 'store', order.delivery_fee), ('delivery', 'store', 'courier', courier_part)]
+        specs = [('products', 'client', 'store', order.items_total),
+                 ('delivery_collection', 'client', 'store', order.delivery_fee)]
+        # Le livreur est salarié/partenaire de la boutique : aucun reversement
+        # à un livreur indépendant Gaboshop ne doit être créé par cette commande.
+        if delivery_method != STORE_DELIVERY:
+            specs.append(('delivery', 'store', 'courier', courier_part))
     elif flow == 'courier_cash':
         specs = [('products', 'client', 'courier', order.items_total), ('delivery', 'client', 'courier', order.delivery_fee), ('courier_remittance', 'courier', 'store', order.items_total)]
     else:
@@ -145,7 +155,7 @@ def create_arrangement(order, flow, method, delivery_method=None, user=None):
         order.status = 'confirmed'
         order.confirmed_at = timezone.now()
         order.save(update_fields=['status', 'confirmed_at'])
-        if hasattr(order, 'delivery'):
+        if hasattr(order, 'delivery') and delivery_method != STORE_DELIVERY:
             order.delivery.agent_commission = courier_part
             order.delivery.save(update_fields=['agent_commission'])
     return arrangement
