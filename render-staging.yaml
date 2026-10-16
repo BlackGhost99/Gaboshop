@@ -30,6 +30,12 @@ services:
         value: "0"
       - key: DJANGO_SECRET_KEY
         generateValue: true
+      # Pendant les tests, aucun SMS ni WhatsApp payant : e-mail et notifications internes seulement.
+      - key: NOTIFICATION_CHANNEL_MODE
+        value: email_only
+      # Renseigner la clé gratuitement créée sur Brevo dans Render > Environment.
+      - key: BREVO_API_KEY
+        sync: false
       - key: DJANGO_ALLOWED_HOSTS
         value: .onrender.com
       - key: DJANGO_BEHIND_PROXY
