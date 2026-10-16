@@ -21,7 +21,7 @@ def _invoice_logo_data_uri():
     Le PNG est suivi par Git dans orders/static/orders. Le cache évite
     des lectures répétées du fichier pour chaque facture.
     """
-    logo = finders.find('orders/gaboshop-invoice-logo.png')
+    logo = finders.find('orders/gaboshop-invoice-logo-white.png')
     if not logo:
         return ''
     try:
