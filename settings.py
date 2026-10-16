@@ -338,6 +338,11 @@ _mobile_env = env("DJANGO_MOBILE_APP_ORIGINS", "https://localhost,capacitor://lo
 CORS_ALLOWED_ORIGINS += [o.strip() for o in _mobile_env.split(",") if o.strip() and o.strip() not in CORS_ALLOWED_ORIGINS]
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
+# django-cors-headers n'autorise pas Idempotency-Key par défaut.
+# Le checkout envoie cette clé pour éviter de créer deux fois la même commande.
+# Ajouter uniquement cet en-tête ; conserver la liste d'origines autorisées.
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = (*default_headers, 'idempotency-key')
 
 # CSRF origins follow the same explicit production policy.
 _csrf_env = env("DJANGO_CSRF_TRUSTED_ORIGINS", "")

@@ -11,7 +11,14 @@ print("DB ->", d["ENGINE"].split(".")[-1], "user=%r host=%r port=%r name=%r pass
 PY
 
 # Ne pas arreter le conteneur en silence : afficher le code de sortie (137 = manque de memoire)
-python manage.py migrate --noinput --verbosity 2 2>&1 || echo "MIGRATE ECHEC (code $?)"
+# Sur staging, un schema incomplet ne doit jamais sembler operationnel.
+# En production, garder le comportement historique tant que l'administrateur ne valide pas son evolution.
+if [ "${STAGING_TEST_SHOP:-0}" = "1" ]; then
+  echo "STAGING : migrations obligatoires (arreter le demarrage en cas d'echec)"
+  python manage.py migrate --noinput --verbosity 2
+else
+  python manage.py migrate --noinput --verbosity 2 2>&1 || echo "MIGRATE ECHEC (code $?)"
+fi
 python manage.py createcachetable 2>&1 || echo "CACHE ECHEC (code $?)"
 python manage.py collectstatic --noinput 2>&1 || echo "COLLECTSTATIC ECHEC (code $?)"
 
