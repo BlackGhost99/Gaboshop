@@ -33,3 +33,31 @@ jobs:
         run: python manage.py check
       - name: Tester les adresses et les quartiers
         run: python manage.py test orders.tests.test_adresses_quartiers_2026_10_16 --noinput -v 2
+      - name: Vérifier les quartiers sur l’API Render de staging (lecture seule)
+        run: |
+          python - <<'PY'
+          import json, time, urllib.request
+          url = "https://gaboshop-api-staging-uvn1.onrender.com/api/v1/geo/"
+          for attempt in range(24):
+              try:
+                  with urllib.request.urlopen(url, timeout=100) as response:
+                      payload = json.load(response)
+                  data = payload["data"]
+                  ville = next(x["id"] for x in data["cities"] if x["name"] == "Libreville")
+                  arrs = {a["id"]: a["number"] for a in data["arrondissements"] if a["city_id"] == ville}
+                  quartiers = {q["name"]: q for q in data["neighborhoods"] if q["city_id"] == ville}
+                  attendu = {"Nzeng-Ayong": 6, "Lalala": 5, "Quartier Glass": 4, "Montagne Sainte": 3}
+                  correct = all(name in quartiers and arrs.get(quartiers[name]["arrondissement_id"]) == n
+                                for name, n in attendu.items())
+                  if correct:
+                      print("STAGING OK :", len(quartiers), "quartiers accessibles")
+                      for name, n in attendu.items():
+                          print(f"  {name} -> arrondissement {n}")
+                      break
+                  print("Déploiement géographique en attente :", attempt + 1, "/24", flush=True)
+              except Exception as exc:
+                  print("Staging indisponible :", type(exc).__name__, str(exc)[:120], flush=True)
+              time.sleep(20)
+          else:
+              raise SystemExit("ÉCHEC : les nouveaux quartiers ne sont pas visibles sur staging.")
+          PY
