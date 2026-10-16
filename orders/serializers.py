@@ -135,7 +135,7 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_delivered_by_store(self, obj):
         """Option « tout au commerce » : le commerce livre lui-même cette commande."""
         arrangement = getattr(obj, 'payment_arrangement', None)
-        return bool(arrangement is not None and arrangement.flow == 'platform_online' and arrangement.delivery_method == 'store')
+        return bool(arrangement is not None and obj.delivery_requested and arrangement.delivery_method == 'store')
 
     def get_client_can_confirm(self, obj):
         if self.get_delivered_by_store(obj):
