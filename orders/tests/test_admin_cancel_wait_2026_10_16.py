@@ -82,6 +82,12 @@ class AdminCancellationAndDispatchTests(TestCase):
                                  {'reason': 'Commande trop ancienne'}, format='json')
         self.assertEqual(response.status_code, 409)
 
+    def test_cannot_cancel_when_course_is_open_to_couriers(self):
+        Delivery.objects.filter(order=self.order).update(is_open_to_all=True)
+        response = self.api.post(f'/api/v1/admin/orders/{self.order.id}/cancel/',
+                                 {'reason': 'Commande trop ancienne'}, format='json')
+        self.assertEqual(response.status_code, 409)
+
     def test_client_cannot_use_admin_cancel_endpoint(self):
         self.api.force_authenticate(self.customer)
         response = self.api.post(f'/api/v1/admin/orders/{self.order.id}/cancel/',
