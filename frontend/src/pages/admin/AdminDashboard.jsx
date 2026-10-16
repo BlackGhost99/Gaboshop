@@ -2571,6 +2571,15 @@ const AdminDashboard = () => {
                 />
                 <label className="text-sm text-gray-700">Active</label>
               </div>
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={!!newStoreCat.sells_everything}
+                  onChange={(e) => setNewStoreCat({ ...newStoreCat, sells_everything: e.target.checked })}
+                />
+                <label className="text-sm text-gray-700">Grande surface : vend de tout (hypermarché, supermarché, mall). Chaque produit garde le taux de sa catégorie.</label>
+              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowAddStoreCat(false)} className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white hover:bg-gray-50">Annuler</button>
                 <button type="submit" className="px-3 py-2 text-sm font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Créer</button>
@@ -2622,6 +2631,15 @@ const AdminDashboard = () => {
                   onChange={(e) => setEditingStoreCat({ ...editingStoreCat, is_active: e.target.checked })}
                 />
                 <label className="text-sm text-gray-700">Active</label>
+              </div>
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={!!editingStoreCat.sells_everything}
+                  onChange={(e) => setEditingStoreCat({ ...editingStoreCat, sells_everything: e.target.checked })}
+                />
+                <label className="text-sm text-gray-700">Grande surface : vend de tout (hypermarché, supermarché, mall). Chaque produit garde le taux de sa catégorie.</label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setEditingStoreCat(null)} className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white hover:bg-gray-50">Annuler</button>

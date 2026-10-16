@@ -447,7 +447,14 @@ class StoreProductCategoryListView(ListAPIView):
         store_id = self.kwargs['store_id']
         # Return categories related to the store's StoreCategory
         try:
-            store = Store.objects.get(id=store_id)
+            store = Store.objects.select_related('category').get(id=store_id)
+            if store.category_id and store.category.sells_everything:
+                # Grande surface : toutes les catégories générales, la sienne d'abord.
+                from django.db.models import Case, IntegerField, Q, Value, When
+                return (ProductCategory.objects.filter(Q(store__isnull=True) | Q(store=store))
+                        .annotate(own=Case(When(store_category_id=store.category_id, then=Value(0)), default=Value(1),
+                                           output_field=IntegerField()))
+                        .order_by('own', 'name'))
             return ProductCategory.objects.filter(store_category_id=store.category_id).order_by('order', 'name')
         except Store.DoesNotExist:
             return ProductCategory.objects.none()

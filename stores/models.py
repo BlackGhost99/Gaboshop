@@ -63,6 +63,10 @@ class StoreCategory(models.Model):
 	description = models.TextField(blank=True)
 	icon = models.CharField(max_length=50, blank=True, help_text="Icône FontAwesome ou autre")
 	is_active = models.BooleanField(default=True)
+	sells_everything = models.BooleanField(
+		default=False,
+		help_text="Grande surface (hypermarché, supermarché, mall…) : peut utiliser toutes les catégories de produits, chacune avec son taux",
+	)
     
 	class Meta:
 		verbose_name = "Catégorie de Magasin"

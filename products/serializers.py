@@ -121,13 +121,15 @@ def category_allowed(category, store):
     Sa propre catégorie ou une catégorie générale de son type : toujours. Une catégorie d'un autre type
     (une épicerie qui vend aussi des vêtements) : oui, sauf si elle sert à payer moins de commission,
     c'est-à-dire une catégorie alimentaire pour un commerce non alimentaire (0 % en Business), ou un taux
-    plus bas que celui des catégories de son propre type."""
+    plus bas que celui des catégories de son propre type. Une grande surface (type « vend de tout ») : toutes."""
     if category is None or store is None:
         return True
     if category.store_id:
         return category.store_id == store.id
     if category.store_category_id == store.category_id:
         return True
+    if store.category_id and store.category.sells_everything:
+        return True  # grande surface : chaque produit prend le taux de sa propre catégorie
     from decimal import Decimal
     from payments.subscription_check import SubscriptionChecker
     from products.models import ProductCategory

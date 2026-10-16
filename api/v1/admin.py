@@ -529,6 +529,7 @@ class AdminStoreCategoriesView(APIView):
                 "description": c.description,
                 "icon": c.icon,
                 "is_active": c.is_active,
+                "sells_everything": c.sells_everything,
             }
             for c in qs
         ]
@@ -544,7 +545,8 @@ class AdminStoreCategoriesView(APIView):
                 name=name,
                 description=request.data.get('description', ''),
                 icon=request.data.get('icon', ''),
-                is_active=request.data.get('is_active', True)
+                is_active=request.data.get('is_active', True),
+                sells_everything=str(request.data.get('sells_everything', '')).lower() in ('true', '1', 'on', 'oui'),
             )
         except IntegrityError:
             return Response({"success": False, "message": "Cette catégorie existe déjà"}, status=status.HTTP_400_BAD_REQUEST)
@@ -557,6 +559,7 @@ class AdminStoreCategoriesView(APIView):
                 "description": cat.description,
                 "icon": cat.icon,
                 "is_active": cat.is_active,
+                "sells_everything": cat.sells_everything,
             }
         }, status=status.HTTP_201_CREATED)
 
@@ -578,6 +581,8 @@ class AdminStoreCategoriesView(APIView):
             cat.icon = request.data['icon']
         if 'is_active' in request.data:
             cat.is_active = bool(request.data['is_active'])
+        if 'sells_everything' in request.data:
+            cat.sells_everything = str(request.data['sells_everything']).lower() in ('true', '1', 'on', 'oui')
         
         try:
             cat.save()
@@ -590,6 +595,7 @@ class AdminStoreCategoriesView(APIView):
             "description": cat.description,
             "icon": cat.icon,
             "is_active": cat.is_active,
+            "sells_everything": cat.sells_everything,
         }})
 
     def delete(self, request):
