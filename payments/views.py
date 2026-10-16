@@ -455,7 +455,13 @@ class SubscriptionPaymentIntentAPIView(APIView):
             PaymentTransaction.objects.create(intent=intent, status=intent.status, raw_response=response)
 
         if intent.status == "FAILED":
-            return Response({"detail": "Impossible d'initialiser le paiement"}, status=status.HTTP_400_BAD_REQUEST)
+            from notifications.messages import payment_init_failure
+            failure = payment_init_failure(response)
+            logger.warning("Abonnement : paiement non initialisé (%s) : %s", failure['failure_code'], str(response)[:500])
+            return Response({
+                "detail": f"{failure['message']} {failure['reason']} {failure['next_step']}",
+                "error": failure,
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({
             "success": True,

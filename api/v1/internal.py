@@ -28,6 +28,16 @@ class SchedulerTickView(APIView):
 		return Response({'success': True, 'data': run_due_jobs()})
 
 
+def _payments_mode():
+	"""disabled : coupés (site de test) ; simulated : faux SingPay (site de test) ; real : clés SingPay présentes ; not_configured."""
+	from payments.configuration import payments_simulated, platform_online_ready
+	if getattr(settings, 'PAYMENTS_DISABLED', False):
+		return 'disabled'
+	if payments_simulated():
+		return 'simulated'
+	return 'real' if platform_online_ready() else 'not_configured'
+
+
 class HealthView(APIView):
 	"""GET /api/v1/health/ : état de l'API sans aucune donnée privée (base, minuteur, commandes bloquées)."""
 	permission_classes = [permissions.AllowAny]
@@ -57,6 +67,7 @@ class HealthView(APIView):
 		xff = [p for p in (meta.get('HTTP_X_FORWARDED_FOR') or '').split(',') if p.strip()]
 		ip_source = 'cloudflare' if meta.get('HTTP_CF_CONNECTING_IP') else ('x-forwarded-for' if xff else 'remote_addr')
 		return Response({'success': True, 'data': {
+			'payments_mode': _payments_mode(),
 			'ip_source': ip_source,
 			'forwarded_hops': len(xff),
 			'database': database,

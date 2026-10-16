@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import StoreLayout from '../../components/StoreLayout';
 import api from '../../services/api';
 import useVisibleInterval from '../../hooks/useVisibleInterval';
+import { notifyError, notifySuccess } from '../../utils/feedback';
 
 const SubscriptionPlans = () => {
   const [plans, setPlans] = useState([]);
@@ -45,7 +46,7 @@ const SubscriptionPlans = () => {
     try {
       const isMobileMoney = paymentProvider === 'airtel' || paymentProvider === 'moov';
       if (isMobileMoney && !phoneNumber.trim()) {
-        showToast('Le numéro de téléphone est requis pour Mobile Money', 'error');
+        notifyError({ error: { message: 'Le numéro Mobile Money est requis.', reason: 'Le paiement du plan part sur votre téléphone.', next_step: 'Saisissez votre numéro Airtel ou Moov dans « Mode de paiement », puis recommencez.' } }, { action: 'Activer le plan' });
         setSubscribing(null);
         return;
       }
@@ -62,14 +63,19 @@ const SubscriptionPlans = () => {
         if (intent?.payment_url) {
           window.open(intent.payment_url, '_blank', 'noopener,noreferrer');
         }
-        showToast('Paiement initié. Finalisez le paiement pour activer votre plan.', 'success');
+        notifySuccess(
+          'Demande de paiement envoyée',
+          intent?.payment_url
+            ? 'Finalisez le paiement dans la page qui vient de s\'ouvrir : votre plan s\'active dès qu\'il est confirmé.'
+            : 'Validez le paiement sur votre téléphone avec votre code secret : votre plan s\'active dès qu\'il est confirmé.',
+        );
         setTimeout(() => fetchPlans(), 2500);
       } else {
-        showToast(response.data.detail || response.data.error || 'Erreur lors de la souscription', 'error');
+        notifyError(response.data, { action: 'Activer le plan' });
       }
     } catch (err) {
       console.error('Erreur souscription:', err);
-      showToast(err.response?.data?.detail || err.response?.data?.error || 'Erreur lors de la souscription', 'error');
+      notifyError(err, { action: 'Activer le plan' });
     } finally {
       setSubscribing(null);
     }

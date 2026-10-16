@@ -268,6 +268,29 @@ def payment_failure_code(details):
     return 'unknown'
 
 
+def payment_init_failure(response):
+    """Pourquoi une demande de paiement n'a pas pu partir (abonnement, forfait, mise en avant) : cause et remède."""
+    details = response if isinstance(response, dict) else {'error': str(response or '')}
+    error_text = str(details.get('error') or '').lower()
+    if details.get('disabled'):
+        code = 'disabled'
+        reason = "Les paiements en ligne sont coupés sur ce site de test."
+        next_step = "Aucun argent n'a été demandé. L'administrateur doit retirer le réglage « paiements désactivés » dans Render : le paiement simulé s'activera."
+    elif details.get('missing') or 'manquant' in error_text:
+        code = 'not_configured'
+        reason = "Le paiement en ligne n'est pas encore activé sur ce serveur : les clés SingPay ne sont pas installées."
+        next_step = "Rien n'a été débité. L'administrateur doit saisir les clés SingPay dans Render (vrai site) ou activer le paiement simulé (site de test)."
+    else:
+        # La réponse d'erreur de SingPay détaille souvent la cause (numéro, solde, opérateur).
+        nested = details.get('response') if isinstance(details.get('response'), dict) else {}
+        code = payment_failure_code({**details, 'message': nested.get('message') or details.get('message')})
+        reason, next_step = PAYMENT_FAILURES[code]
+    return {
+        'code': f'payment_init_{code}', 'failure_code': code,
+        'message': "La demande de paiement n'a pas pu être envoyée.", 'reason': reason, 'next_step': next_step,
+    }
+
+
 def payment_failed_for_client(order, payment, details=None):
     code = payment_failure_code(details)
     reason, next_step = PAYMENT_FAILURES[code]
