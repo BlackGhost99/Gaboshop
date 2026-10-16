@@ -105,8 +105,12 @@ class AdressesQuartiersTests(TestCase):
 
     def test_every_seeded_quarter_has_its_arrondissement(self):
         self.assertFalse(Neighborhood.objects.filter(city__name__in=['Libreville', 'Akanda', 'Owendo'],
-                                                     arrondissement__isnull=True).exists())
-        self.assertEqual(Neighborhood.objects.get(city=self.libreville, name='Nzeng-Ayong').arrondissement.number, 5)
+                                                     arrondissement__isnull=True).exclude(city=self.libreville, name__in=['PK10', 'PK11', 'PK12', 'Plaine Orety']).exists())
+        self.assertEqual(Neighborhood.objects.get(city=self.libreville, name='Nzeng-Ayong').arrondissement.number, 6)
+        self.assertEqual(Neighborhood.objects.get(city=self.libreville, name='Lalala').arrondissement.number, 5)
+        self.assertEqual(Neighborhood.objects.get(city=self.libreville, name='Quartier Glass').arrondissement.number, 4)
+        for name in ('PK10', 'PK11', 'PK12', 'Plaine Orety'):
+            self.assertIsNone(Neighborhood.objects.get(city=self.libreville, name=name).arrondissement_id)
         tree = APIClient().get('/api/v1/geo/').json()['data']
         self.assertTrue(any(l['name'] == 'Marché de Mont-Bouët' for l in tree['landmarks']))
 
