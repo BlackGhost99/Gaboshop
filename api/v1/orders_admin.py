@@ -377,42 +377,98 @@ class OrderStatusUpdateView(APIView):
         return ip
 
 
+def _dispatch_cancel_blocker(order):
+    """Empêcher toute annulation administrative silencieuse d'argent reçu ou de course engagée."""
+    from payments.models import Payment, PaymentIntent
+    from django.db.models import Q
+
+    if order.status in ('cancelled', 'refunded', 'delivered'):
+        return 'Commande déjà terminée, annulée ou remboursée.'
+    if order.status not in ('created', 'pending_payment', 'confirmed', 'preparing', 'ready'):
+        return 'La livraison est engagée. Traitez cette annulation avec le support et le livreur.'
+
+    delivery = getattr(order, 'delivery', None)
+    if delivery and (
+        delivery.delivery_agent_id
+        or delivery.accepted_at
+        or delivery.status not in ('waiting', 'pending', 'ready_for_assignment',
+                                  'awaiting_delivery_payment', 'pending_vehicle_validation')
+    ):
+        return 'Un livreur ou un transport a déjà été engagé : vérification manuelle nécessaire.'
+
+    payout = getattr(order, 'store_payout', None)
+    if payout and payout.status in ('processing', 'paid'):
+        return 'Un reversement au commerçant existe : rapprochement financier nécessaire.'
+
+    if Payment.objects.filter(order=order, status__in=('pending', 'processing', 'success')).exists():
+        return 'Paiement en ligne existant ou en cours : vérifier SingPay et organiser le remboursement.'
+
+    # Un intent peut être réglé après sa création, y compris si le webhook arrive tard.
+    if PaymentIntent.objects.filter(order=order).exclude(
+        status__in=('FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED', 'failed', 'cancelled', 'expired', 'refunded')
+    ).exists():
+        return 'Transaction opérateur à vérifier avant toute annulation.'
+
+    arrangement = getattr(order, 'payment_arrangement', None)
+    if arrangement:
+        if arrangement.flow == 'platform_online':
+            return 'Paiement plateforme : annulation à traiter après rapprochement SingPay.'
+        for debt in arrangement.obligations.filter(payer='client').prefetch_related('receipts'):
+            if debt.status in ('paid', 'partially_paid', 'partially_refunded', 'refunded'):
+                return 'Paiement déclaré : annulation et remboursement à vérifier.'
+            if any(receipt.status in ('pending', 'confirmed') for receipt in debt.receipts.all()):
+                return 'Preuve de paiement déposée : contrôler le règlement avant annulation.'
+    return None
+
+
 class OrdersCancelView(APIView):
-    """Annulation d'une commande"""
+    """Annulation sûre d'une commande non payée avant début effectif de livraison."""
     permission_classes = [IsPlatformAdmin]
-    
+
     def post(self, request, order_id):
-        try:
-            order = Order.objects.get(id=order_id)
-            if order.status in ('delivered', 'cancelled', 'refunded'):
-                return Response({
-                    "success": False,
-                    "error": "Cette commande est déjà livrée, annulée ou remboursée : elle ne peut plus être annulée.",
-                }, status=409)
-            reason = request.data.get('reason', 'Annulation admin')
-            refund_amount = request.data.get('refund_amount')
-            if refund_amount and hasattr(order, 'payment_arrangement'):
-                from payments.direct_service import record_refund
-                record_refund(
-                    order,
-                    request.data.get('refund_component', 'products'),
-                    Decimal(str(refund_amount)),
-                    request.user,
-                    request.data.get('refund_reference') or f'CANCEL-{order.id}-{int(timezone.now().timestamp())}',
-                    reason,
-                )
-            
-            order.status = 'cancelled'
-            order.save()
-            
+        from django.db import transaction
+
+        reason = (request.data.get('reason') or '').strip()
+        if len(reason) < 5 or len(reason) > 500:
+            return Response({'success': False, 'error': 'Précisez le motif (5 à 500 caractères).'}, status=400)
+        if request.data.get('refund_amount') not in (None, '', 0, '0'):
             return Response({
-                "success": True,
-                "message": "Commande annulée",
-                "reason": reason,
-            })
-        
-        except Order.DoesNotExist:
-            return Response({"success": False, "error": "Commande non trouvée"}, status=404)
+                'success': False,
+                'error': 'Un remboursement ne se déclenche pas par une simple annulation. '
+                         'Vérifiez et remboursez le paiement par la procédure financière avant de clôturer.'
+            }, status=409)
+
+        with transaction.atomic():
+            order = Order.objects.select_for_update().filter(pk=order_id).first()
+            if not order:
+                return Response({'success': False, 'error': 'Commande introuvable.'}, status=404)
+            blocker = _dispatch_cancel_blocker(order)
+            if blocker:
+                return Response({'success': False, 'error': {
+                    'message': 'Annulation automatique refusée.',
+                    'reason': blocker,
+                    'next_step': 'Vérifiez le paiement et contactez le support Gaboshop avant toute restitution de fonds.',
+                }}, status=409)
+
+            order.status = 'cancelled'
+            order.save(update_fields=['status', 'updated_at'])
+            # Annuler les dettes non acquittées, sans fabriquer de remboursement.
+            arrangement = getattr(order, 'payment_arrangement', None)
+            if arrangement:
+                arrangement.obligations.filter(
+                    status__in=('not_due', 'unpaid', 'overdue')
+                ).update(status='cancelled')
+            AuditLog.log_action(
+                action_type='order_cancelled',
+                user=request.user, object_type='order', object_id=order.id,
+                old_value='en cours', new_value='cancelled', reason=reason,
+            )
+
+        return Response({
+            'success': True,
+            'message': 'Commande annulée (aucun paiement reçu dans le système).',
+            'reason': reason,
+        })
 
 
 class OrderProblemResolveView(APIView):
