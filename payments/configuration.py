@@ -177,11 +177,13 @@ def _available_payment_options(store, delivery_requested=True, b2b=False):
             # Pilote B2C : jamais d'espèces encaissées par un livreur Gaboshop.
             # Si la boutique livre elle-même, son livreur encaisse pour son compte,
             # via store_collects_all, et non via le grand livre d'un livreur Gaboshop.
-            if not b2b and flow == 'courier_cash':
+            if (not b2b and getattr(django_settings, 'B2C_STORE_COURIER_CASH_ONLY', True)
+                    and flow == 'courier_cash'):
                 continue
             if flow == 'courier_cash' and (method != 'cash' or not delivery_requested):
                 continue
-            if not b2b and method == 'cash' and delivery_requested:
+            if (not b2b and getattr(django_settings, 'B2C_STORE_COURIER_CASH_ONLY', True)
+                    and method == 'cash' and delivery_requested):
                 if flow != 'store_collects_all' or not store.offers_delivery:
                     continue
             instructions = policy.get('instructions', {}).get(method, '')
