@@ -17,9 +17,8 @@ jobs:
     timeout-minutes: 25
     env:
       DJANGO_SETTINGS_MODULE: gaboshop.settings
-      SECRET_KEY: ci-only-not-for-production-000000000000000000000000000
-      DEBUG: 'True'
-      DATABASE_URL: sqlite:///:memory:
+      DJANGO_SECRET_KEY: ci-only-not-for-production-000000000000000000000000000
+      DJANGO_DEBUG: 'True'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
