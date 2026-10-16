@@ -74,7 +74,7 @@ class ChoixEtFactureTests(TestCase):
         self.assertTrue(pdf.content.startswith(b'%PDF'))
         # Une commande simple ne doit pas créer une deuxième page quasi vide.
         reader = PdfReader(BytesIO(pdf.content))
-        self.assertEqual(len(reader.pages), 1, 'La facture simple doit tenir sur une page A4')
+        self.assertEqual(len(reader.pages), 1, 'La facture simple doit tenir sur une page A4; page 2: ' + repr(reader.pages[1].extract_text()[:600] if len(reader.pages) > 1 else ''))
         extracted = reader.pages[0].extract_text()
         self.assertIn('72 000', extracted)
         self.assertIn('Timberland', extracted)
