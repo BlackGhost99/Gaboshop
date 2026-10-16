@@ -16,7 +16,7 @@ Décision du propriétaire : Gaboshop proposera les paiements directs **et** Sin
 |---|---|---|---|---|
 | `direct_split` | Client verse les articles au commerce | Client règle séparément le livreur | Commerce et livreur confirment chacun leur part | Chaque personne qui a reçu l'argent restitue sa part due ; Gaboshop suit le dossier |
 | `store_collects_all` | Client verse articles + livraison au commerce | Le commerce rémunère le livreur | Confirmation par le commerce, rapprochement du livreur | Le commerce prend en charge les fonds qu'il a encaissés |
-| `courier_cash` | Le livreur collecte les espèces pour les articles + livraison | Le livreur reverse la part produits au commerce | Reçu espèces et preuve de remise au commerce | Livreurs et commerce doivent rapprocher l'argent réellement conservé avant remboursement |
+| `courier_cash` | **Désactivé pour le pilote B2C** : aucun livreur Gaboshop ne collecte d'espèces | — | Le serveur refuse cette option au panier | Les anciens flux restent consultables pour l'historique |
 | `platform_online` | Client paie Airtel/Moov via SingPay | Part commerçant/livreur selon circuit et contrat | Confirmation prestataire, jamais simple capture | Gaboshop coordonne avec le PSP ; confirmation réelle obligatoire pour annoncer le remboursement |
 
 ### Exemple : 70 000 FCFA d'articles + 2 000 FCFA de livraison
