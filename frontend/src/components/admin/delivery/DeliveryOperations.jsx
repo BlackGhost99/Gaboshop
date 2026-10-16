@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { assignDeliveryAgent, getDeliveryIncidents, getDeliveryOperations, getAdminDeliveryStats, getDeliveryProofPhoto } from '../../../services/adminService';
+import { assignDeliveryAgent, cancelOrder, getDeliveryIncidents, getDeliveryOperations, getAdminDeliveryStats, getDeliveryProofPhoto } from '../../../services/adminService';
 import { notifyError, notifySuccess } from '../../../utils/feedback';
 import useVisibleInterval from '../../../hooks/useVisibleInterval';
 
@@ -87,6 +87,9 @@ function DeliveryCard({ row, children }) {
 export function DeliveryDispatch() {
   const [data, load] = useOperations();
   const [choice, setChoice] = useState({});
+  const [cancelForm, setCancelForm] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   if (!data) return <p className="p-6 text-sm text-gray-600">Chargement…</p>;
 
   const assign = async (row) => {
@@ -102,12 +105,37 @@ export function DeliveryDispatch() {
     }
   };
 
+  const cancel = async (row) => {
+    const reason = cancelReason.trim();
+    if (reason.length < 5 || cancelling) return;
+    setCancelling(true);
+    try {
+      await cancelOrder(row.order_id, reason);
+      notifySuccess('Commande annulée', 'La commande a été annulée et le stock restitué. Aucun remboursement n’a été supposé.');
+      setCancelForm(null);
+      setCancelReason('');
+      load();
+    } catch (err) {
+      notifyError(err, { action: `Annuler la commande #${row.order_number}` });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">Courses qui n’ont pas encore de livreur. La liste se met à jour toute seule.</p>
+      <p className="text-sm text-gray-600">Commandes en préparation et courses prêtes sans livreur. L'attribution commence une fois la commande prête.</p>
       {data.waiting.length === 0 ? <Empty>Aucune course en attente de livreur.</Empty> : data.waiting.map((row) => (
         <DeliveryCard key={row.id} row={row}>
-          <p className="mt-2 text-sm text-amber-700">En attente depuis {since(row.minutes_waiting)}{row.order_status !== 'ready' ? ' · le commerce prépare encore la commande' : ''}</p>
+          {row.order_status === 'ready' ? (
+            <p className="mt-2 text-sm text-amber-700">En attente de livreur depuis {since(row.minutes_waiting)}.</p>
+          ) : (
+            <p className={`mt-2 text-sm ${row.minutes_since_order >= 60 ? 'font-semibold text-red-700' : 'text-amber-700'}`}>
+              Commande créée il y a {since(row.minutes_since_order)} : le commerce ne l'a pas encore marquée « prête ».
+              {row.minutes_since_order >= 60 ? ' Relance du commerce recommandée.' : ''}
+            </p>
+          )}
+          {row.store_phone && <a className="mt-1 inline-block text-sm font-medium text-indigo-700 underline" href={`tel:${row.store_phone}`}>Appeler le commerce</a>}
           <div className="mt-3 flex flex-wrap gap-2">
             <select className="min-w-0 flex-1 rounded-md border border-gray-300 p-2 text-sm" value={choice[row.id] || ''} onChange={(e) => setChoice({ ...choice, [row.id]: e.target.value })}>
               <option value="">Choisir un livreur…</option>
@@ -119,7 +147,30 @@ export function DeliveryDispatch() {
             </select>
             <button type="button" disabled={!choice[row.id] || row.order_status !== 'ready'} onClick={() => assign(row)}
               className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Attribuer</button>
+            <button type="button" className="rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              onClick={() => { setCancelForm(row.id); setCancelReason(''); }}>
+              Annuler la commande…
+            </button>
           </div>
+          {cancelForm === row.id && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
+              <p className="font-semibold text-red-900">Confirmer l'annulation de la commande #{row.order_number}</p>
+              <p className="mt-1 text-red-800">Possible uniquement avant prise en charge et sans paiement confirmé ou en cours.
+                Sinon le serveur refusera : il faudra vérifier les fonds et traiter le remboursement séparément.</p>
+              <label className="mt-2 block font-medium text-gray-800" htmlFor={`cancel-reason-${row.id}`}>Motif obligatoire</label>
+              <textarea id={`cancel-reason-${row.id}`} rows={2} maxLength={500}
+                className="mt-1 w-full rounded-md border border-gray-300 p-2" placeholder="Ex. : le commerce n'a pas préparé la commande malgré la relance"
+                value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}/>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" disabled={cancelling || cancelReason.trim().length < 5} onClick={() => cancel(row)}
+                  className="rounded-md bg-red-700 px-3 py-2 font-semibold text-white disabled:opacity-50">
+                  {cancelling ? 'Annulation…' : 'Confirmer l’annulation'}
+                </button>
+                <button type="button" disabled={cancelling} onClick={() => setCancelForm(null)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-gray-700">Retour</button>
+              </div>
+            </div>
+          )}
         </DeliveryCard>
       ))}
     </div>

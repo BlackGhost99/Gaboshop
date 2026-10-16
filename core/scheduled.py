@@ -210,6 +210,42 @@ def release_unconfirmed_payouts():
 	return f'{stores} versement(s) commerce et {drivers} versement(s) livreur après 48 h sans confirmation'
 
 
+def alert_stale_preparation():
+    """Une commande non prête depuis 60 min doit être portée à l'attention du commerce et de l'admin.
+    Ne crée ni annulation ni remboursement : seule une alerte, une fois par utilisateur et commande.
+    """
+    from notifications.models import Notification
+    from orders.models import Order
+    from users.models import User
+
+    cutoff = timezone.now() - timedelta(hours=1)
+    stale = (Order.objects.filter(
+        status__in=('confirmed', 'preparing'), updated_at__lte=cutoff,
+    ).select_related('store__manager', 'client').order_by('updated_at')[:100])
+    admin_ids = list(User.objects.filter(is_active=True).filter(
+        Q(user_type='admin') | Q(is_staff=True)
+    ).values_list('id', flat=True))
+    alerts = 0
+    for order in stale:
+        recipients = {order.store.manager_id, *admin_ids}
+        # Alertes internes une seule fois ; le client voit déjà le statut de commande.
+        for user_id in recipients:
+            if not user_id:
+                continue
+            _, created = Notification.objects.get_or_create(
+                user_id=user_id, order=order, title='Retard de préparation de commande',
+                defaults={
+                    'body': f'Commande {order.order_number} chez {order.store.name} : '
+                            'préparation en attente depuis plus d’une heure. '
+                            'Contactez le commerce et vérifiez le paiement avant toute annulation.',
+                    'notif_type': 'warning',
+                    'metadata': {'context': 'stale_preparation', 'order_id': order.id},
+                },
+            )
+            alerts += int(created)
+    return f'{alerts} alerte(s) de préparation envoyée(s)'
+
+
 def guard_against_fraud():
 	"""Gardien anti-fraude : réexamine les comptes à l'activité suspecte récente (core/guardian.py)."""
 	from core.guardian import scan_recent
@@ -226,6 +262,7 @@ JOBS = (
 	('livraisons', timedelta(minutes=2), advance_deliveries),
 	('paiements_en_ligne', timedelta(minutes=2), check_online_payments),
 	('commandes_abandonnees', timedelta(hours=1), cancel_abandoned_orders),
+	('retards_preparation', timedelta(minutes=15), alert_stale_preparation),
 	('abonnements_expires', timedelta(hours=12), expire_subscriptions),
 	('versements_sans_confirmation', timedelta(hours=1), release_unconfirmed_payouts),
 	('gardien_antifraude', timedelta(minutes=30), guard_against_fraud),

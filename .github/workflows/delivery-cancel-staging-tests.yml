@@ -1,0 +1,38 @@
+name: Livraison - staging
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'api/v1/delivery_admin.py'
+      - 'api/v1/orders_admin.py'
+      - 'frontend/src/components/admin/delivery/DeliveryOperations.jsx'
+      - 'orders/tests/test_admin_cancel_wait_2026_10_16.py'
+      - '.github/workflows/delivery-cancel-staging-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  django-tests:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: testing-only-abcdefghijklm0123456789
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python manage.py test orders.tests.test_admin_cancel_wait_2026_10_16 --noinput -v 2
+  react-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
