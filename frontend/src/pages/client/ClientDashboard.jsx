@@ -13,6 +13,7 @@ import { METHOD_LABELS } from '../../components/payments/paymentLabels';
 import api from '../../services/api';
 import AddressPicker from '../../components/address/AddressPicker';
 import useGeo from '../../hooks/useGeo';
+import { describeOptions, lineKey, productOptions } from '../../utils/productOptions';
 
 const CART_KEY = 'gaboshop_cart';
 const envBase = import.meta.env.VITE_API_URL;
@@ -280,12 +281,12 @@ const ClientDashboard = () => {
           const res = await getProductDetails(miss.id);
           const data = res?.data || res;
           if (data?.store) {
-            const idx = updated.findIndex((i) => i.id === miss.id && !i.store_id);
+            const idx = updated.findIndex((i) => lineKey(i) === lineKey(miss) && !i.store_id);
             if (idx !== -1) {
               updated[idx] = { ...updated[idx], store_id: data.store, store_name: data.store_name || updated[idx].store_name };
             }
           }
-          const idx = updated.findIndex((i) => i.id === miss.id);
+          const idx = updated.findIndex((i) => lineKey(i) === lineKey(miss));
           if (idx !== -1) {
             const next = { ...updated[idx] };
             if (!next.weight_kg && data?.weight_kg) next.weight_kg = data.weight_kg;
@@ -308,7 +309,7 @@ const ClientDashboard = () => {
     persistCart(
       cartItems
         .map((it) =>
-          it.id === itemId && (it.store_name || 'Magasin') === storeName
+          lineKey(it) === itemId && (it.store_name || 'Magasin') === storeName
             ? { ...it, quantity: Math.max(0, (it.quantity || 0) + delta) }
             : it
         )
@@ -316,10 +317,25 @@ const ClientDashboard = () => {
     );
   };
 
+  // Taille / couleur choisie (ou changée) depuis le panier ; deux lignes devenues identiques fusionnent.
+  const handleSetOption = (storeName, key, field, value) => {
+    const merged = [];
+    cartItems
+      .map((it) => (lineKey(it) === key && (it.store_name || 'Magasin') === storeName
+        ? { ...it, options: { ...(it.options || {}), [field]: value } }
+        : it))
+      .forEach((it) => {
+        const same = merged.find((m) => lineKey(m) === lineKey(it) && m.store_name === it.store_name);
+        if (same) same.quantity = (same.quantity || 0) + (it.quantity || 0);
+        else merged.push({ ...it });
+      });
+    persistCart(merged);
+  };
+
   const handleRemoveItem = (storeName, itemId) => {
     persistCart(
       cartItems.filter(
-        (it) => !(it.id === itemId && (it.store_name || 'Magasin') === storeName)
+        (it) => !(lineKey(it) === itemId && (it.store_name || 'Magasin') === storeName)
       )
     );
   };
@@ -411,6 +427,14 @@ const ClientDashboard = () => {
         return;
       }
     }
+    const unchosen = items.find((it) => {
+      const o = productOptions(it);
+      return (o.size.length > 1 && !it.options?.size) || (o.color.length > 1 && !it.options?.color);
+    });
+    if (unchosen) {
+      setToast({ type: 'error', message: `Choisissez la taille / la couleur de « ${unchosen.name} » dans le panier.` });
+      return;
+    }
     if (form.delivery_requested !== false && geoReady && !form.neighborhood) {
       setToast({ type: 'error', message: 'Choisissez votre quartier dans la liste.' });
       return;
@@ -432,7 +456,7 @@ const ClientDashboard = () => {
       payment_flow,
       payment_method,
       delivery_payment_method: payment_flow === 'platform_online' ? (form.delivery_by || 'gaboshop') : '',
-      items: items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
+      items: items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1, ...(it.options ? { options: it.options } : {}) })),
     };
 
     setSubmitting((prev) => ({ ...prev, [storeName]: true }));
@@ -737,7 +761,7 @@ const ClientDashboard = () => {
 
                   <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
                     {data.items.map((item) => (
-                      <div key={`${storeName}-${item.id}`} className="py-3 flex justify-between items-start gap-3">
+                      <div key={`${storeName}-${lineKey(item)}`} className="py-3 flex justify-between items-start gap-3">
                         <div className="flex gap-3">
                           <div className="h-14 w-14 rounded-md bg-gray-100 overflow-hidden flex-shrink-0">
                             {item.image ? (
@@ -748,10 +772,29 @@ const ClientDashboard = () => {
                           </div>
                           <div className="space-y-1">
                             <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                            {[['size', 'Taille / pointure'], ['color', 'Couleur']].map(([field, label]) => {
+                              const values = productOptions(item)[field];
+                              if (values.length < 2) return null;
+                              return (
+                                <select
+                                  key={field}
+                                  aria-label={label}
+                                  className={`mt-1 mr-1 rounded border px-2 py-1 text-xs ${item.options?.[field] ? 'border-gray-200' : 'border-red-400 text-red-700'}`}
+                                  value={item.options?.[field] || ''}
+                                  onChange={(e) => handleSetOption(storeName, lineKey(item), field, e.target.value)}
+                                >
+                                  <option value="">{label} ?</option>
+                                  {values.map((v) => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                              );
+                            })}
+                            {describeOptions(item.options) && productOptions(item).size.length < 2 && productOptions(item).color.length < 2 && (
+                              <p className="text-xs font-semibold text-indigo-700">{describeOptions(item.options)}</p>
+                            )}
                             <p className="text-xs text-gray-500">{formatCurrency(item.price)}</p>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => handleUpdateQuantity(storeName, item.id, -1)}
+                                onClick={() => handleUpdateQuantity(storeName, lineKey(item), -1)}
                                 className="h-7 w-7 rounded border border-gray-200 text-gray-600 hover:bg-gray-50"
                                 aria-label="Diminuer"
                               >
@@ -759,14 +802,14 @@ const ClientDashboard = () => {
                               </button>
                               <span className="text-sm font-semibold text-gray-800 min-w-[24px] text-center">{item.quantity}</span>
                               <button
-                                onClick={() => handleUpdateQuantity(storeName, item.id, 1)}
+                                onClick={() => handleUpdateQuantity(storeName, lineKey(item), 1)}
                                 className="h-7 w-7 rounded border border-gray-200 text-gray-600 hover:bg-gray-50"
                                 aria-label="Augmenter"
                               >
                                 +
                               </button>
                               <button
-                                onClick={() => handleRemoveItem(storeName, item.id)}
+                                onClick={() => handleRemoveItem(storeName, lineKey(item))}
                                 className="ml-2 text-xs text-red-500 hover:text-red-600"
                               >
                                 Supprimer

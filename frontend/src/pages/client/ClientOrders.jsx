@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { openInvoice } from '../../utils/invoice';
+import { describeOptions } from '../../utils/productOptions';
 import { notifySuccess, notifyError } from '../../utils/feedback';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -410,6 +412,14 @@ const ClientOrders = () => {
                 <OrderPaymentPanel orderId={detail.id} onChange={fetchOrders} />
               </div>
 
+              <button
+                type="button"
+                onClick={() => openInvoice(detail.id, detail.order_number)}
+                className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+              >
+                📄 Facture (PDF)
+              </button>
+
               <div>
                 <p className="font-semibold text-gray-900 mb-2">Articles</p>
                 <div className="divide-y divide-gray-100 border border-gray-100 rounded-md">
@@ -417,6 +427,7 @@ const ClientOrders = () => {
                     <div key={it.id} className="flex justify-between items-center px-3 py-2 text-sm">
                       <div className="space-y-0.5">
                         <p className="font-medium text-gray-900">{it.product_name || it.product}</p>
+                        {describeOptions(it.options) && <p className="text-xs font-semibold text-indigo-700">{describeOptions(it.options)}</p>}
                         <p className="text-xs text-gray-500">{formatCurrency(it.unit_price)} · Qté {it.quantity}</p>
                       </div>
                       <p className="text-sm font-semibold text-gray-900">{formatCurrency(it.subtotal || it.unit_price * it.quantity)}</p>

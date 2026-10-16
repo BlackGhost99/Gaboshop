@@ -9,7 +9,8 @@ import HeroBanner from '../components/HeroBanner';
 import CategoriesGrid from '../components/CategoriesGrid';
 import ProductDetailModal from '../components/ProductDetailModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
-import { isLoggedIn, savePendingCartItem, applyPendingCartItem, CART_EVENT } from '../utils/session';
+import { isLoggedIn, savePendingCartItem, applyPendingCartItem, addToCart, CART_EVENT } from '../utils/session';
+import { defaultChoice, needsChoice } from '../utils/productOptions';
 import ProductCard from '../components/ProductCard';
 import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/helpers';
@@ -355,38 +356,19 @@ const Home = () => {
     setSelectedProduct(product);
   };
 
-  const handleAddToCart = (product) => {
+  const handleAddToCart = (product, options = null) => {
+    if (needsChoice(product) && !options) {
+      setSelectedProduct(product);  // la fiche demande la pointure / la couleur
+      return;
+    }
+    const chosen = options || defaultChoice(product);
     if (!isLoggedIn()) {
-      savePendingCartItem(product);
+      savePendingCartItem(product, chosen);
       setSelectedProduct(null);
       setLoginPromptProduct(product);
       return;
     }
-    setCart((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === product.id);
-      if (existingIndex !== -1) {
-        const next = [...prev];
-        next[existingIndex] = {
-          ...next[existingIndex],
-          quantity: next[existingIndex].quantity + 1
-        };
-        return next;
-      }
-      return [
-        ...prev,
-        {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image: product.image,
-          weight_kg: product.weight_kg,
-          length_m: product.length_m,
-          store_name: product.store_name,
-          store_id: product.store,
-          quantity: 1
-        }
-      ];
-    });
+    addToCart(product, 1, chosen);
     setToast({ message: `${product.name} ajouté au panier`, type: 'success', at: Date.now() });
     setTimeout(() => setToast(null), 1800);
   };

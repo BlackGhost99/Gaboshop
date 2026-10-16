@@ -450,6 +450,8 @@ class OrderItem(models.Model):
     
 	quantity = models.PositiveIntegerField(default=1)
 	unit_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Prix au moment de la commande")
+	# Choix du client : {'size': '42', 'color': 'Marron'} (vide si le produit n'a pas de choix).
+	options = models.JSONField(default=dict, blank=True)
     
 	class Meta:
 		verbose_name = "Article de Commande"

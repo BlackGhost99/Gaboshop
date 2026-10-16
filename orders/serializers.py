@@ -14,7 +14,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = [
             'id', 'product', 'product_name', 'product_image',
-            'quantity', 'unit_price', 'subtotal'
+            'quantity', 'unit_price', 'subtotal', 'options'
         ]
         read_only_fields = ['unit_price', 'subtotal']
 
@@ -22,6 +22,7 @@ class OrderItemCreateSerializer(serializers.Serializer):
     """Serializer pour la création d'items de commande"""
     product_id = serializers.IntegerField()
     quantity = serializers.IntegerField(min_value=1)
+    options = serializers.DictField(child=serializers.CharField(allow_blank=True), required=False)
     
     def validate(self, attrs):
         product_id = attrs['product_id']
@@ -41,6 +42,11 @@ class OrderItemCreateSerializer(serializers.Serializer):
                 'quantity': _(f'Stock insuffisant. Il reste {product.stock} unité(s).')
             })
         
+        from products.options import clean_choice
+        try:
+            attrs['options'] = clean_choice(product, attrs.get('options'))
+        except ValueError as exc:
+            raise serializers.ValidationError({'options': str(exc)})
         attrs['product'] = product
         attrs['unit_price'] = product.price
         
@@ -152,6 +158,7 @@ class OrderSerializer(serializers.ModelSerializer):
             items_breakdown.append({
                 'product_id': item.product.id,
                 'product_name': item.product.name,
+                'options': item.options or {},
                 'quantity': item.quantity,
                 'unit_price': str(item.unit_price),
                 'subtotal': str(item.subtotal)
@@ -380,7 +387,8 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 order=order,
                 product=item_data['product'],
                 quantity=item_data['quantity'],
-                unit_price=item_data['unit_price']
+                unit_price=item_data['unit_price'],
+                options=item_data.get('options') or {},
             )
         
         # Réserver le stock (refuse la commande si un article vient d'être épuisé)

@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
+import { openInvoice } from '../../utils/invoice';
+import { describeOptions } from '../../utils/productOptions';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { describeError, notifySuccess } from '../../utils/feedback';
@@ -1359,6 +1361,10 @@ const AdminDashboard = () => {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Commande #{selectedOrder.order_number}</h2>
                 <p className="text-sm text-gray-500 mt-1">ID: {selectedOrder.id}</p>
+                <button type="button" onClick={() => openInvoice(selectedOrder.id, selectedOrder.order_number)}
+                  className="mt-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700">
+                  📄 Facture (PDF)
+                </button>
               </div>
               <button 
                 onClick={() => setSelectedOrder(null)} 
@@ -1418,6 +1424,7 @@ const AdminDashboard = () => {
                     <div key={idx} className="flex justify-between text-sm py-2 border-b last:border-0">
                       <div className="flex-1">
                         <p className="font-semibold text-gray-900">{item.product_name}</p>
+                        {describeOptions(item.options) && <p className="text-xs font-semibold text-indigo-700">{describeOptions(item.options)}</p>}
                         <p className="text-xs text-gray-600">Quantité: {item.quantity} × {(item.price || 0).toLocaleString('fr-FR')} FCFA</p>
                       </div>
                       <p className="font-bold text-gray-900 text-right">{(item.total || 0).toLocaleString('fr-FR')} FCFA</p>

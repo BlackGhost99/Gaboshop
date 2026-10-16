@@ -1,4 +1,16 @@
 import { useState } from 'react';
+import OptionChips from './OptionChips';
+
+const range = (a, b, step = 1) => Array.from({ length: Math.floor((b - a) / step) + 1 }, (_, i) => String(a + i * step));
+const SIZE_GROUPS = [
+  { key: 'shoes', label: 'Pointures', values: range(16, 50) },
+  { key: 'letters', label: 'Tailles S, M, L', values: ['Taille unique', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'] },
+  { key: 'numbers', label: 'Tailles 34, 36…', values: range(32, 60, 2) },
+  { key: 'kids', label: 'Enfant', values: ['0-3 mois', '3-6 mois', '6-12 mois', '12-18 mois', '2 ans', '3 ans', '4 ans', '5 ans', '6 ans', '8 ans', '10 ans', '12 ans', '14 ans', '16 ans'] },
+];
+const COLOR_GROUPS = [
+  { key: 'colors', label: 'Couleurs', values: ['Noir', 'Blanc', 'Gris', 'Beige', 'Marron', 'Camel', 'Rouge', 'Bordeaux', 'Rose', 'Orange', 'Jaune', 'Vert', 'Kaki', 'Bleu', 'Bleu marine', 'Violet', 'Doré', 'Argenté', 'Multicolore'] },
+];
 
 // Catégories pour lesquelles on demande marque, modèle et tailles/pointures
 const FASHION_RE = /v[eê]tement|habit|chaussure|basket|mode|textile|pr[eê]t[- ]à[- ]porter|sac|accessoire/i;
@@ -91,14 +103,20 @@ export default function ProductSpecsFields({ weightKg, lengthM, attributes = {},
             <label className={label}>Modèle</label>
             <input type="text" className={`mt-1 ${input}`} value={attributes.model || ''} placeholder="ex : Air Max 90" onChange={(e) => setAttr('model', e.target.value)} />
           </div>
-          <div>
-            <label className={label}>Tailles / pointures disponibles</label>
-            <input type="text" className={`mt-1 ${input}`} value={attributes.sizes || ''} placeholder="ex : 40, 41, 42 ou S, M, L" onChange={(e) => setAttr('sizes', e.target.value)} />
-          </div>
-          <div>
-            <label className={label}>Couleur</label>
-            <input type="text" className={`mt-1 ${input}`} value={attributes.color || ''} placeholder="ex : Noir" onChange={(e) => setAttr('color', e.target.value)} />
-          </div>
+          <OptionChips
+            label="Tailles / pointures disponibles"
+            groups={SIZE_GROUPS}
+            value={attributes.sizes || ''}
+            onChange={(v) => setAttr('sizes', v)}
+            otherPlaceholder="Autre taille (ex : 42.5)"
+          />
+          <OptionChips
+            label="Couleurs disponibles"
+            groups={COLOR_GROUPS}
+            value={attributes.color || ''}
+            onChange={(v) => setAttr('color', v)}
+            otherPlaceholder="Autre couleur"
+          />
         </>
       )}
     </>

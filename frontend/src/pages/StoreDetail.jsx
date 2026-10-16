@@ -8,6 +8,7 @@ import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import { isLoggedIn, savePendingCartItem, applyPendingCartItem, addToCart } from '../utils/session';
+import { defaultChoice, needsChoice } from '../utils/productOptions';
 import HomeNavbar from '../components/HomeNavbar'; // Reusing HomeNavbar
 import Footer from '../components/Footer';
 
@@ -38,14 +39,19 @@ const StoreDetail = () => {
     }, [requestedProductId, setSearchParams]);
 
     // Même panier que la page d'accueil (stocké sur l'appareil)
-    const handleAddToCart = (product) => {
+    const handleAddToCart = (product, options = null) => {
+        if (needsChoice(product) && !options) {
+            setSelectedProduct(product);  // la fiche demande la pointure / la couleur
+            return;
+        }
+        const chosen = options || defaultChoice(product);
         if (!isLoggedIn()) {
-            savePendingCartItem(product);
+            savePendingCartItem(product, chosen);
             setSelectedProduct(null);
             setLoginPromptProduct(product);
             return;
         }
-        addToCart(product, 1);
+        addToCart(product, 1, chosen);
         setToast(`${product.name} ajouté au panier`);
         setTimeout(() => setToast(null), 1800);
     };

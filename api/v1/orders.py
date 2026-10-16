@@ -768,3 +768,27 @@ class DeliveryQuoteView(APIView):
 			# Ajouté seulement si le client paie en ligne (voir OrderCreateSerializer.create).
 			'small_order_fee_online': str(small_order_fee(items_total)),
 		}})
+
+
+class OrderInvoiceView(APIView):
+	"""GET /orders/<id>/invoice/ : facture PDF Gaboshop (client, commerce de la commande ou admin)."""
+	permission_classes = [permissions.IsAuthenticated]
+
+	def get(self, request, order_id):
+		from django.http import HttpResponse
+		from orders.invoice import can_view, render_invoice_pdf
+		order = Order.objects.select_related('store__category', 'client').filter(pk=order_id).first()
+		if order is None or not can_view(request.user, order):
+			return Response({'success': False, 'error': {'message': 'Commande introuvable.', 'reason': '', 'next_step': ''}},
+							status=status.HTTP_404_NOT_FOUND)
+		try:
+			pdf = render_invoice_pdf(order)
+		except Exception:
+			logger.exception("Facture %s impossible à générer", order.order_number)
+			return Response({'success': False, 'error': {
+				'message': 'Facture indisponible pour le moment.', 'reason': 'Le document n’a pas pu être créé.',
+				'next_step': 'Réessayez dans un instant ; si cela continue, contactez le support.'}},
+				status=status.HTTP_503_SERVICE_UNAVAILABLE)
+		response = HttpResponse(pdf, content_type='application/pdf')
+		response['Content-Disposition'] = f'inline; filename="Facture-{order.order_number}.pdf"'
+		return response

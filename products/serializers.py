@@ -58,11 +58,23 @@ class ProductAttributesField(serializers.JSONField):
                 raise serializers.ValidationError(_('Caractéristiques invalides.'))
         if not isinstance(data, dict):
             raise serializers.ValidationError(_('Caractéristiques invalides.'))
-        return {
-            k: str(v).strip()[:100]
+        from products.options import join_values
+        if isinstance(data.get('sizes'), list):
+            data['sizes'] = ', '.join(str(v) for v in data['sizes'])
+        if isinstance(data.get('color'), list):
+            data['color'] = ', '.join(str(v) for v in data['color'])
+        cleaned = {
+            k: str(v).strip()[:300 if k in ('sizes', 'color') else 100]
             for k, v in data.items()
             if k in ALLOWED_ATTRIBUTE_KEYS and v not in (None, '') and str(v).strip()
         }
+        # Tailles et couleurs rangées en liste propre « 40, 41, 42 », même tapées sans virgules.
+        for key in ('sizes', 'color'):
+            if key in cleaned:
+                cleaned[key] = join_values(cleaned[key])
+                if not cleaned[key]:
+                    del cleaned[key]
+        return cleaned
 
 
 class ProductSerializer(serializers.ModelSerializer):

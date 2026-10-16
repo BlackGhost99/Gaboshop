@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getProductDetails } from '../services/productService';
 import { formatCurrency } from '../utils/helpers';
+import { productOptions } from '../utils/productOptions';
 
 /**
  * Fiche produit complète pour le client : photos, prix, stock,
@@ -23,16 +24,12 @@ const formatLength = (m) => {
   return `${Number(n.toFixed(2))} m`;
 };
 
-const splitList = (value) =>
-  String(value || '')
-    .split(/[,;/]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
 const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [details, setDetails] = useState(product);
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
+  const [choice, setChoice] = useState({});
+  const [choiceError, setChoiceError] = useState('');
 
   useEffect(() => {
     if (!product?.id) return undefined;
@@ -68,7 +65,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
     ),
   ];
 
-  const sizes = splitList(attrs.sizes);
+  const { size: sizes, color: colors } = productOptions(p);
   const variants = (p.variants || []).filter((v) => v && v.name);
   const stock = Number(p.stock);
   const hasStockInfo = p.stock !== undefined && p.stock !== null && !Number.isNaN(stock);
@@ -77,7 +74,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const specs = [
     ['Marque', attrs.brand],
     ['Modèle', attrs.model],
-    ['Couleur', attrs.color],
+    ['Couleur', colors.length === 1 ? colors[0] : null],
     ['Catégorie', p.category_name],
     ['Poids', formatWeight(p.weight_kg)],
     ['Longueur / taille du colis', formatLength(p.length_m)],
@@ -172,16 +169,33 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                 </p>
               )}
 
-              {sizes.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Tailles / pointures disponibles</p>
-                  <div className="flex flex-wrap gap-2">
-                    {sizes.map((s) => (
-                      <span key={s} className="px-3 py-1 rounded-lg border border-gray-300 text-sm text-gray-800">{s}</span>
-                    ))}
+              {[['size', 'Choisissez la taille / pointure', sizes], ['color', 'Choisissez la couleur', colors]]
+                .filter(([key, , values]) => values.length > 1 || (key === 'size' && values.length === 1))
+                .map(([key, title, values]) => (
+                  <div key={key}>
+                    <p className="text-sm font-semibold text-gray-900 mb-2">{title}</p>
+                    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={title}>
+                      {values.map((v) => {
+                        const on = (choice[key] || (values.length === 1 ? values[0] : '')) === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            onClick={() => { setChoice((c) => ({ ...c, [key]: v })); setChoiceError(''); }}
+                            className={`min-w-[2.75rem] px-3 py-1.5 rounded-lg border text-sm font-medium ${
+                              on ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300 text-gray-800 hover:border-indigo-400'
+                            }`}
+                          >
+                            {v}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                ))}
+              {choiceError && <p className="text-sm font-semibold text-red-600">{choiceError}</p>}
 
               {variants.length > 0 && (
                 <div>
@@ -225,7 +239,14 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
         {/* Boutons toujours visibles */}
         <div className="border-t border-gray-100 bg-white p-3 flex gap-3" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <button
-            onClick={() => onAddToCart?.(p)}
+            onClick={() => {
+              const chosen = { ...choice };
+              if (sizes.length === 1) [chosen.size] = sizes;
+              if (colors.length === 1) [chosen.color] = colors;
+              if (sizes.length > 1 && !chosen.size) { setChoiceError('Choisissez d’abord votre taille / pointure.'); return; }
+              if (colors.length > 1 && !chosen.color) { setChoiceError('Choisissez d’abord la couleur.'); return; }
+              onAddToCart?.(p, chosen);
+            }}
             disabled={outOfStock}
             className="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white px-4 py-3 rounded-lg shadow"
           >

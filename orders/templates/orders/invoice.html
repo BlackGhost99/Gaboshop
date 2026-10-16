@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 1.4cm 1.3cm 1.6cm 1.3cm;
+          @frame footer { -pdf-frame-content: footer; bottom: 0.6cm; margin-left: 1.3cm; margin-right: 1.3cm; height: 0.8cm; } }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9.5pt; color: #1f2937; }
+  .brand { font-size: 22pt; font-weight: bold; color: #4f46e5; }
+  .muted { color: #6b7280; font-size: 8.5pt; }
+  h2 { font-size: 11pt; color: #111827; margin: 14px 0 4px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #eef2ff; color: #3730a3; text-align: left; padding: 5px; font-size: 8.5pt; }
+  td { padding: 5px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  .right { text-align: right; }
+  .total td { font-size: 12pt; font-weight: bold; color: #111827; border-top: 2px solid #4f46e5; }
+  .box { border: 1px solid #e5e7eb; padding: 6px; }
+  .help { background: #fff7ed; border: 1px solid #fed7aa; padding: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<table>
+  <tr>
+    <td style="border:none; width:55%;">
+      <div class="brand">{{ brand }}</div>
+      <div class="muted">{{ company_name }}{% if company_ids %} · {{ company_ids }}{% endif %}</div>
+      {% if company_address %}<div class="muted">{{ company_address }}</div>{% endif %}
+      {% if support %}<div class="muted">Support : {{ support }}</div>{% endif %}
+    </td>
+    <td style="border:none;" class="right">
+      <div style="font-size:15pt; font-weight:bold;">FACTURE</div>
+      <div><b>N° {{ number }}</b></div>
+      <div class="muted">Commande {{ order_number }} du {{ ordered_at }}</div>
+      <div class="muted">Émise le {{ issued_at }}</div>
+      <div class="muted">Statut : {{ status }}</div>
+    </td>
+  </tr>
+</table>
+
+<table style="margin-top:12px;">
+  <tr>
+    <td class="box" style="width:50%;">
+      <b>Vendeur</b><br>{{ store.name }}{% if store.category %} ({{ store.category }}){% endif %}<br>
+      {% if store.address %}{{ store.address }}<br>{% endif %}{% if store.phone %}Tél. {{ store.phone }}{% endif %}
+    </td>
+    <td class="box">
+      <b>Client</b><br>{{ client.name }}<br>Tél. {{ client.phone }}{% if client.email %}<br>{{ client.email }}{% endif %}
+    </td>
+  </tr>
+</table>
+
+<h2>Articles</h2>
+<table>
+  <tr><th>Produit</th><th>Choix</th><th class="right">Qté</th><th class="right">Prix unitaire</th><th class="right">Total</th></tr>
+  {% for item in items %}
+  <tr><td>{{ item.name }}</td><td>{{ item.options|default:"—" }}</td><td class="right">{{ item.quantity }}</td>
+      <td class="right">{{ item.unit_price }}</td><td class="right">{{ item.subtotal }}</td></tr>
+  {% endfor %}
+</table>
+
+<table style="margin-top:6px;">
+  {% for label, amount in lines %}<tr><td style="width:70%;">{{ label }}</td><td class="right">{{ amount }}</td></tr>{% endfor %}
+  <tr class="total"><td>Total</td><td class="right">{{ total }}</td></tr>
+</table>
+
+{% if payment %}
+<h2>Paiement</h2>
+<table>{% for label, value in payment %}<tr><td style="width:35%;" class="muted">{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}</table>
+{% endif %}
+
+<h2>Livraison</h2>
+<table>{% for label, value in delivery %}<tr><td style="width:35%;" class="muted">{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}</table>
+{% if notes %}<p class="muted">Instructions du client : {{ notes }}</p>{% endif %}
+{% if problem %}<p><b>Problème signalé :</b> {{ problem }}</p>{% endif %}
+
+<div class="help">
+  <b>Un souci avec cette commande ?</b> Dans l'application, ouvrez la commande {{ order_number }} et touchez
+  « Signaler un problème » dans les 48 h après la livraison : le paiement du commerce est alors bloqué jusqu'à
+  vérification par Gaboshop.{% if support %} Vous pouvez aussi joindre le support : {{ support }}.{% endif %}
+  Gardez cette facture et les références de paiement ci-dessus.
+</div>
+
+<div id="footer" class="muted" style="text-align:center;">
+  {{ brand }} · Facture {{ number }} · générée automatiquement, aucune signature requise
+</div>
+</body>
+</html>
