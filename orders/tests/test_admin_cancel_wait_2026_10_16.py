@@ -88,6 +88,20 @@ class AdminCancellationAndDispatchTests(TestCase):
                                  {'reason': 'Commande trop ancienne'}, format='json')
         self.assertEqual(response.status_code, 409)
 
+    def test_preparation_delay_creates_one_alert_per_recipient(self):
+        from core.scheduled import alert_stale_preparation
+        from notifications.models import Notification
+
+        Order.objects.filter(pk=self.order.pk).update(updated_at=timezone.now() - timedelta(minutes=65))
+        first = alert_stale_preparation()
+        second = alert_stale_preparation()
+        alerts = Notification.objects.filter(order=self.order, title='Retard de préparation de commande')
+        self.assertEqual(alerts.count(), 2, (first, second))
+        self.assertIn('2 alerte', first)
+        self.assertIn('0 alerte', second)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'preparing')
+
     def test_client_cannot_use_admin_cancel_endpoint(self):
         self.api.force_authenticate(self.customer)
         response = self.api.post(f'/api/v1/admin/orders/{self.order.id}/cancel/',
