@@ -36,6 +36,8 @@ Les commissions Gaboshop, la marge de livraison et les frais de paiement dépend
 
 ## Configuration du pilote
 - Par défaut : `direct_split`, sous réserve de la validation de l'administrateur.
+- **Choix du fondateur :** les espèces à la livraison sont autorisées uniquement pour les boutiques qui disposent de leurs propres livreurs et sont configurées `offers_delivery=True`. Le mode accepté est `store_collects_all` avec `cash` ; l'encaissement est attribué au commerce. Pour une livraison par un livreur Gaboshop, les espèces ne sont pas proposées au panier B2C. Le retrait en boutique peut rester payable en espèces sur place.
+- Avant ouverture, vérifier matériellement et approuver que chaque commerce autorisé possède son propre service de livraison ; le champ `offers_delivery` ne constitue pas à lui seul une preuve documentaire.
 - Autoriser simultanément `direct_split`, `store_collects_all`, `courier_cash` et `platform_online` seulement si les options correspondantes sont vérifiées.
 - Les paiements directs Mobile Money exigent des instructions vérifiables du commerce ; les espèces au livreur exigent une livraison et une procédure de remise d'espèces.
 - L'affichage B2C initial masquait les paiements directs lorsque SingPay était prêt. Correction réalisée **sur la branche de revue uniquement**, avec tests ; aucune activation en production.
