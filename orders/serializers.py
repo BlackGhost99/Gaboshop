@@ -304,6 +304,10 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 attrs['delivery_address'] = ' — '.join(parts)
             else:
                 attrs['landmark'] = None
+                try:
+                    attrs['delivery_zone'] = resolve_zone(attrs.get('city') or 'Libreville', attrs.get('delivery_zone'))
+                except ValueError as exc:
+                    raise serializers.ValidationError({'delivery_zone': str(exc)})
             # Position GPS partagée par le client (facultative) : les deux coordonnées, au Gabon, ou rien.
             lat, lng = attrs.get('delivery_latitude'), attrs.get('delivery_longitude')
             if lat is not None or lng is not None:
@@ -312,10 +316,6 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                     attrs['delivery_latitude'], attrs['delivery_longitude'] = parse_point(lat, lng)
                 except ValueError as exc:
                     raise serializers.ValidationError({'delivery_latitude': str(exc)})
-                try:
-                    attrs['delivery_zone'] = resolve_zone(attrs.get('city') or 'Libreville', attrs.get('delivery_zone'))
-                except ValueError as exc:
-                    raise serializers.ValidationError({'delivery_zone': str(exc)})
         else:
             attrs['neighborhood'] = None
             attrs['landmark'] = None
