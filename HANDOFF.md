@@ -81,6 +81,18 @@ pourquoi les images envoyées sont stockées en base (`core.StoredFile`, `core/s
   - Il propose un mode voix.
   - Sans clé Groq, un moteur local répond.
   - État de l'assistant : `/api/v1/ai/assistant/status/`.
+- **Notifications (boîte, alertes téléphone/ordinateur, annonces) :**
+  - Une notification est enregistrée en base (`notifications/models.py`), avec un lien par rôle (`notifications/links.py`).
+    La cloche, la page `/notifications` et la barre du bas (`MobileTabBar`) lisent le même compteur
+    (`frontend/src/context/NotificationContext.jsx`, appel léger toutes les 20 s).
+  - Alertes quand le site est fermé = Web Push (`notifications/push.py`, `public/sw.js`). Les clés VAPID se créent seules
+    en base au premier besoin ; `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` dans Render les remplaceraient, `PUSH_ENABLED=0` coupe tout.
+    Seules les adresses des vrais services d'alertes (Google, Mozilla, Apple, Windows) sont acceptées à l'inscription.
+  - Admin › Annonces : un message à tous les clients, commerces, livreurs ou à l'admin seul (essai). Entre 21 h et 7 h
+    (Libreville) l'alerte téléphone attend 7 h, sauf annonce « urgente » ; la tâche automatique `annonces_differees` l'envoie.
+  - L'application Android (APK) n'a pas Web Push : elle voit la cloche, mais l'alerte application fermée demande Firebase
+    (`PushSubscription.kind='fcm'` est prévu, rien n'est branché ; le propriétaire doit créer un projet Firebase).
+  - iPhone : les alertes ne marchent que si le site est ajouté à l'écran d'accueil.
 - **Anti-fraude :**
   - Un nouveau commerce est invisible tant que l'admin ne l'a pas validé.
   - Le « Gardien anti-fraude » est en place.

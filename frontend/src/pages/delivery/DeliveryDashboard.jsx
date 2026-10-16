@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { askAI, describeError, notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
 import NotificationHelp from '../../components/NotificationHelp';
+import NotificationBell from '../../components/NotificationBell';
+import { PushPrompt } from '../../components/PushControls';
+import { logout } from '../../utils/session';
 import { statusLabel } from '../../utils/notificationLabels';
 import DeliveryMap from '../../components/map/DeliveryMap';
 import useOrderTracking from '../../hooks/useOrderTracking';
@@ -14,7 +17,6 @@ import { getDeliveryDashboard, updateDeliveryProfile } from '../../services/dash
 import { startDelivery, acceptDelivery, rejectDelivery, getAvailableDeliveries, claimDelivery, updateAvailability } from '../../services/deliveryService';
 import { formatCurrency, getDeliveryStatusBadge } from '../../utils/helpers';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from '../../services/notificationService';
-import authStorage from '../../utils/authStorage';
 import PendingPayments from '../../components/payments/PendingPayments';
 import MyPlatformDebt from '../../components/payments/MyPlatformDebt';
 
@@ -407,11 +409,7 @@ const DeliveryDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    authStorage.removeItem('token');
-    authStorage.removeItem('refresh_token');
-    window.location.href = '/login';
-  };
+  const handleLogout = () => logout('/login');
 
   // Spinner au premier chargement seulement : un rafraîchissement ne fait plus disparaître la page.
   if (loading && !dashboardData) return <LoadingSpinner />;
@@ -460,15 +458,19 @@ const DeliveryDashboard = () => {
           <span className="font-semibold text-gray-800 text-lg">{profile.first_name || 'Livreur'}</span>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="text-gray-500 hover:text-red-600 font-medium text-sm"
-        >
-          Déconnexion
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button
+            onClick={handleLogout}
+            className="text-gray-500 hover:text-red-600 font-medium text-sm"
+          >
+            Déconnexion
+          </button>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PushPrompt role="delivery_agent" />
         <PendingPayments title="Paiements à confirmer" />
         <MyPlatformDebt />
         {dashboardData && !profile.mobile_money_phone && (
@@ -516,7 +518,7 @@ const DeliveryDashboard = () => {
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <StatCard
             title="Livraisons du jour"
             value={dashboardData?.stats?.completed_today || 0}

@@ -1,5 +1,7 @@
 import { lineKey } from './productOptions';
 import authStorage from './authStorage';
+import { forgetRole } from './currentUser';
+import { disablePush } from './push';
 
 // Produit choisi par un visiteur avant de se connecter : ajouté au panier au retour.
 const PENDING_CART_KEY = 'gaboshop_pending_cart_item';
@@ -8,24 +10,33 @@ const CART_KEY = 'gaboshop_cart';
 export const isLoggedIn = () => Boolean(authStorage.getItem('token'));
 
 export const logout = (redirectTo = '/') => {
-  ['token', 'refresh_token'].forEach((key) => {
-    authStorage.removeItem(key);
-    try {
-      localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
-    } catch {
-      // stockage indisponible
-    }
-  });
-  // Appareil partagé : le panier et le dernier message d'erreur ne restent pas pour la personne suivante.
-  [CART_KEY, PENDING_CART_KEY, 'last_api_error'].forEach((key) => {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // stockage indisponible
-    }
-  });
-  window.location.href = redirectTo;
+  const finish = () => {
+    ['token', 'refresh_token'].forEach((key) => {
+      authStorage.removeItem(key);
+      try {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      } catch {
+        // stockage indisponible
+      }
+    });
+    forgetRole();
+    // Appareil partagé : le panier et le dernier message d'erreur ne restent pas pour la personne suivante.
+    [CART_KEY, PENDING_CART_KEY, 'last_api_error'].forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // stockage indisponible
+      }
+    });
+    window.location.href = redirectTo;
+  };
+  // Cet appareil n'est plus alerté pour ce compte (la personne suivante pourra activer les siennes).
+  // On n'attend pas plus d'1,5 s : se déconnecter ne doit jamais bloquer.
+  Promise.race([
+    disablePush({ keepBrowserSubscription: true }),
+    new Promise((resolve) => setTimeout(resolve, 1500)),
+  ]).catch(() => {}).finally(finish);
 };
 
 // Adresse de retour après connexion, limitée au site lui-même.

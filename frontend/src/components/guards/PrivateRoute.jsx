@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import LoadingSpinner from '../LoadingSpinner';
 import authStorage from '../../utils/authStorage';
@@ -11,15 +11,20 @@ import PhoneVerifyBanner from '../PhoneVerifyBanner';
  * @param {React.ReactNode} props.children - Composants enfants à afficher si autorisé
  * @param {string[]} props.allowedRoles - Liste des rôles autorisés (ex: ['client', 'store_manager'])
  */
-export default function PrivateRoute({ children, allowedRoles = [] }) {
+const ANY_ROLE = [];
+
+export default function PrivateRoute({ children, allowedRoles = ANY_ROLE }) {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [isAuthorized, setIsAuthorized] = useState(null);
 
 	useEffect(() => {
 		const checkAuth = async () => {
 			const token = authStorage.getItem('token');
 			if (!token) {
-				navigate('/login');
+				// Retour là où la personne allait (notification touchée, panier…) une fois connectée.
+				const wanted = `${location.pathname}${location.search}${location.hash}`;
+				navigate(wanted && wanted !== '/' ? `/login?next=${encodeURIComponent(wanted)}` : '/login');
 				return;
 			}
 
@@ -45,6 +50,7 @@ export default function PrivateRoute({ children, allowedRoles = [] }) {
 		};
 
 		checkAuth();
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [navigate, allowedRoles]);
 
 	if (isAuthorized === null) {

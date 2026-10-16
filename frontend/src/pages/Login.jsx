@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '../services/dashboardService';
 import authStorage from '../utils/authStorage';
 import { safeNextPath } from '../utils/session';
+import { rememberRole } from '../utils/currentUser';
 import { describeError } from '../utils/feedback';
 import FormError from '../components/FormError';
 
@@ -30,10 +31,12 @@ const Login = () => {
 
         // Direct redirect for admin users, otherwise go to /dashboard
         const userType = response.data.user?.user_type || response.data.user_type;
-        if (userType === 'admin') {
+        rememberRole(userType);
+        if (userType === 'admin' && !(nextPath && /^\/(admin|notifications)(\/|\?|$)/.test(nextPath))) {
           navigate('/admin/dashboard');
-        } else if (nextPath && userType === 'client') {
-          // Retour là où le client était (ex. produit qu'il voulait ajouter au panier)
+        } else if (nextPath) {
+          // Retour là où la personne était (produit à ajouter au panier, notification touchée…).
+          // Une adresse qui n'est pas pour son rôle la renvoie à son espace.
           navigate(nextPath);
         } else {
           navigate('/dashboard');

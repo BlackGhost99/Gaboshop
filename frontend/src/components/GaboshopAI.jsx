@@ -140,7 +140,7 @@ const GaboshopAI = () => {
     };
 
     return (
-        <div className="fixed bottom-6 right-4 sm:right-6 z-50 font-sans">
+        <div className="ai-fab fixed bottom-6 right-4 sm:right-6 z-50 font-sans">
             {isOpen && (
                 <div className="bg-white shadow-2xl rounded-2xl w-[calc(100vw-2rem)] max-w-sm sm:w-96 flex flex-col mb-4 overflow-hidden ring-1 ring-black/5 max-h-[75dvh]">
                     {/* En-tête */}

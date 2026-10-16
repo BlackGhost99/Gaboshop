@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import AndroidBackButton from './components/AndroidBackButton';
 import ScrollToTop from './components/ScrollToTop';
 import Login from './pages/Login';
@@ -14,7 +14,10 @@ import DashboardRedirect from './components/DashboardRedirect';
 import GaboshopAI from './components/GaboshopAI';
 import FeedbackCenter from './components/FeedbackCenter';
 import AIAlertBanner from './components/AIAlertBanner';
+import MobileTabBar from './components/MobileTabBar';
 import { AIContextProvider } from './context/AIContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { registerServiceWorker } from './utils/push';
 const ClientDashboard = lazy(() => import('./pages/client/ClientDashboard'));
 const ClientOrders = lazy(() => import('./pages/client/ClientOrders'));
 const StoreDashboard = lazy(() => import('./pages/store/StoreDashboard'));
@@ -36,6 +39,7 @@ const Confidentialite = lazy(() => import('./pages/legal/Confidentialite'));
 const MentionsLegales = lazy(() => import('./pages/legal/MentionsLegales'));
 const SuppressionCompte = lazy(() => import('./pages/legal/SuppressionCompte'));
 const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 
 // Les espaces client, commerce, livreur et admin se chargent à la demande :
 // le premier écran du site reste léger.
@@ -45,9 +49,26 @@ const PageLoader = () => (
   </div>
 );
 
+// Adresse inconnue (lien ancien, faute de frappe) : un message et deux sorties, au lieu d'une page blanche.
+const NotFound = () => (
+  <div className="flex min-h-[70vh] flex-col items-center justify-center gap-3 px-6 text-center">
+    <p className="text-5xl" aria-hidden="true">🧭</p>
+    <h1 className="text-xl font-bold text-gray-900">Cette page n’existe pas</h1>
+    <p className="max-w-sm text-sm text-gray-600">Le lien est peut-être ancien ou mal écrit. Revenez à l’accueil ou à votre espace.</p>
+    <div className="flex gap-2">
+      <Link to="/" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Accueil</Link>
+      <Link to="/dashboard" className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800">Mon espace</Link>
+    </div>
+  </div>
+);
+
+const CLIENT_ONLY = ['client'];
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
 function App() {
+  // Le service qui reçoit les alertes (téléphone et ordinateur) est prêt dès l'ouverture.
+  useEffect(() => { registerServiceWorker(); }, []);
+
   useEffect(() => {
     let timeoutId;
 
@@ -89,6 +110,7 @@ function App() {
       <ScrollToTop />
       <AndroidBackButton />
       <AIContextProvider>
+        <NotificationProvider>
         <Suspense fallback={<PageLoader />}>
         <Routes>
         {/* Routes publiques (BLOQUEES pour store_managers) */}
@@ -110,6 +132,20 @@ function App() {
         <Route path="/mentions-legales" element={<MentionsLegales />} />
         <Route path="/suppression-compte" element={<SuppressionCompte />} />
         <Route path="/supprimer-mon-compte" element={<DeleteAccount />} />
+
+        {/* Notifications : tous les comptes connectés */}
+        <Route path="/notifications" element={
+          <PrivateRoute>
+            <Notifications />
+          </PrivateRoute>
+        } />
+
+        {/* Panier : il vit dans l'espace client (lien de la barre du bas, de l'en-tête et de l'assistant) */}
+        <Route path="/cart" element={
+          <PrivateRoute allowedRoles={CLIENT_ONLY}>
+            <Navigate to="/client/dashboard#paniers" replace />
+          </PrivateRoute>
+        } />
 
         {/* Client routes (PROTEGEES) */}
         <Route path="/client/dashboard" element={
@@ -187,11 +223,14 @@ function App() {
             <StoreSubscriptionPlans />
           </PrivateRoute>
         } />
+        <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
+        <MobileTabBar />
         <AIAlertBanner />
         <GaboshopAI />
         <FeedbackCenter />
+        </NotificationProvider>
       </AIContextProvider>
     </Router>
   );

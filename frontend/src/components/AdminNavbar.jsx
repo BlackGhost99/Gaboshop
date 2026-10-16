@@ -1,4 +1,5 @@
 import React from 'react';
+import NotificationBell from './NotificationBell';
 
 const AdminNavbar = ({ onRefresh, onLogout, refreshing, onMenuClick }) => (
   <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-white border-b border-gray-200 z-20 flex items-center gap-2 px-3 sm:px-6">
@@ -15,12 +16,15 @@ const AdminNavbar = ({ onRefresh, onLogout, refreshing, onMenuClick }) => (
       <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Console Admin</h1>
       <p className="hidden sm:block text-xs text-gray-500 truncate">Pilotage global users / commandes / finances</p>
     </div>
-    <div className="flex items-center gap-2 shrink-0">
+    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <NotificationBell />
       <button
         onClick={onRefresh}
         className="px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-semibold bg-white border border-gray-200 shadow-sm hover:bg-gray-50"
+        aria-label="Rafraîchir les données"
       >
-        {refreshing ? 'Rafraîchissement...' : 'Rafraîchir'}
+        <span className="sm:hidden" aria-hidden="true">{refreshing ? '…' : '↻'}</span>
+        <span className="hidden sm:inline">{refreshing ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
       </button>
       <button
         onClick={onLogout}

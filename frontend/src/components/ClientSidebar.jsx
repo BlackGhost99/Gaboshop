@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getClientDashboard } from '../services/dashboardService';
 import { logout } from '../utils/session';
+import { useNotifications } from '../context/NotificationContext';
+import { CountBadge } from './NotificationBell';
 
 const ClientSidebar = ({ open = false, onClose }) => {
   const location = useLocation();
   const [clientData, setClientData] = useState(null);
+  const { unread } = useNotifications();
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -26,14 +29,30 @@ const ClientSidebar = ({ open = false, onClose }) => {
 
   const links = [
     {
-      name: 'Dashboard',
+      name: 'Tableau de bord',
       path: '/client/dashboard',
       icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    },
+    {
+      name: 'Mon panier',
+      path: '/cart',
+      icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z',
     },
     {
       name: 'Mes commandes',
       path: '/client/orders',
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+    },
+    {
+      name: 'Notifications',
+      path: '/notifications',
+      badge: unread,
+      icon: 'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+    },
+    {
+      name: 'Toutes les boutiques',
+      path: '/boutiques',
+      icon: 'M3 9l9-6 9 6v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',
     },
   ];
 
@@ -73,7 +92,8 @@ const ClientSidebar = ({ open = false, onClose }) => {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={link.icon} />
             </svg>
-            <span>{link.name}</span>
+            <span className="flex-1">{link.name}</span>
+            <CountBadge count={link.badge} />
           </Link>
         ))}
         <button

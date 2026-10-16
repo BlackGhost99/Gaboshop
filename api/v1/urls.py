@@ -36,7 +36,8 @@ from .dashboards import (
 )
 from .notifications import (
     NotificationListView, NotificationMarkAllReadView, NotificationMarkReadView,
-    NotificationDeleteView
+    NotificationDeleteView, NotificationUnreadCountView, NotificationPreferencesView,
+    PushConfigView, PushSubscribeView, PushUnsubscribeView, PushTestView, AdminAnnouncementsView,
 )
 from . import delivery_admin, geo
 from . import client_forfaits
@@ -135,6 +136,12 @@ urlpatterns = [
 
     # Notifications
     path('notifications/', NotificationListView.as_view(), name='notifications'),
+    path('notifications/unread-count/', NotificationUnreadCountView.as_view(), name='notifications-unread-count'),
+    path('notifications/preferences/', NotificationPreferencesView.as_view(), name='notifications-preferences'),
+    path('notifications/push/config/', PushConfigView.as_view(), name='notifications-push-config'),
+    path('notifications/push/subscribe/', PushSubscribeView.as_view(), name='notifications-push-subscribe'),
+    path('notifications/push/unsubscribe/', PushUnsubscribeView.as_view(), name='notifications-push-unsubscribe'),
+    path('notifications/push/test/', PushTestView.as_view(), name='notifications-push-test'),
     path('notifications/mark-all-read/', NotificationMarkAllReadView.as_view(), name='notifications-mark-all'),
     path('notifications/<int:pk>/read/', NotificationMarkReadView.as_view(), name='notifications-read'),
     path('notifications/<int:pk>/', NotificationDeleteView.as_view(), name='notifications-delete'),
@@ -174,6 +181,7 @@ urlpatterns = [
 
     # Admin (plateforme)
     path('admin/summary/', AdminSummaryView.as_view(), name='admin-summary'),
+    path('admin/announcements/', AdminAnnouncementsView.as_view(), name='admin-announcements'),
     path('admin/users/', AdminUsersView.as_view(), name='admin-users'),
     path('admin/guardian/', AdminGuardianView.as_view(), name='admin-guardian'),
     path('admin/guardian/<int:hold_id>/decision/', AdminGuardianDecisionView.as_view(), name='admin-guardian-decision'),

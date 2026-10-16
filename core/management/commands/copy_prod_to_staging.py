@@ -33,6 +33,9 @@ EXCLUDE = [
     'contenttypes', 'auth.permission', 'sessions', 'admin.logentry',
     'django_celery_results', 'django_celery_beat',
     'core.storedfile',  # copié à part, par paquets
+    # Jamais les appareils des vrais clients ni les clés d'alerte de la production : le site de test ne doit pas pouvoir
+    # envoyer une alerte sur le téléphone d'une vraie personne.
+    'notifications.pushsubscription', 'notifications.pushkeypair',
 ]
 FILE_BATCH = 20
 

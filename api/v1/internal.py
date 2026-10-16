@@ -38,6 +38,15 @@ def _payments_mode():
 	return 'real' if platform_online_ready() else 'not_configured'
 
 
+def _push_mode():
+	"""off : alertes coupées (PUSH_ENABLED=0) ; env : clés dans l'environnement ; database : clés créées par le site."""
+	if not getattr(settings, 'PUSH_ENABLED', True):
+		return 'off'
+	if getattr(settings, 'VAPID_PUBLIC_KEY', '') and getattr(settings, 'VAPID_PRIVATE_KEY', ''):
+		return 'env'
+	return 'database'
+
+
 class HealthView(APIView):
 	"""GET /api/v1/health/ : état de l'API sans aucune donnée privée (base, minuteur, commandes bloquées)."""
 	permission_classes = [permissions.AllowAny]
@@ -68,6 +77,7 @@ class HealthView(APIView):
 		ip_source = 'cloudflare' if meta.get('HTTP_CF_CONNECTING_IP') else ('x-forwarded-for' if xff else 'remote_addr')
 		return Response({'success': True, 'data': {
 			'payments_mode': _payments_mode(),
+			'push_mode': _push_mode(),
 			'ip_source': ip_source,
 			'forwarded_hops': len(xff),
 			'database': database,

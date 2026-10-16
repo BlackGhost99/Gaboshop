@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { openInvoice } from '../../utils/invoice';
 import { describeOptions } from '../../utils/productOptions';
-import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { describeError, notifySuccess } from '../../utils/feedback';
 import B2CCategoryModal from '../../components/B2CCategoryModal';
@@ -71,6 +70,8 @@ import AdminNavbar from '../../components/AdminNavbar';
 import AdminStoresSection from '../../components/AdminStoresSection';
 import AdminProductsSection from '../../components/AdminProductsSection';
 import AdminOverviewSection from '../../components/AdminOverviewSection';
+import AdminAnnouncementsSection from '../../components/AdminAnnouncementsSection';
+import { PushPrompt } from '../../components/PushControls';
 import AdminDeliverySection from '../../components/AdminDeliverySection';
 import AdminSubscriptionsSection from '../../components/AdminSubscriptionsSection';
 import AdminB2BManagementSection from '../../components/AdminB2BManagementSection';
@@ -86,7 +87,7 @@ import PlatformDebts from '../../components/admin/PlatformDebts';
 import AlertModal from '../../components/AlertModal';
 import ConfirmModal from '../../components/ConfirmModal';
 import StoreDetailModal from '../../components/StoreDetailModal';
-import authStorage from '../../utils/authStorage';
+import { logout } from '../../utils/session';
 
 const StatCard = ({ title, value, hint }) => (
   <div className="bg-white shadow-sm rounded-lg p-4 border border-gray-100">
@@ -97,7 +98,6 @@ const StatCard = ({ title, value, hint }) => (
 );
 
 const AdminDashboard = () => {
-  const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
   // const [financials, setFinancials] = useState(null);  // Not used in favor of financeDashboard
   const [users, setUsers] = useState([]);
@@ -262,11 +262,7 @@ const AdminDashboard = () => {
     loadData(true);
   }, []);
 
-  const handleLogout = () => {
-    authStorage.removeItem('token');
-    authStorage.removeItem('refresh_token');
-    navigate('/login');
-  };
+  const handleLogout = () => logout('/login');
 
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -2164,6 +2160,7 @@ const AdminDashboard = () => {
       <AdminNavbar onRefresh={() => loadData(false)} onLogout={handleLogout} refreshing={refreshing} onMenuClick={() => setMobileMenuOpen(true)} />
       <main className="pt-20 px-3 sm:px-6 lg:pl-64 lg:pr-6 pb-10">
         {/* Navigation désormais uniquement via la sidebar */}
+        <PushPrompt role="admin" />
         
         {/* Messages de succès/erreur */}
         {actionSuccess && (
@@ -2180,6 +2177,7 @@ const AdminDashboard = () => {
         )}
 
         {activeTab === 'overview' && overviewSection}
+        {activeTab === 'announcements' && <AdminAnnouncementsSection />}
         {activeTab === 'users' && usersSection}
         {activeTab === 'orders' && ordersSection}
         {activeTab === 'finances' && financesSection}

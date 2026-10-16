@@ -3,6 +3,7 @@ import React from 'react';
 const AdminSidebar = ({ activeTab, onTabChange, mobileOpen = false, onClose = () => {} }) => {
   const links = [
     { id: 'overview', label: 'Vue globale', icon: 'M3 12l2-2 7-7 7 7-2 2v7a1 1 0 01-1 1h-3m-6 0h6m-6 0a1 1 0 01-1-1v-7' },
+    { id: 'announcements', label: 'Annonces', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z' },
     { id: 'users', label: 'Utilisateurs', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2a3 3 0 00-.879-2.121M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2a3 3 0 01.879-2.121m0 0a3 3 0 014.242 0M12 6a3 3 0 110 6 3 3 0 010-6zm-5 3a3 3 0 105.879 1.121' },
     { id: 'orders', label: 'Commandes', icon: 'M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 0a2 2 0 104 0m-4 0a2 2 0 114 0' },
     { id: 'finances', label: 'Finances', icon: 'M12 8c-4.418 0-8 1.79-8 4s3.582 4 8 4 8-1.79 8-4-3.582-4-8-4zm0 8c-4.418 0-8-1.79-8-4m8 4v4m0-4c4.418 0 8-1.79 8-4m-8-4V4' },

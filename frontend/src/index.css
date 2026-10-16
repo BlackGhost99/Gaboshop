@@ -251,3 +251,18 @@ main.bg-gray-100,
     animation: none;
   }
 }
+
+/* ---------- Notifications : apparition douce de l'alerte à l'écran ---------- */
+@keyframes notifToastIn {
+  from { transform: translateY(-14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.notif-toast { animation: notifToastIn 220ms ease-out; }
+
+/* ---------- Barre du bas sur téléphone ---------- */
+@media (max-width: 767px) {
+  /* Pages qui défilent avec la fenêtre : la barre fixe ne cache pas le bas de page. */
+  body.tabbar-pad { padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+  /* L'assistant IA remonte au-dessus de la barre. */
+  body.has-tabbar .ai-fab { bottom: calc(4.75rem + env(safe-area-inset-bottom)); }
+}

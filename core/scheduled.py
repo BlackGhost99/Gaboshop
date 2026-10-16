@@ -216,6 +216,12 @@ def guard_against_fraud():
 	return scan_recent()
 
 
+def send_deferred_announcement_pushes():
+	"""Alertes téléphone des annonces reçues la nuit : elles partent à 7 h, heure de Libreville."""
+	from notifications.push import send_deferred_announcements
+	return send_deferred_announcements()
+
+
 JOBS = (
 	('livraisons', timedelta(minutes=2), advance_deliveries),
 	('paiements_en_ligne', timedelta(minutes=2), check_online_payments),
@@ -223,6 +229,7 @@ JOBS = (
 	('abonnements_expires', timedelta(hours=12), expire_subscriptions),
 	('versements_sans_confirmation', timedelta(hours=1), release_unconfirmed_payouts),
 	('gardien_antifraude', timedelta(minutes=30), guard_against_fraud),
+	('annonces_differees', timedelta(minutes=10), send_deferred_announcement_pushes),
 )
 
 

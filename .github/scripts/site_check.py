@@ -50,6 +50,9 @@ MARKERS = {
     'Preuve de livraison par code PIN seul (16 oct.)': 'seule preuve de remise acceptée',
     'Adresses Province › Ville › Arrondissement › Quartier (16 oct.)': 'Secteur partagé',
     'Position GPS du client partagée au livreur (16 oct.)': 'Position GPS partagée avec le livreur',
+    'Boîte de notifications et alertes appareil (16 oct.)': 'Réglages des alertes',
+    'Annonces de l\'admin (16 oct.)': 'Alerter aussi sur les téléphones et ordinateurs',
+    'Barre du bas sur téléphone (16 oct.)': 'Navigation principale',
 }
 
 
@@ -154,9 +157,17 @@ def check(site):
             f"paiements en ligne en attente depuis 30 min : `{data.get('online_payments_pending_30min')}`"
         )
         lines.append(f"- Paiements en ligne : mode `{data.get('payments_mode')}` (simulated = faux SingPay du site de test, real = vrais paiements, disabled = coupés)")
+        lines.append(f"- Alertes téléphone/ordinateur : clés `{data.get('push_mode')}` (database = créées par le site, env = fournies, off = coupées)")
         lines.append(f"- Adresse IP des limites d'essais : source `{data.get('ip_source')}`, relais X-Forwarded-For : `{data.get('forwarded_hops')}`")
     except Exception:
         lines.append(f"- Santé de l'API : **{res['status']}**")
+
+    # Service des alertes et manifeste de l'application installable (16 oct.)
+    sw = fetch(f'{web}/sw.js', attempts=1)
+    manifest = fetch(f'{web}/manifest.webmanifest', attempts=1)
+    sw_ok = sw['status'] == 200 and b'showNotification' in (sw['body'] or b'')
+    lines.append(f"- Service des alertes (/sw.js) : **{sw['status']}** ({'contenu attendu' if sw_ok else 'contenu inattendu ou absent'}) ; "
+                 f"manifeste (/manifest.webmanifest) : **{manifest['status']}**")
 
     res = fetch(f'{web}/')
     lines.append(f"- Site web : **{res['status']}** en {res['seconds']} s")

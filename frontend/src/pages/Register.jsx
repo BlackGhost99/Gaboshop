@@ -4,6 +4,7 @@ import { register } from '../services/dashboardService';
 import { getStoreCategories } from '../services/storeService';
 import authStorage from '../utils/authStorage';
 import { safeNextPath } from '../utils/session';
+import { rememberRole } from '../utils/currentUser';
 import { describeError } from '../utils/feedback';
 import FormError from '../components/FormError';
 
@@ -127,6 +128,7 @@ const Register = () => {
         authStorage.setItem('refresh_token', res.data.tokens.refresh);
         // If the created user is an admin, redirect to admin dashboard
         const createdUserType = res.data.user?.user_type || res.data.user_type;
+        rememberRole(createdUserType);
         if (createdUserType === 'admin') {
           navigate('/admin/dashboard');
         } else if (nextPath && createdUserType === 'client') {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import StatCard from '../../components/StatCard';
 import ClientForfaitCard from '../../components/ClientForfaitCard';
@@ -74,10 +74,12 @@ const paymentHint = (flow, method, deliveryBy) => {
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
   const [dashboardData, setDashboardData] = useState(null);
   const [error, setError] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [cartByStore, setCartByStore] = useState({});
+  const hasCart = Object.keys(cartByStore).length > 0;
   const [storeForms, setStoreForms] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [toast, setToast] = useState(null);
@@ -159,6 +161,12 @@ const ClientDashboard = () => {
     const timer = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Lien « Panier » (barre du bas, menu) : /client/dashboard#paniers amène directement au panier.
+  useEffect(() => {
+    if (loading || location.hash !== '#paniers') return;
+    requestAnimationFrame(() => document.getElementById('paniers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [loading, location.hash]);
 
   // L'assistant peut ajouter au panier pendant que la page est ouverte
   useEffect(() => {
@@ -565,6 +573,7 @@ const ClientDashboard = () => {
 
   if (loading) return <ClientLayout title="Dashboard"><LoadingSpinner /></ClientLayout>;
 
+
   if (error) {
     return (
       <ClientLayout title="Dashboard">
@@ -576,21 +585,21 @@ const ClientDashboard = () => {
   }
 
   return (
-    <ClientLayout title="Dashboard" userName={dashboardData?.profile?.name || 'Client'}>
+    <ClientLayout userName={dashboardData?.profile?.name || 'Client'}>
       <style>{`
         @keyframes popIn { 0% { transform: translateY(12px) scale(0.98); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
       `}</style>
 
       {/* En-tête */}
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900">
+      <div className="mb-4 sm:mb-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
           Bienvenue, {dashboardData?.profile?.name || 'Client'} !
         </h2>
-        <p className="text-gray-600 mt-2">Voici un aperçu de vos commandes</p>
+        <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Voici un aperçu de vos commandes</p>
       </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <StatCard
             title="Commandes totales"
             value={dashboardData?.stats?.total_orders || 0}
@@ -633,10 +642,12 @@ const ClientDashboard = () => {
           />
         </div>
 
-        <ClientForfaitCard />
+        {/* Le panier passe en premier quand il contient des articles : c'est ce que le client vient finir. */}
+        <div className="flex flex-col gap-6 sm:gap-8">
+        <div className="order-2"><ClientForfaitCard /></div>
 
         {/* Commandes récentes */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className={`bg-white rounded-lg shadow-md p-4 sm:p-6 ${hasCart ? 'order-3' : 'order-1'}`}>
           <h3 className="text-xl font-bold text-gray-900 mb-6">Commandes récentes</h3>
           
           {dashboardData?.recent_orders?.length > 0 ? (
@@ -648,7 +659,7 @@ const ClientDashboard = () => {
                   <div key={order.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-base font-semibold text-gray-900">#{order.id}</p>
+                        <p className="text-base font-semibold text-gray-900">{order.order_number || `#${order.id}`}</p>
                         <p className="text-sm text-gray-700">{order.store_name}</p>
                         <p className="text-xs text-gray-500">{formatDateTime(order.created_at)}</p>
                       </div>
@@ -693,7 +704,7 @@ const ClientDashboard = () => {
                     return (
                       <tr key={order.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          #{order.id}
+                          {order.order_number || `#${order.id}`}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {order.store_name}
@@ -732,7 +743,7 @@ const ClientDashboard = () => {
         </div>
 
         {/* Paniers en cours (par magasin) */}
-        <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+        <div id="paniers" className={`bg-white rounded-lg shadow-md p-4 sm:p-6 scroll-mt-4 ${hasCart ? 'order-1' : 'order-3'}`}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold text-gray-900">Mes paniers</h3>
@@ -741,7 +752,16 @@ const ClientDashboard = () => {
           </div>
 
           {Object.keys(cartByStore).length === 0 ? (
-            <div className="text-center py-10 text-gray-500">Aucun article dans le panier.</div>
+            <div className="text-center py-8 text-gray-500">
+              <p>Aucun article dans le panier.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/boutiques')}
+                className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Découvrir les boutiques
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {Object.entries(cartByStore).map(([storeName, data]) => (
@@ -970,9 +990,10 @@ const ClientDashboard = () => {
             </div>
           )}
         </div>
+        </div>
 
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50">
+        <div className="fixed bottom-24 md:bottom-5 right-5 z-50">
           <div
             className={`px-4 py-3 rounded-lg shadow-xl border text-sm font-medium text-white animate-[popIn_0.25s_ease-out]
               ${toast.type === 'success' ? 'bg-green-600 border-green-500'

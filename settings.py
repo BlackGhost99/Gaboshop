@@ -634,3 +634,11 @@ PAYMENT_WEBHOOK_SIGNATURE_REQUIRED = env_bool(
     'PAYMENT_WEBHOOK_SIGNATURE_REQUIRED',
     default=not DEBUG,
 )
+
+# Alertes sur téléphone et ordinateur (Web Push, notifications/push.py). Les clés VAPID se créent d'elles-mêmes
+# en base ; VAPID_PUBLIC_KEY et VAPID_PRIVATE_KEY (facultatives) les remplacent. PUSH_ENABLED=0 coupe tout envoi.
+PUSH_ENABLED = env_bool('PUSH_ENABLED', True)
+PUSH_SYNC = False  # les tests passent à True pour recevoir le résultat sans attendre un fil d'arrière-plan
+VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY', default='')
+VAPID_SUBJECT = env('VAPID_SUBJECT', default='mailto:contact@gaboshop.ga')
