@@ -58,7 +58,7 @@ class NotificationService:
 
             template = NotificationTemplates.new_order_store(order)
             template['sms'] = message['sms']
-            success = NotificationService._send_to_store(store.phone, template, message['title'])
+            success = NotificationService._send_to_store(store.phone, template, message['title'], store.manager.email or store.email)
             if not success:
                 logger.error("Échec de l'envoi de la nouvelle commande à %s", store.name)
             return success
@@ -123,7 +123,8 @@ class NotificationService:
             success = NotificationService._send_to_agent(
                 delivery.delivery_agent.phone,
                 template,
-                f"Nouvelle livraison #{delivery.tracking_number}"
+                f"Nouvelle livraison #{delivery.tracking_number}",
+                delivery.delivery_agent.email,
             )
             if not success:
                 logger.error("Échec de l'envoi de la livraison au livreur %s", delivery.delivery_agent.phone)
@@ -211,7 +212,7 @@ class NotificationService:
                           'amount': float(payout.calculated_payout)},
             )
             if payout.status == 'completed':
-                NotificationService._send_to_agent(payout.delivery_agent.phone, {'sms': message['sms']}, message['title'])
+                NotificationService._send_to_agent(payout.delivery_agent.phone, {'sms': message['sms']}, message['title'], payout.delivery_agent.email)
             return note
         except Exception as e:
             logger.error(f"Erreur notification gain livreur: {e}")
@@ -241,29 +242,23 @@ class NotificationService:
     # ===== MÉTHODES D'ENVOI SPÉCIALISÉES =====
     
     @staticmethod
-    def _send_to_store(store_phone, template, fallback_message):
-        """Envoyer une notification à un magasin"""
-        # Magasins préfèrent WhatsApp pour les commandes
-        if not store_phone:
-            logger.warning("?? Téléphone magasin manquant, notification non envoyée")
-            return False
-        channels = ['whatsapp', 'sms']
-        return NotificationService._send_notification(store_phone, None, template, channels)
+    def _send_to_store(store_phone, template, fallback_message, store_email=None):
+        """Prévenir le commerce sur le canal configuré, notamment l'e-mail."""
+        channels = ['whatsapp', 'sms', 'email']
+        template = {**template, 'email_subject': fallback_message}
+        return NotificationService._send_notification(store_phone, store_email, template, channels)
     
     @staticmethod
     def _send_to_client(client_phone, client_email, template, fallback_message):
-        """Envoyer une notification à un client"""
-        channels = ['whatsapp', 'sms']
-        if client_email:
-            channels.append('email')
-        return NotificationService._send_notification(client_phone, client_email, template, channels)
+        """Envoyer une notification à un client."""
+        template = {**template, 'email_subject': fallback_message}
+        return NotificationService._send_notification(client_phone, client_email, template, ['whatsapp', 'sms', 'email'])
     
     @staticmethod
-    def _send_to_agent(agent_phone, template, fallback_message):
-        """Envoyer une notification à un livreur"""
-        # Livreurs préfèrent SMS pour rapidité
-        channels = ['sms', 'whatsapp']
-        return NotificationService._send_notification(agent_phone, None, template, channels)
+    def _send_to_agent(agent_phone, template, fallback_message, agent_email=None):
+        """Envoyer une notification à un livreur."""
+        template = {**template, 'email_subject': fallback_message}
+        return NotificationService._send_notification(agent_phone, agent_email, template, ['sms', 'whatsapp', 'email'])
     
     @staticmethod
     def _enabled_channels(channels):
@@ -274,6 +269,8 @@ class NotificationService:
             'sms': SystemSettings.current('enable_sms', True),
             'email': SystemSettings.current('enable_email', True),
         }
+        if getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only':
+            return ['email'] if 'email' in channels and flags['email'] else []
         return [channel for channel in channels if flags.get(channel, True)]
 
     @staticmethod
@@ -296,12 +293,14 @@ class NotificationService:
                 elif channel == 'sms' and 'sms' in template:
                     success = SMSService.send_sms(phone, template['sms'])
                 
-                elif channel == 'email' and email and 'email' in template:
-                    success = EmailService.send_template_email(
-                        email,
-                        template['email'],
-                        template.get('email_context', {})
-                    )
+                elif channel == 'email' and email:
+                    subject = template.get('email_subject') or 'Gaboshop — Notification'
+                    if template.get('email'):
+                        success = EmailService.send_template_email(
+                            email, template['email'], template.get('email_context', {}), subject=subject
+                        )
+                    elif template.get('sms'):
+                        success = EmailService.send_text_email(email, subject, str(template['sms']))
                 
                 if success:
                     break
