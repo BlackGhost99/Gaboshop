@@ -108,9 +108,8 @@ class SubscriptionChecker:
         ✔️ Vérifiez si le magasin peut ajouter un produit selon son forfait
         """
         plan = SubscriptionChecker.get_current_plan(store)
-        
         if not plan:
-            raise PermissionDenied("Aucun forfait trouvé. Veuillez vous abonner.")
+            return  # sans forfait connu on ne bloque jamais la création d'un produit
         
         # Vérifier si c'est un plan B2B ou B2C
         from b2b.models import B2BSubscriptionPlan
@@ -126,22 +125,21 @@ class SubscriptionChecker:
                 total_product_count = store.products.count()
                 
                 if total_product_count >= max_products:
-                    raise PermissionDenied(
-                        f"Votre forfait {plan.name} ne permet que {max_products} produit{'s' if max_products > 1 else ''} B2B. "
-                        f"Vous en avez déjà {total_product_count}. "
-                        f"Passez à un forfait supérieur pour ajouter plus de produits."
-                    )
+                    raise PermissionDenied(SubscriptionChecker.product_limit_message(plan, max_products))
         else:
             # Pour les stores B2C, vérifier max_products
             if plan.max_products is not None:
                 product_count = store.products.count()
                 if product_count >= plan.max_products:
-                    raise PermissionDenied(
-                        f"Votre forfait {plan.name} ne permet que {plan.max_products} produits. "
-                        f"Vous en avez déjà {product_count}. "
-                        f"Passez à un forfait supérieur pour ajouter plus de produits."
-                    )
+                    raise PermissionDenied(SubscriptionChecker.product_limit_message(plan, plan.max_products))
     
+    @staticmethod
+    def product_limit_message(plan, limit):
+        name = 'Gratuit' if getattr(plan, 'plan_type', '') == 'free' else plan.name
+        upgrade = 'Passez à Pro' if getattr(plan, 'plan_type', '') == 'free' else 'Passez à un forfait supérieur'
+        return (f"Vous avez atteint la limite de {limit} produit{'s' if limit > 1 else ''} du forfait {name}. "
+                f"{upgrade} pour ajouter davantage de produits.")
+
     @staticmethod
     def _normalize_text(value):
         text = (value or '').strip().lower()
@@ -184,7 +182,7 @@ class SubscriptionChecker:
         """
         plan = SubscriptionChecker.get_current_plan(store)
         if not plan:
-            raise PermissionDenied("Aucun forfait trouvé. Veuillez vous abonner.")
+            return
 
         max_food = getattr(plan, 'max_products_food', None)
         if max_food is None:

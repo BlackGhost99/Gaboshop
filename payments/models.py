@@ -400,6 +400,7 @@ class SubscriptionPlan(models.Model):
 	description = models.TextField(blank=True)
 	features_json = models.JSONField(default=list, blank=True, help_text="Liste des fonctionnalités en JSON")
 	is_active = models.BooleanField(default=True)
+	is_available = models.BooleanField(default=True, help_text="Décoché : le plan reste visible mais grisé « Bientôt disponible » et ne peut pas être acheté")
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 	

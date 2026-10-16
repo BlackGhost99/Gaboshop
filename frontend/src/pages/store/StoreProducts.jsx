@@ -275,11 +275,11 @@ const StoreProducts = () => {
                                 const maxProducts = subscriptionInfo?.limits?.products?.max ?? subscriptionInfo?.features?.max_products ?? null;
                                 const planName = subscriptionInfo?.subscription?.plan_name ?? subscriptionInfo?.plan?.name ?? 'votre forfait';
                                 
-                                let message = `Vous avez atteint la limite de produits de ${planName}. `;
-                                if (maxProducts !== null) {
-                                    message += `Vous avez ${currentProducts}/${maxProducts} produits. `;
-                                }
-                                message += `Passez à un forfait supérieur pour ajouter plus de produits.`;
+                                const isFree = /free|gratuit/i.test(String(planName));
+                                let message = maxProducts !== null
+                                    ? `Vous avez atteint la limite de ${maxProducts} produits du forfait ${isFree ? 'Gratuit' : planName} (${currentProducts}/${maxProducts}). `
+                                    : `Vous avez atteint la limite de produits du forfait ${planName}. `;
+                                message += isFree ? 'Passez à Pro pour ajouter davantage de produits.' : 'Passez à un forfait supérieur pour ajouter davantage de produits.';
                                 
                                 showToast(message, 'error');
                                 return;

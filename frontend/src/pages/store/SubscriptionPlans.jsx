@@ -193,8 +193,8 @@ const SubscriptionPlans = () => {
               </div>
               {currentPlan.plan_type === 'free' && (
                 <div className="text-right">
-                  <p className="text-sm text-gray-600">Passez au plan Business pour débloquer :</p>
-                  <p className="text-xs text-indigo-600 font-semibold mt-1">✓ Accès B2B ✓ Commission 0-2% ✓ Analytics avancés</p>
+                  <p className="text-sm text-gray-600">Passez à Pro pour débloquer :</p>
+                  <p className="text-xs text-indigo-600 font-semibold mt-1">✓ Plus de produits ✓ Import CSV ✓ Statistiques avancées</p>
                 </div>
               )}
             </div>
@@ -205,16 +205,22 @@ const SubscriptionPlans = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {plans.map((plan) => {
             const isCurrent = currentPlan?.plan_type === plan.plan_type;
-            const isHighlighted = plan.plan_type === 'business';
+            const unavailable = plan.is_available === false;
+            const isHighlighted = plan.plan_type === 'pro' && !unavailable;
 
             return (
               <div
                 key={plan.id}
-                className={`relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-300 hover:scale-105 ${
+                className={`relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-300 ${unavailable ? 'opacity-60 grayscale' : 'hover:scale-105'} ${
                   isCurrent ? 'ring-4 ring-green-500' : ''
                 } ${isHighlighted ? 'border-4 border-indigo-400' : 'border border-gray-200'}`}
               >
                 {/* Badge "Recommandé" ou "Actuel" */}
+                {unavailable && (
+                  <div className="absolute top-4 right-4 bg-gray-700 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
+                    Bientôt disponible
+                  </div>
+                )}
                 {isHighlighted && !isCurrent && (
                   <div className="absolute top-4 right-4 bg-indigo-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
                     ⭐ RECOMMANDÉ
@@ -231,7 +237,9 @@ const SubscriptionPlans = () => {
                   <div className="text-6xl mb-4">{getPlanIcon(plan.plan_type)}</div>
                   <h3 className="text-3xl font-bold mb-2">{plan.name}</h3>
                   <div className="flex items-baseline mb-2">
-                    {plan.actual_price === 0 || plan.price === 0 ? (
+                    {unavailable ? (
+                      <span className="text-3xl font-bold">Bientôt disponible</span>
+                    ) : Number(plan.actual_price ?? plan.price) === 0 ? (
                       <span className="text-4xl font-bold">GRATUIT</span>
                     ) : (
                       <>
@@ -240,7 +248,10 @@ const SubscriptionPlans = () => {
                       </>
                     )}
                   </div>
-                  {plan.price_label && plan.plan_type === 'business' && (
+                  {unavailable && plan.description && (
+                    <p className="text-sm text-white/90">{plan.description}</p>
+                  )}
+                  {!unavailable && plan.price_label && plan.plan_type === 'business' && (
                     <p className="text-sm text-white/80">{plan.price_label}</p>
                   )}
                 </div>
@@ -263,12 +274,19 @@ const SubscriptionPlans = () => {
                   </ul>
 
                   {/* CTA Button */}
-                  {plan.plan_type === 'free' ? (
+                  {unavailable ? (
                     <button
                       disabled
                       className="w-full py-4 px-6 bg-gray-300 text-gray-500 rounded-lg font-bold cursor-not-allowed"
                     >
-                      Plan par défaut
+                      Indisponible
+                    </button>
+                  ) : plan.plan_type === 'free' ? (
+                    <button
+                      disabled
+                      className="w-full py-4 px-6 bg-gray-300 text-gray-500 rounded-lg font-bold cursor-not-allowed"
+                    >
+                      {isCurrent ? '✓ Plan actif (gratuit)' : 'Plan par défaut'}
                     </button>
                   ) : isCurrent ? (
                     <button

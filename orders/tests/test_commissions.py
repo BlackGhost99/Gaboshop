@@ -46,6 +46,7 @@ class CommissionCalculationTests(TestCase):
         )
 
         # Default plan (starter)
+        SubscriptionPlan.objects.all().delete()  # la migration de la gamme crée Gratuit/Pro/Business
         self.starter = SubscriptionPlan.objects.create(name='Starter', slug='starter', plan_type='starter', price=Decimal('0.00'), commission_multiplier=Decimal('1.00'))
         # Pro plan
         self.pro = SubscriptionPlan.objects.create(name='Pro', slug='pro', plan_type='pro', price=Decimal('15000.00'), commission_multiplier=Decimal('0.60'))

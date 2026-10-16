@@ -134,6 +134,7 @@ class B2BSubscriptionPlan(models.Model):
     
     # Métadonnées
     is_active = models.BooleanField(default=True)
+    is_available = models.BooleanField(default=True, help_text="Décoché : le plan reste visible mais grisé « Bientôt disponible » et ne peut pas être acheté")
     is_popular = models.BooleanField(default=False, help_text="Badge 'Populaire'")
     display_order = models.IntegerField(default=0, help_text="Ordre d'affichage (croissant)")
     created_at = models.DateTimeField(auto_now_add=True)

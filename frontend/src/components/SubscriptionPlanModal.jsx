@@ -23,6 +23,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     applies_to: 'b2c',
     description: '',
     is_active: true,
+    is_available: true,
     
     // Limites
     max_products: null,
@@ -90,6 +91,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         applies_to: 'b2c',
         description: '',
         is_active: true,
+        is_available: true,
         max_products: null,
         max_orders_per_month: null,
         max_products_food: null,
@@ -296,6 +298,16 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
               <label htmlFor="is_active" className="text-sm text-gray-700">Plan actif</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_available"
+                checked={formData.is_available !== false}
+                onChange={(e) => updateField('is_available', e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="is_available" className="text-sm text-gray-700">Achetable (décoché : visible mais grisé « Bientôt disponible »)</label>
             </div>
           </div>
         )}

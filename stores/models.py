@@ -326,11 +326,9 @@ class Store(models.Model):
 		if subscription and subscription.plan:
 			return subscription.plan
 		
-		# Plan par défaut: Free
-		try:
-			return SubscriptionPlan.objects.get(plan_type='free')
-		except SubscriptionPlan.DoesNotExist:
-			return None
+		# Plan par défaut : Gratuit, créé s'il manque (jamais « Aucun forfait trouvé »).
+		from payments.default_plans import ensure_free_plan
+		return ensure_free_plan(SubscriptionPlan)
 	
 	def get_current_b2b_plan(self):
 		"""
@@ -346,11 +344,9 @@ class Store(models.Model):
 		except B2BStoreSubscription.DoesNotExist:
 			pass
 		
-		# Plan par défaut: B2B Free
-		try:
-			return B2BSubscriptionPlan.objects.get(plan_type='free')
-		except B2BSubscriptionPlan.DoesNotExist:
-			return None
+		# Plan par défaut : B2B Gratuit, créé s'il manque.
+		from payments.default_plans import ensure_free_b2b_plan
+		return ensure_free_b2b_plan(B2BSubscriptionPlan)
 	
 	def is_subscription_active(self):
 		"""Vérifie si le magasin a un forfait ACTIF"""

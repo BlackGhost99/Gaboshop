@@ -121,6 +121,7 @@ def get_available_plans(request):
                 'type': plan.plan_type,
                 'price': float(plan.price),
                 'description': plan.description,
+                'is_available': plan.is_available,
                 'features': {
                     'max_products': plan.max_products,
                     'has_statistics': plan.has_statistics,
@@ -245,6 +246,9 @@ def purchase_plan(request):
 
         if not plan:
             return Response({'success': False, 'error': 'Plan introuvable ou inactif'}, status=status.HTTP_404_NOT_FOUND)
+        if not plan.is_available:
+            from payments.default_plans import unavailable_message
+            return Response({'success': False, 'error': unavailable_message(plan)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create a PaymentIntent (simulated) — amount in FCFA (integer)
         try:

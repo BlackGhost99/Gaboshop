@@ -20,6 +20,7 @@ from datetime import timedelta
 
 from .models import PaymentIntent, PaymentTransaction, SubscriptionPlan, StoreSubscription
 from .serializers import CreatePaymentSerializer, PaymentIntentSerializer, SubscriptionPlanSerializer
+from .default_plans import ensure_free_b2b_plan, ensure_free_plan, unavailable_message
 from .utils import (
     call_cinetpay_init, call_cinetpay_check, call_cinetpay_refund,
     call_airtel_money_init, call_airtel_money_check,
@@ -383,6 +384,8 @@ class SubscriptionPaymentIntentAPIView(APIView):
                     {"detail": "Plan B2B introuvable ou invalide"},
                     status=status.HTTP_404_NOT_FOUND
                 )
+            if not plan.is_available:
+                return Response({"detail": unavailable_message(plan)}, status=status.HTTP_400_BAD_REQUEST)
             amount = int(Decimal(plan.price))
         else:
             plan = SubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
@@ -391,6 +394,8 @@ class SubscriptionPaymentIntentAPIView(APIView):
                     {"detail": "Plan B2C introuvable ou invalide"},
                     status=status.HTTP_404_NOT_FOUND
                 )
+            if not plan.is_available:
+                return Response({"detail": unavailable_message(plan)}, status=status.HTTP_400_BAD_REQUEST)
             amount = _get_subscription_price(store, plan)
 
         metadata = {
@@ -907,7 +912,11 @@ class SubscriptionPlansAPIView(APIView):
         from .online_verification import refresh_pending_intents
         refresh_pending_intents(request.user)
         store = Store.objects.filter(manager=request.user).first()
-        
+        try:
+            ensure_free_b2b_plan() if (store and store.is_b2b) else ensure_free_plan()
+        except Exception:  # tables B2B absentes : traité plus bas
+            logger.exception("Plan Gratuit impossible à créer")
+
         # Si le store est B2B, retourner les plans B2B
         if store and store.is_b2b:
             if not _b2b_subscription_tables_ready():
@@ -935,6 +944,7 @@ class SubscriptionPlansAPIView(APIView):
                     'tagline': plan.tagline,
                     'features': features_list,  # Liste de strings pour le frontend
                     'is_popular': plan.is_popular,
+                    'is_available': plan.is_available,
                 })
             
             # Récupérer le plan actuel B2B
@@ -988,7 +998,18 @@ class SubscriptionPlansAPIView(APIView):
                     plan['price_label'] = f"{int(price_value)} F/mois" if price_value > 0 else "Gratuit"
 
         current_plan = None
-        if store:
+        if store and not SubscriptionChecker.get_active_subscription(store):
+            # Pas d'abonnement payé : le commerce est au forfait Gratuit (sans date de fin).
+            free = store.get_current_plan()
+            if free:
+                current_plan = {
+                    'id': free.id, 'name': free.name, 'plan_type': free.plan_type, 'price': 0.0,
+                    'end_date': None, 'status': 'active', 'auto_renew': False,
+                    'features': free.get_features_list(), 'max_products': free.max_products,
+                    'max_orders_per_month': free.max_orders_per_month, 'can_access_b2b': free.can_access_b2b,
+                    'priority_listing': free.priority_listing, 'can_sponsor_products': free.can_sponsor_products,
+                }
+        if store and current_plan is None:
             active_sub = (
                 StoreSubscription.objects
                 .filter(store=store, status='active')

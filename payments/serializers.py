@@ -176,7 +176,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
             'can_sponsor_products', 'has_statistics', 'has_custom_page',
             'has_priority_support', 'priority_listing', 'commission_rate',
             'commission_multiplier',
-            'description', 'features_json', 'is_active', 'features'
+            'description', 'features_json', 'is_active', 'is_available', 'features'
         ]
         read_only_fields = fields
 
