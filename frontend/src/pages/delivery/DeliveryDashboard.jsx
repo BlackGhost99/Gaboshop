@@ -20,8 +20,13 @@ import MyPlatformDebt from '../../components/payments/MyPlatformDebt';
 
 const NOTIF_POLL_MS = 20000;
 
-const mapsLink = (address) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address || '')}&travelmode=driving`;
+// Itinéraire : le point GPS quand on l'a (précis), sinon le texte de l'adresse.
+const mapsLink = (address, lat, lng) => {
+  const hasPoint = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) && lat != null && lng != null;
+  const destination = hasPoint ? `${lat},${lng}` : encodeURIComponent(address || '');
+  return `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+};
+const PICKED = ['picked_up', 'in_delivery', 'in_transit'];
 
 const DELIVERY_STEPS = ['Acceptée', 'Colis récupéré', 'En route', 'Livrée'];
 const stepsDone = (status) => ({ accepted: 1, picked_up: 2, in_transit: 3, delivered: 4 }[status] || 0);
@@ -765,30 +770,35 @@ const DeliveryDashboard = () => {
                           <div className="rounded-lg bg-gray-50 p-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">1. Récupérer chez {delivery.store_name}</p>
                             <p className="text-sm font-medium text-gray-900 mt-1">{delivery.pickup_address || 'Adresse du magasin non renseignée'}</p>
-                            {delivery.pickup_address && (
+                            {!PICKED.includes(delivery.status) && (delivery.pickup_address || delivery.pickup_lat != null) && (
                               <a
-                                href={mapsLink(delivery.pickup_address)}
+                                href={mapsLink(delivery.pickup_address, delivery.pickup_lat, delivery.pickup_lng)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
+                                className="mt-2 inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
                               >
-                                Itinéraire
+                                🧭 Itinéraire vers le commerce
                               </a>
                             )}
+                            {PICKED.includes(delivery.status) && <p className="mt-1 text-xs font-semibold text-green-700">✓ Colis récupéré</p>}
                           </div>
                           <div className="rounded-lg bg-gray-50 p-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">2. Livrer à {delivery.client_name || 'Client'}</p>
                             <p className="text-sm font-medium text-gray-900 mt-1">{delivery.delivery_address || 'Adresse non renseignée'}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {delivery.delivery_address && (
-                                <a
-                                  href={mapsLink(delivery.delivery_address)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
-                                >
-                                  Itinéraire
-                                </a>
+                              {PICKED.includes(delivery.status) ? (
+                                (delivery.delivery_address || delivery.delivery_lat != null) && (
+                                  <a
+                                    href={mapsLink(delivery.delivery_address, delivery.delivery_lat, delivery.delivery_lng)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+                                  >
+                                    🧭 Itinéraire vers le client
+                                  </a>
+                                )
+                              ) : (
+                                <p className="w-full text-xs text-gray-500">L’itinéraire vers le client s’affiche dès que vous avez récupéré le colis.</p>
                               )}
                               {delivery.client_phone && (
                                 <a

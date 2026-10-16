@@ -393,6 +393,11 @@ class DeliveryDashboardView(APIView):
                 'store_name': active_delivery.order.store.name,
                 'pickup_address': active_delivery.pickup_address,
                 'delivery_address': active_delivery.delivery_address,
+                # Points GPS (vides si inconnus) : l'itinéraire s'appuie dessus plutôt que sur le texte de l'adresse.
+                'pickup_lat': float(active_delivery.pickup_lat) if active_delivery.pickup_lat is not None else None,
+                'pickup_lng': float(active_delivery.pickup_lng) if active_delivery.pickup_lng is not None else None,
+                'delivery_lat': float(active_delivery.delivery_lat) if active_delivery.delivery_lat is not None else None,
+                'delivery_lng': float(active_delivery.delivery_lng) if active_delivery.delivery_lng is not None else None,
                 'client_phone': active_delivery.order.client.phone,
                 'client_name': active_delivery.order.client.get_display_name(),
                 'status': active_delivery.status,
