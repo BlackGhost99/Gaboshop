@@ -12,6 +12,8 @@ import { getProductDetails } from '../../services/productService';
 import { METHOD_LABELS } from '../../components/payments/paymentLabels';
 import api from '../../services/api';
 import AddressPicker from '../../components/address/AddressPicker';
+import QuoteDetails from '../../components/cart/QuoteDetails';
+import ShareLocationButton from '../../components/address/ShareLocationButton';
 import useGeo from '../../hooks/useGeo';
 import { describeOptions, lineKey, productOptions } from '../../utils/productOptions';
 
@@ -85,17 +87,9 @@ const ClientDashboard = () => {
   const geo = useGeo();
   const geoReady = !!geo?.neighborhoods?.length;
 
-  // Helper: Calculate total amount
-  const calculateTotal = (subtotal, deliveryCost) => {
-    return subtotal + deliveryCost;
-  };
-
   // Prix de livraison calculé par le serveur, exactement comme à la commande (prix affiché = prix payé).
   const [quotes, setQuotes] = useState({});
   const quoteFor = (storeName) => quotes[storeName] || {};
-  // Frais petit panier : seulement en paiement en ligne (réglage admin, 0 = éteint).
-  const smallFeeFor = (storeName) => (storeForms[storeName]?.payment_flow === 'platform_online'
-    ? Number(quoteFor(storeName).small_order_fee_online) || 0 : 0);
   const zonesForCity = (city) => zones.filter((z) => (z.city || '').toLowerCase() === (city || 'Libreville').trim().toLowerCase());
 
   const groupByStore = (items) => {
@@ -258,6 +252,11 @@ const ClientDashboard = () => {
             city: form.city || 'Libreville',
             delivery_zone: form.zone || '',
             neighborhood: geoReady ? (form.neighborhood || null) : null,
+            landmark: geoReady ? (form.landmark || null) : null,
+            delivery_address: form.address || '',
+            payment_flow: form.payment_flow || '',
+            payment_method: form.payment_method || '',
+            delivery_by: form.payment_flow === 'platform_online' ? (form.delivery_by || 'gaboshop') : '',
             items: group.items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
           });
           if (active) setQuotes((prev) => ({ ...prev, [storeName]: res.data?.data || {} }));
@@ -452,6 +451,8 @@ const ClientDashboard = () => {
       delivery_zone,
       neighborhood: geoReady && form.delivery_requested !== false ? Number(form.neighborhood) : null,
       landmark: geoReady && form.delivery_requested !== false && form.landmark ? Number(form.landmark) : null,
+      ...(form.delivery_requested !== false && form.latitude != null && form.longitude != null
+        ? { delivery_latitude: form.latitude, delivery_longitude: form.longitude } : {}),
       delivery_requested: form.delivery_requested !== false,
       notes: form.notes || '',
       payment_flow,
@@ -890,6 +891,12 @@ const ClientDashboard = () => {
                       value={storeForms[storeName]?.address || ''}
                       onChange={(e) => handleChangeForm(storeName, 'address', e.target.value)}
                     />
+                    {storeForms[storeName]?.delivery_requested !== false && (
+                      <ShareLocationButton
+                        value={storeForms[storeName]}
+                        onChange={(patch) => handlePatchForm(storeName, patch)}
+                      />
+                    )}
                     <select
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
                       value={`${storeForms[storeName]?.payment_flow || ''}|${storeForms[storeName]?.payment_method || ''}|${storeForms[storeName]?.delivery_by || ''}`}
@@ -936,52 +943,18 @@ const ClientDashboard = () => {
                     </div>
                   )}
 
-                  {/* Détail des frais */}
-                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2">
-                    <p className="text-xs font-semibold text-gray-700 uppercase">Détail du devis</p>
-                    <div className="space-y-1 text-xs text-gray-700">
-                      <div className="flex justify-between">
-                        <span>Sous-total (articles)</span>
-                        <span className="font-semibold">{formatCurrency(data.total)}</span>
-                      </div>
-                      
-                      {/* Delivery fee */}
-                      {storeForms[storeName]?.delivery_requested !== false && (
-                        <div className="flex justify-between text-amber-700">
-                          <span>&#x1F69A; Frais de livraison</span>
-                          <span className="font-semibold">
-                            {quoteFor(storeName).delivery_fee != null ? formatCurrency(Number(quoteFor(storeName).delivery_fee)) : (quoteFor(storeName).message ? 'Choisissez la zone' : 'Calcul...')}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {storeForms[storeName]?.payment_flow === 'platform_online' && Number(quoteFor(storeName).small_order_fee_online) > 0 && (
-                        <div className="flex justify-between text-gray-700">
-                          <span>Frais petit panier (paiement en ligne)</span>
-                          <span className="font-semibold">{formatCurrency(Number(quoteFor(storeName).small_order_fee_online))}</span>
-                        </div>
-                      )}
-
-                      {/* TOTAL */}
-                      <div className="pt-2 border-t border-gray-300 flex justify-between font-bold text-gray-900 text-sm">
-                        <span>TOTAL A PAYER</span>
-                        <span className="text-base text-indigo-600">
-                          {storeForms[storeName]?.delivery_requested === false
-                            ? formatCurrency(data.total + smallFeeFor(storeName))
-                            : quoteFor(storeName).delivery_fee != null
-                              ? formatCurrency(calculateTotal(data.total, Number(quoteFor(storeName).delivery_fee)) + smallFeeFor(storeName))
-                              : 'Calcul...'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 italic pt-2">Tous les frais sont calculés et affichés ici. Aucune surcharge à la confirmation.</p>
-                  </div>
+                  <QuoteDetails
+                    quote={quoteFor(storeName)}
+                    items={data.items}
+                    itemsTotal={data.total}
+                    deliveryRequested={storeForms[storeName]?.delivery_requested !== false}
+                  />
 
                   <div className="mt-4 flex gap-2">
                     <button
                       onClick={() => handleSubmitOrder(storeName)}
-                      disabled={!!submitting[storeName]}
-                      className={`flex-1 text-sm font-medium px-4 py-2 rounded-md text-white ${submitting[storeName] ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                      disabled={!!submitting[storeName] || (quoteFor(storeName).blocking || []).length > 0}
+                      className={`flex-1 text-sm font-medium px-4 py-2 rounded-md text-white ${submitting[storeName] || (quoteFor(storeName).blocking || []).length > 0 ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                     >
                        {submitting[storeName] ? 'Envoi...' : 'Passer la commande'}
                      </button>

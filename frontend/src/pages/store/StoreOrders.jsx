@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { openInvoice } from '../../utils/invoice';
+import OrderLiveMap from '../../components/map/OrderLiveMap';
 import { describeOptions } from '../../utils/productOptions';
 import { notifyError, notifySuccess } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
@@ -362,6 +363,8 @@ const StoreOrders = () => {
                   <p>{formatCurrency(detail.total_amount || detail.total)}</p>
                 </div>
               </div>
+
+              {['ready', 'assigned', 'in_transit'].includes(detail.status) && <OrderLiveMap orderId={detail.id} viewer="store" />}
 
               <button
                 type="button"

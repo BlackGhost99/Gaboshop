@@ -720,23 +720,21 @@ class OrderSelectVehicleView(APIView):
 
 
 class DeliveryQuoteView(APIView):
-	"""POST /orders/delivery-quote/ : prix de livraison exact avant de commander (même calcul que la commande).
+	"""POST /orders/delivery-quote/ : devis complet avant de commander (même calcul que la commande).
 
-	Corps : {store, city, delivery_zone, items: [{product_id, quantity}]}. Rien n'est enregistré.
+	Corps : {store, items: [{product_id, quantity}], delivery_requested, city, delivery_zone, neighborhood,
+	landmark, delivery_address (repère), payment_flow, payment_method, delivery_by}. Rien n'est enregistré.
+	Réponse : prix de livraison (champs historiques) + devis détaillé (orders/quote.py).
 	"""
 	permission_classes = [permissions.IsAuthenticated]
 
 	def post(self, request):
-		from decimal import Decimal
 		from products.models import Product
 		from stores.models import Store
-		from delivery.zones import active_zones, resolve_zone
-		store = Store.objects.filter(pk=request.data.get('store')).first()
+		from orders.quote import build_quote
+		store = Store.objects.select_related('category').filter(pk=request.data.get('store')).first()
 		if store is None:
 			return Response({'success': False, 'error': 'Commerce introuvable.'}, status=status.HTTP_400_BAD_REQUEST)
-		city = (request.data.get('city') or 'Libreville').strip()
-		zones = list(active_zones(city).values_list('name', flat=True))
-		pickup = request.data.get('delivery_requested') is False
 		pairs = []
 		for item in (request.data.get('items') or [])[:100]:
 			try:
@@ -748,26 +746,17 @@ class DeliveryQuoteView(APIView):
 				pairs.append((product, quantity))
 		if not pairs:
 			return Response({'success': False, 'error': 'Panier vide.'}, status=status.HTTP_400_BAD_REQUEST)
-		zone = ''
-		if not pickup:
-			try:
-				if request.data.get('neighborhood'):
-					from delivery.zones import resolve_neighborhood, zone_name_for
-					neighborhood = resolve_neighborhood(request.data.get('neighborhood'))
-					city, zone = neighborhood.city.name, zone_name_for(neighborhood)
-				else:
-					zone = resolve_zone(city, request.data.get('delivery_zone'))
-			except ValueError as exc:
-				return Response({'success': True, 'data': {'delivery_fee': None, 'zones': zones, 'message': str(exc)}})
-		order = Order(store=store, city=city, delivery_zone=zone, delivery_type='standard')
-		fee = Decimal('0') if pickup else order.quote_delivery(pairs)
-		from payments.economics import small_order_fee
-		items_total = sum((Decimal(product.price or 0) * quantity for product, quantity in pairs), Decimal('0'))
-		return Response({'success': True, 'data': {
-			'delivery_fee': str(Decimal(fee)), 'vehicle_type': order.vehicle_type, 'zone': zone, 'zones': zones,
-			# Ajouté seulement si le client paie en ligne (voir OrderCreateSerializer.create).
-			'small_order_fee_online': str(small_order_fee(items_total)),
-		}})
+		data = request.data
+		quote = build_quote(
+			store, request.user, pairs,
+			delivery_requested=data.get('delivery_requested') is not False,
+			city=data.get('city') or 'Libreville', zone_text=data.get('delivery_zone') or '',
+			neighborhood_id=data.get('neighborhood') or None, landmark_id=data.get('landmark') or None,
+			details=str(data.get('delivery_address') or '')[:300],
+			payment_flow=str(data.get('payment_flow') or ''), payment_method=str(data.get('payment_method') or ''),
+			delivery_by=str(data.get('delivery_by') or ''),
+		)
+		return Response({'success': True, 'data': quote})
 
 
 class OrderInvoiceView(APIView):

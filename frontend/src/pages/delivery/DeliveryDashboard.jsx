@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { askAI, describeError, notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
 import NotificationHelp from '../../components/NotificationHelp';
 import { statusLabel } from '../../utils/notificationLabels';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import DeliveryMap from '../../components/map/DeliveryMap';
+import useOrderTracking from '../../hooks/useOrderTracking';
+import api from '../../services/api';
 
 import StatCard from '../../components/StatCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -18,31 +18,13 @@ import authStorage from '../../utils/authStorage';
 import PendingPayments from '../../components/payments/PendingPayments';
 import MyPlatformDebt from '../../components/payments/MyPlatformDebt';
 
-// Fix for default marker icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
 const NOTIF_POLL_MS = 20000;
-
-const GAB_CENTER = [0.4162, 9.4673];
 
 const mapsLink = (address) =>
   `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address || '')}&travelmode=driving`;
 
 const DELIVERY_STEPS = ['Acceptée', 'Colis récupéré', 'En route', 'Livrée'];
 const stepsDone = (status) => ({ accepted: 1, picked_up: 2, in_transit: 3, delivered: 4 }[status] || 0);
-
-function RecenterMap({ position }) {
-  const map = useMap();
-  useEffect(() => {
-    if (position) map.setView(position, 15);
-  }, [map, position]);
-  return null;
-}
 
 const DeliveryDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -62,6 +44,19 @@ const DeliveryDashboard = () => {
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
+
+  // Course en cours : carte (commerce, client) et position partagée avec le client toutes les 10 s au plus.
+  const activeDelivery = dashboardData?.active_delivery || null;
+  const { tracking } = useOrderTracking(activeDelivery?.order_id, !!activeDelivery?.order_id);
+  const lastSent = useRef(0);
+  useEffect(() => {
+    if (!activeDelivery?.id || !myPosition) return;
+    const now = Date.now();
+    if (now - lastSent.current < 10000) return;
+    lastSent.current = now;
+    api.post(`/dashboard/delivery/${activeDelivery.id}/position/`, { latitude: myPosition[0], longitude: myPosition[1] })
+      .catch(() => { lastSent.current = 0; });
+  }, [activeDelivery?.id, myPosition]);
 
   // Notification Detail Modal State
   const [selectedNotification, setSelectedNotification] = useState(null);
@@ -727,28 +722,7 @@ const DeliveryDashboard = () => {
 
               {dashboardData?.active_delivery ? (
                 <div className="space-y-4">
-                  {/* MAP ADDITION */}
-                  <div className="h-64 w-full rounded-xl overflow-hidden shadow-inner mb-4 z-0 relative">
-                    <MapContainer
-                      center={myPosition || GAB_CENTER}
-                      zoom={13}
-                      style={{ height: '100%', width: '100%' }}
-                      scrollWheelZoom={false}
-                    >
-                      <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      />
-                      {myPosition && (
-                        <>
-                          <RecenterMap position={myPosition} />
-                          <Marker position={myPosition}>
-                            <Popup>Vous êtes ici</Popup>
-                          </Marker>
-                        </>
-                      )}
-                    </MapContainer>
-                  </div>
+                  <DeliveryMap tracking={tracking} myPosition={myPosition} viewer="courier" />
 
                   {(() => {
                     const delivery = dashboardData.active_delivery;

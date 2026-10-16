@@ -9,6 +9,7 @@ from .models import Order
 from payments.models import Payment, Commission
 from orders.services import OrderService
 from delivery.models import Delivery
+from delivery.tracking import destination_fields
 from notifications.service import NotificationService
 from api.models import SystemSettings
 
@@ -49,6 +50,7 @@ def handle_order_status_change(sender, instance, created, **kwargs):
 				'pickup_lat': order.store.latitude,
 				'pickup_lng': order.store.longitude,
 				'delivery_address': order.delivery_address,
+				**destination_fields(order),
 				'delivery_fee': order.delivery_fee,
 				'agent_commission': SystemSettings.courier_share(order.delivery_fee),  # part réglée dans l'admin
 				'status': 'waiting'

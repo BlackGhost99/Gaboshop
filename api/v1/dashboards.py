@@ -388,6 +388,7 @@ class DeliveryDashboardView(APIView):
             proof = getattr(active_delivery, 'proof', None)
             active_delivery_data = {
                 'id': active_delivery.id,
+                'order_id': active_delivery.order_id,
                 'order_number': active_delivery.order.order_number,
                 'store_name': active_delivery.order.store.name,
                 'pickup_address': active_delivery.pickup_address,

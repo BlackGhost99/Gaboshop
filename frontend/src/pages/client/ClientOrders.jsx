@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { openInvoice } from '../../utils/invoice';
+import OrderLiveMap from '../../components/map/OrderLiveMap';
 import { describeOptions } from '../../utils/productOptions';
 import { notifySuccess, notifyError } from '../../utils/feedback';
 import ClientLayout from '../../components/ClientLayout';
@@ -406,6 +407,8 @@ const ClientOrders = () => {
                   <p>{formatCurrency(detail.total_amount || detail.total)}</p>
                 </div>
               </div>
+
+              {['ready', 'assigned', 'in_transit'].includes(detail.status) && <OrderLiveMap orderId={detail.id} />}
 
               <div>
                 <p className="font-semibold text-gray-900 mb-2">Paiement</p>

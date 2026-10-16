@@ -8,6 +8,7 @@ from django.db.models import Count
 from django.utils import timezone
 
 from delivery.models import Delivery
+from delivery.tracking import destination_fields
 from delivery.utils import haversine_distance
 from notifications.service import NotificationService
 from users.models import LivreurProfile
@@ -65,6 +66,7 @@ def start_delivery_assignment(order):
             'pickup_lat': order.store.latitude,
             'pickup_lng': order.store.longitude,
             'delivery_address': order.delivery_address,
+            **destination_fields(order),
             'delivery_fee': order.delivery_fee,
             'city': order.city,
             'status': 'waiting',

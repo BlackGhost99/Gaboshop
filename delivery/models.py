@@ -239,6 +239,10 @@ class Delivery(models.Model):
 	delivery_address = models.TextField(help_text="Adresse du client")
 	delivery_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 	delivery_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	# Position en direct du livreur pendant la course (carte du client, façon Uber/Gozem).
+	courier_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	courier_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	courier_location_at = models.DateTimeField(null=True, blank=True)
     
 	# Frais et rémunération
 	delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)

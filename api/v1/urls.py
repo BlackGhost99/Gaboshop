@@ -4,6 +4,7 @@ Register explicit views for users, stores, products and orders.
 """
 
 from django.urls import path, include
+from .tracking import CourierPositionView, OrderTrackingView
 from rest_framework.routers import DefaultRouter
 
 from .users import (
@@ -154,6 +155,8 @@ urlpatterns = [
     path('dashboard/delivery/<int:delivery_id>/proof-photo/<str:kind>/', DeliveryProofPhotoView.as_view(), name='delivery-proof-photo'),
     path('dashboard/delivery/<int:delivery_id>/verify-pin/', DeliveryVerifyPINView.as_view(), name='delivery-verify-pin'),
     path('dashboard/delivery/<int:delivery_id>/complete/', DeliveryCompleteView.as_view(), name='delivery-complete'),
+    path('dashboard/delivery/<int:delivery_id>/position/', CourierPositionView.as_view(), name='delivery-courier-position'),
+    path('orders/<int:order_id>/tracking/', OrderTrackingView.as_view(), name='order-tracking'),
     
     # Vehicle types endpoints
     path('delivery/vehicle-types/', VehicleTypeListView.as_view(), name='vehicle-types-list'),
