@@ -492,6 +492,9 @@ GEMINI_MODEL = env('GEMINI_MODEL', default='models/gemini-2.0-flash')
 
 # Production : e-mails uniquement, aucun SMS/WhatsApp payant par défaut.
 NOTIFICATION_CHANNEL_MODE = env('NOTIFICATION_CHANNEL_MODE', default='email_only')
+# Les livreurs Gaboshop n'encaissent pas les espèces des commandes B2C en livraison.
+# Seules les boutiques assurant leur propre livraison peuvent accepter le cash à la réception.
+B2C_STORE_COURIER_CASH_ONLY = env_bool('B2C_STORE_COURIER_CASH_ONLY', True)
 
 # Email Configuration (optionnel)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
