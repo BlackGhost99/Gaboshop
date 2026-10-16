@@ -28,7 +28,7 @@ def _invoice_logo_data_uri():
         data = Path(logo).read_bytes()
     except OSError:
         return ''
-    if not data.startswith(b'\\x89PNG\\r\\n\\x1a\\n'):
+    if data[:8] != bytes((137, 80, 78, 71, 13, 10, 26, 10)):
         return ''
     return 'data:image/png;base64,' + b64encode(data).decode('ascii')
 
