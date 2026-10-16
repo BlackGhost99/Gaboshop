@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("delivery", "0018_quartiers_par_arrondissement_2026_10_16"),
+        ("delivery", "0020_secteurs_partages_libreville"),
     ]
 
     operations = [

@@ -9,9 +9,11 @@ export default function AddressPicker({ geo, value = {}, onChange }) {
   const city = (geo?.cities || []).find((c) => c.id === Number(value.city_id));
   const arrondissements = useMemo(() => (geo?.arrondissements || []).filter((a) => a.city_id === Number(value.city_id)), [geo, value.city_id]);
   const hasArr = arrondissements.length > 0;
-  // Ville à arrondissements : seuls les quartiers de l'arrondissement choisi. Sinon : tous ceux de la ville.
+  // Ville à arrondissements : seuls les quartiers de l'arrondissement choisi, plus les secteurs partagés entre
+  // plusieurs arrondissements (sans rattachement, ex. PK10–PK12). Ville sans arrondissement : tous ses quartiers.
   const neighborhoods = useMemo(() => (geo?.neighborhoods || []).filter((n) => n.city_id === Number(value.city_id)
-    && (hasArr ? !!value.arrondissement_id && n.arrondissement_id === Number(value.arrondissement_id) : true)), [geo, value.city_id, value.arrondissement_id, hasArr]);
+    && (hasArr ? !!value.arrondissement_id && (n.arrondissement_id === Number(value.arrondissement_id) || !n.arrondissement_id) : true)),
+  [geo, value.city_id, value.arrondissement_id, hasArr]);
   const landmarks = useMemo(() => (geo?.landmarks || []).filter((l) => l.neighborhood_id === Number(value.neighborhood)), [geo, value.neighborhood]);
   const quartersOf = (arrId) => (geo?.neighborhoods || []).filter((n) => n.arrondissement_id === arrId).map((n) => n.name);
 
@@ -59,7 +61,7 @@ export default function AddressPicker({ geo, value = {}, onChange }) {
         label="Quartier"
         placeholder={!city ? "Choisissez d'abord la ville" : hasArr && !value.arrondissement_id ? "Choisissez d'abord l'arrondissement" : 'Tapez votre quartier'}
         emptyText="Quartier absent de la liste : choisissez le plus proche et précisez dans le repère."
-        options={neighborhoods.map((n) => ({ value: n.id, label: n.name }))}
+        options={neighborhoods.map((n) => ({ value: n.id, label: n.name, hint: hasArr && !n.arrondissement_id ? 'Secteur partagé' : '' }))}
         value={value.neighborhood}
         onChange={(id) => {
           const n = geo.neighborhoods.find((x) => x.id === Number(id));

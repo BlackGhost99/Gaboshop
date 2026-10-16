@@ -115,7 +115,7 @@ export default function DeliveryAddresses() {
           <h3 className="text-lg font-semibold text-gray-900">Quartiers de {city.name}</h3>
           <p className="mt-1 text-sm text-gray-600">
             Chaque quartier est rangé dans son arrondissement : le client voit seulement les quartiers de l'arrondissement choisi
-            (un quartier « À préciser » n'est pas proposé). Le rangement de départ est une estimation, corrigez-le ici.
+            (un quartier « À préciser » est proposé partout comme secteur partagé). Corrigez le rangement ici si besoin.
             Les zones phares (carrefour, marché…) aident le livreur. Sans zone de prix, le client paie le prix de livraison du commerce.
             {zones.length === 0 && ' Aucune zone de prix pour cette ville : créez-en dans l’onglet Tarifs.'}
           </p>

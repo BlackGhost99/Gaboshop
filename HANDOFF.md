@@ -70,7 +70,8 @@ pourquoi les images envoyées sont stockées en base (`core.StoredFile`, `core/s
   - Le code est dans `delivery/geo_data.py`, `delivery/zones.py` et `api/v1/geo.py`. L'écran admin est dans Admin › Livraison › Adresses.
   - Les 9 provinces existent, mais seule Libreville est ouverte.
   - Le prix de livraison vient de la zone de prix du quartier (DeliveryZone, à régler dans l'onglet Tarifs).
-  - Le rangement des quartiers par arrondissement est une estimation que le propriétaire doit vérifier.
+  - Libreville suit la loi 020/2025 (migration delivery 0019) ; les secteurs partagés (PK10–PK12, Plaine Orety)
+    restent sans arrondissement et sont proposés dans chaque arrondissement.
 - **Grandes surfaces :** une catégorie de magasin peut avoir « Vend de tout » (`StoreCategory.sells_everything`).
 - **Produits à tailles et couleurs :** le client choisit la taille et la couleur au panier (`products/options.py`).
   Le stock n'est pas suivi par taille.
