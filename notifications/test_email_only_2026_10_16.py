@@ -72,6 +72,17 @@ class EmailOnlyTests(TestCase):
         post.assert_not_called()
 
     @patch('notifications.service.SMSService.send_sms')
+    @patch('notifications.sms.requests.post')
+    @patch('notifications.whatsapp.requests.post')
+    def test_no_external_sms_or_whatsapp_even_if_called_directly(self, wa_post, sms_post):
+        from notifications.sms import SMSService
+        from notifications.whatsapp import WhatsAppService
+        self.assertFalse(SMSService.send_sms(self.user.phone, 'Test'))
+        self.assertFalse(WhatsAppService.send_text_message(self.user.phone, 'Test'))
+        self.assertFalse(WhatsAppService.send_template_message(self.user.phone, 'test_template', []))
+        wa_post.assert_not_called()
+        sms_post.assert_not_called()
+
     def test_without_email_only_in_app_remains(self, sms):
         self.user.email = ''
         self.user.save(update_fields=['email'])
