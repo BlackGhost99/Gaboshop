@@ -23,9 +23,14 @@ def store_delivers(order):
 
     Les anciennes commandes, faites avant ce choix, suivent le réglage du commerce (« il livre lui-même »)."""
     arrangement = getattr(order, 'payment_arrangement', None)
+    # Respecter le choix figé lors de la commande, même si la boutique modifie
+    # plus tard le paramètre offers_delivery : ne jamais basculer une commande
+    # payée en espèces au livreur de la boutique vers un livreur Gaboshop.
+    if arrangement is not None and arrangement.delivery_method == STORE_DELIVERY:
+        return True
     if arrangement is not None and arrangement.flow == 'platform_online':
-        if arrangement.delivery_method in (STORE_DELIVERY, GABOSHOP_DELIVERY):
-            return arrangement.delivery_method == STORE_DELIVERY
+        if arrangement.delivery_method == GABOSHOP_DELIVERY:
+            return False
     store = getattr(order, 'store', None)
     return bool(getattr(store, 'offers_delivery', False))
 
