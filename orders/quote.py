@@ -47,6 +47,72 @@ def _error_text(exc):
     return ' '.join(parts)
 
 
+def _has_forfait(user):
+    from payments.client_forfaits import active_forfait
+    try:
+        return bool(active_forfait(user))
+    except Exception:
+        return False
+
+
+def _fee_details(*, online, payment_flow, method, delivery_by, delivery_requested, items_total, delivery_fee,
+                 operator_fee, small, forfait, user, has_forfait):
+    """Lignes d'explication des frais : ``status`` = charged (dans le total), free (offert) ou info (ne change pas le total)."""
+    from api.models import SystemSettings
+    from payments.economics import small_order_fee
+    settings = SystemSettings.get_settings()
+    rows = []
+
+    # Frais de l'opérateur Mobile Money.
+    if not payment_flow:
+        pass
+    elif not online:
+        rows.append({'label': 'Frais Mobile Money', 'amount': '0', 'status': 'info',
+                     'note': "Aucun : vous payez directement le commerce et le livreur, sans passer par Gaboshop."})
+    elif operator_fee > 0:
+        rows.append({'label': f"Frais {METHOD_LABELS.get(method, 'Mobile Money')}", 'amount': str(operator_fee),
+                     'status': 'charged', 'note': 'Frais de l\'opérateur sur les articles et la livraison.'})
+    else:
+        rows.append({'label': f"Frais {METHOD_LABELS.get(method, 'Mobile Money')}", 'amount': '0', 'status': 'free',
+                     'note': 'Offerts : Gaboshop prend ces frais à sa charge.'})
+
+    # Frais petit panier (petites courses).
+    fee = _franc(settings.small_order_fee or 0)
+    threshold = _franc(settings.small_order_threshold or 0)
+    if fee <= 0:
+        rows.append({'label': 'Frais petit panier', 'amount': '0', 'status': 'free',
+                     'note': 'Aucun frais sur les petites courses.'})
+    elif small > 0:
+        rows.append({'label': f"Frais petit panier (articles sous {_money(threshold)})", 'amount': str(small),
+                     'status': 'charged', 'note': 'Petite course payée en ligne : participation aux frais de traitement.'})
+    elif Decimal(items_total or 0) >= threshold:
+        rows.append({'label': 'Frais petit panier', 'amount': '0', 'status': 'free',
+                     'note': f"Non appliqué : vos articles dépassent {_money(threshold)}."})
+    elif payment_flow and not online:
+        rows.append({'label': 'Frais petit panier', 'amount': '0', 'status': 'info',
+                     'note': f"Non appliqué : il ne concerne que le paiement en ligne ({_money(fee)} sous {_money(threshold)} d'articles)."})
+    else:
+        rows.append({'label': f"Frais petit panier ({_money(fee)})", 'amount': '0', 'status': 'info',
+                     'note': f"S'applique en paiement en ligne quand les articles sont sous {_money(threshold)}."})
+
+    # Réduction du forfait client sur la livraison.
+    if has_forfait and delivery_requested:
+        if forfait > 0:
+            rows.append({'label': 'Réduction de votre forfait livraison', 'amount': str(-forfait), 'status': 'charged',
+                         'note': 'Déduite des frais de livraison, offerte par Gaboshop.'})
+        elif online and delivery_by == 'store':
+            rows.append({'label': 'Réduction de votre forfait livraison', 'amount': '0', 'status': 'info',
+                         'note': 'Non appliquée : le commerce livre lui-même.'})
+        elif payment_flow and not online:
+            rows.append({'label': 'Réduction de votre forfait livraison', 'amount': '0', 'status': 'info',
+                         'note': 'Réservée au paiement en ligne.'})
+
+    # Commission : payée par le commerce, jamais ajoutée au total du client.
+    rows.append({'label': 'Commission Gaboshop', 'amount': '0', 'status': 'info',
+                 'note': "Prélevée sur la vente du commerce : elle n'est pas ajoutée à votre total."})
+    return rows
+
+
 def _hours(store):
     opening, closing = store.opening_time, store.closing_time
     if not opening or not closing:
@@ -85,7 +151,11 @@ def _payment_lines(flow, method, delivery_by, delivery_requested, items, deliver
     if flow == 'platform_online':
         lines.append({'payee': 'Gaboshop (paiement en ligne)', 'amount': total, 'how': how,
                       'when': 'Juste après la commande : une seule demande arrive sur votre téléphone, '
-                              'validez-la avec votre code secret.'})
+                              'validez-la avec votre code secret.',
+                      'then': ("Gaboshop reverse ensuite les articles au commerce (après votre confirmation de réception) "
+                               + ("et la livraison au commerce, qui livre lui-même." if delivery_by == 'store'
+                                  else "et la livraison au livreur.")) if delivery_requested else
+                              "Gaboshop reverse ensuite les articles au commerce après votre confirmation de réception."})
     elif flow == 'direct_split':
         lines.append({'payee': 'Le commerce', 'amount': items, 'how': to_store_how, 'when': to_store_when})
         if delivery_requested and delivery:
@@ -219,6 +289,15 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
     if delivery_fee is not None:
         total = _franc(items_total + delivery_fee + operator_fee + small - forfait)
 
+    # Chaque frais expliqué, même quand il vaut 0 ou ne s'applique pas : le client sait pourquoi.
+    fee_details = _fee_details(
+        online=online, payment_flow=payment_flow, method=payment_method, delivery_by=delivery_by,
+        delivery_requested=bool(delivery_requested), items_total=items_total, delivery_fee=delivery_fee,
+        operator_fee=operator_fee, small=small, forfait=forfait, user=user,
+        has_forfait=bool(user is not None and getattr(user, 'is_authenticated', False)
+                         and _has_forfait(user)),
+    )
+
     # Ce qui bloquerait la commande, dit avant d'appuyer sur « Passer la commande ».
     if not store.is_active:
         blocking.append("Ce commerce n'est pas actif.")
@@ -283,6 +362,7 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
         'items_total': str(_franc(items_total)),
         'delivery': delivery,
         'fees': fees,
+        'fee_details': fee_details,
         'total': str(total) if total is not None else None,
         'payment': payment,
         'blocking': blocking,

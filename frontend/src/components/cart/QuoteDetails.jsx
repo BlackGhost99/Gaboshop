@@ -82,7 +82,21 @@ export default function QuoteDetails({ quote = {}, items = [], itemsTotal = 0, d
         )}
       </Section>
 
-      {(quote.fees || []).length > 0 && (
+      {(quote.fee_details || []).length > 0 ? (
+        <Section title="Frais, commissions et réductions">
+          {quote.fee_details.map((fee) => {
+            const amount = Number(fee.amount) || 0;
+            const tone = amount < 0 ? 'text-green-700' : fee.status === 'charged' ? 'text-gray-900' : 'text-gray-500';
+            const shown = fee.status === 'charged' ? money(fee.amount) : (fee.status === 'free' ? 'Offert' : '—');
+            return (
+              <div key={fee.label}>
+                <Row label={fee.label} value={shown} strong={fee.status === 'charged'} tone={tone} />
+                {fee.note && <p className="text-[11px] text-gray-500">{fee.note}</p>}
+              </div>
+            );
+          })}
+        </Section>
+      ) : (quote.fees || []).length > 0 && (
         <Section title="Frais et réductions">
           {quote.fees.map((fee) => (
             <Row key={fee.label} label={fee.label} value={money(fee.amount)} tone={Number(fee.amount) < 0 ? 'text-green-700' : 'text-gray-700'} />
@@ -103,6 +117,7 @@ export default function QuoteDetails({ quote = {}, items = [], itemsTotal = 0, d
               <Row label={line.payee} value={money(line.amount)} strong tone="text-gray-900" />
               <p className="text-gray-600">{line.how}</p>
               <p className="text-gray-500">{line.when}</p>
+              {line.then && <p className="mt-1 text-gray-500">{line.then}</p>}
             </div>
           ))}
           {payment.simulated && (

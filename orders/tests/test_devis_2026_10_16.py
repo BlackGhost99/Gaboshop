@@ -173,3 +173,33 @@ class DevisCompletTests(TestCase):
         body = self.body('', '')
         quote = self.api.post('/api/v1/orders/delivery-quote/', body, format='json').json()['data']
         self.assertIn('Choisissez un moyen de paiement dans la liste.', quote['blocking'])
+
+    def test_every_fee_is_explained_even_when_zero_or_not_applicable(self):
+        by_label = lambda q: {row['label'].split(' (')[0]: row for row in q['fee_details']}
+        # Petit panier payé en ligne : frais appliqué.
+        with mock.patch('payments.configuration.platform_online_ready', return_value=True):
+            self.set_policy(True)
+            online = self.api.post('/api/v1/orders/delivery-quote/',
+                                   self.body('platform_online', 'airtel_money', 'gaboshop'), format='json').json()['data']
+        rows = by_label(online)
+        self.assertEqual(rows['Frais petit panier']['status'], 'charged')
+        self.assertEqual(rows['Frais Airtel Money']['status'], 'charged')
+        self.assertIn('Commission Gaboshop', rows)
+        # Paiement direct : le frais petit panier est expliqué, pas appliqué.
+        direct = self.api.post('/api/v1/orders/delivery-quote/', self.body('direct_split', 'cash'),
+                               format='json').json()['data']
+        rows = by_label(direct)
+        self.assertEqual(rows['Frais petit panier']['status'], 'info')
+        self.assertIn('paiement en ligne', rows['Frais petit panier']['note'])
+        self.assertEqual(rows['Frais Mobile Money']['status'], 'info')
+        # Panier au-dessus du seuil.
+        big = self.api.post('/api/v1/orders/delivery-quote/', self.body('direct_split', 'cash', quantity=5),
+                            format='json').json()['data']
+        self.assertIn('dépassent', by_label(big)['Frais petit panier']['note'])
+        # Réglage éteint.
+        s = SystemSettings.get_settings()
+        s.small_order_fee = Decimal('0')
+        s.save(update_fields=['small_order_fee'])
+        off = self.api.post('/api/v1/orders/delivery-quote/', self.body('direct_split', 'cash'),
+                            format='json').json()['data']
+        self.assertEqual(by_label(off)['Frais petit panier']['status'], 'free')
