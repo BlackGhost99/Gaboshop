@@ -1,0 +1,64 @@
+name: Checkout CORS staging
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'settings.py'
+      - 'api/test_cors_preflight.py'
+      - '.github/workflows/cors-staging-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cors-checkout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DJANGO_SETTINGS_MODULE: gaboshop.settings
+      DJANGO_SECRET_KEY: staging-ci-only-secret-not-for-production-000000000000000
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+      - name: Vérifier Django et la permission CORS
+        run: |
+          python manage.py check
+          python manage.py test api.test_cors_preflight --noinput -v 2
+      - name: Vérifier le preflight HTTP réel sur Render staging
+        run: |
+          python - <<'PY'
+          import time
+          from urllib.request import Request, urlopen
+
+          api = "https://gaboshop-api-staging-uvn1.onrender.com/api/v1/orders/create/"
+          origin = "https://gaboshop-web-staging-uvn1.onrender.com"
+          for n in range(30):
+              try:
+                  req = Request(api, method="OPTIONS", headers={
+                      "Origin": origin,
+                      "Access-Control-Request-Method": "POST",
+                      "Access-Control-Request-Headers": "authorization,content-type,idempotency-key",
+                  })
+                  with urlopen(req, timeout=100) as r:
+                      headers = r.headers
+                      status = r.status
+                  accepted = {x.strip().lower() for x in
+                              headers.get("Access-Control-Allow-Headers", "").split(",")}
+                  if status == 200 and headers.get("Access-Control-Allow-Origin") == origin and (
+                          {"authorization", "content-type", "idempotency-key"} <= accepted):
+                      print("STAGING CORS OK: Idempotency-Key et commandes autorisés depuis le frontend.")
+                      break
+                  print(f"Attente déploiement {n+1}/30 : status={status}, headers={sorted(accepted)}",flush=True)
+              except Exception as exc:
+                  print(f"Attente API staging {n+1}/30: {type(exc).__name__}: {exc}",flush=True)
+              time.sleep(20)
+          else:
+              raise SystemExit("ERREUR: preflight CORS Idempotency-Key non autorisé sur staging.")
+          PY
