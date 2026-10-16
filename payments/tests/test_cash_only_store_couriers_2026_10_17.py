@@ -71,6 +71,11 @@ class CashWithStoreCouriersTests(TestCase):
         self.assertFalse(arrangement.obligations.filter(kind='delivery').exists())
         self.assertFalse(arrangement.obligations.filter(kind='courier_remittance').exists())
         self.assertTrue(OrderSerializer(order).data['delivered_by_store'])
+        from payments.direct_service import store_delivers
+        self.store.offers_delivery = False
+        self.store.save(update_fields=['offers_delivery'])
+        order.refresh_from_db()
+        self.assertTrue(store_delivers(order), 'La livraison boutique est figée pour la commande')
 
     def test_pickup_can_still_be_paid_cash_at_store(self):
         _, options = available_payment_options(self.store, delivery_requested=False)
