@@ -117,7 +117,7 @@ export default function Confidentialite() {
         <p>
           Nous protégeons vos données par des mesures adaptées : connexion chiffrée (HTTPS), mots de passe chiffrés,
           accès limité selon le rôle (client, commerce, livreur, administrateur), sauvegardes et surveillance des accès.
-          Aucun système n'étant parfait, nous vous informerons, ainsi que la CNPDCP lorsque la loi le prévoit, en cas
+          Aucun système n'étant parfait, nous vous informerons, ainsi que l'APDPVP lorsque la loi le prévoit, en cas
           d'incident grave touchant vos données.
         </p>
       </Section>
