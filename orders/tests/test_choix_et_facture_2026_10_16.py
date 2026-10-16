@@ -75,6 +75,10 @@ class ChoixEtFactureTests(TestCase):
         # Une commande simple ne doit pas créer une deuxième page quasi vide.
         reader = PdfReader(BytesIO(pdf.content))
         self.assertEqual(len(reader.pages), 1, 'La facture simple doit tenir sur une page A4; page 2: ' + repr(reader.pages[1].extract_text()[:600] if len(reader.pages) > 1 else ''))
+        page = reader.pages[0]
+        self.assertAlmostEqual(float(page.mediabox.width), 595.3, delta=1)
+        self.assertAlmostEqual(float(page.mediabox.height), 841.9, delta=1)
+        self.assertGreater(len(page.images), 0, "Le logo Gaboshop doit être incorporé au PDF")
         extracted = reader.pages[0].extract_text()
         self.assertIn('72 000', extracted)
         self.assertIn('Timberland', extracted)
@@ -82,6 +86,7 @@ class ChoixEtFactureTests(TestCase):
         from orders.invoice import invoice_context
         ctx = invoice_context(order)
         self.assertEqual(ctx['number'], f'FAC-{order.order_number}')
+        self.assertTrue(ctx['logo_data_uri'].startswith('data:image/png;base64,'))
         self.assertEqual(ctx['items'][0]['options'], 'Taille 42 · Marron')
         self.assertFalse(ctx['payment_is_paid'], "Ne pas indiquer payé sans confirmation")
         self.assertNotEqual(ctx['payment_state'], 'Règlement confirmé')
