@@ -50,10 +50,37 @@ class SinglePaymentTests(TestCase):
         return order
 
     # --- choix proposés -------------------------------------------------------------
-    def test_only_airtel_and_moov_are_offered_when_online_payment_is_ready(self):
+    def test_online_and_direct_are_offered_together_when_enabled(self):
         _, options = available_payment_options(self.store)
-        self.assertEqual({(o['flow'], o['method'], o['delivery_by']) for o in options},
-                         {('platform_online', 'airtel_money', 'gaboshop'), ('platform_online', 'moov_money', 'gaboshop')})
+        online = {(o['flow'], o['method'], o['delivery_by']) for o in options
+                  if o['flow'] == 'platform_online'}
+        self.assertEqual(online, {
+            ('platform_online', 'airtel_money', 'gaboshop'),
+            ('platform_online', 'moov_money', 'gaboshop'),
+        })
+        self.assertTrue(matching_option(options, 'direct_split', 'cash'))
+        self.assertTrue(matching_option(options, 'store_collects_all', 'cash'))
+        self.assertTrue(matching_option(options, 'courier_cash', 'cash'))
+
+    def test_online_method_is_not_reenabled_when_disabled_by_admin(self):
+        settings = SystemSettings.get_settings()
+        settings.payment_policy = {
+            **settings.payment_policy,
+            'enabled_methods': ['cash', 'airtel_money'],
+        }
+        settings.save(update_fields=['payment_policy'])
+        _, options = available_payment_options(self.store)
+        self.assertTrue(matching_option(options, 'platform_online', 'airtel_money', 'gaboshop'))
+        self.assertIsNone(matching_option(options, 'platform_online', 'moov_money', 'gaboshop'))
+        self.assertTrue(matching_option(options, 'direct_split', 'cash'))
+
+    def test_manual_mobile_money_requires_store_instructions(self):
+        _, options = available_payment_options(self.store)
+        self.assertIsNone(matching_option(options, 'direct_split', 'moov_money'))
+        self.store.payment_preferences = {'instructions': {'moov_money': 'Code marchand 06...'}}
+        self.store.save(update_fields=['payment_preferences'])
+        _, configured = available_payment_options(self.store)
+        self.assertTrue(matching_option(configured, 'direct_split', 'moov_money'))
 
     def test_store_that_delivers_gets_the_pay_everything_to_store_option(self):
         self.store.offers_delivery = True
