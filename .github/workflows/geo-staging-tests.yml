@@ -1,0 +1,36 @@
+name: Test du référentiel géographique (staging)
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'delivery/**'
+      - 'orders/tests/test_adresses_quartiers_2026_10_16.py'
+      - '.github/workflows/geo-staging-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  geo-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DJANGO_SETTINGS_MODULE: gaboshop.settings
+      SECRET_KEY: ci-only-not-for-production-000000000000000000000000000
+      DEBUG: 'True'
+      DATABASE_URL: sqlite:///:memory:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+      - name: Vérifier les migrations
+        run: python manage.py migrate --noinput
+      - name: Tester la cohérence des modèles
+        run: python manage.py check
+      - name: Tester les adresses et les quartiers
+        run: python manage.py test orders.tests.test_adresses_quartiers_2026_10_16 --noinput -v 2
