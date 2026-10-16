@@ -737,12 +737,6 @@ class DeliveryQuoteView(APIView):
 		city = (request.data.get('city') or 'Libreville').strip()
 		zones = list(active_zones(city).values_list('name', flat=True))
 		pickup = request.data.get('delivery_requested') is False
-		zone = ''
-		if not pickup:
-			try:
-				zone = resolve_zone(city, request.data.get('delivery_zone'))
-			except ValueError as exc:
-				return Response({'success': True, 'data': {'delivery_fee': None, 'zones': zones, 'message': str(exc)}})
 		pairs = []
 		for item in (request.data.get('items') or [])[:100]:
 			try:
@@ -754,6 +748,17 @@ class DeliveryQuoteView(APIView):
 				pairs.append((product, quantity))
 		if not pairs:
 			return Response({'success': False, 'error': 'Panier vide.'}, status=status.HTTP_400_BAD_REQUEST)
+		zone = ''
+		if not pickup:
+			try:
+				if request.data.get('neighborhood'):
+					from delivery.zones import resolve_neighborhood, zone_name_for
+					neighborhood = resolve_neighborhood(request.data.get('neighborhood'))
+					city, zone = neighborhood.city.name, zone_name_for(neighborhood)
+				else:
+					zone = resolve_zone(city, request.data.get('delivery_zone'))
+			except ValueError as exc:
+				return Response({'success': True, 'data': {'delivery_fee': None, 'zones': zones, 'message': str(exc)}})
 		order = Order(store=store, city=city, delivery_zone=zone, delivery_type='standard')
 		fee = Decimal('0') if pickup else order.quote_delivery(pairs)
 		from payments.economics import small_order_fee

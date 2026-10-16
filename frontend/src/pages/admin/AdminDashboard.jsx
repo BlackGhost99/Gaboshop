@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
-import { notifySuccess } from '../../utils/feedback';
+import { describeError, notifySuccess } from '../../utils/feedback';
 import B2CCategoryModal from '../../components/B2CCategoryModal';
 import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import AdminSettingsSection from '../../components/AdminSettingsSection';
@@ -288,7 +288,7 @@ const AdminDashboard = () => {
         notifySuccess(`Compte créé pour ${created.phone}`, 'La personne peut se connecter avec le mot de passe choisi.');
       }
     } catch (err) {
-      setActionError(err?.message || 'Création échouée');
+      setActionError(describeError(err, 'Création échouée').message);
     }
   };
 
@@ -301,7 +301,7 @@ const AdminDashboard = () => {
       setUsers((prev) => prev.map((u) => (u.id === payload.id ? res.data : u)));
       setEditingUser(null);
     } catch (err) {
-      setActionError(err?.message || 'Mise à jour échouée');
+      setActionError(describeError(err, 'Mise à jour échouée').message);
     }
   };
 
@@ -315,7 +315,7 @@ const AdminDashboard = () => {
       if (selectedUser?.id === userId) setSelectedUser(null);
       if (confirmDeleteUser?.id === userId) setConfirmDeleteUser(null);
     } catch (err) {
-      setActionError(err?.message || 'Suppression échouée');
+      setActionError(describeError(err, 'Suppression échouée').message);
     }
   };
 
@@ -327,7 +327,7 @@ const AdminDashboard = () => {
       setNewStoreCat({ name: '', description: '', icon: '', is_active: true });
       loadData(false);
     } catch (err) {
-      setActionError(err?.message || 'Erreur création catégorie');
+      setActionError(describeError(err, 'Erreur création catégorie').message);
     }
   };
 
@@ -339,7 +339,7 @@ const AdminDashboard = () => {
       setEditingStoreCat(null);
       loadData(false);
     } catch (err) {
-      setActionError(err?.message || 'Erreur mise à jour catégorie');
+      setActionError(describeError(err, 'Erreur mise à jour catégorie').message);
     }
   };
 
@@ -348,7 +348,7 @@ const AdminDashboard = () => {
       const pc = await getAllProductCategories();
       setAllProductCategories(pc?.data || []);
     } catch (err) {
-      setActionError(err?.message || 'Erreur chargement catégories de produits');
+      setActionError(describeError(err, 'Erreur chargement catégories de produits').message);
     }
   };
 
@@ -382,7 +382,7 @@ const AdminDashboard = () => {
           await deleteStoreCategory(id);
           loadData(false);
         } catch (err) {
-          setActionError(err?.message || 'Erreur suppression catégorie');
+          setActionError(describeError(err, 'Erreur suppression catégorie').message);
         }
       },
     });
@@ -399,7 +399,7 @@ const AdminDashboard = () => {
         loadData(false);
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur création magasin');
+      setActionError(describeError(err, 'Erreur création magasin').message);
     }
   };
 
@@ -414,7 +414,7 @@ const AdminDashboard = () => {
         loadData(false);
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur mise à jour magasin');
+      setActionError(describeError(err, 'Erreur mise à jour magasin').message);
     }
   };
 
@@ -435,7 +435,7 @@ const AdminDashboard = () => {
             loadData(false);
           }
         } catch (err) {
-          setActionError(err?.message || 'Erreur suppression magasin');
+          setActionError(describeError(err, 'Erreur suppression magasin').message);
         }
       },
     });
@@ -456,7 +456,7 @@ const AdminDashboard = () => {
       if (byStore?.success) setOrdersByStore(byStore.data);
       if (agents?.success) setDeliveryAgents(agents.data);
     } catch (err) {
-      setActionError(err?.message || 'Erreur chargement commandes');
+      setActionError(describeError(err, 'Erreur chargement commandes').message);
     }
   }, [ordersFilter]);
 
@@ -467,7 +467,7 @@ const AdminDashboard = () => {
         setSelectedOrder(res.data);
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur chargement détails');
+      setActionError(describeError(err, 'Erreur chargement détails').message);
     }
   };
 
@@ -583,7 +583,7 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       console.error('Error loading stores:', err);
-      setActionError(err?.message || 'Erreur chargement magasins');
+      setActionError(describeError(err, 'Erreur chargement magasins').message);
       setStoresListAdmin([]);
     }
   }, [storesFilter]);
@@ -595,7 +595,7 @@ const AdminDashboard = () => {
       // Le modal StoreDetailModal chargera les détails automatiquement
       setSelectedStoreForDetail(storeId);
     } catch (err) {
-      setActionError(err?.message || 'Erreur chargement magasin');
+      setActionError(describeError(err, 'Erreur chargement magasin').message);
     } finally {
       setB2bLoading(prev => ({ ...prev, [storeId]: false }));
     }
@@ -615,7 +615,7 @@ const AdminDashboard = () => {
             loadStoresData();
           }
         } catch (err) {
-          setActionError(err?.message || 'Erreur désactivation magasin');
+          setActionError(describeError(err, 'Erreur désactivation magasin').message);
         } finally {
           setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
         }
@@ -631,7 +631,7 @@ const AdminDashboard = () => {
         loadStoresData();
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur activation magasin');
+      setActionError(describeError(err, 'Erreur activation magasin').message);
     }
   };
 
@@ -719,7 +719,7 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       console.error('Error loading products:', err);
-      setActionError(err?.message || 'Erreur chargement produits');
+      setActionError(describeError(err, 'Erreur chargement produits').message);
       setProductsListAdmin([]);
     }
   }, [productsFilter]);
@@ -731,7 +731,7 @@ const AdminDashboard = () => {
         setViewingProduct(res.data);
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur chargement produit');
+      setActionError(describeError(err, 'Erreur chargement produit').message);
     }
   };
 
@@ -742,7 +742,7 @@ const AdminDashboard = () => {
         loadProductsData();
       }
     } catch (err) {
-      setActionError(err?.message || 'Erreur activation produit');
+      setActionError(describeError(err, 'Erreur activation produit').message);
     }
   };
 
@@ -759,7 +759,7 @@ const AdminDashboard = () => {
             loadProductsData();
           }
         } catch (err) {
-          setActionError(err?.message || 'Erreur désactivation produit');
+          setActionError(describeError(err, 'Erreur désactivation produit').message);
         }
       },
     });
@@ -781,7 +781,7 @@ const AdminDashboard = () => {
             loadProductsData();
           }
         } catch (err) {
-          setActionError(err?.message || 'Erreur suppression produit');
+          setActionError(describeError(err, 'Erreur suppression produit').message);
         }
       },
     });
@@ -806,7 +806,7 @@ const AdminDashboard = () => {
             });
           }
         } catch (err) {
-          setActionError(err?.message || 'Erreur action en masse');
+          setActionError(describeError(err, 'Erreur action en masse').message);
         }
       },
     });

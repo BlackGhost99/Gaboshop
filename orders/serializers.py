@@ -253,7 +253,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'store', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
+            'store', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone', 'neighborhood',
             'delivery_type', 'delivery_requested', 'notes', 'items',
             'payment_flow', 'payment_method', 'delivery_payment_method'
         ]
@@ -271,11 +271,26 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             })
 
         if attrs.get('delivery_requested', True):
-            from delivery.zones import resolve_zone
-            try:
-                attrs['delivery_zone'] = resolve_zone(attrs.get('city') or 'Libreville', attrs.get('delivery_zone'))
-            except ValueError as exc:
-                raise serializers.ValidationError({'delivery_zone': str(exc)})
+            from delivery.zones import resolve_neighborhood, resolve_zone, zone_name_for
+            neighborhood = attrs.get('neighborhood')
+            if neighborhood is not None:
+                # Quartier choisi dans la liste : la ville et la zone de prix viennent de lui, jamais du texte tapé.
+                try:
+                    neighborhood = resolve_neighborhood(neighborhood.pk)
+                except ValueError as exc:
+                    raise serializers.ValidationError({'neighborhood': str(exc)})
+                attrs['neighborhood'] = neighborhood
+                attrs['city'] = neighborhood.city.name
+                attrs['delivery_zone'] = zone_name_for(neighborhood)
+                landmark = (attrs.get('delivery_address') or '').strip()
+                attrs['delivery_address'] = f"{neighborhood.label} — {landmark}" if landmark else neighborhood.label
+            else:
+                try:
+                    attrs['delivery_zone'] = resolve_zone(attrs.get('city') or 'Libreville', attrs.get('delivery_zone'))
+                except ValueError as exc:
+                    raise serializers.ValidationError({'delivery_zone': str(exc)})
+        else:
+            attrs['neighborhood'] = None
 
         items = attrs['items']
         if any(item['product'].store_id != store.id for item in items):

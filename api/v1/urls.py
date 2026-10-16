@@ -37,7 +37,7 @@ from .notifications import (
     NotificationListView, NotificationMarkAllReadView, NotificationMarkReadView,
     NotificationDeleteView
 )
-from . import delivery_admin
+from . import delivery_admin, geo
 from . import client_forfaits
 from .sponsoring import StoreSponsoringView
 from .delivery import (
@@ -178,6 +178,9 @@ urlpatterns = [
     path('admin/delivery/tariff-analytics/', DeliveryTariffAnalyticsView.as_view(), name='delivery-tariff-analytics'),
     path('admin/delivery/tariffs/', delivery_admin.DeliveryTariffsView.as_view(), name='admin-delivery-tariffs'),
     path('admin/delivery/defaults/', delivery_admin.DeliveryDefaultsView.as_view(), name='admin-delivery-defaults'),
+    path('geo/', geo.GeoTreeView.as_view(), name='geo-tree'),
+    path('admin/geo/<str:level>/', geo.GeoAdminView.as_view(), name='admin-geo'),
+    path('admin/geo/<str:level>/<int:item_id>/', geo.GeoAdminView.as_view(), name='admin-geo-item'),
     path('admin/delivery/zones/', delivery_admin.DeliveryZonesAdminView.as_view(), name='admin-delivery-zones'),
     path('admin/delivery/zones/<int:zone_id>/', delivery_admin.DeliveryZonesAdminView.as_view(), name='admin-delivery-zone'),
     path('admin/delivery/vehicles/<int:vehicle_id>/', delivery_admin.VehicleTypeAdminView.as_view(), name='admin-delivery-vehicle'),

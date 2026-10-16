@@ -81,6 +81,9 @@ class Order(models.Model):
 	delivery_address = models.TextField()
 	delivery_phone = models.CharField(max_length=20)
 	delivery_zone = models.CharField(max_length=100)
+	# Quartier choisi dans la liste (Province › Ville › Arrondissement › Quartier) ; vide pour les anciennes commandes.
+	neighborhood = models.ForeignKey('delivery.Neighborhood', on_delete=models.SET_NULL, null=True, blank=True,
+									 related_name='orders')
     
 	# Timestamps
 	created_at = models.DateTimeField(auto_now_add=True)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { notifyError, notifySuccess, notifyWarning, notifyInfo } from '../utils/feedback';
 import useEnabledCities from '../hooks/useEnabledCities';
 import DeliveryTariffs from './admin/delivery/DeliveryTariffs';
+import DeliveryAddresses from './admin/delivery/DeliveryAddresses';
 import { DeliveryActive, DeliveryDispatch, DeliveryIncidents, DeliveryStats } from './admin/delivery/DeliveryOperations';
 import { getDeliveryAgents, createDeliveryAgent, updateDeliveryAgent, toggleDeliveryAgentStatus } from '../services/adminService';
 
@@ -224,7 +225,7 @@ const AdminDeliverySection = () => {
     <div className="space-y-6">
       {/* Tabs Navigation */}
       <div className="flex space-x-4 border-b border-gray-200 pb-2 overflow-x-auto">
-        {['agents', 'attribution', 'active_orders', 'settings', 'stats', 'incidents'].map((tab) => (
+        {['agents', 'attribution', 'active_orders', 'settings', 'addresses', 'stats', 'incidents'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -238,6 +239,7 @@ const AdminDeliverySection = () => {
             {tab === 'attribution' && 'Attribution'}
             {tab === 'active_orders' && 'Commandes en cours'}
             {tab === 'settings' && 'Tarifs'}
+            {tab === 'addresses' && 'Adresses'}
             {tab === 'stats' && 'Statistiques'}
             {tab === 'incidents' && 'Incidents'}
           </button>
@@ -338,6 +340,7 @@ const AdminDeliverySection = () => {
       {activeTab === 'attribution' && <DeliveryDispatch />}
       {activeTab === 'active_orders' && <DeliveryActive />}
       {activeTab === 'settings' && <DeliveryTariffs />}
+      {activeTab === 'addresses' && <DeliveryAddresses />}
       {activeTab === 'stats' && <DeliveryStats />}
       {activeTab === 'incidents' && <DeliveryIncidents />}
 

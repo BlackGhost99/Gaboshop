@@ -558,3 +558,79 @@ class DeliveryProof(models.Model):
 		
 		# Tolérance: 100 mètres
 		return self.distance_from_address <= 100
+
+
+# ---------------------------------------------------------------------------
+# Référentiel d'adresses : Province › Ville › Arrondissement › Quartier.
+# C'est la géographie réelle. Le prix vient de la zone de livraison (DeliveryZone) à laquelle
+# l'admin rattache chaque quartier : plusieurs quartiers partagent un même tarif.
+# ---------------------------------------------------------------------------
+
+class Province(models.Model):
+	name = models.CharField(max_length=100, unique=True)
+	order = models.PositiveIntegerField(default=0)
+	is_active = models.BooleanField(default=True)
+
+	class Meta:
+		verbose_name = "Province"
+		ordering = ['order', 'name']
+
+	def __str__(self):
+		return self.name
+
+
+class City(models.Model):
+	province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name='cities')
+	name = models.CharField(max_length=100)
+	order = models.PositiveIntegerField(default=0)
+	is_active = models.BooleanField(default=True, help_text="Visible dans les listes")
+	is_open = models.BooleanField(default=False, help_text="Gaboshop livre dans cette ville (sinon « Bientôt disponible »)")
+
+	class Meta:
+		verbose_name = "Ville"
+		ordering = ['order', 'name']
+		unique_together = [['province', 'name']]
+
+	def __str__(self):
+		return self.name
+
+
+class Arrondissement(models.Model):
+	city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='arrondissements')
+	name = models.CharField(max_length=100)
+	number = models.PositiveIntegerField(default=0)
+	is_active = models.BooleanField(default=True)
+
+	class Meta:
+		verbose_name = "Arrondissement"
+		ordering = ['number', 'name']
+		unique_together = [['city', 'name']]
+
+	def __str__(self):
+		return f"{self.name} ({self.city.name})"
+
+
+class Neighborhood(models.Model):
+	city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='neighborhoods')
+	arrondissement = models.ForeignKey(Arrondissement, on_delete=models.SET_NULL, null=True, blank=True,
+									   related_name='neighborhoods')
+	name = models.CharField(max_length=100)
+	zone = models.ForeignKey(DeliveryZone, on_delete=models.SET_NULL, null=True, blank=True, related_name='neighborhoods',
+							 help_text="Zone de prix de livraison (vide : prix de livraison du commerce)")
+	is_active = models.BooleanField(default=True)
+
+	class Meta:
+		verbose_name = "Quartier"
+		ordering = ['name']
+		unique_together = [['city', 'name']]
+
+	def __str__(self):
+		return f"{self.name} ({self.city.name})"
+
+	@property
+	def label(self):
+		parts = [self.name]
+		if self.arrondissement_id:
+			parts.append(self.arrondissement.name)
+		parts.append(self.city.name)
+		return ', '.join(parts)

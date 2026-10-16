@@ -11,6 +11,8 @@ import { getPaymentOptions, initPayment } from '../../services/paymentService';
 import { getProductDetails } from '../../services/productService';
 import { METHOD_LABELS } from '../../components/payments/paymentLabels';
 import api from '../../services/api';
+import AddressPicker from '../../components/address/AddressPicker';
+import useGeo from '../../hooks/useGeo';
 
 const CART_KEY = 'gaboshop_cart';
 const envBase = import.meta.env.VITE_API_URL;
@@ -79,6 +81,8 @@ const ClientDashboard = () => {
   const [storeAlerts, setStoreAlerts] = useState({});
   const [paymentOptions, setPaymentOptions] = useState({});
   const [zones, setZones] = useState([]);
+  const geo = useGeo();
+  const geoReady = !!geo?.neighborhoods?.length;
 
   // Helper: Calculate total amount
   const calculateTotal = (subtotal, deliveryCost) => {
@@ -252,6 +256,7 @@ const ClientDashboard = () => {
             delivery_requested: form.delivery_requested !== false,
             city: form.city || 'Libreville',
             delivery_zone: form.zone || '',
+            neighborhood: geoReady ? (form.neighborhood || null) : null,
             items: group.items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
           });
           if (active) setQuotes((prev) => ({ ...prev, [storeName]: res.data?.data || {} }));
@@ -261,7 +266,7 @@ const ClientDashboard = () => {
       });
     }, 400);
     return () => { active = false; clearTimeout(timer); };
-  }, [cartByStore, storeForms]);
+  }, [cartByStore, storeForms, geoReady]);
 
   useEffect(() => {
     // Backfill store_id/weight/length for legacy cart items
@@ -337,10 +342,13 @@ const ClientDashboard = () => {
     persistCart(cartItems.filter((it) => (it.store_name || 'Magasin') !== storeName));
   };
 
-  const handleChangeForm = (storeName, field, value) => {
+  const handleChangeForm = (storeName, field, value) => handlePatchForm(storeName, { [field]: value });
+
+  const handlePatchForm = (storeName, patch) => {
     setStoreForms((prev) => ({
       ...prev,
       [storeName]: {
+        ...(prev[storeName] || {}),
         city: prev[storeName]?.city ?? 'Libreville',
         address: prev[storeName]?.address ?? '',
         phone: prev[storeName]?.phone ?? '',
@@ -351,7 +359,7 @@ const ClientDashboard = () => {
         payment_method: prev[storeName]?.payment_method ?? '',
         delivery_by: prev[storeName]?.delivery_by ?? '',
         delivery_requested: prev[storeName]?.delivery_requested ?? true,
-        [field]: value,
+        ...patch,
       },
     }));
   };
@@ -403,6 +411,10 @@ const ClientDashboard = () => {
         return;
       }
     }
+    if (form.delivery_requested !== false && geoReady && !form.neighborhood) {
+      setToast({ type: 'error', message: 'Choisissez votre quartier dans la liste.' });
+      return;
+    }
     if (!delivery_zone) {
       setToast({ type: 'error', message: 'Renseignez une zone/quartier.' });
       return;
@@ -414,6 +426,7 @@ const ClientDashboard = () => {
       delivery_address,
       delivery_phone,
       delivery_zone,
+      neighborhood: geoReady && form.delivery_requested !== false ? Number(form.neighborhood) : null,
       delivery_requested: form.delivery_requested !== false,
       notes: form.notes || '',
       payment_flow,
@@ -794,6 +807,13 @@ const ClientDashboard = () => {
                       value={storeForms[storeName]?.payment_phone || ''}
                       onChange={(e) => handleChangeForm(storeName, 'payment_phone', e.target.value)}
                     />
+                    {geoReady ? (
+                      <AddressPicker
+                        geo={geo}
+                        value={storeForms[storeName] || {}}
+                        onChange={(patch) => handlePatchForm(storeName, patch)}
+                      />
+                    ) : (<>
                     <input
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
                       placeholder="Ville"
@@ -819,9 +839,10 @@ const ClientDashboard = () => {
                         onChange={(e) => handleChangeForm(storeName, 'zone', e.target.value)}
                       />
                     )}
+                    </>)}
                     <input
                       className="w-full border border-gray-200 rounded-md px-3 py-2"
-                      placeholder="Adresse de livraison"
+                      placeholder={geoReady ? 'Repère : derrière la pharmacie X, portail bleu…' : 'Adresse de livraison'}
                       value={storeForms[storeName]?.address || ''}
                       onChange={(e) => handleChangeForm(storeName, 'address', e.target.value)}
                     />
