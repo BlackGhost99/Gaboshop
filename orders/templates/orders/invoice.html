@@ -6,7 +6,7 @@
   @page {
     size: A4;
     margin: 12mm 13mm 15mm 13mm;
-    @frame footer { -pdf-frame-content: page_footer; bottom: 5mm; left: 13mm; right: 13mm; height: 6mm; }
+    @frame footer { -pdf-frame-content: page_footer; bottom: 4mm; left: 13mm; right: 13mm; height: 9mm; }
   }
   body { font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #1e293b; }
   table { width: 100%; border-collapse: collapse; }
@@ -142,15 +142,10 @@
 {% if notes %}<p class="small"><b>Instructions du client :</b> {{ notes }}</p>{% endif %}
 {% if problem %}<p class="small"><b>Problème signalé :</b> {{ problem }}</p>{% endif %}
 
-<div class="help">
-  <b>Besoin d'aide sur cette commande ?</b>
-  Ouvrez « Mes commandes » dans Gaboshop puis « Signaler un problème » sur la commande {{ order_number }}.
-  {% if support %}<br/>Assistance : {{ support }}{% endif %}
-  <br/><span class="note">Document généré à partir des informations enregistrées au moment de l'édition. Le vendeur est le commerce identifié ci-dessus.</span>
-</div>
 
 <div id="page_footer" class="footer">
-  {{ brand }} &nbsp; | &nbsp; Commande {{ order_number }} &nbsp; | &nbsp; Page <pdf:pagenumber/>
+  Aide : dans « Mes commandes », sélectionnez « Signaler un problème ».{% if support %} &nbsp; {{ support }}{% endif %}
+  <br/>{{ brand }} &nbsp; | &nbsp; Facture {{ number }} &nbsp; | &nbsp; Page <pdf:pagenumber/>
 </div>
 </body>
 </html>
