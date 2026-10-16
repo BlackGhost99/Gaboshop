@@ -63,28 +63,30 @@ export default function CGU() {
 
       <Section title="5. Paiement">
         <p>
-          Aujourd'hui, {COMPANY.brand} <strong>n'encaisse pas l'argent des commandes</strong> : il n'y a pas encore
-          d'agrégateur de paiement intégré. Le client paie directement le commerce, ou le livreur à la livraison :
+          Plusieurs circuits de paiement peuvent être proposés selon le commerce, la commande et les options
+          effectivement activées lors de la validation du panier. Le client voit avant de confirmer sa commande
+          le montant à payer, les frais de livraison et le bénéficiaire du paiement.
         </p>
         <List
           items={[
-            <><strong>En espèces</strong> au commerce ;</>,
-            <><strong>Par Mobile Money</strong> (Airtel Money ou Moov Money), sur le code marchand du commerce affiché dans l'application ;</>,
-            <><strong>En espèces au livreur</strong>, au moment de la livraison, lorsque le commerce accepte ce mode de paiement.</>,
+            <>Paiement direct au commerce : en espèces, par Mobile Money ou par un autre moyen proposé à l'écran de commande.</>,
+            <>Paiement au livreur ou paiement intégral au commerce : uniquement lorsque cette option est effectivement proposée au panier.</>,
+            <>Paiement en ligne via un prestataire, lorsque ce service est activé : le paiement est initié depuis {COMPANY.brand},
+              puis son statut est vérifié auprès du prestataire. Les parts dues au commerce, au livreur et à la plateforme
+              font l'objet d'un suivi distinct.</>,
           ]}
         />
         <p>
-          Pour un paiement Mobile Money, le client doit <strong>saisir dans l'application la référence de la transaction</strong>{' '}
-          (reçue par SMS). {COMPANY.brand} ne vous demandera jamais votre code secret (PIN) Mobile Money : ne le communiquez
-          à personne.
+          Les modes et frais disponibles peuvent varier selon la commande. Pour un paiement Mobile Money réalisé
+          directement au commerce ou à un livreur, une référence ou une preuve peut être demandée pour vérifier
+          le règlement. Une déclaration de paiement ne constitue pas, à elle seule, une confirmation de réception.
+          Ne communiquez jamais votre code secret (PIN) Mobile Money à qui que ce soit.
         </p>
         <p>
-          <strong>Une commande n'est préparée qu'une fois que le commerce a confirmé avoir reçu le paiement</strong>, ou,
-          pour un paiement en espèces, au moment de la livraison.
-        </p>
-        <p>
-          Déclarer un paiement qui n'a pas été fait (fausse référence, faux reçu, etc.) est une fraude. Elle entraîne la
-          suspension du compte et peut faire l'objet de poursuites.
+          Le démarrage de la préparation et de la livraison dépend du mode choisi et des confirmations
+          requises. Un paiement initié, mais non confirmé, ne vaut pas paiement reçu.
+          Les reversements aux bénéficiaires sont soumis aux vérifications financières et aux conditions
+          applicables au circuit sélectionné ; leur automatisation n'est pas garantie.
         </p>
       </Section>
 
@@ -92,31 +94,48 @@ export default function CGU() {
         <List
           items={[
             "Les frais de livraison sont affichés avant la validation de la commande. Ils dépendent de la zone de livraison.",
-            "La commande est remise par un livreur indépendant, à l'adresse indiquée par le client. Les délais sont donnés à titre indicatif.",
-            "À la livraison, le client communique au livreur un code de confirmation (PIN de livraison) affiché dans son application. Ce code prouve que la commande a bien été remise : ne le donnez qu'une fois le colis reçu et vérifié.",
+            "La livraison peut être assurée par un livreur partenaire de Gaboshop ou par le commerce lorsque ce mode est proposé. Les délais communiqués sont indicatifs ; tout retard important peut être signalé au support.",
+            "Lorsqu'un code de confirmation de livraison est demandé, le client ne le communique qu'après réception et contrôle du colis. Les modalités peuvent différer lorsque le commerce livre lui-même.",
             "Le client doit être joignable et présent (ou désigner quelqu'un) à l'adresse indiquée. En cas d'absence, des frais peuvent rester dus.",
           ]}
         />
       </Section>
 
-      <Section title="7. Annulation, retours et remboursements">
+      <Section title="7. Annulation, rétractation, retours et remboursements">
         <p>
-          Les annulations, échanges, retours et remboursements sont gérés <strong>par le commerce</strong>, selon ses
-          propres conditions et la loi gabonaise. Le client doit signaler tout problème (produit manquant, abîmé ou non
-          conforme) rapidement, de préférence dès la livraison.
+          Une commande peut faire l'objet d'une demande d'annulation avant sa livraison. Les suites données
+          dépendent notamment de la préparation, de la prise en charge du colis, du paiement reçu et des
+          éventuels frais déjà engagés. Une annulation de commande ne constitue pas une preuve de remboursement.
         </p>
         <p>
-          En cas de désaccord, le client ou le commerce peut contacter {COMPANY.brand} à {COMPANY.contact}.{' '}
-          {COMPANY.brand} joue alors un rôle de médiateur pour trouver une solution amiable, sans être tenu de rembourser
-          à la place du commerce.
+          Pour les contrats à distance avec les consommateurs, le droit de rétractation prévu par la loi
+          gabonaise n°025/2021 s'applique, lorsqu'il est ouvert, dans un délai de quatorze jours calendaires :
+          à compter de la livraison du bien ou de la conclusion du contrat de service. Des exceptions légales
+          existent, notamment pour certains biens périssables, personnalisés ou descellés pour des raisons
+          d'hygiène. Le commerce et {COMPANY.brand} ne peuvent supprimer un droit impératif par leurs propres conditions.
+        </p>
+        <p>
+          Lorsqu'un remboursement est dû, son montant, son délai, le traitement des frais de livraison et le
+          moyen de remboursement doivent respecter la loi applicable. Dans les cas prévus par celle-ci, les
+          paiements reçus, frais de livraison compris, sont remboursés au plus tard sous quatorze jours
+          calendaires suivant l'information de la rétractation, avec les règles légales relatives au retour du bien.
+        </p>
+        <p>
+          Si le client a payé directement le commerce, celui-ci reste l'interlocuteur du règlement et du
+          remboursement dû. Si un paiement est passé par un prestataire en ligne, son remboursement doit être
+          vérifié et suivi dans le circuit concerné ; aucune opération ne sera présentée comme exécutée
+          avant sa confirmation. Une réclamation peut être adressée à {COMPANY.brand} via {COMPANY.contact}
+          afin d'en assurer le suivi avec le commerce et le prestataire, sans préjudice des droits du consommateur.
         </p>
       </Section>
 
       <Section title="8. Commission due par les commerces">
         <p>
-          Les commerces doivent à {COMPANY.brand} une <strong>commission sur les ventes réalisées via l'application</strong>.
-          Le taux applicable est affiché dans l'espace du commerce. Le commerce doit régler la commission dans le délai
-          indiqué. À défaut, son compte peut être suspendu jusqu'au paiement complet.
+          Les commissions applicables à une vente dépendent des catégories de produits et, lorsqu'il existe,
+          du forfait professionnel concerné. Elles sont calculées selon les règles et montants affichés
+          dans l'espace du commerce. Selon le circuit de paiement, elles peuvent être retenues sur le
+          versement au commerce ou faire l'objet d'une dette à régler dans le délai indiqué.
+          En cas d'impayé vérifié, le compte peut faire l'objet de mesures prévues par les présentes conditions.
         </p>
       </Section>
 
