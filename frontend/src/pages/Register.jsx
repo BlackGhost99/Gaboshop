@@ -200,14 +200,15 @@ const Register = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <label className="block text-sm font-medium text-gray-700">Adresse e-mail</label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => updateField('email', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="(optionnel)"
+                  placeholder="exemple@gmail.com"
                 />
+                <p className="mt-1 text-xs text-indigo-700">Renseignez une adresse e-mail accessible : elle sert aux notifications et à récupérer votre mot de passe sans SMS payant.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Ville</label>

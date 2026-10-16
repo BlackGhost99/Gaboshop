@@ -1,0 +1,44 @@
+name: E-mails production — tests avant déploiement
+on:
+  push:
+    branches:
+      - main
+      - feat/email-only-production-20261016
+    paths:
+      - 'notifications/**'
+      - 'users/password_reset.py'
+      - 'settings.py'
+      - 'render.yaml'
+      - 'frontend/src/pages/Register.jsx'
+      - '.github/workflows/email-production-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  django-mail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DJANGO_SECRET_KEY: email-production-ci-only-not-a-real-secret-2026
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py test notifications.test_email_only_2026_10_16 --noinput -v 2
+  react:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build

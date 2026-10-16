@@ -490,6 +490,9 @@ GROQ_MODEL = env('GROQ_MODEL', default='llama-3.3-70b-versatile')  # sait appele
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
 GEMINI_MODEL = env('GEMINI_MODEL', default='models/gemini-2.0-flash')
 
+# Production : e-mails uniquement, aucun SMS/WhatsApp payant par défaut.
+NOTIFICATION_CHANNEL_MODE = env('NOTIFICATION_CHANNEL_MODE', default='email_only')
+
 # Email Configuration (optionnel)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
