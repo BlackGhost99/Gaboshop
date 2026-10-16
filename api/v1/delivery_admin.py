@@ -295,7 +295,10 @@ class DeliveryPriceSimulatorView(APIView):
 def _delivery_row(delivery, now):
     order = delivery.order
     agent = delivery.delivery_agent
-    started = delivery.assigned_at or delivery.created_at
+    # La date de création de la livraison n'est pas le début de l'attente d'un livreur :
+    # la commande peut rester plusieurs heures chez le commerçant avant d'être prête.
+    is_ready_for_dispatch = bool(order and order.status == 'ready' and not agent)
+    started = (delivery.assignment_started_at or order.updated_at) if is_ready_for_dispatch else None
     return {
         'id': delivery.id, 'status': delivery.status, 'status_label': delivery.get_status_display(),
         'order_id': order.id if order else None, 'order_number': order.order_number if order else '',
@@ -307,7 +310,8 @@ def _delivery_row(delivery, now):
         'agent_id': agent.id if agent else None, 'agent_name': (agent.get_full_name() or agent.phone) if agent else '',
         'agent_phone': agent.phone if agent else '',
         'created_at': delivery.created_at, 'assigned_at': delivery.assigned_at,
-        'minutes_waiting': int((now - started).total_seconds() // 60) if started else None,
+        'minutes_waiting': max(0, int((now - started).total_seconds() // 60)) if started else None,
+        'minutes_since_order': max(0, int((now - order.created_at).total_seconds() // 60)) if order else None,
         'proof_photos': _proof_photos(delivery),
     }
 
