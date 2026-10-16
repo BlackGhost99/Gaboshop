@@ -70,7 +70,7 @@ export default function CGU() {
         <List
           items={[
             <>Paiement direct au commerce : en espèces, par Mobile Money ou par un autre moyen proposé à l'écran de commande.</>,
-            <>Paiement au livreur ou paiement intégral au commerce : uniquement lorsque cette option est effectivement proposée au panier.</>,
+            <>Paiement en espèces à la livraison : uniquement lorsque la boutique assure elle-même la livraison avec ses propres livreurs. Les espèces sont encaissées pour le compte de la boutique, et non d'un livreur Gaboshop.</>,
             <>Paiement en ligne via un prestataire, lorsque ce service est activé : le paiement est initié depuis {COMPANY.brand},
               puis son statut est vérifié auprès du prestataire. Les parts dues au commerce, au livreur et à la plateforme
               font l'objet d'un suivi distinct.</>,
