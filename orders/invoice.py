@@ -5,9 +5,33 @@ livraison (livreur, code), et comment joindre le support. Générée à la deman
 """
 from decimal import Decimal
 from io import BytesIO
+from base64 import b64encode
+from functools import lru_cache
+from pathlib import Path
+
+from django.contrib.staticfiles import finders
 
 from django.template.loader import render_to_string
 from django.utils import timezone
+
+@lru_cache(maxsize=1)
+def _invoice_logo_data_uri():
+    """Incorporer le logo directement au PDF sans URL publique ni requête réseau.
+
+    Le PNG est suivi par Git dans orders/static/orders. Le cache évite
+    des lectures répétées du fichier pour chaque facture.
+    """
+    logo = finders.find('orders/gaboshop-invoice-logo.png')
+    if not logo:
+        return ''
+    try:
+        data = Path(logo).read_bytes()
+    except OSError:
+        return ''
+    if not data.startswith(b'\\x89PNG\\r\\n\\x1a\\n'):
+        return ''
+    return 'data:image/png;base64,' + b64encode(data).decode('ascii')
+
 
 METHOD_LABELS = {
     'cash': 'Espèces', 'airtel_money': 'Airtel Money', 'moov_money': 'Moov Money',
@@ -119,6 +143,7 @@ def invoice_context(order):
                                settings.company_nif and f"NIF {settings.company_nif}") if v]
     return {
         'brand': settings.company_trade_name or 'Gaboshop',
+        'logo_data_uri': _invoice_logo_data_uri(),
         'company_name': settings.company_name or settings.company_trade_name or 'Gaboshop',
         'company_ids': ' · '.join(company_ids),
         'company_address': ', '.join(v for v in (settings.company_address, settings.company_city) if v),
