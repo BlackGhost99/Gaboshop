@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.admin import IsPlatformAdmin
-from delivery.models import Arrondissement, City, DeliveryZone, Neighborhood, Province
+from delivery.models import Arrondissement, City, DeliveryZone, Landmark, Neighborhood, Province
 from delivery.zones import geo_tree
 
 
@@ -36,6 +36,7 @@ LEVELS = {
     'cities': (City, ('province', Province), ('is_active', 'is_open')),
     'arrondissements': (Arrondissement, ('city', City), ('is_active',)),
     'neighborhoods': (Neighborhood, ('city', City), ('is_active',)),
+    'landmarks': (Landmark, ('neighborhood', Neighborhood), ('is_active',)),
 }
 
 
@@ -51,6 +52,7 @@ class GeoAdminView(APIView):
             'cities': list(City.objects.values('id', 'name', 'province_id', 'is_active', 'is_open', 'order')),
             'arrondissements': list(Arrondissement.objects.values('id', 'name', 'city_id', 'number', 'is_active')),
             'neighborhoods': list(Neighborhood.objects.values('id', 'name', 'city_id', 'arrondissement_id', 'zone_id', 'is_active')),
+            'landmarks': list(Landmark.objects.values('id', 'name', 'neighborhood_id', 'is_active')),
             'zones': list(DeliveryZone.objects.values('id', 'name', 'city', 'is_active')),
         }})
 
@@ -86,6 +88,10 @@ class GeoAdminView(APIView):
             except (TypeError, ValueError):
                 return _error('Numéro invalide.')
         if level == 'neighborhoods':
+            # La cascade se suit : dans une ville à arrondissements, chaque quartier est rangé dans le sien.
+            if not obj.pk and not data.get('arrondissement_id') and obj.city.arrondissements.exists():
+                return _error("Choisissez l'arrondissement du quartier.",
+                              "Sélectionnez l'arrondissement puis ajoutez le quartier.")
             if 'arrondissement_id' in data:
                 value = data.get('arrondissement_id')
                 arr = Arrondissement.objects.filter(pk=value).first() if value else None

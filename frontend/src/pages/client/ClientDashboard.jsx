@@ -451,6 +451,7 @@ const ClientDashboard = () => {
       delivery_phone,
       delivery_zone,
       neighborhood: geoReady && form.delivery_requested !== false ? Number(form.neighborhood) : null,
+      landmark: geoReady && form.delivery_requested !== false && form.landmark ? Number(form.landmark) : null,
       delivery_requested: form.delivery_requested !== false,
       notes: form.notes || '',
       payment_flow,

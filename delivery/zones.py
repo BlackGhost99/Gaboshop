@@ -1,5 +1,5 @@
 """Zones de livraison choisies par le client : une seule règle pour l'affichage et la commande."""
-from .models import City, DeliveryZone, Neighborhood
+from .models import City, DeliveryZone, Landmark, Neighborhood
 
 
 def active_zones(city):
@@ -28,6 +28,16 @@ def resolve_neighborhood(neighborhood_id):
     if not neighborhood.city.is_open:
         raise ValueError(f"Gaboshop ne livre pas encore à {neighborhood.city.name}. {open_cities_sentence()}".strip())
     return neighborhood
+
+
+def resolve_landmark(landmark_id, neighborhood):
+    """La zone phare choisie, qui doit être dans le quartier choisi ; None si rien n'est choisi."""
+    if landmark_id in (None, '', 0, '0'):
+        return None
+    try:
+        return Landmark.objects.get(pk=int(landmark_id), neighborhood=neighborhood, is_active=True)
+    except (Landmark.DoesNotExist, TypeError, ValueError):
+        raise ValueError("Cette zone phare n'est pas dans le quartier choisi : choisissez-la dans la liste.")
 
 
 def zone_name_for(neighborhood):
@@ -71,5 +81,7 @@ def geo_tree():
             'id': n.id, 'name': n.name, 'city_id': n.city_id, 'arrondissement_id': n.arrondissement_id,
             'zone': n.zone.name if n.zone_id and n.zone.is_active else None,
         })
+    landmarks = list(Landmark.objects.filter(is_active=True, neighborhood__is_active=True)
+                     .values('id', 'name', 'neighborhood_id'))
     return {'provinces': provinces, 'cities': cities, 'arrondissements': arrondissements,
-            'neighborhoods': neighborhoods, 'message': open_cities_sentence()}
+            'neighborhoods': neighborhoods, 'landmarks': landmarks, 'message': open_cities_sentence()}

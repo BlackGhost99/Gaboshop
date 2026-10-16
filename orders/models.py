@@ -84,6 +84,8 @@ class Order(models.Model):
 	# Quartier choisi dans la liste (Province › Ville › Arrondissement › Quartier) ; vide pour les anciennes commandes.
 	neighborhood = models.ForeignKey('delivery.Neighborhood', on_delete=models.SET_NULL, null=True, blank=True,
 									 related_name='orders')
+	landmark = models.ForeignKey('delivery.Landmark', on_delete=models.SET_NULL, null=True, blank=True,
+								 related_name='orders', help_text="Zone phare choisie près de l'adresse")
     
 	# Timestamps
 	created_at = models.DateTimeField(auto_now_add=True)

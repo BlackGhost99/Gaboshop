@@ -8,7 +8,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from api.models import SystemSettings
-from delivery.models import City, DeliveryZone, Neighborhood, Province, VehicleType, ZoneVehicleRate
+from delivery.models import City, DeliveryZone, Landmark, Neighborhood, Province, VehicleType, ZoneVehicleRate
 from delivery.zones import resolve_zone
 from orders.models import Order
 from payments.configuration import DEFAULT_PAYMENT_POLICY
@@ -88,6 +88,7 @@ class AdressesQuartiersTests(TestCase):
         payload = {
             'store': self.store.id, 'city': 'Owendo', 'delivery_address': 'Portail bleu', 'delivery_phone': '077391199',
             'delivery_zone': 'texte ignoré', 'neighborhood': self.louis.id, 'delivery_requested': True,
+            'landmark': Landmark.objects.get(neighborhood=self.louis, name='Carrefour Louis').id,
             'payment_flow': 'direct_split', 'payment_method': 'cash',
             'items': [{'product_id': self.product.id, 'quantity': 1}],
         }
@@ -99,4 +100,39 @@ class AdressesQuartiersTests(TestCase):
         self.assertEqual(order.city, 'Libreville')
         self.assertEqual(order.delivery_zone, 'Centre')
         self.assertEqual(order.delivery_fee, Decimal('1500'))
-        self.assertEqual(order.delivery_address, 'Louis, Libreville — Portail bleu')
+        self.assertEqual(order.landmark.name, 'Carrefour Louis')
+        self.assertEqual(order.delivery_address, 'Louis, 1er arrondissement, Libreville — près de Carrefour Louis — Portail bleu')
+
+    def test_every_seeded_quarter_has_its_arrondissement(self):
+        self.assertFalse(Neighborhood.objects.filter(city__name__in=['Libreville', 'Akanda', 'Owendo'],
+                                                     arrondissement__isnull=True).exists())
+        self.assertEqual(Neighborhood.objects.get(city=self.libreville, name='Nzeng-Ayong').arrondissement.number, 5)
+        tree = APIClient().get('/api/v1/geo/').json()['data']
+        self.assertTrue(any(l['name'] == 'Marché de Mont-Bouët' for l in tree['landmarks']))
+
+    def test_landmark_from_another_quarter_refused(self):
+        rio = Landmark.objects.get(name='Carrefour Rio')
+        payload = {
+            'store': self.store.id, 'delivery_address': 'Portail', 'delivery_phone': '077391199', 'delivery_zone': 'x',
+            'neighborhood': self.louis.id, 'landmark': rio.id, 'delivery_requested': True,
+            'payment_flow': 'direct_split', 'payment_method': 'cash',
+            'items': [{'product_id': self.product.id, 'quantity': 1}],
+        }
+        res = self.api.post('/api/v1/orders/create/', payload, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('zone phare', res.content.decode())
+
+    def test_admin_quarter_needs_arrondissement(self):
+        admin = User.objects.create_user(phone='+24177600409', password='Mapeto88x', user_type='admin',
+                                         is_staff=True, is_superuser=True)
+        api = APIClient()
+        api.force_authenticate(admin)
+        res = api.post('/api/v1/admin/geo/neighborhoods/', {'city_id': self.libreville.id, 'name': 'Bikélé'}, format='json')
+        self.assertEqual(res.status_code, 400)
+        arr = self.libreville.arrondissements.get(number=6)
+        res = api.post('/api/v1/admin/geo/neighborhoods/', {'city_id': self.libreville.id, 'name': 'Bikélé',
+                                                            'arrondissement_id': arr.id}, format='json')
+        self.assertEqual(res.status_code, 200, res.content)
+        res = api.post('/api/v1/admin/geo/landmarks/', {'neighborhood_id': res.json()['data']['id'],
+                                                        'name': 'Carrefour Bikélé'}, format='json')
+        self.assertEqual(res.status_code, 200, res.content)

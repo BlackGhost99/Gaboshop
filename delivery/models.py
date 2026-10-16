@@ -617,6 +617,9 @@ class Neighborhood(models.Model):
 	name = models.CharField(max_length=100)
 	zone = models.ForeignKey(DeliveryZone, on_delete=models.SET_NULL, null=True, blank=True, related_name='neighborhoods',
 							 help_text="Zone de prix de livraison (vide : prix de livraison du commerce)")
+	# Centre du quartier, pour la future carte des livreurs.
+	latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 	is_active = models.BooleanField(default=True)
 
 	class Meta:
@@ -634,3 +637,21 @@ class Neighborhood(models.Model):
 			parts.append(self.arrondissement.name)
 		parts.append(self.city.name)
 		return ', '.join(parts)
+
+
+class Landmark(models.Model):
+	"""Zone phare d'un quartier : carrefour, marché, école, station… que tout le monde connaît.
+	Le client la choisit pour guider le livreur ; les coordonnées serviront à la carte des livreurs."""
+	neighborhood = models.ForeignKey(Neighborhood, on_delete=models.CASCADE, related_name='landmarks')
+	name = models.CharField(max_length=120)
+	latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	is_active = models.BooleanField(default=True)
+
+	class Meta:
+		verbose_name = "Zone phare"
+		ordering = ['name']
+		unique_together = [['neighborhood', 'name']]
+
+	def __str__(self):
+		return f"{self.name} ({self.neighborhood.name})"

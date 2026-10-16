@@ -22,7 +22,7 @@ export default function SearchSelect({ label, placeholder, options, value, onCha
 
   const shown = useMemo(() => {
     const q = fold(query);
-    return q ? options.filter((o) => fold(o.label).includes(q)) : options;
+    return q ? options.filter((o) => fold(`${o.label} ${o.search || ''}`).includes(q)) : options;
   }, [options, query]);
 
   return (
@@ -60,8 +60,8 @@ export default function SearchSelect({ label, placeholder, options, value, onCha
                   } ${String(o.value) === String(value) ? 'font-semibold text-indigo-700' : ''}`}
                   onClick={() => { if (!o.disabled) { onChange(o.value); setOpen(false); } }}
                 >
-                  <span className="min-w-0 truncate">{o.label}</span>
-                  {o.hint && <span className="shrink-0 text-xs text-gray-400">{o.hint}</span>}
+                  <span className="shrink-0">{o.label}</span>
+                  {o.hint && <span className="min-w-0 truncate text-right text-xs text-gray-400">{o.hint}</span>}
                 </button>
               </li>
             ))}

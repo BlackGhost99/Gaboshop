@@ -2,7 +2,7 @@
 du Grand Libreville et une première liste de quartiers. L'admin corrige et complète dans Admin › Livraison › Adresses.
 
 Seule Libreville est ouverte aux livraisons au départ ; les autres villes s'affichent « Bientôt disponible ».
-Les quartiers sont créés sans arrondissement : leur rattachement se vérifie sur place puis se règle dans l'admin.
+Le rattachement quartier → arrondissement ci-dessous est une première estimation, à vérifier dans l'admin.
 """
 
 PROVINCES = [
@@ -35,6 +35,43 @@ NEIGHBORHOODS = {
 }
 
 
+# Première estimation (16 oct. 2026), à corriger dans Admin › Livraison › Adresses.
+QUARTIER_ARRONDISSEMENT = {
+    'Libreville': {
+        1: ['Centre-ville', 'Louis', 'Batterie IV', 'Haut de Gué-Gué', 'Bas de Gué-Gué', 'Charbonnages', 'Alibandeng'],
+        2: ['Quartier Glass', 'Montagne Sainte', 'Nombakélé', 'Toulon', 'Petit Paris', 'Oloumi', 'Ancienne Sobraga', 'London'],
+        3: ['Mont-Bouët', 'Nkembo', 'Cocotiers', 'Plaine Orety', 'Akébé', 'Derrière la Prison', 'Venez-Voir',
+            'Kinguélé', 'Atong Abè'],
+        4: ['Lalala', 'Awendjé', 'Beau Séjour', 'Rio', 'Belle-Vue'],
+        5: ['Nzeng-Ayong', 'Avéa', 'Kalikak', 'Sotega'],
+        6: ['PK5', 'PK6', 'PK7', 'PK8', 'PK9', 'PK10', 'PK11', 'PK12'],
+    },
+    'Akanda': {1: ['Angondjé', 'Okala'], 2: ['Cap Estérias', 'Malibé']},
+    'Owendo': {1: ['Alénakiri'], 2: ['Akournam']},
+}
+
+# Zones phares : repères que tout le monde connaît, pour guider le livreur. L'admin complète.
+LANDMARKS = {
+    'Libreville': {
+        'Centre-ville': ['Bord de mer', 'Mairie centrale'],
+        'Louis': ['Carrefour Louis'],
+        'Mont-Bouët': ['Marché de Mont-Bouët'],
+        'Oloumi': ["Marché d'Oloumi"],
+        'Rio': ['Carrefour Rio'],
+        'Nzeng-Ayong': ['Carrefour Nzeng-Ayong'],
+        'Akébé': ['Carrefour Akébé'],
+        'Lalala': ['Carrefour Lalala'],
+        'Awendjé': ['Carrefour Awendjé'],
+        'London': ['Carrefour London'],
+        'Charbonnages': ['Carrefour Charbonnages'],
+        'Belle-Vue': ['Carrefour Belle-Vue'],
+        'PK8': ['Carrefour PK8'],
+        'PK12': ['Carrefour PK12'],
+    },
+    'Akanda': {'Angondjé': ["Stade de l'Amitié", 'Carrefour Angondjé']},
+}
+
+
 def ordinal(n):
     return '1er arrondissement' if n == 1 else f'{n}e arrondissement'
 
@@ -52,3 +89,20 @@ def seed(Province, City, Arrondissement, Neighborhood):
                 Arrondissement.objects.get_or_create(city=city, name=ordinal(n), defaults={'number': n})
             for name in NEIGHBORHOODS.get(city_name, []):
                 Neighborhood.objects.get_or_create(city=city, name=name)
+
+
+def link_and_landmarks(City, Arrondissement, Neighborhood, Landmark):
+    """Rattache les quartiers encore « à préciser » et ajoute les zones phares manquantes, sans rien écraser."""
+    for city_name, table in QUARTIER_ARRONDISSEMENT.items():
+        for city in City.objects.filter(name=city_name):
+            for number, names in table.items():
+                arr = Arrondissement.objects.filter(city=city, number=number).first()
+                if arr is not None:
+                    Neighborhood.objects.filter(city=city, name__in=names, arrondissement__isnull=True).update(arrondissement=arr)
+    for city_name, table in LANDMARKS.items():
+        for city in City.objects.filter(name=city_name):
+            for quarter, names in table.items():
+                neighborhood = Neighborhood.objects.filter(city=city, name=quarter).first()
+                if neighborhood is not None:
+                    for name in names:
+                        Landmark.objects.get_or_create(neighborhood=neighborhood, name=name)
