@@ -3,7 +3,9 @@ import { uploadProof, verifyPIN, completeDelivery } from '../services/deliverySe
 
 /**
  * Modal pour uploader la preuve de livraison
- * PHASE 3: Photo pièce d'identité OBLIGATOIRE + GPS + Signature/PIN
+ * Photo pièce d'identité OBLIGATOIRE + GPS + code PIN du client.
+ * La livraison ne se prouve QUE par le code PIN du client (reçu sur son téléphone) :
+ * aucune image ni signature ne peut le remplacer.
  * 
  * Justification: Toutes les routes ne sont pas accessibles à Libreville,
  * le client peut venir chercher le colis. La photo de la pièce d'identité
@@ -12,7 +14,7 @@ import { uploadProof, verifyPIN, completeDelivery } from '../services/deliverySe
 export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [step, setStep] = useState(1); // 1: Photos+GPS, 2: Verification (Signature/PIN)
+  const [step, setStep] = useState(1); // 1: Photos+GPS, 2: Code PIN du client
   
   // Step 1: Photos + GPS
   const [idCardPhoto, setIdCardPhoto] = useState(null);
@@ -23,9 +25,6 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   
   // Step 2: Verification
-  const [verificationMethod, setVerificationMethod] = useState('signature'); // 'signature' or 'pin'
-  const [signature, setSignature] = useState(null);
-  const [signaturePreview, setSignaturePreview] = useState(null);
   const [pinCode, setPinCode] = useState('');
   const [pinVerified, setPinVerified] = useState(false);
 
@@ -69,15 +68,6 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
     if (file) {
       setPackagePhoto(file);
       setPackagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleSignatureChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSignature(file);
-      setSignaturePreview(URL.createObjectURL(file));
-      setErrors(prev => ({ ...prev, signature: null }));
     }
   };
 
@@ -127,12 +117,9 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
   const handleSubmit = async () => {
     const newErrors = {};
 
-    // Validate verification method
-    if (verificationMethod === 'signature' && !signature) {
-      newErrors.signature = 'La signature du client est requise';
-    }
-    if (verificationMethod === 'pin' && !pinVerified) {
-      newErrors.pin = 'Veuillez vérifier le code PIN du client';
+    // Le code PIN du client est la seule preuve de remise
+    if (!pinVerified) {
+      newErrors.pin = 'Saisissez et vérifiez le code PIN du client';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -150,12 +137,7 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
     formData.append('latitude', gpsLocation.latitude.toFixed(6));
     formData.append('longitude', gpsLocation.longitude.toFixed(6));
     
-    if (verificationMethod === 'signature') {
-      formData.append('signature', signature);
-    } else {
-      formData.append('pin_code', pinCode);
-      formData.append('pin_verified', true);
-    }
+    formData.append('pin_code', pinCode);
 
     setLoading(true);
 
@@ -326,115 +308,63 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
         {/* Step 2: Verification */}
         {step === 2 && (
           <div className="space-y-6">
-            {/* Verification Method Selection */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Méthode de vérification <span className="text-red-600">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setVerificationMethod('signature')}
-                  className={`p-4 border-2 rounded-lg text-left transition ${
-                    verificationMethod === 'signature'
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">✍️</div>
-                  <div className="font-semibold text-gray-900">Signature</div>
-                  <div className="text-xs text-gray-600 mt-1">Le client signe pour confirmer</div>
-                </button>
-                <button
-                  onClick={() => setVerificationMethod('pin')}
-                  className={`p-4 border-2 rounded-lg text-left transition ${
-                    verificationMethod === 'pin'
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">✍️</div>
-                  <div className="font-semibold text-gray-900">Code PIN</div>
-                  <div className="text-xs text-gray-600 mt-1">Le client fournit son code PIN</div>
-                </button>
-              </div>
-            </div>
-
-            {/* Signature Upload */}
-            {verificationMethod === 'signature' && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  ✍️ Signature du client <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleSignatureChange}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                {signaturePreview && (
-                  <img src={signaturePreview} alt="Signature" className="mt-3 w-full h-32 object-contain bg-gray-50 rounded-md border border-gray-200" />
-                )}
-                {errors.signature && (
-                  <p className="mt-1 text-sm text-red-600">{errors.signature}</p>
-                )}
-              </div>
-            )}
+            <p className="text-sm text-gray-600">
+              Le client a reçu un code PIN sur son téléphone. Demandez-le-lui : c'est la seule preuve de remise acceptée,
+              ni une photo ni une signature ne la remplace.
+            </p>
 
             {/* PIN Verification */}
-            {verificationMethod === 'pin' && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  🔢 Code PIN du client (4-6 chiffres) <span className="text-red-600">*</span>
-                </label>
-                <div className={`p-4 rounded-lg border-2 transition ${
-                  pinVerified 
-                    ? 'bg-green-50 border-green-300' 
-                    : 'bg-white border-gray-300'
-                }`}>
-                  <div className="flex space-x-2 mb-3">
-                    <input
-                      type="text"
-                      maxLength="6"
-                      pattern="[0-9]*"
-                      inputMode="numeric"
-                      value={pinCode}
-                      onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
-                      disabled={pinVerified}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                      placeholder="0000"
-                    />
-                    {!pinVerified ? (
-                      <button
-                        onClick={handleVerifyPIN}
-                        disabled={loading || pinCode.length < 4}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition"
-                      >
-                        {loading ? 'Vérification...' : 'Vérifier'}
-                      </button>
-                    ) : (
-                      <div className="px-3 py-2 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center whitespace-nowrap">
-                        ✓ Vérifié
-                      </div>
-                    )}
-                  </div>
-                  
-                  {errors.pin && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                      <p className="text-sm text-red-700 font-medium">{errors.pin}</p>
-                      <p className="text-xs text-red-600 mt-1">Veuillez vérifier le code et réessayer</p>
-                    </div>
-                  )}
-                  
-                  {pinVerified && (
-                    <div className="p-3 bg-green-100 border border-green-300 rounded-md">
-                      <p className="text-sm text-green-700 font-semibold">✓ Code PIN vérifié avec succès</p>
-                      <p className="text-xs text-green-600 mt-1">Vous pouvez maintenant confirmer la livraison</p>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                🔢 Code PIN du client (6 chiffres) <span className="text-red-600">*</span>
+              </label>
+              <div className={`p-4 rounded-lg border-2 transition ${
+                pinVerified 
+                  ? 'bg-green-50 border-green-300' 
+                  : 'bg-white border-gray-300'
+              }`}>
+                <div className="flex space-x-2 mb-3">
+                  <input
+                    type="text"
+                    maxLength="6"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
+                    disabled={pinVerified}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                    placeholder="0000"
+                  />
+                  {!pinVerified ? (
+                    <button
+                      onClick={handleVerifyPIN}
+                      disabled={loading || pinCode.length < 4}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition"
+                    >
+                      {loading ? 'Vérification...' : 'Vérifier'}
+                    </button>
+                  ) : (
+                    <div className="px-3 py-2 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center whitespace-nowrap">
+                      ✓ Vérifié
                     </div>
                   )}
                 </div>
+                
+                {errors.pin && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-700 font-medium">{errors.pin}</p>
+                    <p className="text-xs text-red-600 mt-1">Veuillez vérifier le code et réessayer</p>
+                  </div>
+                )}
+                
+                {pinVerified && (
+                  <div className="p-3 bg-green-100 border border-green-300 rounded-md">
+                    <p className="text-sm text-green-700 font-semibold">✓ Code PIN vérifié avec succès</p>
+                    <p className="text-xs text-green-600 mt-1">Vous pouvez maintenant confirmer la livraison</p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="flex justify-between gap-3">
               <button
@@ -445,9 +375,9 @@ export default function ProofUploadModal({ delivery, onClose, onSuccess }) {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={loading || (verificationMethod === 'signature' && !signature) || (verificationMethod === 'pin' && !pinVerified)}
+                disabled={loading || !pinVerified}
                 className={`flex-1 sm:flex-none px-4 sm:px-8 py-3 rounded-md font-bold text-sm sm:text-base transition transform ${
-                  loading || (verificationMethod === 'signature' && !signature) || (verificationMethod === 'pin' && !pinVerified)
+                  loading || !pinVerified
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
                     : 'bg-green-600 text-white hover:bg-green-700 active:scale-95 shadow-lg hover:shadow-xl'
                 }`}

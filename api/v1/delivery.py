@@ -257,6 +257,18 @@ class DeliveryStatusUpdateView(APIView):
 					}
 				}, status=status.HTTP_403_FORBIDDEN)
             
+			# « Livrée » ne s'obtient que par le code PIN du client (jamais d'un simple changement de statut du livreur).
+			if request.data.get('status') == 'delivered' and not request.user.is_admin() and not delivery.code_verified:
+				return Response({
+					'success': False,
+					'error': {
+						'code': 'pin_required',
+						'message': 'Le code PIN du client n\'a pas été vérifié.',
+						'reason': 'Une livraison ne se prouve que par le code PIN envoyé sur le téléphone du client.',
+						'next_step': 'Demandez le code au client, puis saisissez-le dans « Preuve de livraison ».'
+					}
+				}, status=status.HTTP_400_BAD_REQUEST)
+            
 			serializer = DeliveryStatusUpdateSerializer(
 				delivery,
 				data=request.data,
@@ -304,6 +316,18 @@ class DeliveryConfirmView(APIView):
 				id=delivery_id,
 				delivery_agent=request.user
 			)
+            
+			# Confirmer une livraison suppose le code PIN du client vérifié.
+			if not delivery.code_verified:
+				return Response({
+					'success': False,
+					'error': {
+						'code': 'pin_required',
+						'message': 'Le code PIN du client n\'a pas été vérifié.',
+						'reason': 'Une livraison ne se prouve que par le code PIN envoyé sur le téléphone du client.',
+						'next_step': 'Demandez le code au client, puis saisissez-le dans « Preuve de livraison ».'
+					}
+				}, status=status.HTTP_400_BAD_REQUEST)
             
 			serializer = DeliveryConfirmSerializer(
 				delivery,
@@ -808,7 +832,8 @@ class DeliveryRejectAssignmentView(APIView):
 
 class DeliveryProofUploadView(APIView):
 	"""
-	Upload de la preuve de livraison (photo pièce d'identité + GPS + signature/PIN)
+	Upload de la preuve de livraison (photo pièce d'identité + GPS + code PIN du client)
+	La remise ne se prouve QUE par le code PIN du client : aucune image (signature, photo) ne peut le remplacer.
 	IMPORTANT: Photo pièce d'identité OBLIGATOIRE, photo colis OPTIONNELLE
 	Car le client peut venir chercher le colis (toutes les routes ne sont pas accessibles)
 	"""
@@ -839,10 +864,9 @@ class DeliveryProofUploadView(APIView):
 			# Extraire les données
 			id_card_photo = request.FILES.get('id_card_photo')  # OBLIGATOIRE
 			package_photo = request.FILES.get('package_photo')   # OPTIONNELLE
-			signature = request.FILES.get('signature')
 			latitude = request.data.get('latitude')
 			longitude = request.data.get('longitude')
-			pin_code = request.data.get('pin_code')
+			pin_code = str(request.data.get('pin_code') or '').strip()
 			recipient_name = request.data.get('recipient_name', '')
 			gps_accuracy = request.data.get('gps_accuracy')
 			notes = request.data.get('notes', '')
@@ -850,7 +874,9 @@ class DeliveryProofUploadView(APIView):
 			# sinon le commerce et le livreur ne seraient jamais payés par la confirmation du client.
 			client_received_status = False
 			
-			# Vérifier le PIN d'abord, avec la limite d'essais (sinon un PIN faux n'était jamais compté)
+			# Le PIN du client est la seule preuve. Soit il est envoyé ici (contrôlé avec la limite d'essais),
+			# soit il a déjà été vérifié par « verify-pin » (code_verified n'est posé que par un PIN exact).
+			pin_ok = bool(delivery.code_verified) and not pin_code
 			if pin_code:
 				from delivery import pin_guard
 				if pin_guard.is_locked(delivery):
@@ -858,6 +884,7 @@ class DeliveryProofUploadView(APIView):
 				if pin_code.strip() == delivery.delivery_code.strip():
 					pin_guard.reset(delivery)
 					delivery.code_verified = True
+					pin_ok = True
 				else:
 					pin_guard.record_failure(delivery, request.user)
 					return Response({
@@ -874,9 +901,8 @@ class DeliveryProofUploadView(APIView):
 				'package_photo': package_photo,   # OPTIONNELLE
 				'latitude': latitude,
 				'longitude': longitude,
-				'signature': signature,
 				'pin_code': pin_code,
-				'pin_verified': bool(pin_code) and delivery.code_verified,
+				'pin_verified': pin_ok,
 				'client_received_status': client_received_status
 			}
 			
@@ -897,9 +923,6 @@ class DeliveryProofUploadView(APIView):
 			delivery.proof_latitude = latitude
 			delivery.proof_longitude = longitude
 			
-			if signature:
-				delivery.client_signature = signature
-			
 			if recipient_name:
 				delivery.client_name_confirmed = recipient_name
 			
@@ -917,20 +940,21 @@ class DeliveryProofUploadView(APIView):
 					latitude, longitude,
 					delivery.delivery_lat, delivery.delivery_lng
 				)
+				# Le champ de la preuve tient 6 chiffres (9 999,99 m) : au-delà, on garde le plafond (« très loin »).
+				distance_from_address = min(Decimal(str(distance_from_address)).quantize(Decimal('0.01')), Decimal('9999.99'))
 			
 			defaults_data = {
 				'id_card_photo': id_card_photo,  # OBLIGATOIRE
 				'latitude': latitude,
 				'longitude': longitude,
 				'gps_accuracy': gps_accuracy,
-				'signature': signature,
-				'pin_code': pin_code if pin_code else '',
-				'pin_verified': delivery.code_verified,
+				'pin_code': pin_code,
+				'pin_verified': pin_ok,
 				'recipient_name': recipient_name,
 				'notes': notes,
 				'distance_from_address': distance_from_address,
 				'client_received_status': client_received_status,
-				'status': 'verified' if (signature or delivery.code_verified) else 'pending'
+				'status': 'verified' if pin_ok else 'pending'
 			}
 			
 			# Photo colis optionnelle
@@ -1033,8 +1057,7 @@ class DeliveryVerifyPINView(APIView):
 					proof = DeliveryProof.objects.get(delivery=delivery)
 					proof.pin_code = pin_code
 					proof.pin_verified = True
-					if proof.signature or proof.pin_verified:
-						proof.status = 'verified'
+					proof.status = 'verified'
 					proof.save()
 				except DeliveryProof.DoesNotExist:
 					pass
@@ -1230,7 +1253,7 @@ class DeliveryStartView(APIView):
 class DeliveryCompleteView(APIView):
 	"""
 	Le livreur confirme la livraison avec preuve obligatoire
-	Requiert: photo + GPS + signature/PIN
+	Requiert: code PIN du client vérifié + pièce d'identité + GPS (jamais une simple signature ou photo)
 	"""
 	permission_classes = [permissions.IsAuthenticated]
 
@@ -1272,7 +1295,7 @@ class DeliveryCompleteView(APIView):
 						'details': {
 							'photo_required': not bool(delivery.delivery_proof_photo),
 							'gps_required': not bool(delivery.proof_latitude and delivery.proof_longitude),
-							'signature_or_pin_required': not bool(delivery.client_signature or delivery.code_verified)
+							'pin_required': not bool(delivery.code_verified)
 						}
 					}
 				}, status=status.HTTP_400_BAD_REQUEST)

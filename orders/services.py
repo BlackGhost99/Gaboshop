@@ -122,6 +122,12 @@ class OrderService:
                     f"Transition non autorisée: {old_status} ? {new_status}"
                 )
             
+            # Un livreur ne passe une commande en « livrée » qu'avec le code PIN du client vérifié.
+            if new_status == 'delivered' and user.is_delivery_agent():
+                delivery = getattr(order, 'delivery', None)
+                if delivery is None or not delivery.code_verified:
+                    raise ValueError("Le code PIN du client doit être vérifié avant de livrer.")
+            
             # Mettre à jour le statut
             order.status = new_status
             

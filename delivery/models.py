@@ -367,8 +367,8 @@ class DeliveryProfile(models.Model):
 
 class DeliveryProof(models.Model):
 	"""
-	Preuve de livraison complète avec photo, GPS et signature
-	Requis pour marquer une livraison comme 'delivered'
+	Preuve de livraison : pièce d'identité, GPS et surtout le code PIN du client.
+	Seul le code PIN prouve la remise (une image ou une signature se fabrique) ; il est requis pour passer en 'delivered'.
 	"""
 	PROOF_STATUS_CHOICES = (
 		('pending', 'En attente'),
@@ -433,7 +433,7 @@ class DeliveryProof(models.Model):
 		help_text="Adresse capturée via reverse geocoding"
 	)
 	
-	# Signature ou Code PIN (l'un des deux requis)
+	# Ancienne signature (plus acceptée comme preuve : seul le code PIN prouve la remise)
 	signature = models.ImageField(
 		upload_to=signature_path,
 		storage=private_storage,
@@ -508,7 +508,7 @@ class DeliveryProof(models.Model):
 		return f"Preuve - {self.delivery.tracking_number} - {self.status}"
 	
 	def clean(self):
-		"""Validation: Photo pièce d'identité + GPS obligatoires, Signature OU PIN requis"""
+		"""Validation: photo pièce d'identité + GPS obligatoires, et code PIN vérifié pour toute nouvelle preuve."""
 		errors = {}
 		
 		# Photo pièce d'identité OBLIGATOIRE
@@ -519,9 +519,9 @@ class DeliveryProof(models.Model):
 		if not self.latitude or not self.longitude:
 			errors['latitude'] = "Les coordonnées GPS sont obligatoires"
 		
-		# Signature OU PIN requis
-		if not self.signature and not self.pin_code:
-			errors['signature'] = "La signature ou le code PIN est requis"
+		# Code PIN vérifié obligatoire (jamais une signature). Les anciennes preuves déjà enregistrées restent modifiables.
+		if self._state.adding and not self.pin_verified:
+			errors['pin_verified'] = "Le code PIN du client, vérifié, est obligatoire"
 		
 		if errors:
 			raise ValidationError(errors)
@@ -533,11 +533,10 @@ class DeliveryProof(models.Model):
 	
 	@property
 	def has_required_proof(self):
-		"""Preuve minimale: pièce d'identité + GPS + signature/PIN vérifié."""
+		"""Preuve minimale: pièce d'identité + GPS + code PIN du client vérifié (une signature ne compte pas)."""
 		has_id_card = bool(self.id_card_photo)  # Photo pièce d'identité OBLIGATOIRE
 		has_gps = bool(self.latitude and self.longitude)
-		has_verification = bool(self.signature or (self.pin_code and self.pin_verified))
-		return has_id_card and has_gps and has_verification
+		return has_id_card and has_gps and bool(self.pin_verified)
 
 	@property
 	def is_valid(self):
@@ -551,8 +550,8 @@ class DeliveryProof(models.Model):
 
 	@property
 	def client_confirmation_pending(self):
-		"""Indique si le client doit encore confirmer la réception."""
-		return self.has_required_proof and not self.client_received_status
+		"""Le client doit encore confirmer la réception (quelle que soit la façon dont la remise a été enregistrée)."""
+		return not self.client_received_status
 	
 	@property
 	def is_location_valid(self):

@@ -245,7 +245,7 @@ def validate_delivery_proof(delivery, proof_data):
 	
 	Args:
 		delivery: Instance Delivery
-		proof_data: Dict avec id_card_photo, latitude, longitude, signature/pin
+		proof_data: Dict avec id_card_photo, latitude, longitude, pin_code (et pin_verified une fois le PIN contrôlé)
 	
 	Returns:
 		tuple: (is_valid, errors_dict)
@@ -275,33 +275,23 @@ def validate_delivery_proof(delivery, proof_data):
 			if not (-180 <= lon <= 180):
 				errors['longitude'] = "Longitude invalide (doit être entre -180 et 180)"
 			
-			# Vérifier la distance avec l'adresse de livraison
-			if delivery.delivery_lat and delivery.delivery_lng and not errors:
-				distance = calculate_gps_distance(
-					lat, lon,
-					delivery.delivery_lat, delivery.delivery_lng
-				)
-				
-				# Tolérance: 500 mètres (peut être ajusté)
-				if distance > 500:
-					errors['gps_distance'] = f"Position GPS trop éloignée de l'adresse de livraison ({distance:.0f}m)"
+			# La distance avec l'adresse de livraison n'est qu'un indice (enregistré sur la preuve, visible de l'admin) :
+			# un GPS imprécis ou un client qui reçoit ailleurs ne doit pas bloquer une remise prouvée par le code PIN.
 		except (ValueError, TypeError, Exception) as e:
 			errors['gps'] = f"Coordonnées GPS invalides: {str(e)}"
 	
-	# 3. Signature OU Code PIN requis
-	has_signature = bool(proof_data.get('signature') or proof_data.get('client_signature'))
-	has_pin = bool(proof_data.get('pin_code'))
-	pin_verified = proof_data.get('pin_verified', False)
-	
-	if not has_signature and not has_pin:
-		errors['verification'] = "La signature du client ou le code PIN est requis"
-	
-	# 4. Si PIN fourni, vérifier qu'il correspond
-	if has_pin and not pin_verified:
-		provided_pin = proof_data.get('pin_code', '').strip()
-		expected_pin = delivery.delivery_code.strip()
-		
-		if provided_pin != expected_pin:
+	# 3. Code PIN du client : la SEULE preuve de remise acceptée.
+	# Une signature ou une photo se fabrique (n'importe quelle image convient) ; le PIN n'arrive que sur le téléphone du client.
+	pin_verified = bool(proof_data.get('pin_verified'))
+	if not pin_verified:
+		provided_pin = str(proof_data.get('pin_code') or '').strip()
+		expected_pin = str(delivery.delivery_code or '').strip()
+		if not provided_pin:
+			errors['pin_code'] = (
+				"Le code PIN du client est obligatoire : une livraison ne se prouve que par ce code, "
+				"envoyé sur le téléphone du client. Demandez-le-lui."
+			)
+		elif not expected_pin or provided_pin != expected_pin:
 			errors['pin_code'] = "Code PIN incorrect"
 	
 	is_valid = len(errors) == 0
@@ -326,7 +316,15 @@ def can_mark_as_delivered(delivery):
 	if not delivery.delivery_agent:
 		return False, "Aucun livreur assigné à cette livraison"
 	
-	# 3. Vérifier si une preuve existe déjà
+	# 3. Le code PIN du client doit avoir été vérifié : c'est la seule preuve de remise.
+	# (Ni une signature, ni une photo, ni les coordonnées GPS ne remplacent ce code.)
+	if not delivery.code_verified:
+		return False, (
+			"Le code PIN du client n'a pas été vérifié. Une livraison ne se prouve que par ce code, "
+			"envoyé sur le téléphone du client : demandez-le-lui puis saisissez-le."
+		)
+	
+	# 4. Pièces complémentaires (pièce d'identité + GPS), en plus du PIN
 	from delivery.models import DeliveryProof
 	try:
 		proof = DeliveryProof.objects.get(delivery=delivery)
@@ -338,8 +336,6 @@ def can_mark_as_delivered(delivery):
 			return False, "La photo de livraison est requise"
 		if not delivery.proof_latitude or not delivery.proof_longitude:
 			return False, "Les coordonnées GPS sont requises"
-		if not delivery.client_signature and not delivery.code_verified:
-			return False, "La signature ou le code PIN vérifié est requis"
 	
 	return True, "OK"
 
