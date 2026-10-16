@@ -211,6 +211,11 @@ const StoreProfile = () => {
 
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="md:col-span-2 rounded-md border border-indigo-100 bg-indigo-50 p-3 text-sm">
+                            <span className="font-medium text-gray-700">Type de commerce : </span>
+                            <span className="font-semibold text-indigo-800">{store?.category_name || 'Non renseigné'}</span>
+                            <p className="mt-1 text-xs text-gray-600">Il fixe les catégories de produits proposées et leurs commissions. Pour le changer, contactez l'administrateur.</p>
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Nom du magasin</label>
                             <input 

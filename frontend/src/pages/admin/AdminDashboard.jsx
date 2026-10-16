@@ -949,6 +949,9 @@ const AdminDashboard = () => {
                 <p className="text-xs text-gray-500">{[u.first_name, u.last_name].filter(Boolean).join(' ')}</p>
                 <p className="text-xs text-gray-500">{u.email}</p>
                 <p className="text-xs text-gray-500">{u.city}</p>
+                {u.store_name && (
+                  <p className="text-xs text-indigo-700">🏪 {u.store_name}{u.store_category ? ` · ${u.store_category}` : ''}</p>
+                )}
                 <p className="text-xs text-gray-500">Créé le {new Date(u.created_at).toLocaleDateString()}</p>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -2333,6 +2336,9 @@ const AdminDashboard = () => {
               <p><span className="font-semibold">Nom: </span>{[selectedUser.first_name, selectedUser.last_name].filter(Boolean).join(' ')}</p>
               <p><span className="font-semibold">Email: </span>{selectedUser.email}</p>
               <p><span className="font-semibold">Ville: </span>{selectedUser.city}</p>
+              {selectedUser.store_name && (
+                <p><span className="font-semibold">Commerce: </span>{selectedUser.store_name}{selectedUser.store_category ? ` (${selectedUser.store_category})` : ''}</p>
+              )}
               <p><span className="font-semibold">Actif: </span>{selectedUser.is_active ? 'Oui' : 'Non'}</p>
               <p><span className="font-semibold">Staff: </span>{selectedUser.is_staff ? 'Oui' : 'Non'}</p>
               <p><span className="font-semibold">Vérifié: </span>{selectedUser.is_verified ? 'Oui' : 'Non'}</p>

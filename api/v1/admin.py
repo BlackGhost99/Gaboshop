@@ -248,8 +248,14 @@ class AdminUsersView(APIView):
         if user_type == 'delivery_agent':
             qs = qs.select_related('delivery_profile')
         
+        users = list(qs[:200])
+        # Commerce et type de commerce (Mode, Alimentation…) de chaque commerçant.
+        from stores.models import Store
+        stores_by_manager = {}
+        for st in Store.objects.filter(manager_id__in=[u.id for u in users]).select_related('category').order_by('id'):
+            stores_by_manager.setdefault(st.manager_id, st)
         data = []
-        for u in qs[:200]:
+        for u in users:
             user_data = {
                 "id": u.id,
                 "phone": u.phone,
@@ -265,6 +271,11 @@ class AdminUsersView(APIView):
                 "is_available": getattr(u, 'is_available', False),
                 "created_at": u.date_joined,
             }
+            managed = stores_by_manager.get(u.id)
+            if managed is not None:
+                user_data['store_id'] = managed.id
+                user_data['store_name'] = managed.name
+                user_data['store_category'] = managed.category.name if managed.category_id else ''
             
             # Add delivery profile for delivery agents
             if u.user_type == 'delivery_agent' and hasattr(u, 'delivery_profile'):
