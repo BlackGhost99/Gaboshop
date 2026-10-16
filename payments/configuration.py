@@ -138,52 +138,51 @@ def available_payment_options(store, delivery_requested=True, b2b=False, user=No
 
 
 def _available_payment_options(store, delivery_requested=True, b2b=False):
-    """Choix de paiement proposés au client pour ce commerce.
+    """Proposer ensemble les circuits directs et SingPay quand ils sont autorisés.
 
-    Dès que le paiement en ligne Gaboshop (SingPay) est prêt et autorisé, seuls Airtel Money et Moov Money
-    sont proposés : le client paie tout en une fois à Gaboshop, qui reverse ensuite la part du commerce et
-    celle du livreur. Si le commerce livre lui-même, une option « tout au commerce » s'ajoute : le commerce
-    livre et reçoit aussi les frais de livraison (``delivery_by='store'``).
-    Sans paiement en ligne, les circuits manuels (espèces, code marchand) restent proposés.
-    Commandes entre commerces (B2B) : tous les circuits autorisés restent proposés.
+    La politique globale et les préférences du commerce filtrent toujours les circuits.
+    Le paiement en ligne n'est jamais proposé sans configuration prête ; les méthodes
+    manuelles non-espèces exigent des instructions de paiement du commerce.
     """
     policy = get_payment_policy(store)
-    if not b2b and 'platform_online' in policy['enabled_flows'] and platform_online_ready():
-        methods = [m for m in ONLINE_METHODS if m in policy['enabled_methods']] or list(ONLINE_METHODS)
-        options = [
-            {'flow': 'platform_online', 'method': method, 'delivery_by': 'gaboshop',
-             'label': 'Paiement en ligne Gaboshop', 'instructions': ''}
-            for method in methods
-        ]
-        if delivery_requested and getattr(store, 'offers_delivery', False):
-            options += [
-                {'flow': 'platform_online', 'method': method, 'delivery_by': 'store',
-                 'label': 'Tout au commerce (il livre lui-même)', 'instructions': ''}
-                for method in methods
-            ]
-        return policy, options
-
     labels = {
-        'direct_split': 'Payer le commerce directement', 'store_collects_all': 'Tout payer au commerce',
+        'direct_split': 'Payer le commerce directement',
+        'store_collects_all': 'Tout payer au commerce',
         'courier_cash': 'Espèces au livreur à la livraison',
     }
     options = []
-    ordered_flows = [policy['default_flow']] + [flow for flow in policy['enabled_flows'] if flow != policy['default_flow']]
+    ordered_flows = [policy['default_flow']] + [
+        flow for flow in policy['enabled_flows'] if flow != policy['default_flow']
+    ]
     for flow in ordered_flows:
-        if flow == 'platform_online' and not (b2b and platform_online_ready()):
-            continue
-        for method in policy['enabled_methods']:
-            if flow == 'platform_online':
-                if method in ONLINE_METHODS:
-                    options.append({'flow': flow, 'method': method, 'delivery_by': 'gaboshop',
-                                    'label': 'Paiement en ligne Gaboshop', 'instructions': ''})
+        if flow == 'platform_online':
+            if not platform_online_ready():
                 continue
+            # Ne pas forcer Airtel/Moov si l'administrateur les a désactivés.
+            for method in ONLINE_METHODS:
+                if method not in policy['enabled_methods']:
+                    continue
+                options.append({
+                    'flow': flow, 'method': method, 'delivery_by': 'gaboshop',
+                    'label': 'Paiement en ligne Gaboshop', 'instructions': '',
+                })
+                if not b2b and delivery_requested and getattr(store, 'offers_delivery', False):
+                    options.append({
+                        'flow': flow, 'method': method, 'delivery_by': 'store',
+                        'label': 'Tout au commerce (il livre lui-même)', 'instructions': '',
+                    })
+            continue
+
+        for method in policy['enabled_methods']:
             if flow == 'courier_cash' and (method != 'cash' or not delivery_requested):
                 continue
             instructions = policy.get('instructions', {}).get(method, '')
             if method != 'cash' and not instructions:
                 continue
-            options.append({'flow': flow, 'method': method, 'label': labels[flow], 'instructions': instructions})
+            options.append({
+                'flow': flow, 'method': method, 'label': labels[flow],
+                'instructions': instructions,
+            })
     return policy, options
 
 
