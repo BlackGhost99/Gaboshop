@@ -86,7 +86,8 @@ class CashWithStoreCouriersTests(TestCase):
         self.store.offers_delivery = True
         self.store.save(update_fields=['offers_delivery'])
         obj = SystemSettings.get_settings()
-        obj.payment_policy = {**DEFAULT_PAYMENT_POLICY, 'enabled_methods': ['airtel_money']}
+        obj.payment_policy = {**DEFAULT_PAYMENT_POLICY, 'enabled_methods': ['airtel_money'],
+                              'enabled_flows': ['direct_split', 'store_collects_all']}
         obj.save(update_fields=['payment_policy'])
         _, options = available_payment_options(self.store)
         self.assertFalse(any(o['method'] == 'cash' for o in options))
