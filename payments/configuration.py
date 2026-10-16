@@ -174,13 +174,25 @@ def _available_payment_options(store, delivery_requested=True, b2b=False):
             continue
 
         for method in policy['enabled_methods']:
+            # Pilote B2C : jamais d'espèces encaissées par un livreur Gaboshop.
+            # Si la boutique livre elle-même, son livreur encaisse pour son compte,
+            # via store_collects_all, et non via le grand livre d'un livreur Gaboshop.
+            if not b2b and flow == 'courier_cash':
+                continue
             if flow == 'courier_cash' and (method != 'cash' or not delivery_requested):
                 continue
+            if not b2b and method == 'cash' and delivery_requested:
+                if flow != 'store_collects_all' or not store.offers_delivery:
+                    continue
             instructions = policy.get('instructions', {}).get(method, '')
             if method != 'cash' and not instructions:
                 continue
+            label = labels[flow]
+            if (not b2b and flow == 'store_collects_all'
+                    and method == 'cash' and delivery_requested and store.offers_delivery):
+                label = 'Espèces à la livraison — livreur de la boutique'
             options.append({
-                'flow': flow, 'method': method, 'label': labels[flow],
+                'flow': flow, 'method': method, 'label': label,
                 'instructions': instructions,
             })
     return policy, options
