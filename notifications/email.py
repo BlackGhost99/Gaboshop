@@ -24,9 +24,9 @@ class EmailService:
         Envoyer un email avec template
         """
         try:
-            if not settings.EMAIL_HOST_USER:
-                logger.warning("?? Email non configuré - Simulation")
-                return EmailService._simulate_send(to_email, template_name, context)
+            if not (getattr(settings, 'BREVO_API_KEY', '') or settings.EMAIL_HOST_USER):
+                logger.warning("E-mail non configuré : envoi réel impossible")
+                return False
             
             # Rendre le template HTML
             html_content = render_to_string(f"emails/{template_name}", context)
@@ -43,8 +43,10 @@ class EmailService:
                 [to_email]
             )
             email.attach_alternative(html_content, "text/html")
-            email.send()
-            
+            count = email.send(fail_silently=False)
+            if count != 1:
+                return False
+
             logger.info(f"? Email envoyé à {to_email}: {template_name}")
             return True
             
@@ -58,19 +60,19 @@ class EmailService:
         Envoyer un email texte simple
         """
         try:
-            send_mail(
+            if not (getattr(settings, 'BREVO_API_KEY', '') or settings.EMAIL_HOST_USER):
+                logger.warning("E-mail non configuré : envoi réel impossible")
+                return False
+            count = send_mail(
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL,
                 [to_email],
                 fail_silently=False,
             )
-            return True
+            return count == 1
         except Exception as e:
             logger.error(f"? Erreur envoi email texte: {e}")
             return False
     
-    @staticmethod
-    def _simulate_send(to_email, template_name, context):
-        logger.info(f"?? Email simulé à {to_email}: {template_name} - {context}")
-        return True
+ 
