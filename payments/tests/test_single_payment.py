@@ -58,9 +58,8 @@ class SinglePaymentTests(TestCase):
             ('platform_online', 'airtel_money', 'gaboshop'),
             ('platform_online', 'moov_money', 'gaboshop'),
         })
-        self.assertTrue(matching_option(options, 'direct_split', 'cash'))
-        self.assertTrue(matching_option(options, 'store_collects_all', 'cash'))
-        self.assertTrue(matching_option(options, 'courier_cash', 'cash'))
+        self.assertFalse(any(o['method'] == 'cash' for o in options))
+        self.assertTrue(all(o['flow'] != 'courier_cash' for o in options))
 
     def test_online_method_is_not_reenabled_when_disabled_by_admin(self):
         settings = SystemSettings.get_settings()
