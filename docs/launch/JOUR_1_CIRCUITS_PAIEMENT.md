@@ -15,7 +15,7 @@ Décision du propriétaire : Gaboshop proposera les paiements directs **et** Sin
 | Code | Encaissement | Livraison | Vérification | Responsable pratique du remboursement |
 |---|---|---|---|---|
 | `direct_split` | Client verse les articles au commerce | Client règle séparément le livreur | Commerce et livreur confirment chacun leur part | Chaque personne qui a reçu l'argent restitue sa part due ; Gaboshop suit le dossier |
-| `store_collects_all` | Client verse articles + livraison au commerce | Le commerce rémunère le livreur | Confirmation par le commerce, rapprochement du livreur | Le commerce prend en charge les fonds qu'il a encaissés |
+| `store_collects_all` | Client verse articles + livraison au commerce ; en espèces à la réception **uniquement si la boutique a ses propres livreurs** | Si livraison propre : aucune dette envers un livreur Gaboshop ; sinon paiement au livreur selon les modes non-espèces autorisés | Confirmation de réception par la boutique | Le commerce prend en charge les fonds qu'il a encaissés |
 | `courier_cash` | **Désactivé pour le pilote B2C** : aucun livreur Gaboshop ne collecte d'espèces | — | Le serveur refuse cette option au panier | Les anciens flux restent consultables pour l'historique |
 | `platform_online` | Client paie Airtel/Moov via SingPay | Part commerçant/livreur selon circuit et contrat | Confirmation prestataire, jamais simple capture | Gaboshop coordonne avec le PSP ; confirmation réelle obligatoire pour annoncer le remboursement |
 
