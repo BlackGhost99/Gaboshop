@@ -71,7 +71,7 @@ class SinglePaymentTests(TestCase):
         _, options = available_payment_options(self.store)
         self.assertTrue(matching_option(options, 'platform_online', 'airtel_money', 'gaboshop'))
         self.assertIsNone(matching_option(options, 'platform_online', 'moov_money', 'gaboshop'))
-        self.assertTrue(matching_option(options, 'direct_split', 'cash'))
+        self.assertFalse(any(o['method'] == 'cash' for o in options))
 
     def test_manual_mobile_money_requires_store_instructions(self):
         _, options = available_payment_options(self.store)
