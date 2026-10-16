@@ -47,6 +47,9 @@ MARKERS = {
     'Client : signaler un problème, versement à 48 h (15 oct.)': 'Signaler un problème',
     'Forfaits clients (15 oct.)': 'Payez moins cher la livraison en vous abonnant',
     'Gardien anti-fraude (15 oct.)': 'le Gardien a seulement mis en pause',
+    'Preuve de livraison par code PIN seul (16 oct.)': 'seule preuve de remise acceptée',
+    'Adresses Province › Ville › Arrondissement › Quartier (16 oct.)': 'Secteur partagé',
+    'Position GPS du client partagée au livreur (16 oct.)': 'Position GPS partagée avec le livreur',
 }
 
 
@@ -94,6 +97,14 @@ def check(site):
     except Exception:
         pass
     lines.append(f"- API magasins : **{res['status']}** en {res['seconds']} s{count}")
+    # Adresses (16 oct.) : le référentiel Province › Ville › Arrondissement › Quartier prouve que la nouvelle API tourne.
+    geo = fetch(f'{api}/api/v1/geo/', origin=web, attempts=1)
+    try:
+        tree = json.loads(geo['body']).get('data') or json.loads(geo['body'])
+        lines.append(f"- Référentiel d'adresses : **{geo['status']}**, {len(tree.get('provinces', []))} province(s), "
+                     f"{len(tree.get('arrondissements', []))} arrondissement(s), {len(tree.get('neighborhoods', []))} quartier(s)")
+    except Exception:
+        lines.append(f"- Référentiel d'adresses : **{geo['status']}** (absent : l'API n'a pas encore la version du 16 oct.)")
     # Images publiques (logos, photos) toujours servies ; justificatifs privés jamais (15 oct.).
     try:
         found = re.findall(r'"(?:logo|banner|image|cover_image)"\s*:\s*"([^"]+)"', res['body'].decode('utf-8', 'replace'))
