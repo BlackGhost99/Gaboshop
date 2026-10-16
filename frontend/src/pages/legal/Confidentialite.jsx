@@ -18,9 +18,10 @@ export default function Confidentialite() {
           Contact : {COMPANY.contact}.
         </p>
         <p>
-          Nous traitons vos données conformément à la <strong>loi n°001/2011 du 25 septembre 2011 relative à la protection
-          des données à caractère personnel</strong> en République gabonaise. L'autorité de contrôle est la{' '}
-          <strong>CNPDCP</strong> (Commission Nationale pour la Protection des Données à Caractère Personnel).
+          Nous traitons les données personnelles conformément au droit gabonais applicable,
+          notamment à la <strong>loi n°025/2023 du 9 juillet 2023 modifiant la loi n°001/2011
+          relative à la protection des données à caractère personnel</strong>. L'autorité compétente
+          est l'<strong>APDPVP</strong> (Autorité pour la Protection des Données Personnelles et de la Vie Privée).
         </p>
       </Section>
 
@@ -93,7 +94,7 @@ export default function Confidentialite() {
             "Le commerce voit le nom, le numéro de téléphone et l'adresse de livraison du client pour les commandes passées chez lui.",
             "Le livreur voit les informations nécessaires à la livraison : nom et téléphone du client, adresse, contenu et montant à encaisser le cas échéant.",
             "Le client voit le nom et le téléphone du commerce et du livreur liés à sa commande.",
-            "Nos prestataires techniques (hébergement, IA) traitent les données uniquement pour notre compte.",
+            "Nos prestataires techniques peuvent comprendre les services d'hébergement, les communications transactionnelles par e-mail, les paiements lorsqu'ils sont activés, les notifications push et les outils d'IA. Seules les données nécessaires au service concerné leur sont transmises.",
             "Les autorités, uniquement lorsque la loi l'exige.",
           ]}
         />
@@ -122,7 +123,7 @@ export default function Confidentialite() {
       </Section>
 
       <Section title="10. Vos droits">
-        <p>Conformément à la loi n°001/2011, vous disposez des droits suivants :</p>
+        <p>Conformément au cadre gabonais relatif aux données personnelles, notamment à la loi n°025/2023, vous disposez des droits suivants :</p>
         <List
           items={[
             "droit d'accès : savoir quelles données nous avons sur vous et en obtenir une copie ;",
@@ -134,7 +135,7 @@ export default function Confidentialite() {
         <p>
           Pour exercer ces droits, écrivez à <strong>{COMPANY.contact}</strong> en indiquant le numéro de téléphone de votre
           compte. Nous pouvons vous demander de prouver votre identité. Nous répondons dans un délai d'un mois au plus.
-          Si vous n'êtes pas satisfait de notre réponse, vous pouvez saisir la CNPDCP.
+          Si vous n'êtes pas satisfait de notre réponse, vous pouvez saisir l'APDPVP.
         </p>
       </Section>
 
