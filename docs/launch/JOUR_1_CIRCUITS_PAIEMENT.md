@@ -44,7 +44,7 @@ Les commissions Gaboshop, la marge de livraison et les frais de paiement dépend
 - Vérifier les réglages réellement stockés en base : les valeurs du code ne prouvent pas les options en vigueur.
 
 ## Décisions du propriétaire encore nécessaires
-1. Activer les **espèces au livreur** dès le début ou après une période de contrôle ?
+1. **Décision prise :** pas d'espèces pour les livreurs Gaboshop ; uniquement pour les boutiques avec leurs propres livreurs, sous vérification de l'admin.
 2. Suspendre les versements anticipés aux commerces `is_trusted` pendant le pilote ?
 3. Qui effectue le rapprochement quotidien des transactions et valide les remboursements ?
 4. Confirmer les taux de commission, frais de service et marges de livraison effectivement appliqués.
