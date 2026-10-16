@@ -141,3 +141,35 @@ class DevisCompletTests(TestCase):
         quote = self.api.post('/api/v1/orders/delivery-quote/', body, format='json').json()['data']
         self.assertIsNone(quote['total'])
         self.assertIn('quartier', quote['message'])
+
+    def test_direct_mobile_money_has_no_operator_fee_and_split_matches_obligations(self):
+        quote, order = self.quote_then_order('direct_split', 'airtel_money')
+        self.assertEqual(order.operator_fee, Decimal('0'))
+        self.assertEqual(quote['fees'], [])
+        owed = {o.payee: o.amount for o in order.payment_arrangement.obligations.filter(payer='client')}
+        split = {line['payee']: Decimal(line['amount']) for line in quote['payment']['split']}
+        self.assertEqual(split, {'Le commerce': owed['store'], 'Le livreur': owed['courier']})
+        self.assertIn('code marchand', quote['payment']['split'][0]['how'])
+
+    def test_bank_transfer_is_paid_before_shipping(self):
+        s = SystemSettings.get_settings()
+        s.payment_policy = {**DEFAULT_PAYMENT_POLICY, 'instructions': {'bank_transfer': 'IBAN GA00'}}
+        s.save(update_fields=['payment_policy'])
+        quote = self.api.post('/api/v1/orders/delivery-quote/', self.body('direct_split', 'bank_transfer'),
+                              format='json').json()['data']
+        store_line = quote['payment']['split'][0]
+        self.assertNotEqual(store_line['how'], 'Espèces')
+        self.assertIn("Avant l'envoi", store_line['when'])
+
+    def test_same_product_in_two_lines_checks_total_stock(self):
+        self.product.stock = 5
+        self.product.save(update_fields=['stock'])
+        body = self.body('direct_split', 'cash')
+        body['items'] = [{'product_id': self.product.id, 'quantity': 3}, {'product_id': self.product.id, 'quantity': 3}]
+        quote = self.api.post('/api/v1/orders/delivery-quote/', body, format='json').json()['data']
+        self.assertTrue(any('Stock insuffisant' in reason for reason in quote['blocking']))
+
+    def test_missing_payment_choice_blocks(self):
+        body = self.body('', '')
+        quote = self.api.post('/api/v1/orders/delivery-quote/', body, format='json').json()['data']
+        self.assertIn('Choisissez un moyen de paiement dans la liste.', quote['blocking'])

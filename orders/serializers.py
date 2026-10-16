@@ -419,7 +419,10 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         
         # Recalculate totals (commission depends on created OrderItems)
         operator = 'moov' if payment_method == 'moov_money' else 'airtel'
-        order.calculate_totals(operator=operator, payment_method=payment_method)
+        # Frais opérateur seulement quand Gaboshop encaisse en ligne : en paiement direct, le client paie le commerce
+        # lui-même et aucune part ne prévoit ces frais (devis, total et parts restent identiques).
+        fee_method = payment_method if payment_flow == 'platform_online' else 'cash'
+        order.calculate_totals(operator=operator, payment_method=fee_method)
 
         # Forfait client : réduction sur la livraison, offerte par Gaboshop, seulement si Gaboshop encaisse (paiement en ligne)
         # et livre. Pas quand le commerce livre lui-même : il fixe son tarif et toucherait le prix plein payé par Gaboshop.

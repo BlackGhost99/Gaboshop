@@ -23,7 +23,8 @@ export default function AddressPicker({ geo, value = {}, onChange }) {
   }, [geo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!geo) return null;
-  const reset = { neighborhood: '', landmark: '', zone: '' };
+  // Changer d'adresse retire aussi la position GPS partagée : elle désignait l'ancienne adresse.
+  const reset = { neighborhood: '', landmark: '', zone: '', latitude: null, longitude: null };
 
   return (
     <>
@@ -62,7 +63,7 @@ export default function AddressPicker({ geo, value = {}, onChange }) {
         value={value.neighborhood}
         onChange={(id) => {
           const n = geo.neighborhoods.find((x) => x.id === Number(id));
-          onChange({ neighborhood: id, landmark: '', zone: n?.name || '' });
+          onChange({ neighborhood: id, landmark: '', zone: n?.name || '', latitude: null, longitude: null });
         }}
       />
       {landmarks.length > 0 && (

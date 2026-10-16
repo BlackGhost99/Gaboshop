@@ -49,14 +49,20 @@ const DeliveryDashboard = () => {
   const activeDelivery = dashboardData?.active_delivery || null;
   const { tracking } = useOrderTracking(activeDelivery?.order_id, !!activeDelivery?.order_id);
   const lastSent = useRef(0);
+  const refused = useRef(null);
+  // Position partagée seulement après acceptation (une simple proposition peut être refusée).
+  const sharing = ['accepted', 'accepted_by_driver', 'picked_up', 'in_delivery', 'in_transit'].includes(activeDelivery?.status);
   useEffect(() => {
-    if (!activeDelivery?.id || !myPosition) return;
+    if (!activeDelivery?.id || !myPosition || !sharing || refused.current === activeDelivery.id) return;
     const now = Date.now();
     if (now - lastSent.current < 10000) return;
     lastSent.current = now;
     api.post(`/dashboard/delivery/${activeDelivery.id}/position/`, { latitude: myPosition[0], longitude: myPosition[1] })
-      .catch(() => { lastSent.current = 0; });
-  }, [activeDelivery?.id, myPosition]);
+      .catch((err) => {
+        // Course terminée ou retirée : on arrête d'envoyer pour cette livraison.
+        if ([400, 403, 404].includes(err?.response?.status)) refused.current = activeDelivery.id;
+      });
+  }, [activeDelivery?.id, myPosition, sharing]);
 
   // Notification Detail Modal State
   const [selectedNotification, setSelectedNotification] = useState(null);

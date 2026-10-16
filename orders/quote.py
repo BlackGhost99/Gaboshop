@@ -65,15 +65,19 @@ def _payment_lines(flow, method, delivery_by, delivery_requested, items, deliver
     """Qui le client paie, combien, comment et quand (mêmes parts que create_arrangement)."""
     how = METHOD_LABELS.get(method, method or '')
     mobile = method in MOBILE_METHODS
-    before_dispatch = policy.get('payment_timing') == 'before_dispatch'
+    # Même règle que payments.direct_service.can_dispatch : tout sauf les espèces se paie avant l'envoi.
+    prepaid = method != 'cash' or policy.get('payment_timing') == 'before_dispatch'
     if mobile:
         to_store_how = f"{how}, au code marchand du commerce"
         to_store_when = "Avant la préparation : vous déclarez l'ID de transaction reçu par SMS, le commerce confirme."
+    elif method != 'cash':
+        to_store_how = f"{how or 'Virement'}, aux coordonnées données par le commerce"
+        to_store_when = "Avant l'envoi : vous déclarez la référence du paiement, le commerce confirme."
     else:
         to_store_how = 'Espèces'
         if not delivery_requested:
             to_store_when = 'Au retrait au commerce.'
-        elif before_dispatch:
+        elif prepaid:
             to_store_when = "Avant l'envoi de la commande."
         else:
             to_store_when = 'À la livraison.'
@@ -83,23 +87,23 @@ def _payment_lines(flow, method, delivery_by, delivery_requested, items, deliver
                       'when': 'Juste après la commande : une seule demande arrive sur votre téléphone, '
                               'validez-la avec votre code secret.'})
     elif flow == 'direct_split':
-        lines.append({'payee': 'Le commerce', 'amount': items + operator_fee, 'how': to_store_how, 'when': to_store_when})
+        lines.append({'payee': 'Le commerce', 'amount': items, 'how': to_store_how, 'when': to_store_when})
         if delivery_requested and delivery:
             lines.append({'payee': 'Le livreur', 'amount': delivery,
-                          'how': 'Espèces' if not mobile else 'Espèces ou Mobile Money, au livreur',
+                          'how': 'Espèces' if method == 'cash' else 'Au livreur directement',
                           'when': 'À la livraison.'})
     elif flow == 'store_collects_all':
-        lines.append({'payee': 'Le commerce', 'amount': items + delivery + operator_fee, 'how': to_store_how,
+        lines.append({'payee': 'Le commerce', 'amount': items + delivery, 'how': to_store_how,
                       'when': to_store_when})
     elif flow == 'courier_cash':
-        lines.append({'payee': 'Le livreur', 'amount': items + delivery + operator_fee, 'how': 'Espèces',
+        lines.append({'payee': 'Le livreur', 'amount': items + delivery, 'how': 'Espèces',
                       'when': 'À la livraison, quand vous avez le colis en main.'})
     return [{**line, 'amount': str(_franc(line['amount']))} for line in lines if _franc(line['amount']) > 0]
 
 
 def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville', zone_text='',
                 neighborhood_id=None, landmark_id=None, details='', payment_flow='', payment_method='',
-                delivery_by=''):
+                delivery_by='', missing_products=0):
     """Devis d'un panier (``pairs`` : liste de (produit, quantité)). Ne lève pas : ce qui bloquerait la commande
     est listé dans ``blocking`` pour que le client le voie avant de commander."""
     from api.models import SystemSettings
@@ -116,6 +120,12 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
     # Articles : prix, disponibilité et stock, comme à la commande.
     lines = []
     items_total = Decimal('0')
+    # Le stock se vérifie sur la quantité totale d'un produit (deux tailles = deux lignes, un seul stock).
+    wanted = {}
+    for product, quantity in pairs:
+        wanted[product.id] = wanted.get(product.id, 0) + quantity
+    if missing_products:
+        blocking.append(f"{missing_products} article(s) du panier n'existe(nt) plus : retirez-les du panier.")
     for product, quantity in pairs:
         subtotal = Decimal(product.price or 0) * quantity
         items_total += subtotal
@@ -123,9 +133,9 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
                 'quantity': quantity, 'subtotal': str(_franc(subtotal)), 'stock': product.stock}
         if not product.is_available or product.market_type not in ('b2c', 'both'):
             line['problem'] = "Cet article n'est plus en vente."
-        elif product.stock is not None and product.stock < quantity:
+        elif product.stock is not None and product.stock < wanted[product.id]:
             line['problem'] = f"Stock insuffisant : il reste {product.stock} unité(s)."
-        if line.get('problem'):
+        if line.get('problem') and f"{product.name} : {line['problem']}" not in blocking:
             blocking.append(f"{product.name} : {line['problem']}")
         lines.append(line)
 
@@ -179,7 +189,11 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
         policy, options = {}, []
         blocking.append(f"Paiement indisponible pour ce commerce : {_error_text(exc)}")
     option = matching_option(options, payment_flow, payment_method, delivery_by or '') if payment_flow else None
-    if payment_flow and option is None and options:
+    if not options and policy:
+        blocking.append("Aucun moyen de paiement n'est proposé pour ce commerce en ce moment.")
+    elif options and not payment_flow:
+        blocking.append('Choisissez un moyen de paiement dans la liste.')
+    elif payment_flow and option is None and options:
         blocking.append("Ce moyen de paiement n'est pas proposé pour ce commerce : choisissez-en un autre dans la liste.")
     online = payment_flow == 'platform_online'
     fees = []
@@ -187,7 +201,8 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
     if delivery_fee is not None:
         order.items_total, order.delivery_fee = items_total, delivery_fee
         operator = 'moov' if payment_method == 'moov_money' else 'airtel'
-        operator_fee = _franc(order.calculate_operator_fee(operator=operator, payment_method=payment_method))
+        fee_method = payment_method if online else 'cash'  # comme OrderCreateSerializer.create
+        operator_fee = _franc(order.calculate_operator_fee(operator=operator, payment_method=fee_method))
         if operator_fee > 0:
             fees.append({'label': f"Frais {METHOD_LABELS.get(payment_method, 'Mobile Money')}", 'amount': str(operator_fee)})
         if online and delivery_by != 'store' and user is not None and getattr(user, 'is_authenticated', False):
@@ -218,6 +233,12 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
         missing = Decimal(store.min_order_amount) - items_total
         blocking.append(f"Minimum de commande du commerce : {_money(store.min_order_amount)}. "
                         f"Ajoutez encore {_money(missing)} d'articles.")
+    from django.core.exceptions import PermissionDenied
+    from payments.subscription_check import SubscriptionChecker
+    try:
+        SubscriptionChecker.check_can_create_order(store)
+    except PermissionDenied as exc:
+        blocking.append(str(exc))
     app = SystemSettings.get_settings()
     if app.order_hours_enabled:
         from stores.models import within_hours

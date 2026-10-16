@@ -736,6 +736,7 @@ class DeliveryQuoteView(APIView):
 		if store is None:
 			return Response({'success': False, 'error': 'Commerce introuvable.'}, status=status.HTTP_400_BAD_REQUEST)
 		pairs = []
+		missing = 0
 		for item in (request.data.get('items') or [])[:100]:
 			try:
 				quantity = max(1, min(1000, int(item.get('quantity') or 1)))
@@ -744,6 +745,8 @@ class DeliveryQuoteView(APIView):
 			product = Product.objects.filter(pk=item.get('product_id'), store=store).first()
 			if product is not None:
 				pairs.append((product, quantity))
+			else:
+				missing += 1
 		if not pairs:
 			return Response({'success': False, 'error': 'Panier vide.'}, status=status.HTTP_400_BAD_REQUEST)
 		data = request.data
@@ -754,7 +757,7 @@ class DeliveryQuoteView(APIView):
 			neighborhood_id=data.get('neighborhood') or None, landmark_id=data.get('landmark') or None,
 			details=str(data.get('delivery_address') or '')[:300],
 			payment_flow=str(data.get('payment_flow') or ''), payment_method=str(data.get('payment_method') or ''),
-			delivery_by=str(data.get('delivery_by') or ''),
+			delivery_by=str(data.get('delivery_by') or ''), missing_products=missing,
 		)
 		return Response({'success': True, 'data': quote})
 

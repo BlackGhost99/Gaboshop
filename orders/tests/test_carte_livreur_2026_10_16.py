@@ -111,3 +111,33 @@ class CarteLivreurTests(TestCase):
         # Un autre livreur ne peut pas envoyer de position pour cette course.
         self.assertEqual(stranger.post(f'/api/v1/dashboard/delivery/{delivery.id}/position/',
                                        {'latitude': 0.4, 'longitude': 9.45}, format='json').status_code, 404)
+
+    def test_offer_not_yet_accepted_shares_nothing(self):
+        order = self.create_order(delivery_latitude='0.412345', delivery_longitude='9.467890')
+        delivery = self.start_ride(order, status='assigned')
+        courier_api = APIClient()
+        courier_api.force_authenticate(self.courier)
+        res = courier_api.post(f'/api/v1/dashboard/delivery/{delivery.id}/position/',
+                               {'latitude': 0.4, 'longitude': 9.45}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIsNone(self.api.get(f'/api/v1/orders/{order.id}/tracking/').json()['data']['courier'])
+
+    def test_bad_coordinates_refused_cleanly(self):
+        order = self.create_order()
+        delivery = self.start_ride(order, status='accepted')
+        courier_api = APIClient()
+        courier_api.force_authenticate(self.courier)
+        for lat in ('NaN', 'Infinity', 'abc'):
+            res = courier_api.post(f'/api/v1/dashboard/delivery/{delivery.id}/position/',
+                                   {'latitude': lat, 'longitude': 9.45}, format='json')
+            self.assertEqual(res.status_code, 400, lat)
+
+    def test_no_route_to_store_without_store_position(self):
+        self.store.latitude = self.store.longitude = None
+        self.store.save()
+        order = self.create_order(delivery_latitude='0.412345', delivery_longitude='9.467890')
+        self.start_ride(order, status='accepted')
+        courier_api = APIClient()
+        courier_api.force_authenticate(self.courier)
+        data = courier_api.get(f'/api/v1/orders/{order.id}/tracking/').json()['data']
+        self.assertEqual(data['directions'], {})

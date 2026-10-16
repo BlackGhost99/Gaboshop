@@ -10,7 +10,8 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
 # Course en cours : le livreur a accepté et n'a pas encore livré.
-ACTIVE_STATUSES = ('assigned', 'accepted_by_driver', 'accepted', 'picked_up', 'in_delivery', 'in_transit')
+# « assigned » n'est qu'une proposition au livreur (il peut refuser) : sa position n'est pas encore partagée.
+ACTIVE_STATUSES = ('accepted_by_driver', 'accepted', 'picked_up', 'in_delivery', 'in_transit')
 CARRYING_STATUSES = ('picked_up', 'in_delivery', 'in_transit')
 # Une position plus vieille n'est plus montrée comme « en direct ».
 FRESH_FOR = timedelta(minutes=5)
@@ -28,6 +29,8 @@ def parse_point(lat, lng):
         lat = Decimal(str(lat)).quantize(Decimal('0.000001'))
         lng = Decimal(str(lng)).quantize(Decimal('0.000001'))
     except (InvalidOperation, TypeError, ValueError):
+        raise ValueError('Position GPS invalide.')
+    if not (lat.is_finite() and lng.is_finite()):
         raise ValueError('Position GPS invalide.')
     if not (LAT_RANGE[0] <= lat <= LAT_RANGE[1] and LNG_RANGE[0] <= lng <= LNG_RANGE[1]):
         raise ValueError('Position GPS hors du Gabon : réactivez la localisation et réessayez.')
@@ -114,7 +117,7 @@ def tracking_payload(order, user):
 
     # Prochaine étape du livreur : le commerce tant que le colis n'est pas récupéré, puis le client.
     carrying = status in CARRYING_STATUSES
-    target = destination if carrying else (store_point or destination)
+    target = destination if carrying else store_point  # sans position du commerce : pas d'itinéraire faux
     eta = remaining = None
     if courier and courier['position'] and target:
         remaining = distance_km((courier['position']['lat'], courier['position']['lng']), target)
