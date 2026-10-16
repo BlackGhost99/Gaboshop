@@ -22,7 +22,7 @@ Décision du propriétaire : Gaboshop proposera les paiements directs **et** Sin
 ### Exemple : 70 000 FCFA d'articles + 2 000 FCFA de livraison
 - Direct séparé : 70 000 reçus par le commerce, 2 000 par le livreur.
 - Tout au commerce : 72 000 reçus par le commerce ; il règle ensuite le livreur.
-- Espèces livreur : 72 000 collectés par le livreur, dont 70 000 à remettre au commerce.
+- Espèces à la livraison **par un livreur de la boutique uniquement** : 72 000 collectés pour la boutique ; aucune dette n'est créée envers un livreur Gaboshop.
 - En ligne : 72 000 initialement encaissés via SingPay ; répartitions et frais réels à rapprocher séparément, sans taux PSP inventé.
 
 Les commissions Gaboshop, la marge de livraison et les frais de paiement dépendent de la configuration et des accords réellement en vigueur : cet exemple n'établit aucun taux commercial.
@@ -38,8 +38,8 @@ Les commissions Gaboshop, la marge de livraison et les frais de paiement dépend
 - Par défaut : `direct_split`, sous réserve de la validation de l'administrateur.
 - **Choix du fondateur :** les espèces à la livraison sont autorisées uniquement pour les boutiques qui disposent de leurs propres livreurs et sont configurées `offers_delivery=True`. Le mode accepté est `store_collects_all` avec `cash` ; l'encaissement est attribué au commerce. Pour une livraison par un livreur Gaboshop, les espèces ne sont pas proposées au panier B2C. Le retrait en boutique peut rester payable en espèces sur place.
 - Avant ouverture, vérifier matériellement et approuver que chaque commerce autorisé possède son propre service de livraison ; le champ `offers_delivery` ne constitue pas à lui seul une preuve documentaire.
-- Autoriser simultanément `direct_split`, `store_collects_all`, `courier_cash` et `platform_online` seulement si les options correspondantes sont vérifiées.
-- Les paiements directs Mobile Money exigent des instructions vérifiables du commerce ; les espèces au livreur exigent une livraison et une procédure de remise d'espèces.
+- Autoriser simultanément `direct_split`, `store_collects_all` et `platform_online` suivant les contrôles. `courier_cash` n'est **pas proposé pour les livraisons B2C** du pilote.
+- Les paiements directs Mobile Money exigent des instructions vérifiables du commerce ; le paiement en espèces à la livraison ne concerne que les livreurs internes des boutiques, avec remise et confirmation de l'encaissement par le commerce.
 - L'affichage B2C initial masquait les paiements directs lorsque SingPay était prêt. Correction réalisée **sur la branche de revue uniquement**, avec tests ; aucune activation en production.
 - Vérifier les réglages réellement stockés en base : les valeurs du code ne prouvent pas les options en vigueur.
 
