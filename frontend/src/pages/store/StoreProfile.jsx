@@ -34,13 +34,26 @@ const FIELD_NAMES = {
     agent_code: 'Code agent',
     payout_phone: 'Numéro Mobile Money',
     delivery_fee: 'Frais de livraison',
+    delivery_fee_express: 'Frais de livraison express',
     min_order_amount: 'Montant min. commande',
     opening_time: "Heure d'ouverture",
     closing_time: 'Heure de fermeture',
     offers_delivery: 'Livraison',
     banner_image: 'Bannière',
     logo: 'Logo',
+    accent_color: "Couleur d'accent",
+    tagline: "Message d'accueil",
+    about: 'Présentation',
+    facebook_url: 'Lien Facebook',
+    instagram_url: 'Lien Instagram',
+    tiktok_url: 'Lien TikTok',
+    website_url: 'Site web',
 };
+
+// Page de boutique personnalisée : champs réservés aux forfaits qui l'incluent.
+const CUSTOM_FIELDS = ['accent_color', 'tagline', 'about', 'facebook_url', 'instagram_url', 'tiktok_url', 'website_url'];
+const DEFAULT_ACCENT = '#4F46E5';
+const customFromStore = (data) => Object.fromEntries(CUSTOM_FIELDS.map((key) => [key, data?.[key] || '']));
 const withFieldNames = (details) => Object.fromEntries(
     Object.entries(details).map(([key, value]) => [FIELD_NAMES[key] || key, value])
 );
@@ -78,6 +91,10 @@ const StoreProfile = () => {
     const [stockThreshold, setStockThreshold] = useState('');
     const [savedStockThreshold, setSavedStockThreshold] = useState('');
     const [stockAlertsIncluded, setStockAlertsIncluded] = useState(false);
+    // Personnalisation de la vitrine : active selon le forfait (l'API renvoie custom_page au commerçant).
+    const [custom, setCustom] = useState(customFromStore(null));
+    // Frais de livraison express : réglage actif selon le forfait (l'API renvoie express au commerçant).
+    const [expressFee, setExpressFee] = useState('');
 
     useEffect(() => {
         fetchStoreData();
@@ -117,6 +134,8 @@ const StoreProfile = () => {
                     setStockThreshold(threshold);
                     setSavedStockThreshold(threshold);
                     setStockAlertsIncluded(!!dashboardRes.data.subscription?.tools?.stock_alerts);
+                    setCustom(customFromStore(data));
+                    setExpressFee(data.express?.fee ? String(Math.round(Number(data.express.fee))) : '');
                     setPreviewLogo(data.logo);
                     setPreviewBanner(data.banner_image);
                 }
@@ -149,6 +168,11 @@ const StoreProfile = () => {
                 setPreviewBanner(URL.createObjectURL(file));
             }
         }
+    };
+
+    const handleCustomChange = (e) => {
+        const { name, value } = e.target;
+        setCustom(prev => ({ ...prev, [name]: value }));
     };
 
     const handleThresholdChange = (e) => {
@@ -196,6 +220,10 @@ const StoreProfile = () => {
         if (logoFile) data.append('logo', logoFile);
         if (bannerFile) data.append('banner_image', bannerFile);
         if (threshold !== null) data.append('stock_alert_threshold', threshold);
+        // Envoyés (même vides, pour pouvoir les effacer) seulement si le forfait inclut l'outil.
+        if (customPage.enabled) CUSTOM_FIELDS.forEach((key) => data.append(key, custom[key] || ''));
+        // Frais express : envoyés seulement si le forfait inclut la livraison express.
+        if (expressInfo.enabled && expressFee !== '') data.append('delivery_fee_express', expressFee);
 
         try {
             const res = await updateStore(store.id, data);
@@ -209,6 +237,8 @@ const StoreProfile = () => {
                     `Vos clients voient déjà les nouvelles informations.${thresholdChanged ? ` Alertes de stock : ${thresholdText}.` : ''}`
                 );
                 setStore(res.data);
+                setCustom(customFromStore(res.data));
+                if (res.data?.express?.fee) setExpressFee(String(Math.round(Number(res.data.express.fee))));
                 setInitialDescription(res.data?.description ?? formData.description);
                 if (threshold !== null) {
                     setStockThreshold(threshold);
@@ -231,6 +261,9 @@ const StoreProfile = () => {
             );
         }
     };
+
+    const customPage = store?.custom_page || { enabled: false, upgrade_hint: '', plan_name: '' };
+    const expressInfo = store?.express || { enabled: false, upgrade_hint: '', plan_name: '', supplement: '0' };
 
     if (loading) return <StoreLayout title="Chargement..."><div>Chargement...</div></StoreLayout>;
 
@@ -424,6 +457,27 @@ const StoreProfile = () => {
                             />
                         </div>
                         <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <label htmlFor="delivery_fee_express" className="block text-sm font-medium text-gray-700">Frais de livraison express (FCFA)</label>
+                                {!expressInfo.enabled && (
+                                    <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                        {expressInfo.plan_name ? `Forfait ${expressInfo.plan_name}` : 'Non disponible'}
+                                    </span>
+                                )}
+                            </div>
+                            <input
+                                id="delivery_fee_express" type="number" min={0} step={100} inputMode="numeric"
+                                value={expressInfo.enabled ? expressFee : ''} disabled={!expressInfo.enabled}
+                                onChange={(e) => setExpressFee(e.target.value)}
+                                className="mt-1 block w-full border rounded-md shadow-sm p-2 disabled:cursor-not-allowed disabled:bg-gray-50"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                {expressInfo.enabled
+                                    ? `Vos clients voient le choix Standard / Express dans leur panier. L'express ajoute au tarif de livraison de leur zone la différence entre ces frais et vos frais standard (supplément actuel : ${Math.round(Number(expressInfo.supplement) || 0)} F). Ces frais doivent être au moins égaux aux frais standard.`
+                                    : expressInfo.upgrade_hint}
+                            </p>
+                        </div>
+                        <div>
                             <label className="block text-sm font-medium text-gray-700">Montant min. commande (FCFA)</label>
                             <input 
                                 type="number" name="min_order_amount" value={formData.min_order_amount} onChange={handleChange}
@@ -467,6 +521,101 @@ const StoreProfile = () => {
                                 >
                                     Passer au forfait Pro
                                 </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Page de boutique personnalisée (outil du forfait Pro) */}
+                    <div className={`rounded-md border border-gray-200 p-4 space-y-4 ${customPage.enabled ? '' : 'bg-gray-50'}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold text-gray-900">Personnaliser ma boutique</h3>
+                            {!customPage.enabled && (
+                                <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                    {customPage.plan_name ? `Forfait ${customPage.plan_name}` : 'Non disponible'}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                            Couleur, présentation et réseaux sociaux : ils apparaissent sur la page publique de votre boutique, vue par vos clients.
+                        </p>
+                        <fieldset disabled={!customPage.enabled} className="space-y-4 disabled:opacity-60">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <label htmlFor="accent_color" className="text-sm font-medium text-gray-700">Couleur d'accent</label>
+                                <input
+                                    id="accent_color" name="accent_color" type="color"
+                                    value={custom.accent_color || DEFAULT_ACCENT} onChange={handleCustomChange}
+                                    className="h-10 w-14 cursor-pointer rounded border p-1 disabled:cursor-not-allowed"
+                                />
+                                <span className="text-xs text-gray-500">{custom.accent_color || 'Couleur par défaut de Gaboshop'}</span>
+                                {custom.accent_color && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setCustom(prev => ({ ...prev, accent_color: '' }))}
+                                        className="text-xs font-medium text-indigo-700 hover:underline"
+                                    >
+                                        Revenir à la couleur par défaut
+                                    </button>
+                                )}
+                            </div>
+                            <div>
+                                <label htmlFor="tagline" className="block text-sm font-medium text-gray-700">Message d'accueil</label>
+                                <input
+                                    id="tagline" name="tagline" type="text" maxLength={120}
+                                    value={custom.tagline} onChange={handleCustomChange}
+                                    className="mt-1 block w-full border rounded-md shadow-sm p-2 disabled:cursor-not-allowed"
+                                    placeholder="Ex. Le bon goût, livré chez vous"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="about" className="block text-sm font-medium text-gray-700">Présentation « À propos »</label>
+                                <textarea
+                                    id="about" name="about" rows="4" maxLength={2000}
+                                    value={custom.about} onChange={handleCustomChange}
+                                    className="mt-1 block w-full border rounded-md shadow-sm p-2 disabled:cursor-not-allowed"
+                                    placeholder="Racontez votre histoire, vos spécialités, ce qui vous distingue."
+                                />
+                                <p className="mt-1 text-xs text-gray-500">{custom.about.length} / 2000 caractères</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {[
+                                    ['facebook_url', 'Facebook', 'facebook.com/votre-page'],
+                                    ['instagram_url', 'Instagram', 'instagram.com/votre-compte'],
+                                    ['tiktok_url', 'TikTok', 'tiktok.com/@votre-compte'],
+                                    ['website_url', 'Site web', 'www.votre-site.ga'],
+                                ].map(([name, label, placeholder]) => (
+                                    <div key={name}>
+                                        <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
+                                        <input
+                                            id={name} name={name} type="text" maxLength={300} autoComplete="off"
+                                            value={custom[name]} onChange={handleCustomChange}
+                                            className="mt-1 block w-full border rounded-md shadow-sm p-2 disabled:cursor-not-allowed"
+                                            placeholder={placeholder}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </fieldset>
+                        {!customPage.enabled && (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="break-words text-sm font-medium text-amber-900">
+                                        {customPage.plan_name ? `Page de boutique personnalisée : forfait ${customPage.plan_name}` : 'Page de boutique personnalisée'}
+                                    </p>
+                                    <p className="mt-0.5 break-words text-xs text-amber-800">{customPage.upgrade_hint}</p>
+                                    {CUSTOM_FIELDS.some((key) => custom[key]) && (
+                                        <p className="mt-0.5 break-words text-xs text-amber-800">
+                                            Vos réglages précédents sont conservés, mais ne sont plus affichés à vos clients tant que l'option n'est pas active.
+                                        </p>
+                                    )}
+                                </div>
+                                {customPage.plan_name && (
+                                    <Link
+                                        to="/store/subscription"
+                                        className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                    >
+                                        Passer au forfait {customPage.plan_name}
+                                    </Link>
+                                )}
                             </div>
                         )}
                     </div>

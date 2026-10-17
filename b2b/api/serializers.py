@@ -1,11 +1,13 @@
 """
 Serializers pour l'API B2B
 """
+from decimal import Decimal
 from rest_framework import serializers
 from stores.models import Store
 from products.models import Product
 from orders.models import Order, OrderItem
 from b2b.models import B2BProfile, B2BCategory, B2BProductPricing
+from b2b.services.tiers import bulk_discounts_active, effective_tiers, pricing_rows, tiers_payload
 
 
 class WholesalerSerializer(serializers.ModelSerializer):
@@ -96,15 +98,64 @@ class B2BProductPricingSerializer(serializers.ModelSerializer):
 		read_only_fields = ['created_at', 'updated_at']
 
 
-class B2BProductSerializer(serializers.ModelSerializer):
+class _TieredPriceMixin:
+	"""
+	Prix d'un produit de grossiste vu par l'acheteur : prix de base, quantité minimale et paliers dégressifs.
+	Les paliers ne sont montrés que si le forfait du grossiste les inclut (sinon seul le prix de base existe).
+	"""
+
+	def _wholesaler_id(self):
+		wholesaler_id = self.context.get('wholesaler_id')
+		return int(wholesaler_id) if wholesaler_id else None
+
+	def _bulk_discounts(self, wholesaler_id):
+		cache = self.context.setdefault('_bulk_discounts', {})
+		if wholesaler_id not in cache:
+			store = Store.objects.filter(id=wholesaler_id).first()
+			cache[wholesaler_id] = bulk_discounts_active(store) if store is not None else False
+		return cache[wholesaler_id]
+
+	def _tiers(self, obj):
+		wholesaler_id = self._wholesaler_id()
+		if not wholesaler_id:
+			return []
+		rows = pricing_rows(obj, wholesaler_id)
+		return effective_tiers(rows, self._bulk_discounts(wholesaler_id))
+
+	def get_b2b_price(self, obj):
+		"""Prix de base B2B (palier de plus petite quantité)"""
+		tiers = self._tiers(obj)
+		return float(tiers[0].b2b_price) if tiers else None
+
+	def get_min_quantity(self, obj):
+		"""Quantité minimale B2B"""
+		tiers = self._tiers(obj)
+		return tiers[0].min_quantity if tiers else None
+
+	def get_pricing_tiers(self, obj):
+		"""Paliers de quantité : [{min_qty, price, saving_percent}] (au moins deux pour parler de dégressivité)"""
+		tiers = self._tiers(obj)
+		return tiers_payload(tiers) if len(tiers) > 1 else []
+
+	def get_promo(self, obj):
+		"""Prix barré du grossiste (promotion) : prix d'avant et pourcentage, seulement s'il est cohérent"""
+		if obj.compare_price and obj.compare_price > obj.price:
+			saving = int(((obj.compare_price - obj.price) / obj.compare_price * 100).quantize(Decimal('1')))
+			return {'compare_price': float(obj.compare_price), 'price': float(obj.price), 'saving_percent': saving}
+		return None
+
+
+class B2BProductSerializer(_TieredPriceMixin, serializers.ModelSerializer):
 	"""
 	Serializer pour les produits B2B avec prix
 	"""
 	category_name = serializers.CharField(source='category.name', read_only=True)
 	b2b_category_name = serializers.CharField(source='b2b_category.name', read_only=True)
-	b2b_pricings = B2BProductPricingSerializer(many=True, read_only=True)
+	b2b_pricings = serializers.SerializerMethodField()
 	b2b_price = serializers.SerializerMethodField()
 	min_quantity = serializers.SerializerMethodField()
+	pricing_tiers = serializers.SerializerMethodField()
+	promo = serializers.SerializerMethodField()
 	
 	class Meta:
 		model = Product
@@ -113,89 +164,31 @@ class B2BProductSerializer(serializers.ModelSerializer):
 			'stock', 'sku', 'barcode', 'is_available', 'is_featured',
 			'category', 'category_name', 'b2b_category', 'b2b_category_name',
 			'market_type', 'image', 'b2b_pricings', 'b2b_price', 'min_quantity',
+			'pricing_tiers', 'promo',
 			'created_at', 'updated_at'
 		]
 		read_only_fields = ['created_at', 'updated_at']
 	
-	def get_b2b_price(self, obj):
-		"""Prix B2B minimum (premier pricing actif)"""
-		context = self.context
-		wholesaler_id = context.get('wholesaler_id')
-		
-		if wholesaler_id:
-			pricing = obj.b2b_pricings.filter(
-				b2b_store_id=wholesaler_id,
-				is_active=True
-			).order_by('min_quantity').first()
-			
-			if pricing:
-				return float(pricing.b2b_price)
-		
-		return None
-	
-	def get_min_quantity(self, obj):
-		"""Quantité minimale B2B"""
-		context = self.context
-		wholesaler_id = context.get('wholesaler_id')
-		
-		if wholesaler_id:
-			pricing = obj.b2b_pricings.filter(
-				b2b_store_id=wholesaler_id,
-				is_active=True
-			).order_by('min_quantity').first()
-			
-			if pricing:
-				return pricing.min_quantity
-		
-		return None
+	def get_b2b_pricings(self, obj):
+		return B2BProductPricingSerializer(self._tiers(obj), many=True).data
 
 
-class B2BCatalogProductSerializer(serializers.ModelSerializer):
+class B2BCatalogProductSerializer(_TieredPriceMixin, serializers.ModelSerializer):
 	"""
 	Serializer pour les produits dans le catalogue B2B (version allégée)
 	"""
 	b2b_price = serializers.SerializerMethodField()
 	min_quantity = serializers.SerializerMethodField()
+	pricing_tiers = serializers.SerializerMethodField()
+	promo = serializers.SerializerMethodField()
 	
 	class Meta:
 		model = Product
 		fields = [
-			'id', 'name', 'description', 'price', 'b2b_price',
+			'id', 'name', 'description', 'price', 'compare_price', 'b2b_price',
 			'stock', 'is_available', 'image', 'min_quantity',
-			'b2b_category'
+			'pricing_tiers', 'promo', 'b2b_category'
 		]
-	
-	def get_b2b_price(self, obj):
-		"""Prix B2B minimum"""
-		context = self.context
-		wholesaler_id = context.get('wholesaler_id')
-		
-		if wholesaler_id:
-			pricing = obj.b2b_pricings.filter(
-				b2b_store_id=wholesaler_id,
-				is_active=True
-			).order_by('min_quantity').first()
-			
-			if pricing:
-				return float(pricing.b2b_price)
-		
-		return None
-	
-	def get_min_quantity(self, obj):
-		"""Quantité minimale B2B"""
-		context = self.context
-		wholesaler_id = context.get('wholesaler_id')
-		
-		if wholesaler_id:
-			pricing = obj.b2b_pricings.filter(
-				b2b_store_id=wholesaler_id,
-				is_active=True
-			).order_by('min_quantity').first()
-			
-			if pricing:
-				return pricing.min_quantity
-		
-		return None
 
 
 class B2BOrderItemSerializer(serializers.Serializer):

@@ -4,6 +4,7 @@ import StoreLayout from '../../components/StoreLayout';
 import WholesalerList from '../../components/b2b/WholesalerList';
 import WholesalerDetail from '../../components/b2b/WholesalerDetail';
 import B2BProductList from '../../components/b2b/B2BProductList';
+import B2BBuyerCapNotice from '../../components/b2b/B2BBuyerCapNotice';
 import B2BCart from '../../components/b2b/B2BCart';
 import B2BOrderForm from '../../components/b2b/B2BOrderForm';
 import {
@@ -21,6 +22,7 @@ const B2BProcurement = () => {
 	const [selectedWholesaler, setSelectedWholesaler] = useState(null);
 	const [products, setProducts] = useState([]);
 	const [categories, setCategories] = useState([]);
+	const [catalogInfo, setCatalogInfo] = useState(null);
 	const [selectedCategory, setSelectedCategory] = useState(null);
 	const [cart, setCart] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -67,6 +69,7 @@ const B2BProcurement = () => {
 				if (response.success) {
 					setProducts(response.data?.products || []);
 					setCategories(response.data?.categories || []);
+					setCatalogInfo(response.data?.wholesaler || null);
 					// Stocker les infos de pagination séparément pour éviter la boucle
 					if (response.data?.pagination) {
 						setPagination(prev => ({
@@ -251,6 +254,8 @@ const B2BProcurement = () => {
 
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 						<div className="lg:col-span-2">
+							<B2BBuyerCapNotice info={catalogInfo} />
+
 							{/* Filtres & Recherche */}
 							<div className="mb-4 bg-white p-4 rounded-lg shadow flex flex-col md:flex-row items-center gap-4">
 								<div className="flex-1 w-full">

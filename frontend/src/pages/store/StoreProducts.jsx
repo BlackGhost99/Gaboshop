@@ -711,7 +711,10 @@ const StoreProducts = () => {
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1 break-words">
                                             {store?.is_b2b ? (
-                                                "Cette promo reste en place. Les grossistes ne peuvent pas encore en créer d'autres."
+                                                <>
+                                                    Cette promo reste en place. Pour la modifier ou en créer d'autres :{' '}
+                                                    <Link to="/store/subscription" className="text-indigo-600 underline">voir « Mon forfait »</Link>.
+                                                </>
                                             ) : (
                                                 <>
                                                     Cette promo reste en place. Pour la modifier ou en créer d'autres :{' '}
@@ -732,7 +735,10 @@ const StoreProducts = () => {
                                         />
                                         <p className="text-xs text-gray-600 mt-1 break-words">
                                             {store?.is_b2b ? (
-                                                "Les promotions (prix barré) ne sont pas encore proposées aux grossistes."
+                                                <>
+                                                    Promotions (prix barré) : incluses dans un forfait grossiste payant.{' '}
+                                                    <Link to="/store/subscription" className="text-indigo-600 underline">Voir « Mon forfait »</Link>
+                                                </>
                                             ) : (
                                                 <>
                                                     Promotions (prix barré) : forfait Pro.{' '}

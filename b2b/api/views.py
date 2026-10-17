@@ -19,7 +19,9 @@ from b2b.services.permissions import (
 	can_access_b2b, 
 	can_purchase_from_wholesaler,
 	can_purchase_from_self,
-	must_be_b2c_store
+	must_be_b2c_store,
+	check_b2c_buyer_quota,
+	notify_buyer_cap_reached,
 )
 from b2b.services.supply import (
 	get_available_wholesalers,
@@ -449,6 +451,7 @@ class WholesalerCatalogView(APIView):
 		
 		# Construire la réponse
 		b2b_profile = wholesaler.b2b_profile if hasattr(wholesaler, 'b2b_profile') else None
+		accepts_new, quota = check_b2c_buyer_quota(wholesaler, buyer_store)
 		
 		return Response({
 			'success': True,
@@ -465,6 +468,9 @@ class WholesalerCatalogView(APIView):
 					'email': wholesaler.email,
 					'minimum_order_amount': float(b2b_profile.minimum_order_amount) if b2b_profile else 0,
 					'delivery_delay_hours': wholesaler.b2b_delivery_delay if hasattr(wholesaler, 'b2b_delivery_delay') else 24,
+					# Faux seulement pour un commerce qui n'est pas déjà client et que le plafond du grossiste écarte
+					'accepts_new_buyers': accepts_new,
+					'buyer_cap_message': quota['message'],
 				},
 				'categories': B2BCatalogCategorySerializer(categories_with_count, many=True).data,
 				'products': B2BCatalogProductSerializer(paginated_products, many=True, context=context).data,
@@ -582,6 +588,19 @@ class B2BOrderCreateView(APIView):
 					'message': error_msg
 				}
 			}, status=status.HTTP_400_BAD_REQUEST)
+		
+		# Plafond de commerces clients du forfait du grossiste : un commerce déjà client reste servi,
+		# un nouveau commerce est refusé et le grossiste est prévenu.
+		quota_ok, quota = check_b2c_buyer_quota(wholesaler, buyer_store)
+		if not quota_ok:
+			notify_buyer_cap_reached(wholesaler, buyer_store, quota)
+			return Response({
+				'success': False,
+				'error': {
+					'code': status.HTTP_403_FORBIDDEN,
+					'message': quota['message']
+				}
+			}, status=status.HTTP_403_FORBIDDEN)
 		
 		# Créer la commande
 		with transaction.atomic():

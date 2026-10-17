@@ -13,6 +13,7 @@ import { METHOD_LABELS } from '../../components/payments/paymentLabels';
 import api from '../../services/api';
 import AddressPicker from '../../components/address/AddressPicker';
 import QuoteDetails from '../../components/cart/QuoteDetails';
+import DeliveryTypePicker from '../../components/cart/DeliveryTypePicker';
 import ShareLocationButton from '../../components/address/ShareLocationButton';
 import useGeo from '../../hooks/useGeo';
 import { describeOptions, lineKey, productOptions } from '../../utils/productOptions';
@@ -265,6 +266,7 @@ const ClientDashboard = () => {
             payment_flow: form.payment_flow || '',
             payment_method: form.payment_method || '',
             delivery_by: form.payment_flow === 'platform_online' ? (form.delivery_by || 'gaboshop') : '',
+            delivery_type: form.delivery_requested !== false && form.delivery_type === 'express' ? 'express' : 'standard',
             items: group.items.map((it) => ({ product_id: it.id, quantity: it.quantity || 1 })),
           });
           if (active) setQuotes((prev) => ({ ...prev, [storeName]: res.data?.data || {} }));
@@ -381,6 +383,7 @@ const ClientDashboard = () => {
         payment_flow: prev[storeName]?.payment_flow ?? '',
         payment_method: prev[storeName]?.payment_method ?? '',
         delivery_by: prev[storeName]?.delivery_by ?? '',
+        delivery_type: prev[storeName]?.delivery_type ?? 'standard',
         delivery_requested: prev[storeName]?.delivery_requested ?? true,
         ...patch,
       },
@@ -462,6 +465,8 @@ const ClientDashboard = () => {
       ...(form.delivery_requested !== false && form.latitude != null && form.longitude != null
         ? { delivery_latitude: form.latitude, delivery_longitude: form.longitude } : {}),
       delivery_requested: form.delivery_requested !== false,
+      // L'express n'est envoyé que si le devis l'a proposé : sinon le serveur le refuserait.
+      delivery_type: form.delivery_requested !== false && form.delivery_type === 'express' && quoteFor(storeName).express_available ? 'express' : 'standard',
       notes: form.notes || '',
       payment_flow,
       payment_method,
@@ -961,6 +966,14 @@ const ClientDashboard = () => {
                         <p>{storeAlerts[storeName]}</p>
                       </div>
                     </div>
+                  )}
+
+                  {storeForms[storeName]?.delivery_requested !== false && (
+                    <DeliveryTypePicker
+                      quote={quoteFor(storeName)}
+                      value={storeForms[storeName]?.delivery_type || 'standard'}
+                      onChange={(type) => handleChangeForm(storeName, 'delivery_type', type)}
+                    />
                   )}
 
                   <QuoteDetails

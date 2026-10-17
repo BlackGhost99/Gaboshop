@@ -252,12 +252,11 @@ class SubscriptionChecker:
         """
         🎨 Vérifiez si le magasin peut personnaliser sa boutique
         """
+        from payments.plan_features import has, required_message
         plan = SubscriptionChecker.get_current_plan(store)
         
-        if not plan or not plan.has_custom_page:
-            raise PermissionDenied(
-                "La personnalisation de boutique n'est pas encore proposée par Gaboshop."
-            )
+        if not has(plan, 'custom_page'):
+            raise PermissionDenied(required_message('custom_page', plan))
     
     @staticmethod
     def check_can_sponsor_products(store):
@@ -325,11 +324,10 @@ class SubscriptionChecker:
         """
         VÇ¸rifie si le magasin peut proposer la livraison express.
         """
+        from payments.plan_features import has, required_message
         plan = SubscriptionChecker.get_current_plan(store)
-        if not plan or not getattr(plan, 'can_offer_express_delivery', False):
-            raise PermissionDenied(
-                "La livraison express n'est pas encore proposée par Gaboshop."
-            )
+        if not has(plan, 'express_delivery'):
+            raise PermissionDenied(required_message('express_delivery', plan))
 
     @staticmethod
     def get_service_fee_b2b(store):

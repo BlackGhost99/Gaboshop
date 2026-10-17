@@ -73,7 +73,7 @@ export default function QuoteDetails({ quote = {}, items = [], itemsTotal = 0, d
             )}
             {quote.message && <p className="font-semibold text-amber-700">{quote.message}</p>}
             <Row
-              label="🚚 Frais de livraison"
+              label={delivery.is_express ? '🚚 Frais de livraison express' : '🚚 Frais de livraison'}
               value={quote.delivery_fee != null ? money(quote.delivery_fee) : (loading ? 'Calcul…' : '—')}
               strong
               tone="text-amber-700"

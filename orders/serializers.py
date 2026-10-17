@@ -84,12 +84,13 @@ class OrderSerializer(serializers.ModelSerializer):
     payment_arrangement = serializers.SerializerMethodField()
     delivered_by_store = serializers.SerializerMethodField()
     store_can_cancel = serializers.SerializerMethodField()
+    is_express = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'client', 'client_phone', 'store', 'store_name', 'store_zone',
-            'status', 'status_display', 'items_total', 'delivery_fee', 'delivery_cost', 'delivery_requested', 'vehicle_type', 'operator_fee', 'tax_amount', 'payment_fees',
+            'status', 'status_display', 'items_total', 'delivery_fee', 'delivery_cost', 'delivery_requested', 'delivery_type', 'is_express', 'vehicle_type', 'operator_fee', 'tax_amount', 'payment_fees',
             'total_amount', 'city', 'delivery_address', 'delivery_phone', 'delivery_zone',
             'notes', 'items', 'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
@@ -101,8 +102,12 @@ class OrderSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'confirmed_at', 'delivered_at',
             'delivery_id', 'delivery_status', 'client_received_status', 'client_confirmation_pending', 'client_can_confirm',
             'invoice_breakdown', 'payment_arrangement', 'delivery_cost', 'vehicle_type', 'delivered_by_store',
-            'store_can_cancel', 'client_problem_reported_at', 'client_problem', 'forfait_discount'
+            'store_can_cancel', 'client_problem_reported_at', 'client_problem', 'forfait_discount',
+            'delivery_type', 'is_express'
         ]
+
+    def get_is_express(self, obj):
+        return bool(obj.delivery_requested and obj.delivery_type == 'express')
 
     def get_store_can_cancel(self, obj):
         """Le commerce ne peut plus annuler une commande payée (seul l'admin annule et rembourse)."""
@@ -379,13 +384,19 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         
         delivery_type = attrs.get('delivery_type', 'standard')
         if delivery_type == 'express':
+            # Livraison express : outil du forfait (message honnête via required_message) et seulement avec livraison.
+            if not attrs.get('delivery_requested', True):
+                raise serializers.ValidationError({
+                    'delivery_type': _('La livraison express ne concerne que les commandes livrées : choisissez la livraison ou le mode standard.')
+                })
             try:
                 SubscriptionChecker.check_can_offer_express_delivery(store)
             except PermissionDenied as e:
                 raise serializers.ValidationError({'delivery_type': str(e)})
 
         attrs['items_total'] = total
-        attrs['delivery_fee'] = store.delivery_fee_express if delivery_type == 'express' else store.delivery_fee
+        # Provisoire : le prix de livraison définitif (zone, véhicule, supplément express) est fixé par calculate_totals.
+        attrs['delivery_fee'] = Order(store=store, delivery_type=delivery_type).calculate_delivery_fee()
         attrs['total_amount'] = total + attrs['delivery_fee']
         
         return attrs

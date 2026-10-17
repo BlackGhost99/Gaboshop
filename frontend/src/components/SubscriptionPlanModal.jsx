@@ -182,7 +182,6 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     { id: 'b2b_quotas', label: 'Quotas B2B' },
     { id: 'commissions', label: 'Commissions' },
     { id: 'b2b_features', label: 'Fonctionnalités B2B' },
-    { id: 'b2b_visibility', label: 'Visibilité B2B' },
     { id: 'delivery', label: 'Livraison' },
     { id: 'reports', label: 'Rapports et Exports' },
     { id: 'tools', label: 'Outils boutique' },
@@ -452,42 +451,6 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
               />
               <label htmlFor="can_access_b2b" className="text-sm text-gray-700">Accès approvisionnement B2B</label>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="has_b2b_visibility"
-                checked={formData.has_b2b_visibility}
-                onChange={(e) => updateField('has_b2b_visibility', e.target.checked)}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-              />
-              <label htmlFor="has_b2b_visibility" className="text-sm text-gray-700">Visibilité maximale catalogue B2B <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
-            </div>
-          </div>
-        )}
-
-        {/* B2B Visibility Section */}
-        {activeSection === 'b2b_visibility' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Priorité catalogue B2B <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
-              <input
-                type="number"
-                min="0"
-                value={formData.b2b_catalog_priority}
-                onChange={(e) => updateField('b2b_catalog_priority', parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="b2b_featured_access"
-                checked={formData.b2b_featured_access}
-                onChange={(e) => updateField('b2b_featured_access', e.target.checked)}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-              />
-              <label htmlFor="b2b_featured_access" className="text-sm text-gray-700">Accès prioritaire aux grossistes mis en avant <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
-            </div>
           </div>
         )}
 
@@ -502,7 +465,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('can_offer_express_delivery', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_offer_express" className="text-sm text-gray-700">Peut proposer la livraison express <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="can_offer_express" className="text-sm text-gray-700">Peut proposer la livraison express</label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -512,7 +475,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_advanced_delivery_tracking', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_advanced_tracking" className="text-sm text-gray-700">Suivi détaillé des livraisons (GPS, temps réel) <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="has_advanced_tracking" className="text-sm text-gray-700">Suivi détaillé des livraisons (GPS, temps réel)</label>
             </div>
           </div>
         )}
@@ -631,7 +594,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('can_view_finance_detailed', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_view_finance_detailed" className="text-sm text-gray-700">Peut voir les détails financiers <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="can_view_finance_detailed" className="text-sm text-gray-700">Peut voir les détails financiers</label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -671,7 +634,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         {activeSection === 'support' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Niveau de support <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Niveau de support</label>
               <select
                 value={formData.support_level}
                 onChange={(e) => updateField('support_level', e.target.value)}
@@ -690,7 +653,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_priority_support', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_priority_support" className="text-sm text-gray-700">Support prioritaire <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="has_priority_support" className="text-sm text-gray-700">Support prioritaire</label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -720,7 +683,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_custom_page', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_custom_page" className="text-sm text-gray-700">Page personnalisée <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="has_custom_page" className="text-sm text-gray-700">Page personnalisée</label>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Priorité dans les listings</label>

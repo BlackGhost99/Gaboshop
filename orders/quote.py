@@ -173,7 +173,7 @@ def _payment_lines(flow, method, delivery_by, delivery_requested, items, deliver
 
 def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville', zone_text='',
                 neighborhood_id=None, landmark_id=None, details='', payment_flow='', payment_method='',
-                delivery_by='', missing_products=0):
+                delivery_by='', missing_products=0, delivery_type='standard'):
     """Devis d'un panier (``pairs`` : liste de (produit, quantité)). Ne lève pas : ce qui bloquerait la commande
     est listé dans ``blocking`` pour que le client le voie avant de commander."""
     from api.models import SystemSettings
@@ -226,13 +226,38 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
                 zone = resolve_zone(city, zone_text)
         except ValueError as exc:
             message = str(exc)
-    order = Order(store=store, city=city, delivery_zone=zone, delivery_type='standard',
-                  delivery_requested=bool(delivery_requested))
+    # Livraison express : outil du forfait du commerce (payments/plan_features.py), seulement avec livraison.
+    from payments.plan_features import store_has
+    express_available = bool(delivery_requested and store_has(store, 'express_delivery'))
+    delivery_type = delivery_type if delivery_type in ('standard', 'express') else 'standard'
+    if delivery_type == 'express' and not express_available:
+        blocking.append("La livraison express ne concerne que les commandes livrées : choisissez la livraison ou le mode standard."
+                        if not delivery_requested else
+                        "Ce commerce ne propose pas la livraison express : choisissez la livraison standard.")
+        delivery_type = 'standard'
+
+    def delivery_order(kind):
+        return Order(store=store, city=city, delivery_zone=zone, delivery_type=kind,
+                     delivery_requested=bool(delivery_requested))
+
+    order = delivery_order(delivery_type)
     delivery_fee = None
+    delivery_options = []
     if not delivery_requested:
         delivery_fee = Decimal('0')
     elif not message:
         delivery_fee = _franc(order.quote_delivery(pairs))
+        if express_available:
+            # Les deux prix côte à côte : le client voit ce que coûte l'express avant de choisir.
+            fees_by_type = {delivery_type: delivery_fee}
+            other = 'standard' if delivery_type == 'express' else 'express'
+            fees_by_type[other] = _franc(delivery_order(other).quote_delivery(pairs))
+            delivery_options = [
+                {'type': 'standard', 'label': 'Standard', 'fee': str(fees_by_type['standard']),
+                 'estimate': '2 à 3 h', 'selected': delivery_type == 'standard'},
+                {'type': 'express', 'label': 'Express', 'fee': str(fees_by_type['express']),
+                 'estimate': 'environ 1 h', 'selected': delivery_type == 'express'},
+            ]
     if delivery_requested:
         address = [neighborhood.label] if neighborhood else [p for p in (zone, city) if p]
         if landmark is not None:
@@ -247,6 +272,7 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
             'intercity': bool(delivery_fee is not None and store.city and city and store.city != city),
             'delivered_by': 'Le commerce' if delivery_by == 'store' else 'Un livreur Gaboshop',
             'fee': str(delivery_fee) if delivery_fee is not None else None,
+            'type': delivery_type, 'is_express': delivery_type == 'express',
         })
     else:
         delivery.update({'address': f"Retrait au commerce : {store.address}".strip(), 'fee': '0'})
@@ -361,6 +387,10 @@ def build_quote(store, user, pairs, *, delivery_requested=True, city='Libreville
         'lines': lines,
         'items_total': str(_franc(items_total)),
         'delivery': delivery,
+        # Choix Standard / Express : proposé seulement quand le commerce a l'outil et que la commande est livrée.
+        'express_available': express_available,
+        'delivery_type': delivery_type,
+        'delivery_options': delivery_options,
         'fees': fees,
         'fee_details': fee_details,
         'total': str(total) if total is not None else None,

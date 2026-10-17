@@ -136,10 +136,9 @@ class Order(models.Model):
 	def calculate_delivery_fee(self):
 		"""Calcule les frais de livraison selon le type (fallback statique)"""
 		# Méthode historique gardée comme fallback (utilise store.delivery_fee)
+		self.delivery_fee = self.store.delivery_fee
 		if self.delivery_type == 'express':
-			self.delivery_fee = self.store.delivery_fee_express
-		else:
-			self.delivery_fee = self.store.delivery_fee
+			self.delivery_fee += self.express_supplement()
 		return self.delivery_fee
 
 	def select_vehicle_for_load(self, total_weight, total_length, items_count):
@@ -173,8 +172,8 @@ class Order(models.Model):
 			return to_decimal(SystemSettings.current('default_intercity_surcharge', Decimal('1000.00')))
 
 		def store_delivery_fee():
-			fee = self.store.delivery_fee if self.delivery_type == 'standard' else self.store.delivery_fee_express
-			return to_decimal(fee)
+			# Toujours le tarif standard : le supplément express s'ajoute ensuite, quelle que soit l'origine du tarif.
+			return to_decimal(self.store.delivery_fee)
 		
 		vehicle, multiplier = self.select_vehicle_for_load(total_weight, total_length, items_count)
 		
@@ -231,12 +230,33 @@ class Order(models.Model):
 			if (not (hasattr(self, 'city') and self.city and self.store and self.store.city and self.store.city == self.city)):
 				cost += intercity_surcharge_default()
 		
+		# Livraison express : tarif standard + supplément du commerce.
+		if self.delivery_type == 'express':
+			cost += self.express_supplement()
+
 		# FCFA sans centimes : franc entier
 		cost = cost.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 		self.vehicle_type = vehicle
 		self.delivery_cost = cost
 		return cost
 	
+	def express_supplement(self):
+		"""Supplément de la livraison express, en FCFA : frais express du commerce moins ses frais standard.
+
+		Le tarif standard (zone, véhicule, inter-ville) ne change pas : l'express ajoute seulement ce supplément.
+		Si les frais express du commerce sont inférieurs à ses frais standard (réglage ancien ou oublié), on applique
+		l'écart par défaut réglé par l'admin (Réglages > Livraison : frais express moins frais standard par défaut).
+		"""
+		from decimal import Decimal
+		fee = Decimal(str(self.store.delivery_fee or 0))
+		express = Decimal(str(self.store.delivery_fee_express or 0))
+		if express >= fee:
+			return express - fee
+		from api.models import SystemSettings
+		defaults = SystemSettings.get_settings()
+		return max(Decimal('0'), Decimal(str(defaults.default_express_delivery_fee or 0))
+			- Decimal(str(defaults.default_delivery_fee or 0)))
+
 	def calculate_service_fee(self):
 		"""Frais de service desactives (toujours 0)."""
 		self.service_fee = Decimal('0.00')

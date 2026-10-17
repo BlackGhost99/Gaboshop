@@ -64,7 +64,11 @@ class OrderService:
                     except PermissionDenied as e:
                         raise ValueError(str(e))
 
-                delivery_fee = store.delivery_fee_express if delivery_type == 'express' else store.delivery_fee
+                if delivery_type not in ('standard', 'express'):
+                    raise ValueError("Type de livraison inconnu : choisissez standard ou express.")
+
+                # Frais standard du commerce, plus son supplément pour l'express.
+                delivery_fee = Order(store=store, delivery_type=delivery_type).calculate_delivery_fee()
                 
                 # Créer la commande
                 order = Order.objects.create(

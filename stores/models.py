@@ -1,5 +1,8 @@
 from datetime import datetime, time, timedelta, timezone as dt_timezone
 
+import re
+
+from django.core.exceptions import ValidationError
 from django.db import models
 from users.models import User
 
@@ -53,6 +56,14 @@ def _as_time(value):
 	if isinstance(value, time):
 		return value.replace(tzinfo=None)
 	return time.fromisoformat(str(value))
+
+
+ACCENT_COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
+
+
+def validate_accent_color(value):
+	if value and not ACCENT_COLOR_RE.match(value):
+		raise ValidationError("Couleur invalide : indiquez un code hexadécimal à 6 chiffres, par exemple #1E40AF.")
 
 
 class StoreCategory(models.Model):
@@ -222,6 +233,19 @@ class Store(models.Model):
 	# Images
 	logo = models.ImageField(upload_to='stores/logos/', blank=True, null=True)
 	banner_image = models.ImageField(upload_to='stores/banners/', blank=True, null=True)
+
+	# Page de boutique personnalisée (forfaits avec l'outil « custom_page ») : facultatif.
+	# Les valeurs restent en base si le forfait expire ; la vitrine ne les montre alors plus.
+	accent_color = models.CharField(
+		max_length=7, blank=True, default='', validators=[validate_accent_color],
+		help_text="Couleur d'accent de la vitrine, au format #RRGGBB"
+	)
+	tagline = models.CharField(max_length=120, blank=True, default='', help_text="Message d'accueil ou slogan de la vitrine")
+	about = models.TextField(blank=True, default='', max_length=2000, help_text="Présentation « À propos » de la vitrine")
+	facebook_url = models.URLField(max_length=200, blank=True, default='')
+	instagram_url = models.URLField(max_length=200, blank=True, default='')
+	tiktok_url = models.URLField(max_length=200, blank=True, default='')
+	website_url = models.URLField(max_length=200, blank=True, default='')
     
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
@@ -381,8 +405,8 @@ class Store(models.Model):
 	
 	def can_customize_store(self):
 		"""Vérifie si le magasin peut personnaliser sa boutique"""
-		plan = self.get_current_plan()
-		return plan and plan.has_custom_page
+		from payments.plan_features import has
+		return has(self.get_current_plan(), 'custom_page')
 	
 	def can_sponsor_products(self):
 		"""Vérifie si le magasin peut sponsoriser des produits"""

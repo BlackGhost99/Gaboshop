@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { notifyWarning } from '../../utils/feedback';
 import { formatCurrency } from '../../utils/helpers';
+import { unitPriceForQuantity, lineTotal } from '../../utils/b2bPricing';
 import api from '../../services/api';
 
 /**
@@ -34,9 +35,7 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 
 	// Calculer les totaux
 	const calculateSubtotal = () => {
-		return cartItems.reduce((total, item) => {
-			return total + (item.b2b_price || item.price) * item.quantity;
-		}, 0);
+		return cartItems.reduce((total, item) => total + lineTotal(item), 0);
 	};
 
 	const calculateTotal = () => {
@@ -113,12 +112,12 @@ const B2BOrderForm = ({ wholesaler, cartItems, onSubmit, onCancel, loading }) =>
 								<div>
 									<p className="font-bold text-sm text-black">{item.name}</p>
 									<p className="text-xs text-black font-bold">
-										{formatCurrency(item.b2b_price || item.price)} × {item.quantity}
+										{formatCurrency(unitPriceForQuantity(item, item.quantity))} × {item.quantity}
 									</p>
 								</div>
 							</div>
 							<p className="font-bold text-black text-lg">
-								{formatCurrency((item.b2b_price || item.price) * item.quantity)}
+								{formatCurrency(lineTotal(item))}
 							</p>
 						</div>
 					))}

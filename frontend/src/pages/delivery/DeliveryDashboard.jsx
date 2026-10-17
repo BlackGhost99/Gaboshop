@@ -6,6 +6,7 @@ import { PushPrompt } from '../../components/PushControls';
 import { logout } from '../../utils/session';
 import { statusLabel } from '../../utils/notificationLabels';
 import DeliveryMap from '../../components/map/DeliveryMap';
+import ExpressBadge from '../../components/ExpressBadge';
 import useOrderTracking from '../../hooks/useOrderTracking';
 import api from '../../services/api';
 
@@ -696,6 +697,7 @@ const DeliveryDashboard = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold text-gray-900">Commande #{delivery.order_number}</p>
+                            <ExpressBadge show={delivery.is_express} />
                             <span className="text-xs text-gray-500">{delivery.store_name}</span>
                           </div>
                           <p className="text-xs text-gray-500 mt-1">{delivery.delivery_address}</p>
@@ -746,7 +748,7 @@ const DeliveryDashboard = () => {
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <h4 className="text-lg font-semibold text-gray-900">
-                              Commande #{delivery.order_number}
+                              Commande #{delivery.order_number} <ExpressBadge show={delivery.is_express} />
                             </h4>
                             <p className="text-sm text-gray-600 mt-1">
                               {delivery.store_name}

@@ -3,14 +3,18 @@ from datetime import time
 from decimal import Decimal
 from unittest import mock
 
+from datetime import timedelta
+
 from django.core.cache import cache
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from api.models import SystemSettings
 from delivery.models import City, Delivery, Neighborhood
 from orders.models import Order
 from payments.configuration import DEFAULT_PAYMENT_POLICY
+from payments.models import StoreSubscription, SubscriptionPlan
 from products.models import Product, ProductCategory
 from stores.models import Store, StoreCategory
 from users.models import User
@@ -30,6 +34,11 @@ class CarteLivreurTests(TestCase):
                                           delivery_fee=Decimal('2000'), is_verified=True,
                                           latitude=Decimal('0.392000'), longitude=Decimal('9.450000'),
                                           opening_time=time(0, 0), closing_time=time(23, 59))
+        # La carte en direct est un outil du forfait Pro (case « suivi en temps réel ») : voir test_express_suivi_2026_10_17.
+        pro = SubscriptionPlan.objects.get(plan_type='pro')
+        SubscriptionPlan.objects.filter(pk=pro.pk).update(has_advanced_delivery_tracking=True)
+        StoreSubscription.objects.create(store=self.store, plan=pro, plan_name=pro.name, monthly_fee=pro.price,
+                                         status='active', end_date=timezone.now().date() + timedelta(days=20))
         s = SystemSettings.get_settings()
         s.payment_policy = DEFAULT_PAYMENT_POLICY
         s.save(update_fields=['payment_policy'])

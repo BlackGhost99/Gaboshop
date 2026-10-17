@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import WholesalerList from './WholesalerList';
 import WholesalerDetail from './WholesalerDetail';
 import B2BProductList from './B2BProductList';
+import B2BBuyerCapNotice from './B2BBuyerCapNotice';
 import B2BCart from './B2BCart';
 import B2BCartSummary from './B2BCartSummary';
 import B2BOrderForm from './B2BOrderForm';
@@ -23,6 +24,7 @@ const B2BProcurementEmbedded = ({ store }) => {
 	const [selectedWholesaler, setSelectedWholesaler] = useState(null);
 	const [products, setProducts] = useState([]);
 	const [categories, setCategories] = useState([]);
+	const [catalogInfo, setCatalogInfo] = useState(null);
 	const [selectedCategory, setSelectedCategory] = useState(null);
 	const [cart, setCart] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -70,6 +72,7 @@ const B2BProcurementEmbedded = ({ store }) => {
 				if (response.success) {
 					setProducts(response.data?.products || []);
 					setCategories(response.data?.categories || []);
+					setCatalogInfo(response.data?.wholesaler || null);
 					if (response.data?.pagination) {
 						setPagination(prev => ({
 							...prev,
@@ -135,7 +138,7 @@ const B2BProcurementEmbedded = ({ store }) => {
 		if (!item) return;
 
 		// Valider la quantité minimale
-		const minQuantity = item.min_order_quantity || 1;
+		const minQuantity = item.min_quantity || item.min_order_quantity || 1;
 		const finalQuantity = Math.max(newQuantity, minQuantity);
 
 		// Vérifier le stock
@@ -297,6 +300,8 @@ const B2BProcurementEmbedded = ({ store }) => {
 
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 						<div className="lg:col-span-2">
+							<B2BBuyerCapNotice info={catalogInfo} />
+
 							{/* Filtres & Recherche */}
 							<div className="mb-4 bg-white p-4 rounded-lg shadow flex flex-col md:flex-row items-center gap-4">
 								<div className="flex-1 w-full">

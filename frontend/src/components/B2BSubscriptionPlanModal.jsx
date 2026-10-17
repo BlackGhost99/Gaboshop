@@ -272,7 +272,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                   onChange={(e) => updateField('is_popular', e.target.checked)}
                   className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
-                <label htmlFor="is_popular" className="text-sm text-gray-700">Populaire <span className="text-gray-400">(sans effet pour l'instant)</span></label>
+                <label htmlFor="is_popular" className="text-sm text-gray-700">Populaire</label>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Ordre d'affichage</label>
@@ -304,7 +304,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Max magasins B2C clients (null = illimité) <span className="font-normal text-gray-400">(sans effet pour l'instant)</span></label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Max magasins B2C clients (null = illimité)</label>
                 <input
                   type="number"
                   min="0"
@@ -366,7 +366,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                 onChange={(e) => updateField('can_offer_bulk_discounts', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_offer_bulk_discounts" className="text-sm text-gray-700">Peut proposer des remises pour achats en gros <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="can_offer_bulk_discounts" className="text-sm text-gray-700">Peut proposer des remises pour achats en gros</label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -406,7 +406,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                 onChange={(e) => updateField('has_priority_support', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_priority_support" className="text-sm text-gray-700">Support prioritaire <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="has_priority_support" className="text-sm text-gray-700">Support prioritaire</label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -416,7 +416,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                 onChange={(e) => updateField('can_create_promotions', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_create_promotions" className="text-sm text-gray-700">Peut créer des promotions B2B <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="can_create_promotions" className="text-sm text-gray-700">Peut créer des promotions B2B</label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -426,7 +426,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                 onChange={(e) => updateField('has_api_access', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_api_access" className="text-sm text-gray-700">Accès à l'API pour intégrations <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="has_api_access" className="text-sm text-gray-700">Accès à l'API pour intégrations</label>
             </div>
           </div>
         )}
@@ -471,7 +471,7 @@ const B2BSubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess })
                 onChange={(e) => updateField('can_view_finance_detailed', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_view_finance_detailed" className="text-sm text-gray-700">Peut voir les détails financiers <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
+              <label htmlFor="can_view_finance_detailed" className="text-sm text-gray-700">Peut voir les détails financiers</label>
             </div>
             <div className="flex items-center gap-2">
               <input

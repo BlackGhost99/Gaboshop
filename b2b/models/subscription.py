@@ -196,10 +196,16 @@ class B2BSubscriptionPlan(models.Model):
                 'enabled': True
             })
         
-        # Aucune limite de commerces clients n'est appliquée par le code : on ne promet pas de plafond.
+        # Le plafond est appliqué à la commande (b2b/services/permissions.py check_b2c_buyer_quota).
         if not self.max_b2c_buyers:
             features.append({
                 'title': "Clients B2C illimités",
+                'category': 'limits',
+                'enabled': True
+            })
+        else:
+            features.append({
+                'title': f"Jusqu'à {self.max_b2c_buyers} commerces clients",
                 'category': 'limits',
                 'enabled': True
             })
