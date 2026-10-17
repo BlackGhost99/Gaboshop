@@ -22,7 +22,7 @@ from .products import (
 )
 from .products import AllProductCategoryListView
 from .orders import (
-    OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView,
+    OrderCreateView, OrderListView, OrderDetailView, OrderStatusUpdateView, StoreOrderActivityView,
     ClientConfirmDeliveryView, OrderSelectVehicleView, ClientReportProblemView, DeliveryQuoteView, OrderInvoiceView
 )
 from .payments import (
@@ -343,6 +343,7 @@ urlpatterns = [
     path('orders/delivery-quote/', DeliveryQuoteView.as_view(), name='order-delivery-quote'),
     path('orders/<int:order_id>/invoice/', OrderInvoiceView.as_view(), name='order-invoice'),
     path('orders/<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
+    path('orders/<int:order_id>/activity/', StoreOrderActivityView.as_view(), name='store-order-activity'),
     path('orders/<int:order_id>/status/', OrderStatusUpdateView.as_view(), name='order-status-update'),
     path('orders/<int:order_id>/confirm-delivery/', ClientConfirmDeliveryView.as_view(), name='client-confirm-delivery'),
     path('orders/<int:order_id>/report-problem/', ClientReportProblemView.as_view(), name='client-report-problem'),
