@@ -268,9 +268,19 @@ class OrderStatusUpdateView(APIView):
 					if not can_dispatch(order):
 						return Response({'success': False, 'error': {'code': 409, 'message': 'Le paiement requis avant expédition n’est pas confirmé.'}}, status=status.HTTP_409_CONFLICT)
 				previous_status = order.status
-				serializer.save()
-				order.refresh_from_db()
-				note_store_cancel(request.user, order, previous_status)
+				# Statut et trace d'audit doivent être enregistrés ensemble.
+				with transaction.atomic():
+					serializer.save()
+					order.refresh_from_db()
+					note_store_cancel(request.user, order, previous_status)
+					if order.status != previous_status:
+						from core.models import AuditLog
+						AuditLog.log_action(
+							'order_cancelled' if order.status == 'cancelled' else 'order_status_change',
+							request.user, 'order', order.id,
+							old_value=previous_status, new_value=order.status,
+							reason='Action effectuée depuis la gestion de commande.',
+						)
 
 				# Auto-assigner dès que le statut passe à "ready" (sauf si le commerce livre lui-même)
 				if order.status == 'ready' and not getattr(getattr(order, 'payment_arrangement', None), 'delivery_method', '') == 'store':
