@@ -16,7 +16,10 @@ PRO_TOOLS = {'has_statistics': True, 'can_view_detailed_reports': True, 'can_exp
              'can_import_products': True, 'has_stock_alerts': True, 'can_create_promotions': True,
              # 17 oct. 2026 : les options marketing deviennent réelles (support, page, express, suivi, finance détaillée).
              'has_priority_support': True, 'support_level': 'prioritaire', 'has_custom_page': True,
-             'can_offer_express_delivery': True, 'has_advanced_delivery_tracking': True, 'can_view_finance_detailed': True}
+             'can_offer_express_delivery': True, 'has_advanced_delivery_tracking': True, 'can_view_finance_detailed': True,
+             # 17 oct. 2026 (demande du propriétaire) : le Pro commande chez les grossistes, avec une limite ; Business sans limite.
+             'can_access_b2b': True, 'max_b2b_suppliers': 3, 'max_b2b_monthly_orders': 10}
+PRO_B2B_LIMITS = {'max_b2b_suppliers': 3, 'max_b2b_monthly_orders': 10}
 B2B_PRO_TOOLS = {'can_view_detailed_reports': True, 'can_export_finance_csv': True, 'can_export_finance_pdf': True,
                  'can_import_products': True, 'has_stock_alerts': True,
                  'can_offer_bulk_discounts': True, 'can_create_promotions': True, 'has_priority_support': True,
@@ -31,6 +34,7 @@ B2C_DEFAULTS = {
     'pro': {'names': ('Pro',), 'price': Decimal('10000'), 'max_products': 200, **PRO_TOOLS,
             'features_json': PRO_FEATURES, 'description': 'Pour les commerces qui veulent vendre plus.'},
     'business': {'names': ('Business',), 'price': Decimal('50000'), 'max_products': None, **PRO_TOOLS,
+                 'max_b2b_suppliers': None, 'max_b2b_monthly_orders': None,
                  'support_level': 'dedie', 'is_available': False,
                  'features_json': BUSINESS_FEATURES, 'description': BUSINESS_DESCRIPTION},
 }

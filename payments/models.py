@@ -470,7 +470,13 @@ class SubscriptionPlan(models.Model):
 			features.append("Statistiques de base : ventes du jour et du mois")
 		features.extend(tool_lines(self))
 		if self.can_access_b2b:
-			features.append("Achat de stock auprès des grossistes (B2B)")
+			limits = []
+			if self.max_b2b_suppliers:
+				limits.append(f"{self.max_b2b_suppliers} grossistes")
+			if self.max_b2b_monthly_orders:
+				limits.append(f"{self.max_b2b_monthly_orders} commandes par mois")
+			features.append("Achat de stock auprès des grossistes (B2B)"
+			                + (f" : jusqu'à {' et '.join(limits)}" if limits else " : sans limite"))
 		if self.priority_listing > 0:
 			features.append("Meilleure visibilité : votre boutique et vos produits passent devant")
 		if self.commission_reduction_percent > 0 and self.plan_type != 'business':
