@@ -247,6 +247,51 @@ def recent_buyer_ids(wholesaler_store, days=30):
 	)
 
 
+def check_buyer_plan_limits(buyer_store, wholesaler_store):
+	"""
+	Limites d'achat en gros du forfait d'un commerce acheteur : nombre de grossistes différents (30 jours) et
+	commandes B2B du mois. Un grossiste déjà fournisseur reste toujours servi pour le plafond de fournisseurs.
+	Sans limite (null) ou pour un grossiste acheteur, tout passe.
+
+	Returns:
+		tuple: (bool, str) - (autorisé, message pour le commerce acheteur)
+	"""
+	from datetime import timedelta
+	from django.utils import timezone
+	from orders.models import Order
+	from payments.plan_features import plan_for_sale
+	from b2b.models import B2BSubscriptionPlan
+	plan = buyer_store.get_current_plan() if buyer_store is not None else None
+	if plan is None or isinstance(plan, B2BSubscriptionPlan) or buyer_store.is_b2b:
+		return True, ''
+	max_suppliers = getattr(plan, 'max_b2b_suppliers', None)
+	max_orders = getattr(plan, 'max_b2b_monthly_orders', None)
+	if not max_suppliers and not max_orders:
+		return True, ''
+	now = timezone.now()
+	orders = Order.objects.filter(source_store=buyer_store, is_b2b=True).exclude(status__in=('cancelled', 'refunded'))
+
+	def lifted_by(accepts):
+		target = plan_for_sale(plan, accepts)
+		if target is None:
+			return "Aucun forfait en vente ne lève cette limite pour le moment."
+		return f"Passez à {target.name} dans « Mon forfait » pour la lever."
+
+	if max_suppliers:
+		suppliers = set(orders.filter(created_at__gte=now - timedelta(days=30)).values_list('store_id', flat=True))
+		if wholesaler_store.id not in suppliers and len(suppliers) >= max_suppliers:
+			return False, (f"Votre forfait {plan.name} permet de commander chez {max_suppliers} grossistes différents "
+			               f"sur 30 jours, et vous les avez atteints. Vous pouvez encore commander chez vos fournisseurs habituels. "
+			               + lifted_by(lambda c: c.can_access_b2b and (c.max_b2b_suppliers is None or c.max_b2b_suppliers > max_suppliers)))
+	if max_orders:
+		month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+		if orders.filter(created_at__gte=month_start).count() >= max_orders:
+			return False, (f"Votre forfait {plan.name} permet {max_orders} commandes en gros par mois, et vous les avez "
+			               f"atteintes. Elles reviennent le 1er du mois prochain. "
+			               + lifted_by(lambda c: c.can_access_b2b and (c.max_b2b_monthly_orders is None or c.max_b2b_monthly_orders > max_orders)))
+	return True, ''
+
+
 def check_b2c_buyer_quota(wholesaler_store, buyer_store=None):
 	"""
 	Plafond de commerces clients du forfait grossiste (max_b2c_buyers, commerces distincts sur 30 jours).

@@ -254,10 +254,13 @@ def validate_b2b_order(order_items, wholesaler, buyer_store):
 		tuple: (bool, str, dict) - (valide, message d'erreur, données calculées)
 	"""
 	# Vérifier les permissions
-	from b2b.services.permissions import can_purchase_from_wholesaler
+	from b2b.services.permissions import can_purchase_from_wholesaler, check_buyer_plan_limits
 	can_purchase, error_msg = can_purchase_from_wholesaler(buyer_store, wholesaler)
 	if not can_purchase:
 		return False, error_msg, None
+	within_limits, limit_msg = check_buyer_plan_limits(buyer_store, wholesaler)
+	if not within_limits:
+		return False, limit_msg, None
 	
 	# Vérifier qu'il y a des items
 	if not order_items:
