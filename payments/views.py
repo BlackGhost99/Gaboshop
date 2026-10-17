@@ -1017,7 +1017,7 @@ class SubscriptionPlansAPIView(APIView):
         for plan in plans_data:
             price_value = float(plan.get('price') or 0)
             plan['actual_price'] = price_value
-            plan['price_label'] = f"{int(price_value)} F/mois" if price_value > 0 else "Gratuit"
+            plan['price_label'] = f"{int(price_value):,} F/mois".replace(',', ' ') if price_value > 0 else "Gratuit"
 
         current_plan = None
         paid_sub = store.get_active_subscription() if store else None
