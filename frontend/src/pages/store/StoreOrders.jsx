@@ -5,7 +5,7 @@ import { describeOptions } from '../../utils/productOptions';
 import { notifyError, notifySuccess } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { getOrders, getOrderDetail } from '../../services/dashboardService';
+import { getOrders, getOrderDetail, getStoreOrderActivity } from '../../services/dashboardService';
 import { updateOrderStatus } from '../../services/orderService';
 import { formatCurrency, formatDateTime } from '../../utils/helpers';
 
@@ -74,6 +74,8 @@ const StoreOrders = () => {
   const [untilDate, setUntilDate] = useState('');
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [activity, setActivity] = useState(null);
+  const [activityError, setActivityError] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [page, setPage] = useState(1);
   const [nextPage, setNextPage] = useState(false);
@@ -157,8 +159,17 @@ const StoreOrders = () => {
 
   const openDetail = async (orderId) => {
     setDetailLoading(true);
+    setActivity(null);
+    setActivityError(false);
     try {
       const res = await getOrderDetail(orderId);
+      // On récupère l'historique uniquement après le contrôle d'accès sur la commande.
+      if (res.success) {
+        getStoreOrderActivity(orderId).then((timeline) => {
+          if (timeline.success) setActivity(timeline.data);
+          else setActivityError(true);
+        }).catch(() => setActivityError(true));
+      }
       if (res.success) {
         setDetail(res.data || res);
       } else {
@@ -467,10 +478,41 @@ const StoreOrders = () => {
                 </div>
                 <p className="mt-3 text-xs text-gray-600">
                   Ces dates proviennent des enregistrements réels de la commande.
-                  L'identité de l'employé ayant préparé ou encaissé la vente n'est pas encore historisée :
-                  elle ne peut pas être reconstituée automatiquement.
+                  L'historique ci-dessous identifie les comptes connectés pour les nouvelles actions.
+                  Il ne peut pas distinguer deux employés qui partagent le même identifiant.
                 </p>
               </div>
+
+              <section className="rounded-lg border border-indigo-200 bg-white p-4">
+                <h4 className="font-bold text-gray-900">Historique des actions et responsables</h4>
+                {activityError && <p className="mt-2 text-sm text-red-700">Impossible de charger l'historique des actions.</p>}
+                {!activity && !activityError && <p className="mt-2 text-sm text-gray-600">Chargement du journal…</p>}
+                {activity && (
+                  <>
+                    <p className="mt-2 text-xs text-gray-600">{activity.shared_account_notice}</p>
+                    <ol className="mt-3 space-y-3 border-l-2 border-indigo-100 pl-4">
+                      {activity.events?.map((event) => (
+                        <li key={event.id} className="relative rounded-md bg-gray-50 p-3 text-sm">
+                          <span className="absolute -left-[22px] top-4 h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                          <p className="font-semibold text-gray-900">{event.actor}</p>
+                          <p className="text-xs text-gray-600">{formatDateTime(event.at)} · {event.actor_role || 'Non identifié'}</p>
+                          <p className="mt-1 text-gray-800">
+                            {event.type === 'order_created' ? 'Commande créée'
+                              : event.type === 'order_cancelled' ? 'Commande annulée'
+                              : event.type === 'order_status_change' ? 'Statut modifié'
+                              : event.type === 'payment_confirmed' ? 'Paiement confirmé'
+                              : event.type === 'payment_receipt' ? 'Paiement déclaré'
+                              : event.type === 'payment_adjustment' ? 'Ajustement / remboursement'
+                              : event.type}
+                            {event.old_status && event.new_status && ` : ${STATUS_MAP[event.old_status]?.label || event.old_status} → ${STATUS_MAP[event.new_status]?.label || event.new_status}`}
+                          </p>
+                          {event.note && <p className="mt-1 text-xs text-gray-600">{event.note}</p>}
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                )}
+              </section>
 
               <section className="rounded-lg border border-gray-200 p-4">
                 <h4 className="font-bold text-gray-900">Récapitulatif du montant facturé</h4>
