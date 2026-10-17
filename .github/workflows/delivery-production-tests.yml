@@ -1,0 +1,44 @@
+name: Livraisons production — validation
+on:
+  push:
+    branches:
+      - main
+      - feat/delivery-wait-cancellation-prod-20261016
+    paths:
+      - 'api/v1/delivery_admin.py'
+      - 'api/v1/orders_admin.py'
+      - 'core/scheduled.py'
+      - 'frontend/src/components/admin/delivery/DeliveryOperations.jsx'
+      - 'orders/tests/test_admin_cancel_wait_2026_10_16.py'
+      - '.github/workflows/delivery-production-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  django-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DJANGO_SECRET_KEY: ci-only-delivery-production-tests-20261016
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py test orders.tests.test_admin_cancel_wait_2026_10_16 orders.tests.test_delivery notifications.test_email_only_2026_10_16 --noinput -v 2
+  react-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build

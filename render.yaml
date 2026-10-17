@@ -18,6 +18,12 @@ services:
         value: "0"
       - key: DJANGO_SECRET_KEY
         generateValue: true
+      # Aucun SMS ou WhatsApp sortant payant : e-mail uniquement.
+      - key: NOTIFICATION_CHANNEL_MODE
+        value: email_only
+      # Clé API Brevo à configurer directement dans Render Environment.
+      - key: BREVO_API_KEY
+        sync: false
       - key: DJANGO_ALLOWED_HOSTS
         value: .onrender.com
       - key: DJANGO_BEHIND_PROXY

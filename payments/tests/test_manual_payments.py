@@ -56,6 +56,9 @@ class ManualPaymentWorkflowTests(TestCase):
         commission = arrangement.obligations.get(kind='commission')
         commission.status = 'unpaid'
         commission.save()
+        # Une commission n'est exigible que si la commande est effectivement livrée.
+        arrangement.order.status = 'delivered'
+        arrangement.order.save(update_fields=['status', 'updated_at'])
         first = create_settlement(self.store, '500', 'cash', self.manager, reference='CASH-1')
         confirm_settlement(first, self.admin)
         commission.refresh_from_db()
@@ -161,6 +164,8 @@ class ManualPaymentWorkflowTests(TestCase):
         commission = arrangement.obligations.get(kind='commission')
         commission.status = 'unpaid'
         commission.save()
+        arrangement.order.status = 'delivered'
+        arrangement.order.save(update_fields=['status', 'updated_at'])
         settlement = create_settlement(self.store, '100', 'cash', self.manager, reference='SELF-SETTLEMENT')
         with self.assertRaises(ValidationError):
             confirm_settlement(settlement, self.manager)
@@ -196,6 +201,7 @@ class ManualPaymentWorkflowTests(TestCase):
         create_arrangement(first, 'courier_cash', 'cash', user=self.client)
         # La commission devient une dette quand la commande est livrée (avant, elle n'est pas exigible).
         first.status = 'delivered'
+        first.save(update_fields=['status', 'updated_at'])
         sync_on_order_status(first)
         with self.assertRaises(ValidationError):
             create_arrangement(self.make_order(), 'courier_cash', 'cash', user=self.client)

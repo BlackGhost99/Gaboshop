@@ -46,8 +46,8 @@ export const logout = () => {
 };
 
 // Commandes
-export const getOrders = async () => {
-  const response = await api.get('/orders/');
+export const getOrders = async (params = {}) => {
+  const response = await api.get('/orders/', { params });
   const payload = response.data;
   // 1) Format standard { success, data }
   if (payload && typeof payload === 'object' && 'success' in payload) {

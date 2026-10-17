@@ -80,7 +80,8 @@ def ensure_credit_limit(store, additional_commission=Decimal('0')):
     # Seules les commissions exigibles (commande livrée) comptent : des commandes passées puis jamais
     # livrées (par un concurrent malveillant, par exemple) ne bloquent plus le commerce.
     debts = PaymentObligation.objects.filter(
-        arrangement__store=store, kind__in=PLATFORM_DEBT_KINDS, payer='store'
+        arrangement__store=store, arrangement__order__status='delivered',
+        kind__in=PLATFORM_DEBT_KINDS, payer='store'
     ).exclude(status__in=['paid', 'cancelled', 'waived', 'not_due']).prefetch_related('receipts', 'adjustments')
     outstanding = sum((debt.remaining_amount for debt in debts), Decimal('0'))
     if outstanding + Decimal(additional_commission) > Decimal(policy['merchant_debt_limit']):
@@ -232,6 +233,11 @@ def payment_summary(value, user=None):
             item['i_am_payer'] = user.id == role_user_id(obligation, obligation.payer)
             item['i_am_payee'] = user.id == role_user_id(obligation, obligation.payee)
             item['receipts'] = [receipt_payload(r) for r in obligation.receipts.all()]
+            item['adjustments'] = [{
+                'id': adj.id, 'type': adj.adjustment_type, 'status': adj.status,
+                'amount': str(adj.amount), 'reference': adj.reference,
+                'reason': adj.reason, 'created_at': adj.created_at,
+            } for adj in obligation.adjustments.all()]
         obligations.append(item)
     order = arrangement.order
     live = ((arrangement.store.payment_preferences or {}).get('instructions') or {}).get(arrangement.method, '')
@@ -351,7 +357,9 @@ def create_settlement(store, amount, method, user, reference='', comment='', pro
         raise ValidationError('Le montant doit être positif.')
     settlement = CommissionSettlement.objects.create(store=store, amount=amount, method=method, reference=reference, comment=comment, proof=proof, collected_by=user)
     remaining = amount
-    debts = PaymentObligation.objects.select_for_update().filter(arrangement__store=store, kind='commission').exclude(status__in=['paid', 'cancelled', 'waived']).order_by('due_at', 'id')
+    debts = PaymentObligation.objects.select_for_update().filter(
+        arrangement__store=store, arrangement__order__status='delivered', kind='commission'
+    ).exclude(status__in=['paid', 'cancelled', 'waived', 'not_due']).order_by('due_at', 'id')
     for debt in debts:
         # Déjà réservé par un autre règlement encore à confirmer : pas alloué deux fois.
         reserved = SettlementAllocation.objects.filter(obligation=debt, settlement__status='pending_confirmation').exclude(settlement=settlement).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -427,29 +435,70 @@ def record_refund(order, component, amount, user, reference, reason=''):
 DUE_STATUSES = ('unpaid', 'overdue', 'partially_paid')
 
 
-def platform_debts(party, target):
-    """Dettes exigibles (commande livrée) d'un commerce ou d'un livreur envers Gaboshop, les plus anciennes d'abord."""
-    qs = PaymentObligation.objects.filter(kind__in=PLATFORM_DEBT_KINDS, payee='platform', payer=party)
+def _platform_obligations(party, target):
+    """Dossiers par bénéficiaire. Le solde comptable est conservé, sans le confondre avec une dette exigible."""
+    qs = PaymentObligation.objects.filter(
+        kind__in=PLATFORM_DEBT_KINDS, payee='platform', payer=party,
+    )
     if party == 'store':
         qs = qs.filter(arrangement__store=target)
     elif party == 'courier':
         qs = qs.filter(arrangement__order__delivery__delivery_agent=target)
     else:
         raise ValidationError('Débiteur inconnu.')
-    debts = list(qs.select_related('arrangement__order').prefetch_related('receipts', 'adjustments').order_by('due_at', 'id'))
+    return qs.select_related('arrangement__order', 'arrangement__store').prefetch_related(
+        'receipts', 'adjustments', 'arrangement__order__items__product',
+    ).order_by('due_at', 'id')
+
+
+def platform_debts(party, target):
+    """Vraies dettes exigibles au titre d'une commande livrée, jamais les commandes annulées/en attente."""
+    debts = list(_platform_obligations(party, target).filter(arrangement__order__status='delivered'))
+    for debt in debts:
+        _refresh_status(debt)
+    return [d for d in debts if d.status in DUE_STATUSES and d.remaining_amount > 0]
+
+
+def platform_debts_under_review(party, target):
+    """Anciennes écritures anormales ou en attente : les rendre visibles sans exiger de paiement."""
+    debts = list(_platform_obligations(party, target).exclude(arrangement__order__status='delivered'))
     for debt in debts:
         _refresh_status(debt)
     return [d for d in debts if d.status in DUE_STATUSES and d.remaining_amount > 0]
 
 
 def debt_summary(debts):
+    def describe(d):
+        order = d.arrangement.order
+        items = [
+            {
+                'name': item.product.name if item.product_id else 'Produit indisponible',
+                'quantity': item.quantity,
+                'unit_price': str(item.unit_price),
+                'subtotal': str(item.subtotal),
+            }
+            for item in order.items.all()
+        ]
+        return {
+            'obligation_id': d.id, 'kind': d.kind,
+            'order_id': order.id, 'order_number': order.order_number,
+            'order_status': order.status, 'created_at': order.created_at,
+            'delivered_at': order.delivered_at,
+            'payment_flow': d.arrangement.flow, 'payment_method': d.arrangement.method,
+            'items': items, 'items_total': str(order.items_total),
+            'delivery_fee': str(order.delivery_fee),
+            'order_total': str(order.total_amount),
+            'commission_total': str(d.arrangement.commission_amount),
+            'amount': str(d.amount), 'paid_to_platform': str(d.received_amount),
+            'credited': str(d.refunded_amount),
+            'remaining': str(d.remaining_amount), 'status': d.status,
+            'due_at': d.due_at,
+        }
+
     return {
         'total_due': str(sum((d.remaining_amount for d in debts), Decimal('0'))),
         'overdue': str(sum((d.remaining_amount for d in debts if d.status == 'overdue'), Decimal('0'))),
-        'items': [{
-            'obligation_id': d.id, 'kind': d.kind, 'order_number': d.arrangement.order.order_number,
-            'amount': str(d.amount), 'remaining': str(d.remaining_amount), 'status': d.status, 'due_at': d.due_at,
-        } for d in debts],
+        'items': [describe(d) for d in debts],
     }
 
 

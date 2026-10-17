@@ -320,13 +320,13 @@ def held_funds(store, limit=10):
         elif payout:
             stage = 'Versement en préparation'
         elif store.is_trusted:
-            stage = 'Versé dès la préparation de la commande'
+            stage = 'Versement possible après préparation, sous réserve de vérification'
         else:
-            stage = 'Versé quand le client confirme la réception (ou 48 h après la livraison)'
+            stage = 'Versement à rapprocher après confirmation de livraison'
         total += amount
         count += 1
         if len(items) < limit:
-            items.append({'order_number': order.order_number, 'amount': float(amount), 'stage': stage})
+            items.append({'order_id': order.id, 'order_number': order.order_number, 'created_at': order.created_at, 'amount': float(amount), 'stage': stage})
     return {
         'total': float(total), 'count': count, 'items': items,
         'frozen': bool(store.payouts_frozen), 'trusted': bool(store.is_trusted),

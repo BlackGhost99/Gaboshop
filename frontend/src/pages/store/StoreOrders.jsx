@@ -44,21 +44,56 @@ const ADVANCE_DETAILS = {
   in_transit: 'Le client est prévenu que vous arrivez. Il confirmera la réception dans son application.',
 };
 
+const PAYMENT_FLOW_NAMES = {
+  direct_split: 'Paiement direct : commerce et livreur',
+  store_collects_all: 'Paiement intégral au commerce',
+  courier_cash: 'Espèces encaissées par un livreur',
+  platform_online: 'Paiement SingPay',
+};
+const PAYMENT_METHOD_NAMES = {
+  cash: 'Espèces', airtel_money: 'Airtel Money', moov_money: 'Moov Money',
+  bank_transfer: 'Virement',
+};
+const ROLE_NAMES = { client: 'Client', store: 'Commerce', courier: 'Livreur', platform: 'Gaboshop' };
+const DEBT_KIND_NAMES = {
+  products: 'Articles', delivery: 'Livraison', delivery_collection: 'Frais de livraison',
+  courier_remittance: 'Fonds remis au commerce', commission: 'Commission Gaboshop',
+  delivery_margin: 'Marge livraison Gaboshop', failed_trip: 'Course non aboutie',
+};
+const orderArticlePreview = (order) => (order.items || [])
+  .map((item) => `${item.product_name || 'Article'} × ${item.quantity}`)
+  .join(' · ');
+
 const StoreOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState(null);
-  const [activeFilter, setActiveFilter] = useState('pending');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [untilDate, setUntilDate] = useState('');
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
+  const [page, setPage] = useState(1);
+  const [nextPage, setNextPage] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (pageNumber = 1) => {
     try {
-      setLoading(true);
-      const res = await getOrders();
+      if (pageNumber === 1) setLoading(true);
+      else setLoadingMore(true);
+      const res = await getOrders({
+        page: pageNumber, search: search.trim(),
+        date_from: fromDate, date_to: untilDate,
+        status: FILTERS[activeFilter]?.statuses?.join(',') || '',
+      });
       if (res.success) {
-        setOrders(res.data || []);
+        setOrders((previous) => pageNumber === 1 ? (res.data || []) : [...previous, ...(res.data || [])]);
+        setNextPage(Boolean(res.meta?.next));
+        setTotalCount(res.meta?.count ?? (res.data || []).length);
+        setPage(pageNumber);
         setError(null);
       } else {
         const detail = res.error?.details;
@@ -71,12 +106,18 @@ const StoreOrders = () => {
       setError(`Erreur: ${msg}`);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
-    // Venu d'une notification (« Voir la commande ») : on ouvre directement cette commande.
+    // Rechercher aussi dans les pages anciennes de la base, pas seulement les 20 visibles.
+    const task = setTimeout(() => fetchOrders(1), 300);
+    return () => clearTimeout(task);
+  }, [search, fromDate, untilDate, activeFilter]);
+
+  useEffect(() => {
+    // Accès depuis une notification ou depuis une ligne du relevé Gaboshop.
     const wanted = new URLSearchParams(window.location.search).get('order');
     if (wanted) openDetail(wanted);
   }, []);
@@ -95,9 +136,19 @@ const StoreOrders = () => {
 
   const filteredOrders = useMemo(() => {
     const filter = FILTERS[activeFilter];
-    if (!filter || filter.statuses.length === 0) return orders;
-    return orders.filter((o) => filter.statuses.includes(o.status));
-  }, [orders, activeFilter]);
+    const query = search.trim().toLocaleLowerCase('fr');
+    return orders.filter((order) => {
+      if (filter?.statuses?.length && !filter.statuses.includes(order.status)) return false;
+      if (query && ![
+        order.order_number, order.client_phone, order.status_display,
+        orderArticlePreview(order),
+      ].some((value) => String(value || '').toLocaleLowerCase('fr').includes(query))) return false;
+      const day = order.created_at ? String(order.created_at).slice(0, 10) : '';
+      if (fromDate && day < fromDate) return false;
+      if (untilDate && day > untilDate) return false;
+      return true;
+    });
+  }, [orders, activeFilter, search, fromDate, untilDate]);
 
   const renderStatus = (status) => {
     const cfg = STATUS_MAP[status] || { label: status, className: 'bg-gray-100 text-gray-800' };
@@ -176,7 +227,7 @@ const StoreOrders = () => {
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading && orders.length === 0) return <LoadingSpinner />;
 
   return (
     <StoreLayout title="Mes Commandes">
@@ -184,7 +235,7 @@ const StoreOrders = () => {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Vue globale</h3>
           <button
-            onClick={fetchOrders}
+            onClick={() => fetchOrders(1)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
           >
             Rafraîchir
@@ -207,10 +258,35 @@ const StoreOrders = () => {
               }`}
             >
               {cfg.label}
-              <span className="ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">{counts[key] || 0}</span>
+              
             </button>
           ))}
         </div>
+
+        <div className="mb-5 grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+          <label className="text-xs font-semibold text-gray-700">
+            Rechercher une vente
+            <input value={search} onChange={(event) => setSearch(event.target.value)}
+              placeholder="N° commande, téléphone, nom d'article"
+              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm" />
+          </label>
+          <label className="text-xs font-semibold text-gray-700">Depuis
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+              className="mt-1 block rounded-md border border-gray-300 bg-white px-2 py-2 text-sm" />
+          </label>
+          <label className="text-xs font-semibold text-gray-700">Jusqu'au
+            <input type="date" value={untilDate} onChange={(e) => setUntilDate(e.target.value)}
+              className="mt-1 block rounded-md border border-gray-300 bg-white px-2 py-2 text-sm" />
+          </label>
+          <button type="button" onClick={() => { setSearch(''); setFromDate(''); setUntilDate(''); setActiveFilter('all'); }}
+            className="self-end rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700">
+            Tout afficher
+          </button>
+        </div>
+        <p className="mb-3 text-sm text-gray-600">
+          {filteredOrders.length} sur {totalCount} commande(s) correspondant aux critères.
+          {loading ? ' Actualisation en cours…' : ''} Cliquez sur une vente pour son relevé détaillé.
+        </p>
 
         {filteredOrders.length === 0 ? (
           <div className="text-center py-12">
@@ -232,7 +308,7 @@ const StoreOrders = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-base font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</p>
-                    <p className="text-xs text-gray-500">{order.items?.length || order.items_count || 0} article(s)</p>
+                    <p className="text-xs text-gray-600 max-w-[160px] break-words">{orderArticlePreview(order) || 'Articles non renseignés'}</p>
                   </div>
                 </div>
                 <div className="mt-2 text-sm">{renderStatus(order.status)}</div>
@@ -274,7 +350,7 @@ const StoreOrders = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Articles</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Articles achetés</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -286,7 +362,10 @@ const StoreOrders = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(order.created_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{renderStatus(order.status)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.items?.length || order.items_count || 0}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 max-w-[260px]">
+                      <p className="font-medium break-words">{orderArticlePreview(order) || 'Articles non renseignés'}</p>
+                      <p className="text-xs text-gray-500">{order.items?.reduce((count, item) => count + Number(item.quantity || 0), 0) || 0} unité(s)</p>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 flex items-center">
                       <button
                         className="text-indigo-600 hover:text-indigo-900"
@@ -331,13 +410,21 @@ const StoreOrders = () => {
               </tbody>
             </table>
           </div>
+          {nextPage && (
+            <div className="mt-4 text-center">
+              <button type="button" disabled={loadingMore} onClick={() => fetchOrders(page + 1)}
+                className="rounded-md border border-indigo-300 px-5 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+                {loadingMore ? 'Chargement…' : 'Charger des commandes plus anciennes'}
+              </button>
+            </div>
+          )}
           </>
         )}
       </div>
 
       {detail && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full overflow-hidden">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b">
               <div>
                 <p className="text-xs text-gray-500">Commande {detail.order_number || `#${detail.id}`}</p>
@@ -366,6 +453,124 @@ const StoreOrders = () => {
                   <p>{formatCurrency(detail.total_amount || detail.total)}</p>
                 </div>
               </div>
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-bold text-gray-900">Fiche de vente — {detail.order_number}</h4>
+                  {renderStatus(detail.status)}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                  <div><p className="text-xs text-gray-600">Création de la commande</p><p className="font-semibold">{formatDateTime(detail.created_at)}</p></div>
+                  <div><p className="text-xs text-gray-600">Confirmée</p><p className="font-semibold">{detail.confirmed_at ? formatDateTime(detail.confirmed_at) : 'Non confirmée'}</p></div>
+                  <div><p className="text-xs text-gray-600">Livrée</p><p className="font-semibold">{detail.delivered_at ? formatDateTime(detail.delivered_at) : 'Non livrée / non renseignée'}</p></div>
+                  <div><p className="text-xs text-gray-600">Dernière mise à jour</p><p className="font-semibold">{detail.updated_at ? formatDateTime(detail.updated_at) : 'Indisponible'}</p></div>
+                </div>
+                <p className="mt-3 text-xs text-gray-600">
+                  Ces dates proviennent des enregistrements réels de la commande.
+                  L'identité de l'employé ayant préparé ou encaissé la vente n'est pas encore historisée :
+                  elle ne peut pas être reconstituée automatiquement.
+                </p>
+              </div>
+
+              <section className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-bold text-gray-900">Récapitulatif du montant facturé</h4>
+                <dl className="mt-2 space-y-1 text-sm">
+                  {[
+                    ['Articles', detail.items_total],
+                    ['Frais de livraison', detail.delivery_fee],
+                    ['Frais opérateur', detail.operator_fee],
+                    ['Autres frais de paiement', detail.payment_fees],
+                    ['Taxes', detail.tax_amount],
+                  ].filter(([, amount]) => Number(amount || 0) !== 0).map(([label, amount]) => (
+                    <div key={label} className="flex justify-between gap-3"><dt>{label}</dt><dd>{formatCurrency(amount)}</dd></div>
+                  ))}
+                  {Number(detail.forfait_discount || 0) > 0 && (
+                    <div className="flex justify-between gap-3 text-green-700"><dt>Réduction forfait livraison</dt><dd>-{formatCurrency(detail.forfait_discount)}</dd></div>
+                  )}
+                  <div className="flex justify-between gap-3 border-t pt-2 font-bold"><dt>Total de la commande</dt><dd>{formatCurrency(detail.total_amount)}</dd></div>
+                </dl>
+              </section>
+
+              <section className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-bold text-gray-900">Paiement et traçabilité financière</h4>
+                {detail.payment_arrangement ? (
+                  <>
+                    <p className="mt-2 text-sm text-gray-800">
+                      <strong>Circuit :</strong> {PAYMENT_FLOW_NAMES[detail.payment_arrangement.flow] || detail.payment_arrangement.flow}
+                      {' · '}<strong>Moyen :</strong> {PAYMENT_METHOD_NAMES[detail.payment_arrangement.method] || detail.payment_arrangement.method}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-700">
+                      Commission calculée lors de la commande : <strong>{formatCurrency(detail.payment_arrangement.commission_amount)}</strong>
+                      {' '}— ce n'est pas nécessairement une somme exigible si la commande n'est pas livrée.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {(detail.payment_arrangement.obligations || []).map((debt) => (
+                        <div key={debt.id} className="rounded-md bg-gray-50 p-3 text-sm">
+                          <div className="flex flex-wrap justify-between gap-2 font-semibold text-gray-900">
+                            <span>{DEBT_KIND_NAMES[debt.kind] || debt.kind}</span>
+                            <span>{formatCurrency(debt.amount)}</span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {ROLE_NAMES[debt.payer] || debt.payer} → {ROLE_NAMES[debt.payee] || debt.payee}
+                            {' · '}État : {debt.status}
+                            {' · '}Reçu : {formatCurrency(debt.received_amount)}
+                            {' · '}Restant : {formatCurrency(debt.remaining_amount)}
+                          </p>
+                          {(debt.adjustments || []).length > 0 && (
+                            <ul className="mt-2 space-y-1 border-t pt-2 text-xs text-gray-700">
+                              {debt.adjustments.map((adjustment) => (
+                                <li key={adjustment.id} className="rounded bg-amber-50 px-2 py-1">
+                                  {adjustment.type === 'refund' ? 'Remboursement enregistré'
+                                    : adjustment.type === 'commission_credit' ? 'Avoir sur commission'
+                                    : 'Correction financière'}
+                                  {' — '}{formatCurrency(adjustment.amount)}
+                                  {' · '}{adjustment.status === 'confirmed' ? 'Confirmé' : 'À vérifier'}
+                                  {adjustment.created_at ? ` · ${formatDateTime(adjustment.created_at)}` : ''}
+                                  {adjustment.reference ? ` · Réf. ${adjustment.reference}` : ''}
+                                  {adjustment.reason ? ` · Motif : ${adjustment.reason}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {(debt.receipts || []).length > 0 && (
+                            <ul className="mt-2 space-y-1 border-t pt-2 text-xs text-gray-700">
+                              {debt.receipts.map((receipt) => (
+                                <li key={receipt.id}>
+                                  Reçu {receipt.receipt_number || `#${receipt.id}`} — {formatCurrency(receipt.amount)}
+                                  {' · '}{receipt.status === 'confirmed' ? 'Confirmé' : receipt.status === 'rejected' ? 'Refusé' : 'En attente'}
+                                  {receipt.reference ? ` · Réf. ${receipt.reference}` : ''}
+                                  {receipt.created_at ? ` · ${formatDateTime(receipt.created_at)}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {['cancelled', 'pending_payment', 'refunded'].includes(detail.status) && (
+                      <p className="mt-3 rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                        Attention : cette commande n'est pas une vente livrée. Un montant comptable affiché ici
+                        doit être rapproché avec Gaboshop avant tout règlement ou remboursement.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-600">Aucun détail de règlement historique disponible pour cette commande.</p>
+                )}
+              </section>
+
+              {detail.notes && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                  <p className="font-bold">Instructions / notes de commande</p>
+                  <p className="mt-1 whitespace-pre-wrap">{detail.notes}</p>
+                </div>
+              )}
+              {detail.client_problem_reported_at && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                  <p className="font-bold">Réclamation client signalée le {formatDateTime(detail.client_problem_reported_at)}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{detail.client_problem || 'Motif non renseigné'}</p>
+                </div>
+              )}
 
               {['ready', 'assigned', 'in_transit'].includes(detail.status) && <OrderLiveMap orderId={detail.id} viewer="store" />}
 

@@ -179,6 +179,32 @@ class OrderListView(ListAPIView):
 			queryset = Order.objects.filter(delivery__delivery_agent=user)
 		else:
 			queryset = Order.objects.all()
+		# Recherche historique côté serveur : aussi dans les anciennes pages, pas seulement les 20 dernières.
+		# Le périmètre du demandeur est filtré ci-dessus avant toute recherche.
+		if user.is_store_manager():
+			from datetime import date
+			from django.db.models import Q
+			search = (self.request.query_params.get('search') or '').strip()[:120]
+			if search:
+				queryset = queryset.filter(
+					Q(order_number__icontains=search) |
+					Q(client__phone__icontains=search) |
+					Q(items__product__name__icontains=search)
+				).distinct()
+			statuses = (self.request.query_params.get('status') or '').strip()
+			if statuses:
+				queryset = queryset.filter(status__in=[
+					part for part in statuses.split(',') if part
+				])
+			for key, lookup in (('date_from', 'gte'), ('date_to', 'lte')):
+				raw = (self.request.query_params.get(key) or '').strip()
+				if raw:
+					try:
+						valid_date = date.fromisoformat(raw)
+					except ValueError:
+						from rest_framework.exceptions import ValidationError
+						raise ValidationError({key: 'Date invalide (AAAA-MM-JJ).'})
+					queryset = queryset.filter(**{f'created_at__date__{lookup}': valid_date})
 		return with_order_display_relations(queryset.order_by('-created_at'))
     
 	def list(self, request, *args, **kwargs):
