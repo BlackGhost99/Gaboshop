@@ -15,7 +15,7 @@ from stores.models import Store
 from .configuration import available_payment_options, get_payment_policy, validate_store_preferences
 from core.validators import validate_proof_file
 from .direct_models import PaymentArrangement, PaymentObligation, PaymentReceipt, CommissionSettlement
-from .direct_service import can_declare, can_review, receipt_payload, role_user_id, payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure, platform_debts, debt_summary, collect_platform_debt
+from .direct_service import can_declare, can_review, receipt_payload, role_user_id, payment_summary, confirm_receipt, reject_receipt, create_settlement, confirm_settlement, courier_cash_position, courier_cash_exposure, platform_debts, platform_debts_under_review, debt_summary, collect_platform_debt
 
 
 def _is_admin(user):
@@ -318,14 +318,18 @@ class FinancialControlView(APIView):
         from .configuration import get_payment_policy
         from .direct_service import _refresh_status
 
-        commissions = PaymentObligation.objects.filter(kind='commission').select_related('arrangement__store').prefetch_related('receipts', 'adjustments')
+        commissions = PaymentObligation.objects.filter(kind='commission').select_related('arrangement__store', 'arrangement__order').prefetch_related('receipts', 'adjustments')
         for debt in commissions:
             _refresh_status(debt)
         stores = []
         for store in Store.objects.filter(payment_arrangements__isnull=False).distinct():
             debts = [x for x in commissions if x.arrangement.store_id == store.id]
-            due = sum((x.remaining_amount for x in debts if x.status not in ('cancelled', 'waived', 'paid')), Decimal('0'))
-            overdue = sum((x.remaining_amount for x in debts if x.status == 'overdue'), Decimal('0'))
+            due = sum((x.remaining_amount for x in debts
+                       if x.arrangement.order.status == 'delivered'
+                       and x.status in ('unpaid', 'overdue', 'partially_paid')), Decimal('0'))
+            overdue = sum((x.remaining_amount for x in debts
+                           if x.arrangement.order.status == 'delivered'
+                           and x.status == 'overdue'), Decimal('0'))
             limit = Decimal(get_payment_policy(store)['merchant_debt_limit'])
             latest = PaymentReceipt.objects.filter(obligation__kind='commission', obligation__arrangement__store=store, status='confirmed').order_by('-confirmed_at').first()
             stores.append({'store_id': store.id, 'store_name': store.name, 'debt': str(due), 'overdue': str(overdue), 'debt_limit': str(limit), 'remaining_before_suspension': str(max(Decimal('0'), limit - due)), 'pending_receipts': PaymentReceipt.objects.filter(obligation__arrangement__store=store, status='pending').count(), 'last_payment_at': latest.confirmed_at if latest else None})
@@ -378,6 +382,13 @@ class MyPlatformDebtView(APIView):
             store = Store.objects.filter(manager=user).first()
             debts = platform_debts('store', store) if store else []
         data = debt_summary(debts)
+        # Les écritures non exigibles mais déjà marquées « impayées » restent
+        # visibles pour contestation ou régularisation comptable, jamais dans le total à payer.
+        if getattr(user, 'user_type', '') == 'delivery_agent':
+            review = platform_debts_under_review('courier', user)
+        else:
+            review = platform_debts_under_review('store', store) if store else []
+        data['review'] = debt_summary(review)
         rules = SystemSettings.get_settings()
         data['pay_to'] = {'phone': rules.support_phone, 'whatsapp': rules.support_whatsapp}
         return Response({'success': True, 'data': data})
