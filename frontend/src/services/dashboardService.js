@@ -74,6 +74,11 @@ export const getOrders = async (params = {}) => {
   return { success: false, error: { message: 'Réponse inattendue du serveur', raw: payload } };
 };
 
+export const getStoreOrderActivity = async (orderId) => {
+  const response = await api.get(`/orders/${orderId}/activity/`);
+  return response.data;
+};
+
 export const getOrderDetail = async (orderId) => {
   const response = await api.get(`/orders/${orderId}/`);
   return response.data;
