@@ -258,6 +258,14 @@ class SubscriptionPlan(models.Model):
 	can_import_products = models.BooleanField(default=False, help_text="Import de produits par fichier Excel/CSV")
 	has_stock_alerts = models.BooleanField(default=False, help_text="Alerte (notification et téléphone) quand un produit passe sous le seuil de stock")
 	can_create_promotions = models.BooleanField(default=False, help_text="Prix barré (prix avant promo) sur les produits")
+	# Equipe du commerce B2C : valeurs indépendantes du nom Free/Pro/Business,
+	# définies depuis l'interface administrateur, jamais codées en dur par type de plan.
+	can_manage_staff = models.BooleanField(
+		default=False, help_text="Autorise le gérant à créer et gérer des accès employés (B2C)"
+	)
+	max_staff_accounts = models.PositiveIntegerField(
+		default=0, help_text="Nombre maximal de comptes employés actifs (hors gérant). 0 = aucun ; quota entier, jamais illimité par accident."
+	)
 
 	# CHAMP DESACTIVE
 	service_fee_client_amount = models.IntegerField(
