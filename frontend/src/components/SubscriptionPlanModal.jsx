@@ -80,6 +80,9 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     can_import_products: false,
     has_stock_alerts: false,
     can_create_promotions: false,
+    // Equipe : réglages libres par plan B2C, désactivés tant que l'accès équipe n'est pas publié
+    can_manage_staff: false,
+    max_staff_accounts: 0,
     features_json: []
   });
 
@@ -130,6 +133,9 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         can_import_products: false,
         has_stock_alerts: false,
         can_create_promotions: false,
+    // Equipe : réglages libres par plan B2C, désactivés tant que l'accès équipe n'est pas publié
+    can_manage_staff: false,
+    max_staff_accounts: 0,
         features_json: []
       });
     }
@@ -186,6 +192,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     { id: 'delivery', label: 'Livraison' },
     { id: 'reports', label: 'Rapports et Exports' },
     { id: 'tools', label: 'Outils boutique' },
+    { id: 'staff', label: 'Équipe & Permissions' },
     { id: 'finance', label: 'Finance B2B' },
     { id: 'support', label: 'Support' },
   ];
@@ -606,6 +613,36 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
               <label htmlFor="can_create_promotions" className="text-sm text-gray-700">Promotions (prix barré)</label>
+            </div>
+          </div>
+        )}
+
+        {/* Comptes employés : paramètres commerciaux, indépendants du nom du forfait. */}
+        {activeSection === 'staff' && (
+          <div className="space-y-5">
+            <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              Vous décidez des accès pour chaque forfait B2C. Ces réglages seront utilisés par
+              la gestion des comptes employés après sa validation de sécurité ; aucun accès
+              supplémentaire n'est ouvert tant que le service employés n'est pas publié.
+            </p>
+            <label className="flex items-center gap-3 text-sm text-gray-800">
+              <input type="checkbox" checked={Boolean(formData.can_manage_staff)}
+                onChange={(e) => updateField('can_manage_staff', e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600" />
+              Autoriser le gérant à gérer des comptes employés
+            </label>
+            <div>
+              <label htmlFor="max_staff_accounts" className="mb-1 block text-sm font-semibold text-gray-700">
+                Nombre maximal de comptes employés actifs (hors gérant)
+              </label>
+              <input id="max_staff_accounts" type="number" min="0" max="1000" step="1"
+                value={formData.max_staff_accounts ?? 0}
+                onChange={(e) => updateField('max_staff_accounts', Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-500" />
+              <p className="mt-1 text-xs text-gray-500">
+                0 = aucun employé supplémentaire. Le gérant principal n'est jamais compté.
+                Ce quota est enregistré pour ce plan, pas fixé automatiquement selon Free, Pro ou Business.
+              </p>
             </div>
           </div>
         )}
