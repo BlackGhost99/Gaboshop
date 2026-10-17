@@ -516,6 +516,22 @@ const StoreOrders = () => {
                             {' · '}Reçu : {formatCurrency(debt.received_amount)}
                             {' · '}Restant : {formatCurrency(debt.remaining_amount)}
                           </p>
+                          {(debt.adjustments || []).length > 0 && (
+                            <ul className="mt-2 space-y-1 border-t pt-2 text-xs text-gray-700">
+                              {debt.adjustments.map((adjustment) => (
+                                <li key={adjustment.id} className="rounded bg-amber-50 px-2 py-1">
+                                  {adjustment.type === 'refund' ? 'Remboursement enregistré'
+                                    : adjustment.type === 'commission_credit' ? 'Avoir sur commission'
+                                    : 'Correction financière'}
+                                  {' — '}{formatCurrency(adjustment.amount)}
+                                  {' · '}{adjustment.status === 'confirmed' ? 'Confirmé' : 'À vérifier'}
+                                  {adjustment.created_at ? ` · ${formatDateTime(adjustment.created_at)}` : ''}
+                                  {adjustment.reference ? ` · Réf. ${adjustment.reference}` : ''}
+                                  {adjustment.reason ? ` · Motif : ${adjustment.reason}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {(debt.receipts || []).length > 0 && (
                             <ul className="mt-2 space-y-1 border-t pt-2 text-xs text-gray-700">
                               {debt.receipts.map((receipt) => (
