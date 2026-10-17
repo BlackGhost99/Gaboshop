@@ -94,15 +94,17 @@ def ensure_free_b2b_plan(model=None):
 
 
 def ensure_range(b2c_model, b2b_model=None):
-    """Gratuit, Pro et Business existent ; Business est grisé (non achetable) tant que l'admin ne l'ouvre pas."""
+    """Créer seulement les forfaits manquants, sans effacer les décisions de l'admin.
+
+    Les valeurs initiales de Business le rendent non achetable à sa création ;
+    une fois modifié depuis l'administration, ses états et son prix sont conservés.
+    """
     for model, table in ((b2c_model, B2C_DEFAULTS), (b2b_model, B2B_DEFAULTS)):
         if model is None:
             continue
         for plan_type in ('free', 'pro', 'business'):
             ensure_plan(model, plan_type, table)
         model.objects.filter(plan_type='free', is_active=False).update(is_active=True)
-        # Business visible (ambition affichée) mais pas achetable.
-        model.objects.filter(plan_type='business').update(is_active=True, is_available=False)
 
 
 def unavailable_message(plan):
