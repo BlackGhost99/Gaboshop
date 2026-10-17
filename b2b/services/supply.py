@@ -44,17 +44,23 @@ def get_available_wholesalers(buyer_store=None):
 	from django.db.models import Case, When, Value, IntegerField, BooleanField
 	
 	queryset = queryset.select_related('b2b_subscription', 'b2b_subscription__plan')
-	
+
+	# La priorité ne vaut que pendant l'abonnement : un grossiste expiré ou résilié repasse à égalité.
+	from django.db.models import Q
+	from django.utils import timezone
+	paying = Q(b2b_subscription__status='active') & (
+		Q(b2b_subscription__end_date__isnull=True) | Q(b2b_subscription__end_date__gte=timezone.now().date()))
+
 	# Annoter avec catalog_priority et featured_in_catalog depuis le plan B2B
 	queryset = queryset.annotate(
 		catalog_priority_value=Case(
-			When(b2b_subscription__plan__catalog_priority__isnull=False,
+			When(paying & Q(b2b_subscription__plan__catalog_priority__isnull=False),
 				 then='b2b_subscription__plan__catalog_priority'),
 			default=Value(0),
 			output_field=IntegerField()
 		),
 		featured_value=Case(
-			When(b2b_subscription__plan__featured_in_catalog=True,
+			When(paying & Q(b2b_subscription__plan__featured_in_catalog=True),
 				 then=Value(1)),
 			default=Value(0),
 			output_field=IntegerField()

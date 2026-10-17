@@ -254,7 +254,11 @@ class SubscriptionPlan(models.Model):
 	has_custom_page = models.BooleanField(default=False, help_text="Page personnalisée")
 	has_priority_support = models.BooleanField(default=False, help_text="Support VIP")
 	priority_listing = models.IntegerField(default=0, help_text="Ordre de priorité dans les listings (plus élevé = plus visible)")
-	
+	# Outils du forfait (16 oct. 2026) : chaque case débloque un vrai écran, rien n'est seulement affiché.
+	can_import_products = models.BooleanField(default=False, help_text="Import de produits par fichier Excel/CSV")
+	has_stock_alerts = models.BooleanField(default=False, help_text="Alerte (notification et téléphone) quand un produit passe sous le seuil de stock")
+	can_create_promotions = models.BooleanField(default=False, help_text="Prix barré (prix avant promo) sur les produits")
+
 	# CHAMP DESACTIVE
 	service_fee_client_amount = models.IntegerField(
 		default=0,
@@ -447,6 +451,9 @@ class SubscriptionPlan(models.Model):
 				or 'servicefee' in normalized
 			)
 
+		# Seules les lignes que le code applique (payments/plan_features.py) : page perso, support prioritaire,
+		# livraison express, suivi avancé ou sponsoring ne sont plus promis tant qu'aucun écran ne les rend réels.
+		from .plan_features import has, keep_free_text, tool_lines
 		features = []
 		if self.max_products:
 			features.append(f"Jusqu'à {self.max_products} produits")
@@ -459,21 +466,22 @@ class SubscriptionPlan(models.Model):
 		else:
 			if self.plan_type != 'free':
 				features.append("Commandes illimitées")
+		if not has(self, 'advanced_stats'):
+			features.append("Statistiques de base : ventes du jour et du mois")
+		features.extend(tool_lines(self))
 		if self.can_access_b2b:
-			features.append("Accès approvisionnement B2B")
-		if self.has_b2b_visibility:
-			features.append("Visibilité maximale catalogue B2B")
-		if self.can_view_detailed_reports or self.has_statistics:  # has_statistics pour compatibilité
-			features.append("Statistiques et rapports de ventes")
-		if self.has_custom_page:
-			features.append("Page personnalisée")
-		if self.has_priority_support:
-			features.append("Support prioritaire")
-		if self.can_sponsor_products:
-			features.append("Produits sponsorisés")
+			features.append("Achat de stock auprès des grossistes (B2B)")
 		if self.priority_listing > 0:
-			features.append("Meilleure visibilité sur la plateforme")
-		raw_features = features + (self.features_json or [])
+			features.append("Meilleure visibilité : votre boutique et vos produits passent devant")
+		if self.commission_reduction_percent > 0 and self.plan_type != 'business':
+			features.append(f"Commission Gaboshop réduite de {self.commission_reduction_percent} %")
+		if self.plan_type in ('pro', 'business'):
+			# Le badge suit l'abonnement payé (Store.refresh_plan_badge) ; l'accueil met ces boutiques en vitrine.
+			label = 'Pro' if self.plan_type == 'pro' else 'Business'
+			features.append(f"Badge « {label} » visible des clients, et place possible dans la vitrine de l'accueil")
+		# Même un forfait fermé (« Bientôt disponible ») n'affiche que ce que le code fait vraiment.
+		free_text = [item for item in (self.features_json or []) if isinstance(item, str) and keep_free_text(item)]
+		raw_features = features + free_text
 		unique = []
 		seen = set()
 		for item in raw_features:
@@ -531,6 +539,15 @@ class CategoryCommissionChangeLog(models.Model):
 	def __str__(self):
 		who = self.changed_by.get_full_name() if self.changed_by else 'Système'
 		return f"{self.category_commission.store_category.name}: {self.old_rate} ? {self.new_rate} par {who} @ {self.created_at}"
+
+
+def paid_first():
+	"""Ordre des abonnements actifs : un forfait payant passe avant la ligne Gratuit créée seule à l'expiration
+	(valable 100 ans). Sans cet ordre, un Pro redonné par l'admin restait caché derrière elle."""
+	from django.db.models import Case, IntegerField, Q, Value, When
+	free = Q(plan__isnull=True) | Q(plan__plan_type='free')
+	return (Case(When(free, then=Value(1)), default=Value(0), output_field=IntegerField()),
+	        '-end_date')
 
 
 class StoreSubscription(models.Model):

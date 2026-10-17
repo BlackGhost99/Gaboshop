@@ -53,6 +53,9 @@ MARKERS = {
     'Boîte de notifications et alertes appareil (16 oct.)': 'Réglages des alertes',
     'Annonces de l\'admin (16 oct.)': 'Alerter aussi sur les téléphones et ordinateurs',
     'Barre du bas sur téléphone (16 oct.)': 'Navigation principale',
+    'Forfaits honnêtes : cartes exactes (17 oct.)': 'Chaque carte liste exactement',
+    'Forfait Pro : page Statistiques (17 oct.)': 'Voir mes statistiques',
+    'Forfait Pro : export dans l application Android (17 oct.)': 'pas encore possible dans l',
 }
 
 

@@ -288,6 +288,23 @@ def subscription_days():
     return int(SystemSettings.current('subscription_days', 30) or 30)
 
 
+def carried_days(remaining_days, old_fee, new_fee, same_plan):
+    """Jours d'un abonnement encore actif reportés sur le nouveau paiement : rien n'est perdu en payant en avance.
+
+    Même forfait : tous les jours restants. Autre forfait : leur valeur convertie au prix du nouveau
+    (10 jours de Pro à 10 000 F valent 2 jours de Business à 50 000 F).
+    """
+    remaining_days = max(0, int(remaining_days or 0))
+    if not remaining_days:
+        return 0
+    if same_plan:
+        return remaining_days
+    old_fee, new_fee = Decimal(old_fee or 0), Decimal(new_fee or 0)
+    if old_fee <= 0 or new_fee <= 0:
+        return 0
+    return int(remaining_days * old_fee / new_fee)
+
+
 def build_cinetpay_payload(intent, channels, lang):
     return {
         "reference": intent.reference,

@@ -156,6 +156,20 @@ def category_allowed(category, store):
     return Decimal(category.commission_rate or 0) >= Decimal(floor)
 
 
+def check_promotion_allowed(store):
+    """Un prix barré (promotion) est un outil du forfait Pro ; une promotion déjà en place reste."""
+    from payments.plan_features import required_message, store_has
+    if store is not None and not store_has(store, 'promotions'):
+        raise serializers.ValidationError({'compare_price': required_message('promotions', store.get_current_plan())})
+
+
+def validate_positive_price(value):
+    """Un produit ne se vend jamais à 0 F ou moins (faute de frappe, import mal lu)."""
+    if value is not None and value <= 0:
+        raise serializers.ValidationError(_('Le prix doit être plus grand que 0.'))
+    return value
+
+
 class ProductCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la création de produit"""
     attributes = ProductAttributesField(required=False)
@@ -168,6 +182,9 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'image_2', 'image_3', 'weight_kg', 'length_m', 'attributes'
         ]
     
+    def validate_price(self, value):
+        return validate_positive_price(value)
+
     def validate(self, attrs):
         if not category_allowed(attrs.get('category'), self.context.get('store')):
             raise serializers.ValidationError({'category': _('Choisissez une catégorie de votre type de commerce.')})
@@ -177,6 +194,8 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'compare_price': _('Le prix de comparaison doit être supérieur au prix actuel.')
             })
+        if attrs.get('compare_price'):
+            check_promotion_allowed(self.context.get('store'))
         
         # Poids obligatoire et > 0
         weight = attrs.get('weight_kg')
@@ -209,6 +228,20 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             'stock', 'sku', 'barcode', 'is_available', 'is_featured',
             'image', 'image_2', 'image_3', 'weight_kg', 'length_m', 'attributes'
         ]
+
+    def validate_price(self, value):
+        return validate_positive_price(value)
+
+    def validate(self, attrs):
+        compare = attrs.get('compare_price')
+        if compare and self.instance is not None and compare != self.instance.compare_price:
+            price = attrs.get('price', self.instance.price)
+            if price is not None and price >= compare:
+                raise serializers.ValidationError({
+                    'compare_price': _('Le prix avant promo doit être supérieur au prix de vente.')
+                })
+            check_promotion_allowed(self.instance.store)
+        return attrs
 
     def validate_category(self, value):
         if self.instance is not None and not category_allowed(value, self.instance.store):

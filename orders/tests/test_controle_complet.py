@@ -76,12 +76,12 @@ class ControleCompletTests(TestCase):
     def test_admin_cancel_restocks_and_refuses_delivered_orders(self):
         order_id = self.order([{'product_id': self.product.id, 'quantity': 1}]).json()['data']['id']
         self.api.force_authenticate(self.admin)
-        self.assertEqual(self.api.post(f'/api/v1/admin/orders/{order_id}/cancel/', {}, format='json').status_code, 200)
+        self.assertEqual(self.api.post(f'/api/v1/admin/orders/{order_id}/cancel/', {'reason': 'Client injoignable'}, format='json').status_code, 200)
         self.assertEqual(self.stock(), 5)
         delivered_id = self.order([{'product_id': self.product.id, 'quantity': 1}]).json()['data']['id']
         Order.objects.filter(pk=delivered_id).update(status='delivered')
         self.api.force_authenticate(self.admin)
-        self.assertEqual(self.api.post(f'/api/v1/admin/orders/{delivered_id}/cancel/', {}, format='json').status_code, 409)
+        self.assertEqual(self.api.post(f'/api/v1/admin/orders/{delivered_id}/cancel/', {'reason': 'Client injoignable'}, format='json').status_code, 409)
         self.assertEqual(self.stock(), 4)
 
     def test_store_cannot_deliver_an_order_meant_for_a_gaboshop_driver(self):

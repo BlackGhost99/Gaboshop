@@ -73,12 +73,12 @@ def enforce_feature(store, feature_key, messages=None):
     
     if not features.get(feature_key, False):
         default_messages = {
-            'can_export_excel': "Export CSV/Excel disponible à partir du plan Pro.",
-            'can_export_pdf': "Export PDF disponible uniquement en plan Business.",
-            'can_view_detailed_reports': "Rapports détaillés disponibles à partir du plan Pro.",
-            'can_export_finance_csv': "Export CSV Finance B2B disponible à partir du plan Pro.",
-            'can_export_finance_pdf': "Export PDF Finance B2B disponible uniquement en plan Business.",
-            'can_view_finance_detailed': "Rapports détaillés Finance B2B disponibles à partir du plan Pro."
+            'can_export_excel': "L'export Excel/CSV fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
+            'can_export_pdf': "L'export PDF fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
+            'can_view_detailed_reports': "Les rapports détaillés font partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
+            'can_export_finance_csv': "L'export CSV fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
+            'can_export_finance_pdf': "L'export PDF fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
+            'can_view_finance_detailed': "Les rapports détaillés font partie du forfait Pro. Passez à Pro dans « Mon forfait »."
         }
         message = (messages or {}).get(feature_key) or default_messages.get(feature_key, "Fonctionnalité non disponible dans votre plan.")
         raise PermissionDenied(message)

@@ -110,9 +110,9 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
             'name', 'description', 'phone', 'email', 'address', 
             'zone', 'latitude', 'longitude', 'logo', 'banner_image',
             'opening_time', 'closing_time', 'offers_delivery', 'delivery_fee', 'min_order_amount',
-            'agent_code', 'payout_phone'
+            'agent_code', 'payout_phone', 'stock_alert_threshold'
         ]
-        extra_kwargs = DELIVERY_FEE_LIMITS
+        extra_kwargs = {**DELIVERY_FEE_LIMITS, 'stock_alert_threshold': {'max_value': 1000}}
 
     def validate_agent_code(self, value):
         value = (value or '').strip()

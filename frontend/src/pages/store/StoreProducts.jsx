@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { notifyError } from '../../utils/feedback';
+import { Link } from 'react-router-dom';
+import { notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import ProductSpecsFields, { isFashionCategory } from '../../components/ProductSpecsFields';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -13,9 +14,49 @@ import {
     getAllCategories,
     createProduct, 
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    downloadProductImportTemplate,
+    importProducts
     // createStoreCategory - DÉSACTIVÉ: Seul l'admin peut créer des catégories
 } from '../../services/productService';
+
+const emptyProduct = () => ({
+    name: '', description: '', price: '', compare_price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null
+});
+
+const IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+
+const IMPORT_STATUS = {
+    ok: { label: 'Prêt', className: 'bg-indigo-100 text-indigo-700' },
+    created: { label: 'Créé', className: 'bg-green-100 text-green-700' },
+    skipped: { label: 'Déjà présent', className: 'bg-gray-100 text-gray-700' },
+    error: { label: 'Erreur', className: 'bg-red-100 text-red-700' },
+};
+
+const formatPrice = (value) => `${Number(value || 0).toLocaleString('fr-FR')} FCFA`;
+
+// Pourcentage de réduction quand un prix avant promo (barré) est plus grand que le prix de vente.
+const promoPercent = (product) => {
+    const price = Number(product?.price);
+    const before = Number(product?.compare_price);
+    if (!before || !(before > price)) return 0;
+    return product.discount_percentage || Math.max(1, Math.floor(((before - price) / before) * 100));
+};
+
+const PriceWithPromo = ({ product, className = '' }) => {
+    const percent = promoPercent(product);
+    return (
+        <div className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 ${className}`}>
+            <span className="font-bold text-indigo-600">{formatPrice(product.price)}</span>
+            {percent > 0 && (
+                <>
+                    <span className="text-sm text-gray-400 line-through">{formatPrice(product.compare_price)}</span>
+                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700">-{percent} %</span>
+                </>
+            )}
+        </div>
+    );
+};
 
 const StoreProducts = () => {
     const [store, setStore] = useState(null);
@@ -28,9 +69,7 @@ const StoreProducts = () => {
     const [deletingProductId, setDeletingProductId] = useState(null);
     
     // Form states
-    const [newProduct, setNewProduct] = useState({
-        name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null
-    });
+    const [newProduct, setNewProduct] = useState(emptyProduct);
     const [newCategory, setNewCategory] = useState({
         name: '', description: '', commission_rate: '8.00', order: 0
     });
@@ -41,6 +80,17 @@ const StoreProducts = () => {
     const [editingProduct, setEditingProduct] = useState(null);
     const [toast, setToast] = useState(null);
     const [subscriptionInfo, setSubscriptionInfo] = useState(null);
+    // Import Excel/CSV : fichier choisi, aperçu renvoyé par le serveur, action en cours.
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importInputKey, setImportInputKey] = useState(0);
+    const [importPreview, setImportPreview] = useState(null);
+    const [importBusy, setImportBusy] = useState('');
+
+    // Outils du forfait (même règle que le serveur) : true = inclus.
+    const tools = subscriptionInfo?.subscription?.tools || {};
+    const canImport = tools.product_import === true;
+    const canPromote = tools.promotions === true;
 
     useEffect(() => {
         fetchData();
@@ -134,6 +184,7 @@ const StoreProducts = () => {
             name: product.name,
             description: product.description || '',
             price: product.price,
+            compare_price: product.compare_price || '',
             stock: product.stock,
             category: product.category,
             weight_kg: product.weight_kg || '',
@@ -148,6 +199,11 @@ const StoreProducts = () => {
 
     const handleSaveProduct = async (e) => {
         e.preventDefault();
+        const comparePrice = String(newProduct.compare_price ?? '').trim();
+        if (comparePrice !== '' && Number(comparePrice) <= Number(newProduct.price)) {
+            notifyWarning('Prix avant promo trop bas', 'Il doit être plus grand que le prix de vente.');
+            return;
+        }
         const formData = new FormData();
         Object.keys(newProduct).forEach(key => {
             if (key === 'attributes') {
@@ -156,6 +212,10 @@ const StoreProducts = () => {
                 formData.append(key, newProduct[key]);
             }
         });
+        // Promo retirée : envoyer un champ vide pour que le serveur efface le prix barré.
+        if (editingProduct?.compare_price && comparePrice === '') {
+            formData.append('compare_price', '');
+        }
         galleryFiles.forEach((file) => formData.append('gallery', file));
         if (editingProduct && removedPhotos.length) {
             formData.append('remove_images', removedPhotos.join(','));
@@ -177,7 +237,7 @@ const StoreProducts = () => {
                 }
                 setShowProductModal(false);
                 setEditingProduct(null);
-                setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null }); setGalleryFiles([]); setRemovedPhotos([]);
+                setNewProduct(emptyProduct()); setGalleryFiles([]); setRemovedPhotos([]);
             }
         } catch (error) {
             console.error("Error saving product", error);
@@ -188,6 +248,85 @@ const StoreProducts = () => {
         }
     };
     
+    const closeImportModal = () => {
+        if (importBusy) return;
+        setShowImportModal(false);
+        setImportFile(null);
+        setImportPreview(null);
+        setImportInputKey(k => k + 1);
+    };
+
+    const handleDownloadTemplate = async () => {
+        setImportBusy('template');
+        try {
+            const where = await downloadProductImportTemplate();
+            notifySuccess(
+                where === 'browser' ? 'Modèle ouvert dans votre navigateur' : 'Modèle téléchargé',
+                'Ouvrez-le dans Excel, remplissez une ligne par produit, puis enregistrez-le.',
+            );
+        } catch (error) {
+            notifyError(error, { action: 'Télécharger le modèle' });
+        } finally {
+            setImportBusy('');
+        }
+    };
+
+    const handleImportFile = (file) => {
+        setImportPreview(null);
+        if (!file) {
+            setImportFile(null);
+            return;
+        }
+        const name = (file.name || '').toLowerCase();
+        let problem = null;
+        if (!name.endsWith('.xlsx') && !name.endsWith('.csv')) {
+            problem = ['Format non pris en charge', 'Choisissez un fichier Excel (.xlsx) ou CSV (.csv).'];
+        } else if (file.size > IMPORT_MAX_BYTES) {
+            problem = ['Fichier trop lourd (2 Mo au plus)', 'Coupez-le en plusieurs fichiers, puis importez-les un par un.'];
+        }
+        if (problem) {
+            notifyWarning(...problem);
+            setImportFile(null);
+            setImportInputKey(k => k + 1);
+            return;
+        }
+        setImportFile(file);
+    };
+
+    const runImport = async (confirm) => {
+        if (!importFile) {
+            notifyWarning('Aucun fichier choisi', 'Choisissez votre fichier Excel ou CSV, puis touchez « Vérifier le fichier ».');
+            return;
+        }
+        setImportBusy(confirm ? 'confirm' : 'preview');
+        try {
+            const res = await importProducts(importFile, confirm);
+            if (!res?.success) {
+                notifyError(res, { action: confirm ? 'Créer les produits' : 'Vérifier le fichier' });
+                return;
+            }
+            const data = res.data || {};
+            if (!confirm) {
+                setImportPreview(data);
+                return;
+            }
+            if (data.counts?.created > 0) {
+                notifySuccess('Import terminé', data.message);
+            } else {
+                notifyWarning('Aucun produit créé', data.message);
+            }
+            setShowImportModal(false);
+            setImportFile(null);
+            setImportPreview(null);
+            setImportInputKey(k => k + 1);
+            await fetchData();
+        } catch (error) {
+            notifyError(error, { action: confirm ? 'Créer les produits' : 'Vérifier le fichier' });
+        } finally {
+            setImportBusy('');
+        }
+    };
+
     const handleDeleteProduct = (productId) => {
         // Ouvrir le modal de confirmation
         setConfirmDeleteProduct(productId);
@@ -253,9 +392,9 @@ const StoreProducts = () => {
     return (
         <>
         <StoreLayout title="Gestion des Produits">
-            <div className="mb-6 flex justify-between">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-2xl font-bold">Mes Produits</h2>
-                <div className="space-x-2">
+                <div className="flex flex-wrap gap-2">
                     {/* Bouton désactivé - Seul l'admin peut créer des catégories */}
                     {/* <button 
                         onClick={() => setShowCategoryModal(true)}
@@ -279,7 +418,8 @@ const StoreProducts = () => {
                                 let message = maxProducts !== null
                                     ? `Vous avez atteint la limite de ${maxProducts} produits du forfait ${isFree ? 'Gratuit' : planName} (${currentProducts}/${maxProducts}). `
                                     : `Vous avez atteint la limite de produits du forfait ${planName}. `;
-                                message += isFree ? 'Passez à Pro pour ajouter davantage de produits.' : 'Passez à un forfait supérieur pour ajouter davantage de produits.';
+                                // Business n'est pas encore en vente : on n'envoie pas un Pro vers un forfait qu'il ne peut pas prendre.
+                                message += isFree ? 'Passez à Pro pour ajouter davantage de produits.' : "Aucun forfait en vente ne permet encore d'ajouter davantage de produits.";
                                 
                                 showToast(message, 'error');
                                 return;
@@ -291,6 +431,16 @@ const StoreProducts = () => {
                         className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
                     >
                         + Nouveau Produit
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowImportModal(true)}
+                        className="inline-flex items-center gap-2 border border-indigo-600 text-indigo-700 px-4 py-2 rounded hover:bg-indigo-50"
+                    >
+                        Importer (Excel/CSV)
+                        {!canImport && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">Pro</span>
+                        )}
                     </button>
                 </div>
             </div>
@@ -314,6 +464,7 @@ const StoreProducts = () => {
                                             </div>
                                         )}
                                         <h4 className="font-bold text-lg mb-1 truncate" title={product.name}>{product.name}</h4>
+                                        <PriceWithPromo product={product} className="mb-2" />
                                         <p className="text-sm text-gray-600 mb-3 line-clamp-2 h-10 overflow-hidden">{product.description}</p>
                                         <div className="mt-auto flex justify-between items-center pt-2 border-t">
                                             <div className="flex space-x-6 w-full justify-center">
@@ -383,9 +534,9 @@ const StoreProducts = () => {
                             </div>
                         )}
                         <div className="space-y-3">
-                            <div>
+                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                 <span className="font-semibold text-gray-700">Prix:</span>
-                                <span className="ml-2 text-xl font-bold text-indigo-600">{viewingProduct.price} FCFA</span>
+                                <PriceWithPromo product={viewingProduct} className="text-xl" />
                             </div>
                             <div>
                                 <span className="font-semibold text-gray-700">Stock:</span>
@@ -529,7 +680,74 @@ const StoreProducts = () => {
                                     />
                                 </div>
                             </div>
-                            
+
+                            <div className="mb-4">
+                                <label htmlFor="compare-price" className="block text-sm font-medium mb-1">Prix avant promo (barré)</label>
+                                {canPromote ? (
+                                    <>
+                                        <input
+                                            id="compare-price"
+                                            type="number"
+                                            min="0"
+                                            className="w-full border rounded p-2"
+                                            value={newProduct.compare_price}
+                                            onChange={e => setNewProduct({ ...newProduct, compare_price: e.target.value })}
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Laissez vide s'il n'y a pas de promotion.</p>
+                                    </>
+                                ) : editingProduct?.compare_price && newProduct.compare_price !== '' ? (
+                                    <>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <input
+                                                id="compare-price"
+                                                type="number"
+                                                className="min-w-0 flex-1 border rounded p-2 bg-gray-100 text-gray-600"
+                                                value={newProduct.compare_price}
+                                                readOnly
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewProduct({ ...newProduct, compare_price: '' })}
+                                                className="px-3 py-2 text-sm text-red-700 border border-red-200 rounded hover:bg-red-50"
+                                            >
+                                                Retirer la promo
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1 break-words">
+                                            {store?.is_b2b ? (
+                                                "Cette promo reste en place. Les grossistes ne peuvent pas encore en créer d'autres."
+                                            ) : (
+                                                <>
+                                                    Cette promo reste en place. Pour la modifier ou en créer d'autres :{' '}
+                                                    <Link to="/store/subscription" className="text-indigo-600 underline">passer au forfait Pro</Link>.
+                                                </>
+                                            )}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <input
+                                            id="compare-price"
+                                            type="number"
+                                            className="w-full border rounded p-2 bg-gray-100"
+                                            value=""
+                                            disabled
+                                            readOnly
+                                        />
+                                        <p className="text-xs text-gray-600 mt-1 break-words">
+                                            {store?.is_b2b ? (
+                                                "Les promotions (prix barré) ne sont pas encore proposées aux grossistes."
+                                            ) : (
+                                                <>
+                                                    Promotions (prix barré) : forfait Pro.{' '}
+                                                    <Link to="/store/subscription" className="text-indigo-600 underline">Passer au forfait Pro</Link>
+                                                </>
+                                            )}
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-1">Catégorie</label>
                                 <select 
@@ -593,7 +811,7 @@ const StoreProducts = () => {
                                     onClick={() => {
                                         setShowProductModal(false);
                                         setEditingProduct(null);
-                                        setNewProduct({ name: '', description: '', price: '', stock: '', category: '', weight_kg: '', length_m: '', attributes: {}, image: null }); setGalleryFiles([]); setRemovedPhotos([]);
+                                        setNewProduct(emptyProduct()); setGalleryFiles([]); setRemovedPhotos([]);
                                     }}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
                                 >
@@ -608,6 +826,192 @@ const StoreProducts = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Excel/CSV : présentation de l'outil Pro, ou modèle -> fichier -> aperçu -> création */}
+            {showImportModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 z-[60]">
+                    <div className={`bg-white rounded-lg px-5 pt-5 w-full ${canImport ? 'max-w-2xl' : 'max-w-md pb-5'} max-h-[85dvh] overflow-y-auto relative`}>
+                        <button
+                            type="button"
+                            onClick={closeImportModal}
+                            disabled={!!importBusy}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 disabled:opacity-40"
+                            aria-label="Fermer"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <h3 className="text-lg font-bold mb-3 pr-8">Importer des produits (Excel/CSV)</h3>
+
+                        {!canImport ? (
+                            <div className="space-y-4">
+                                <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Forfait Pro</span>
+                                <p className="text-sm text-gray-700">
+                                    Ajoutez des centaines de produits en une fois depuis un fichier Excel ou CSV (dans la limite de produits de votre forfait), au lieu de les saisir un par un.
+                                </p>
+                                <p className="text-sm text-gray-700">Cet outil fait partie du forfait Pro.</p>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={closeImportModal}
+                                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                                    >
+                                        Fermer
+                                    </button>
+                                    <Link
+                                        to="/store/subscription"
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                    >
+                                        Passer au forfait Pro
+                                    </Link>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <ol className="space-y-5">
+                                    <li>
+                                        <p className="font-semibold mb-2">1. Téléchargez le modèle</p>
+                                        <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1 mb-3">
+                                            <li>Colonnes obligatoires : Nom, Prix, Poids (kg), Longueur (m).</li>
+                                            <li>500 lignes et 2 Mo maximum par fichier, .xlsx ou .csv, dans la limite de produits de votre forfait.</li>
+                                            <li>Prix en francs CFA, sans centimes : « 4500 », « 4 500 » ou « 4.500 ».</li>
+                                            <li>Une ligne par produit. Les photos s'ajoutent ensuite, produit par produit.</li>
+                                        </ul>
+                                        <button
+                                            type="button"
+                                            onClick={handleDownloadTemplate}
+                                            disabled={!!importBusy}
+                                            className="px-4 py-2 border border-indigo-600 text-indigo-700 rounded hover:bg-indigo-50 disabled:opacity-50"
+                                        >
+                                            {importBusy === 'template' ? 'Téléchargement...' : 'Télécharger le modèle'}
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <p className="font-semibold mb-2">2. Choisissez votre fichier rempli</p>
+                                        {/* Sélection vidée à l'ouverture : choisir à nouveau le même fichier corrigé relance bien la lecture. */}
+                                        <input
+                                            key={importInputKey}
+                                            type="file"
+                                            accept=".xlsx,.csv"
+                                            onClick={e => { e.target.value = ''; }}
+                                            onChange={e => handleImportFile(e.target.files?.[0] || null)}
+                                            disabled={!!importBusy}
+                                            className="block w-full min-w-0 text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-2"
+                                        />
+                                        {importFile && (
+                                            <p className="text-xs text-gray-500 mt-1 break-words">
+                                                {importFile.name} ({Math.max(1, Math.round(importFile.size / 1024))} Ko)
+                                            </p>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => runImport(false)}
+                                            disabled={!!importBusy}
+                                            className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                        >
+                                            {importBusy === 'preview' ? 'Vérification...' : 'Vérifier le fichier'}
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <p className="font-semibold mb-2">3. Vérifiez, puis créez les produits</p>
+                                        {!importPreview ? (
+                                            <p className="text-sm text-gray-500">L'aperçu s'affiche ici. Rien n'est créé avant votre confirmation.</p>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {importPreview.message && (
+                                                    <p className="text-sm text-gray-800 bg-indigo-50 border border-indigo-100 rounded p-3 break-words">{importPreview.message}</p>
+                                                )}
+                                                {importPreview.unknown_columns?.length > 0 && (
+                                                    <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 break-words">
+                                                        Colonnes ignorées : {importPreview.unknown_columns.join(', ')}
+                                                    </p>
+                                                )}
+                                                {importPreview.rows?.length > 0 ? (
+                                                    <div className="overflow-x-auto border rounded">
+                                                        <table className="w-full min-w-[520px] text-sm">
+                                                            <thead className="bg-gray-50 text-left text-gray-600">
+                                                                <tr>
+                                                                    <th className="px-3 py-2 font-medium">Ligne</th>
+                                                                    <th className="px-3 py-2 font-medium">Produit</th>
+                                                                    <th className="px-3 py-2 font-medium">Prix</th>
+                                                                    <th className="px-3 py-2 font-medium">État</th>
+                                                                    <th className="px-3 py-2 font-medium">Détail</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y">
+                                                                {importPreview.rows.map(row => {
+                                                                    const status = IMPORT_STATUS[row.status] || IMPORT_STATUS.error;
+                                                                    return (
+                                                                        <tr key={row.row} className="align-top">
+                                                                            <td className="px-3 py-2 text-gray-500">{row.row}</td>
+                                                                            <td className="px-3 py-2 font-medium break-words max-w-[180px]">{row.name || '—'}</td>
+                                                                            <td className="px-3 py-2 whitespace-nowrap">
+                                                                                {row.price ? `${Number(row.price).toLocaleString('fr-FR')} F` : '—'}
+                                                                                {row.compare_price ? (
+                                                                                    <span className="block text-xs text-gray-400 line-through">{Number(row.compare_price).toLocaleString('fr-FR')} F</span>
+                                                                                ) : null}
+                                                                            </td>
+                                                                            <td className="px-3 py-2">
+                                                                                <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-semibold ${status.className}`}>{status.label}</span>
+                                                                            </td>
+                                                                            <td className="px-3 py-2 text-gray-600 break-words">
+                                                                                {row.message && <p>{row.message}</p>}
+                                                                                {row.notes?.length > 0 && (
+                                                                                    <p className="text-xs text-amber-700">{row.notes.join(' · ')}</p>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500">Le fichier ne contient aucune ligne de produit.</p>
+                                                )}
+                                                {importPreview.categories?.length > 0 && (
+                                                    <details className="text-xs text-gray-500">
+                                                        <summary className="cursor-pointer">Catégories reconnues ({importPreview.categories.length})</summary>
+                                                        <p className="mt-1 break-words">{importPreview.categories.join(', ')}</p>
+                                                    </details>
+                                                )}
+                                                {!(importPreview.counts?.ok > 0) && (
+                                                    <p className="text-sm text-red-700">
+                                                        Aucune ligne prête à créer : corrigez le fichier, choisissez-le à nouveau, puis vérifiez-le.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </li>
+                                </ol>
+                                <div className="sticky bottom-0 -mx-5 px-5 py-3 mt-5 bg-white border-t border-gray-100 flex flex-wrap justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={closeImportModal}
+                                        disabled={!!importBusy}
+                                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
+                                    >
+                                        Fermer
+                                    </button>
+                                    {importPreview && (
+                                        <button
+                                            type="button"
+                                            onClick={() => runImport(true)}
+                                            disabled={!!importBusy || !(importPreview.counts?.ok > 0)}
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {importBusy === 'confirm'
+                                                ? 'Création en cours...'
+                                                : `Créer ${importPreview.counts?.ok || 0} produit${(importPreview.counts?.ok || 0) > 1 ? 's' : ''}`}
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

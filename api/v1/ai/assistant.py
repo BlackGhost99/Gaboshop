@@ -426,7 +426,9 @@ def t_create_product(ctx, name, price, stock=1, category=None, brand=None, model
              (('brand', brand), ('model', model), ('color', color), ('sizes', sizes)) if v not in (None, '')}
     fields = {'name': name, 'price': str(price_value), 'stock': stock, 'category': cat.id if cat else None,
               'attributes': attrs, 'description': str(description or '').strip()[:1000]}
-    if compare_price not in (None, ''):
+    from payments.plan_features import required_message, store_has
+    promo_refused = compare_price not in (None, '') and not store_has(store, 'promotions')
+    if compare_price not in (None, '') and not promo_refused:
         try:
             cp = Decimal(str(compare_price))
             if cp > price_value:
@@ -441,6 +443,8 @@ def t_create_product(ctx, name, price, stock=1, category=None, brand=None, model
     label = f"Créer « {name} » : " + ', '.join(details)
     ctx.confirmations.append({'token': token, 'label': label})
     return {'pending_confirmation': True, 'summary': label,
+            'promotion_refused': (f"Le prix barré n'a pas été repris. {required_message('promotions', store.get_current_plan())}"
+                                  if promo_refused else None),
             'category_found': bool(cat),
             'available_categories': [c.name for c in _store_categories(store)][:20],
             'message': "Le produit sera créé quand le commerçant appuiera sur « Confirmer ». "

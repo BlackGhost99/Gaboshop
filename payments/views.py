@@ -6,7 +6,7 @@ Vues pour l'intégration CinetPay / Airtel Money / Moov Money
 """
 
 import logging
-from payments.utils import payment_request_minutes, subscription_days
+from payments.utils import carried_days, payment_request_minutes, subscription_days
 from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -96,7 +96,7 @@ def _activate_subscription_from_intent(intent):
         return None
 
     start_date = timezone.now().date()
-    end_date = start_date + timedelta(days=subscription_days())
+    days = subscription_days()
 
     if subscription_kind == 'b2b':
         from b2b.models import B2BSubscriptionPlan, B2BStoreSubscription
@@ -114,7 +114,12 @@ def _activate_subscription_from_intent(intent):
             logger.warning("Invalid B2B plan for intent %s", intent.reference)
             return None
 
-        subscription = getattr(store, 'b2b_subscription', None)
+        subscription = B2BStoreSubscription.objects.filter(store=store).first()
+        bonus = 0
+        if subscription and subscription.is_active():
+            bonus = carried_days(subscription.get_remaining_days(), subscription.monthly_fee, plan.price,
+                                 subscription.plan_id == plan.id)
+        end_date = start_date + timedelta(days=days + bonus)
         if subscription:
             subscription.plan = plan
             subscription.plan_name = plan.name
@@ -136,31 +141,35 @@ def _activate_subscription_from_intent(intent):
                 auto_renew=True
             )
 
-        store.subscription_plan = plan.plan_type
-        store.save(update_fields=['subscription_plan'])
     else:
         plan = SubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
         if not plan or plan.plan_type == 'free':
             logger.warning("Invalid B2C plan for intent %s", intent.reference)
             return None
 
+        fee = _get_subscription_price(store, plan)
+        current = store.get_active_subscription()
+        bonus = 0
+        if current:
+            bonus = carried_days((current.end_date - start_date).days, current.monthly_fee, fee,
+                                 current.plan_id == plan.id)
+        end_date = start_date + timedelta(days=days + bonus)
         StoreSubscription.objects.filter(store=store, status='active').update(status='expired')
         subscription = StoreSubscription.objects.create(
             store=store,
             plan=plan,
             plan_name=plan.name,
-            monthly_fee=_get_subscription_price(store, plan),
+            monthly_fee=fee,
             status='active',
             start_date=start_date,
             end_date=end_date,
             auto_renew=True
         )
 
-        store.subscription_plan = plan.plan_type
-        store.save(update_fields=['subscription_plan'])
-
+    store.refresh_plan_badge()
     meta['subscription_activated'] = True
     meta['subscription_id'] = subscription.id
+    meta['carried_days'] = bonus
     intent.metadata = meta
     intent.save(update_fields=['metadata'])
     return subscription
@@ -168,7 +177,7 @@ def _activate_subscription_from_intent(intent):
 
 RESERVED_INTENT_METADATA = {
     'purpose', 'plan', 'plan_id', 'store_id', 'subscription_kind', 'subscription_activated',
-    'forfait_id', 'client_forfait_id', 'sponsorship_id',
+    'forfait_id', 'client_forfait_id', 'sponsorship_id', 'carried_days',
 }
 
 
@@ -352,6 +361,12 @@ class SubscriptionPaymentIntentAPIView(APIView):
 
         if provider not in ("cinetpay", "singpay"):
             return Response({"detail": "Provider non supporte"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if provider == "cinetpay":
+            # Le paiement par carte (CinetPay) n'est pas branché : on ne crée pas une demande qui ne peut pas aboutir.
+            return Response({"detail": "Le paiement par carte bancaire n'est pas encore disponible. "
+                                       "Payez votre forfait avec Airtel Money ou Moov Money."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if provider == "singpay":
             if operator not in ("airtel", "moov"):
@@ -980,7 +995,8 @@ class SubscriptionPlansAPIView(APIView):
                 'success': True,
                 'plans': plans_data,
                 'current_plan': current_plan,
-                'store_type': 'b2b' if store.is_b2b else 'b2c'
+                'store_type': 'b2b' if store.is_b2b else 'b2c',
+                'is_b2b': True,
             })
         
         # Sinon, retourner les plans B2C (comportement existant)
@@ -1016,12 +1032,7 @@ class SubscriptionPlansAPIView(APIView):
                     'priority_listing': free.priority_listing, 'can_sponsor_products': free.can_sponsor_products,
                 }
         if store and current_plan is None:
-            active_sub = (
-                StoreSubscription.objects
-                .filter(store=store, status='active')
-                .order_by('-end_date')
-                .first()
-            )
+            active_sub = store.get_active_subscription()
             if active_sub:
                 plan_obj = active_sub.plan
                 current_plan = {
@@ -1046,7 +1057,8 @@ class SubscriptionPlansAPIView(APIView):
             'success': True,
             'plans': plans_data,
             'current_plan': current_plan,
-            'store_type': store.store_type if store else None
+            'store_type': store.store_type if store else None,
+            'is_b2b': bool(store and store.is_b2b),
         })
 
 

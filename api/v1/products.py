@@ -116,7 +116,7 @@ class ProductListView(ListAPIView):
         from django.db.models import OuterRef, Subquery, Value, IntegerField
         from django.db.models.functions import Coalesce
         from django.utils import timezone
-        from payments.models import StoreSubscription
+        from payments.models import StoreSubscription, paid_first
         from payments.sponsoring import sponsored_product_exists
 
         today = timezone.now().date()
@@ -124,7 +124,7 @@ class ProductListView(ListAPIView):
             store=OuterRef('store_id'),
             status='active',
             end_date__gte=today
-        ).order_by('-end_date').values('plan__priority_listing')[:1]
+        ).order_by(*paid_first()).values('plan__priority_listing')[:1]
 
         return Product.objects.filter(
             is_available=True,

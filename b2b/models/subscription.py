@@ -85,7 +85,15 @@ class B2BSubscriptionPlan(models.Model):
         default=False,
         help_text="Accès à l'API pour intégrations"
     )
-    
+    can_import_products = models.BooleanField(
+        default=False,
+        help_text="Import de produits par fichier Excel/CSV"
+    )
+    has_stock_alerts = models.BooleanField(
+        default=False,
+        help_text="Alerte (notification et téléphone) quand un produit passe sous le seuil de stock"
+    )
+
     # Commissions et frais
     commission_reduction_percent = models.DecimalField(
         max_digits=5,
@@ -188,13 +196,8 @@ class B2BSubscriptionPlan(models.Model):
                 'enabled': True
             })
         
-        if self.max_b2c_buyers:
-            features.append({
-                'title': f"Jusqu'à {self.max_b2c_buyers} clients B2C",
-                'category': 'limits',
-                'enabled': True
-            })
-        else:
+        # Aucune limite de commerces clients n'est appliquée par le code : on ne promet pas de plafond.
+        if not self.max_b2c_buyers:
             features.append({
                 'title': "Clients B2C illimités",
                 'category': 'limits',
@@ -214,114 +217,74 @@ class B2BSubscriptionPlan(models.Model):
                 'enabled': True
             })
         
-        # Fonctionnalités
-        if self.can_offer_bulk_discounts:
+        # Seules les lignes que le code applique (payments/plan_features.py). Ne sont plus promis : remises en gros
+        # (seul l'admin crée les prix par quantité), promotions, API, support prioritaire.
+        from payments.plan_features import keep_free_text, tool_lines
+        for title in tool_lines(self):
+            features.append({'title': title, 'category': 'features', 'enabled': True})
+
+        # Le serveur ouvre l'approvisionnement à tout grossiste qui n'est pas au forfait Gratuit (b2b/api/views.py).
+        if self.plan_type != 'free':
             features.append({
-                'title': "Remises pour achats en gros",
+                'title': "Commandes chez les autres grossistes et industries (approvisionnement)",
                 'category': 'features',
                 'enabled': True
             })
-        
-        if self.can_view_detailed_reports or self.has_advanced_analytics:  # has_advanced_analytics pour compatibilité
-            features.append({
-                'title': "Statistiques avancées",
-                'category': 'features',
-                'enabled': True
-            })
-        
-        if self.has_priority_support:
-            features.append({
-                'title': "Support prioritaire",
-                'category': 'features',
-                'enabled': True
-            })
-        
-        if self.can_create_promotions:
-            features.append({
-                'title': "Créer des promotions",
-                'category': 'features',
-                'enabled': True
-            })
-        
-        if self.has_api_access:
-            features.append({
-                'title': "Accès API",
-                'category': 'features',
-                'enabled': True
-            })
-        
+
         if self.featured_in_catalog:
             features.append({
-                'title': "Mise en avant dans le catalogue",
+                'title': "Mise en avant dans la liste des grossistes",
                 'category': 'marketing',
                 'enabled': True
             })
-        
+
         if self.catalog_priority > 0:
             features.append({
-                'title': f"Priorité d'affichage niveau {self.catalog_priority}",
+                'title': "Priorité d'affichage dans la liste des grossistes",
                 'category': 'marketing',
                 'enabled': True
             })
-        
+
         if self.commission_reduction_percent > 0:
             features.append({
-                'title': f"Réduction de {self.commission_reduction_percent}% sur les commissions",
+                'title': f"Réduction de {Decimal(self.commission_reduction_percent).normalize():f} % sur les commissions",
                 'category': 'pricing',
                 'enabled': True
             })
-        
-        # Finance - Vue détaillée
-        if self.can_view_finance_detailed:
+
+        # Finance - Ventes par catégorie (écran Finance, même case que les statistiques avancées)
+        if self.can_view_detailed_reports:
             features.append({
-                'title': "Finance : vue détaillée par commande et catégorie",
+                'title': "Finance : ventes par catégorie",
                 'category': 'finance',
                 'enabled': True
             })
-        
-        # Finance - Export CSV
-        if self.can_export_finance_csv:
-            features.append({
-                'title': "Export CSV/Excel des rapports financiers",
-                'category': 'finance',
-                'enabled': True
-            })
-        
-        # Finance - Export PDF
-        if self.can_export_finance_pdf:
-            features.append({
-                'title': "Export PDF officiel des rapports financiers",
-                'category': 'finance',
-                'enabled': True
-            })
-        
-        # Finance - Historique illimité
-        if self.finance_history_limit_days is None:
-            features.append({
-                'title': "Historique financier illimité",
-                'category': 'finance',
-                'enabled': True
-            })
-        elif self.finance_history_limit_days > 0:
-            features.append({
-                'title': f"Historique financier : {self.finance_history_limit_days} jours",
-                'category': 'finance',
-                'enabled': True
-            })
-        
-        # Accès approvisionnement B2B (seulement Pro et Business)
-        if self.plan_type in ['pro', 'business']:
-            features.append({
-                'title': "Accès approvisionnement B2B (catalogues grossistes)",
-                'category': 'features',
-                'enabled': True
-            })
-        
-        # Fonctionnalités personnalisées
-        for custom_feature in self.custom_features:
-            if custom_feature.get('enabled', True):
+
+        # Finance - Historique : un avantage seulement s'il est plus long que celui du forfait Gratuit.
+        free = type(self).objects.filter(plan_type='free').exclude(pk=self.pk).first()
+        free_limit = free.finance_history_limit_days if free is not None else None
+        longer = (self.plan_type != 'free' and free is not None and free_limit is not None
+                  and (self.finance_history_limit_days is None or self.finance_history_limit_days > free_limit))
+        if longer:
+            if self.finance_history_limit_days is None:
                 features.append({
-                    'title': custom_feature.get('title', ''),
+                    'title': "Historique financier illimité",
+                    'category': 'finance',
+                    'enabled': True
+                })
+            elif self.finance_history_limit_days > 0:
+                features.append({
+                    'title': f"Historique financier : {self.finance_history_limit_days} jours",
+                    'category': 'finance',
+                    'enabled': True
+                })
+
+        # Avantages saisis par l'admin : gardés seulement s'ils ne promettent pas un outil inexistant.
+        for custom_feature in self.custom_features:
+            title = custom_feature.get('title', '')
+            if custom_feature.get('enabled', True) and keep_free_text(title):
+                features.append({
+                    'title': title,
                     'description': custom_feature.get('description', ''),
                     'category': custom_feature.get('category', 'custom'),
                     'enabled': True

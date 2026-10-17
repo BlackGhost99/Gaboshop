@@ -69,14 +69,14 @@ class StoreListView(ListAPIView):
 			from django.db.models import OuterRef, Subquery, Value, IntegerField
 			from django.db.models.functions import Coalesce
 			from django.utils import timezone
-			from payments.models import StoreSubscription
+			from payments.models import StoreSubscription, paid_first
 
 			today = timezone.now().date()
 			priority_subquery = StoreSubscription.objects.filter(
 				store=OuterRef('pk'),
 				status='active',
 				end_date__gte=today
-			).order_by('-end_date').values('plan__priority_listing')[:1]
+			).order_by(*paid_first()).values('plan__priority_listing')[:1]
 
 			from payments.sponsoring import sponsored_store_exists
 			queryset = queryset.annotate(

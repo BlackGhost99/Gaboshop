@@ -36,16 +36,8 @@ class SubscriptionChecker:
         Returns:
             StoreSubscription ou None
         """
-        try:
-            # Chercher un abonnement actif et non expiré
-            subscription = StoreSubscription.objects.filter(
-                store=store,
-                status='active',
-                end_date__gte=timezone.now().date()
-            ).latest('end_date')
-            return subscription
-        except StoreSubscription.DoesNotExist:
-            return None
+        # Abonnement actif et non expiré ; un forfait payant passe avant la ligne Gratuit automatique.
+        return store.get_active_subscription()
     
     @staticmethod
     def get_current_plan(store):
@@ -136,9 +128,27 @@ class SubscriptionChecker:
     @staticmethod
     def product_limit_message(plan, limit):
         name = 'Gratuit' if getattr(plan, 'plan_type', '') == 'free' else plan.name
-        upgrade = 'Passez à Pro' if getattr(plan, 'plan_type', '') == 'free' else 'Passez à un forfait supérieur'
         return (f"Vous avez atteint la limite de {limit} produit{'s' if limit > 1 else ''} du forfait {name}. "
-                f"{upgrade} pour ajouter davantage de produits.")
+                + SubscriptionChecker.upgrade_hint(plan, 'ajouter davantage de produits'))
+
+    @staticmethod
+    def upgrade_hint(plan, what, **needs):
+        """Que faire, honnêtement : un forfait en vente qui débloque vraiment la chose, sinon « pas encore ».
+
+        ``needs`` : cases que ce forfait doit avoir (ex. can_access_b2b=True). Business fermé n'est jamais proposé.
+        """
+        model = type(plan) if plan is not None else SubscriptionPlan
+        ranks = ('free', 'pro', 'business')
+        current = getattr(plan, 'plan_type', 'free')
+        higher = ranks[ranks.index(current) + 1:] if current in ranks else ranks[1:]
+        target = None
+        if higher:
+            target = (model.objects.filter(plan_type__in=higher, is_active=True, is_available=True, **needs)
+                      .order_by('price').first())
+        if target is not None:
+            return f"Passez au forfait {target.name} dans « Mon forfait » pour {what}."
+        article = "d'" if what[:1].lower() in 'aeiouyéèêh' else 'de '
+        return f"Aucun forfait en vente ne permet encore {article}{what}."
 
     @staticmethod
     def _normalize_text(value):
@@ -204,8 +214,8 @@ class SubscriptionChecker:
             raise PermissionDenied(
                 f"Votre forfait {plan.name} permet {max_food} produits alimentaires. "
                 f"Vous en avez déjà {food_count}. "
-                f"Les produits non alimentaires restent possibles, "
-                f"ou passez à un forfait supérieur pour ajouter plus d'alimentaire."
+                f"Les produits non alimentaires restent possibles. "
+                + SubscriptionChecker.upgrade_hint(plan, "ajouter plus de produits alimentaires")
             )
 
     # Ancien nom, gardé pour les appels existants.
@@ -221,7 +231,7 @@ class SubscriptionChecker:
         if not plan or not plan.has_statistics:
             raise PermissionDenied(
                 f"Les statistiques ne sont pas disponibles avec votre forfait actuel. "
-                f"Passez à un forfait supérieur pour accéder aux statistiques avancées."
+                + SubscriptionChecker.upgrade_hint(plan, 'accéder aux statistiques avancées', has_statistics=True)
             )
     
     @staticmethod
@@ -233,8 +243,7 @@ class SubscriptionChecker:
         
         if not plan or not plan.has_custom_page:
             raise PermissionDenied(
-                f"La personnalisation de boutique n'est pas disponible avec votre forfait actuel. "
-                f"Passez à un forfait supérieur pour personnaliser votre boutique."
+                "La personnalisation de boutique n'est pas encore proposée par Gaboshop."
             )
     
     @staticmethod
@@ -246,8 +255,8 @@ class SubscriptionChecker:
         
         if not plan or not plan.can_sponsor_products:
             raise PermissionDenied(
-                f"La sponsorisation de produits n'est pas disponible avec votre forfait actuel. "
-                f"Passez à un forfait supérieur pour sponsoriser vos produits."
+                "La sponsorisation de produits n'est pas disponible avec votre forfait actuel. "
+                + SubscriptionChecker.upgrade_hint(plan, 'sponsoriser vos produits', can_sponsor_products=True)
             )
     
     @staticmethod
@@ -259,8 +268,7 @@ class SubscriptionChecker:
         
         if not plan or not plan.has_priority_support:
             raise PermissionDenied(
-                f"Le support prioritaire n'est pas disponible avec votre forfait actuel. "
-                f"Passez à un forfait supérieur pour accéder au support VIP."
+                "Le support prioritaire n'est pas encore proposé par Gaboshop."
             )
     
     @staticmethod
@@ -283,7 +291,8 @@ class SubscriptionChecker:
             if order_count >= monthly_limit:
                 raise PermissionDenied(
                     f"Vous avez atteint la limite de {monthly_limit} commandes/mois "
-                    f"de votre plan {plan.name}. Passez au plan Pro ou Business pour des commandes illimitées."
+                    f"de votre forfait {plan.name}. "
+                    + SubscriptionChecker.upgrade_hint(plan, 'recevoir plus de commandes')
                 )
     
     @staticmethod
@@ -294,8 +303,8 @@ class SubscriptionChecker:
         plan = SubscriptionChecker.get_current_plan(store)
         if not plan or not plan.can_access_b2b:
             raise PermissionDenied(
-                f"L'acc?s au catalogue B2B (approvisionnement) est r?serv? aux plans Pro ou Business. "
-                f"Passez au plan Pro ou Business pour commander chez les grossistes."
+                "L'approvisionnement chez les grossistes n'est pas inclus dans votre forfait. "
+                + SubscriptionChecker.upgrade_hint(plan, 'commander chez les grossistes', can_access_b2b=True)
             )
     
     @staticmethod
@@ -306,8 +315,7 @@ class SubscriptionChecker:
         plan = SubscriptionChecker.get_current_plan(store)
         if not plan or not getattr(plan, 'can_offer_express_delivery', False):
             raise PermissionDenied(
-                "La livraison express n'est pas disponible avec votre forfait actuel. "
-                "Passez au plan Pro ou Business pour l'activer."
+                "La livraison express n'est pas encore proposée par Gaboshop."
             )
 
     @staticmethod

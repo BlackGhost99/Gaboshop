@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { notifyError } from '../../utils/feedback';
+import { notifyError, notifyInfo } from '../../utils/feedback';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { downloadFile } from '../../services/financeService';
 
@@ -17,9 +17,16 @@ const ExportButton = ({
   // Check permissions
   const canExportCSV = planFeatures?.can_export_excel;
   const canExportPDF = planFeatures?.can_export_pdf;
-  const planName = planFeatures?.plan_name || 'Free';
 
   const handleExport = async () => {
+    // L'application Android ne sait pas encore enregistrer un fichier : on le dit au lieu d'échouer sans rien afficher.
+    if (window.Capacitor?.isNativePlatform?.()) {
+      notifyInfo(
+        "Téléchargement pas encore possible dans l'application",
+        "Ouvrez Gaboshop dans le navigateur de votre téléphone ou sur un ordinateur, avec le même compte, puis appuyez sur « Export » : le fichier se télécharge.",
+      );
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
@@ -46,13 +53,20 @@ const ExportButton = ({
       const fullFilename = `${filename}.${extension}`;
       
       downloadFile(blob, fullFilename);
-    } catch (err) {
+    } catch (caught) {
+      // Le serveur répond en texte (raison du refus ou de l'échec) : on l'affiche tel quel.
+      let err = caught;
+      const body = caught instanceof Blob ? caught : caught?.response?.data;
+      if (body instanceof Blob) {
+        const text = (await body.text().catch(() => '')).split('\n')[0].trim();
+        err = new Error(text || "L'export n'a pas abouti.");
+      }
       console.error('Erreur lors de l\'export:', err);
       setError(err.message || "Erreur lors de l'export");
       
       // Show permission error if 403
       if (err.response?.status === 403) {
-        notifyError(err, { action: 'Exporter', fallback: 'Cette fonctionnalité nécessite un plan supérieur.' });
+        notifyError(err, { action: 'Exporter', fallback: 'Cet export fait partie du forfait Pro.' });
       } else {
         // Show error message
         notifyError(err, { action: 'Exporter' });
@@ -69,10 +83,10 @@ const ExportButton = ({
   // Upgrade message
   const getUpgradeMessage = () => {
     if (type === 'csv' && !canExportCSV) {
-      return 'Export CSV disponible avec le plan Pro ou Business';
+      return 'Export CSV : forfait Pro';
     }
     if (type === 'pdf' && !canExportPDF) {
-      return 'Export PDF disponible uniquement avec le plan Business';
+      return 'Export PDF : forfait Pro';
     }
     return null;
   };
@@ -119,7 +133,7 @@ const ExportButton = ({
       {/* Locked Badge */}
       {!isAllowed && (
         <div className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
-          🔒 {planName === 'Free' ? 'Pro+' : 'Business'}
+          🔒 Pro
         </div>
       )}
 
