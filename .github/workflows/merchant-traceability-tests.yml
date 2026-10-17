@@ -1,0 +1,32 @@
+name: Historique marchand et dettes — contrôle
+on:
+  push:
+    branches: [feat/merchant-order-traceability-20261017]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  django:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DJANGO_SECRET_KEY: test-merchant-ledger-ci-non-production-2026
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py test payments.tests.test_merchant_order_traceability_2026_10_17 payments.tests.test_manual_payments orders.tests.test_admin_cancel_wait_2026_10_16 --noinput -v 2
+  react:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
