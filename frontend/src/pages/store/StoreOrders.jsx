@@ -44,11 +44,34 @@ const ADVANCE_DETAILS = {
   in_transit: 'Le client est prévenu que vous arrivez. Il confirmera la réception dans son application.',
 };
 
+const PAYMENT_FLOW_NAMES = {
+  direct_split: 'Paiement direct : commerce et livreur',
+  store_collects_all: 'Paiement intégral au commerce',
+  courier_cash: 'Espèces encaissées par un livreur',
+  platform_online: 'Paiement SingPay',
+};
+const PAYMENT_METHOD_NAMES = {
+  cash: 'Espèces', airtel_money: 'Airtel Money', moov_money: 'Moov Money',
+  bank_transfer: 'Virement',
+};
+const ROLE_NAMES = { client: 'Client', store: 'Commerce', courier: 'Livreur', platform: 'Gaboshop' };
+const DEBT_KIND_NAMES = {
+  products: 'Articles', delivery: 'Livraison', delivery_collection: 'Frais de livraison',
+  courier_remittance: 'Fonds remis au commerce', commission: 'Commission Gaboshop',
+  delivery_margin: 'Marge livraison Gaboshop', failed_trip: 'Course non aboutie',
+};
+const orderArticlePreview = (order) => (order.items || [])
+  .map((item) => `${item.product_name || 'Article'} × ${item.quantity}`)
+  .join(' · ');
+
 const StoreOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState(null);
-  const [activeFilter, setActiveFilter] = useState('pending');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [untilDate, setUntilDate] = useState('');
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
@@ -95,9 +118,19 @@ const StoreOrders = () => {
 
   const filteredOrders = useMemo(() => {
     const filter = FILTERS[activeFilter];
-    if (!filter || filter.statuses.length === 0) return orders;
-    return orders.filter((o) => filter.statuses.includes(o.status));
-  }, [orders, activeFilter]);
+    const query = search.trim().toLocaleLowerCase('fr');
+    return orders.filter((order) => {
+      if (filter?.statuses?.length && !filter.statuses.includes(order.status)) return false;
+      if (query && ![
+        order.order_number, order.client_phone, order.status_display,
+        orderArticlePreview(order),
+      ].some((value) => String(value || '').toLocaleLowerCase('fr').includes(query))) return false;
+      const day = order.created_at ? String(order.created_at).slice(0, 10) : '';
+      if (fromDate && day < fromDate) return false;
+      if (untilDate && day > untilDate) return false;
+      return true;
+    });
+  }, [orders, activeFilter, search, fromDate, untilDate]);
 
   const renderStatus = (status) => {
     const cfg = STATUS_MAP[status] || { label: status, className: 'bg-gray-100 text-gray-800' };
@@ -212,6 +245,28 @@ const StoreOrders = () => {
           ))}
         </div>
 
+        <div className="mb-5 grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+          <label className="text-xs font-semibold text-gray-700">
+            Rechercher une vente
+            <input value={search} onChange={(event) => setSearch(event.target.value)}
+              placeholder="N° commande, téléphone, nom d'article"
+              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm" />
+          </label>
+          <label className="text-xs font-semibold text-gray-700">Depuis
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+              className="mt-1 block rounded-md border border-gray-300 bg-white px-2 py-2 text-sm" />
+          </label>
+          <label className="text-xs font-semibold text-gray-700">Jusqu'au
+            <input type="date" value={untilDate} onChange={(e) => setUntilDate(e.target.value)}
+              className="mt-1 block rounded-md border border-gray-300 bg-white px-2 py-2 text-sm" />
+          </label>
+          <button type="button" onClick={() => { setSearch(''); setFromDate(''); setUntilDate(''); setActiveFilter('all'); }}
+            className="self-end rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700">
+            Tout afficher
+          </button>
+        </div>
+        <p className="mb-3 text-sm text-gray-600">{filteredOrders.length} commande(s) affichée(s). Cliquez sur une vente pour son relevé détaillé.</p>
+
         {filteredOrders.length === 0 ? (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,7 +287,7 @@ const StoreOrders = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-base font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</p>
-                    <p className="text-xs text-gray-500">{order.items?.length || order.items_count || 0} article(s)</p>
+                    <p className="text-xs text-gray-600 max-w-[160px] break-words">{orderArticlePreview(order) || 'Articles non renseignés'}</p>
                   </div>
                 </div>
                 <div className="mt-2 text-sm">{renderStatus(order.status)}</div>
@@ -274,7 +329,7 @@ const StoreOrders = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Articles</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Articles achetés</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -286,7 +341,10 @@ const StoreOrders = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(order.created_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{renderStatus(order.status)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.items?.length || order.items_count || 0}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 max-w-[260px]">
+                      <p className="font-medium break-words">{orderArticlePreview(order) || 'Articles non renseignés'}</p>
+                      <p className="text-xs text-gray-500">{order.items?.reduce((count, item) => count + Number(item.quantity || 0), 0) || 0} unité(s)</p>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 flex items-center">
                       <button
                         className="text-indigo-600 hover:text-indigo-900"
