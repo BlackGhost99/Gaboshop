@@ -1,0 +1,33 @@
+name: Business B2C — respect configuration admin
+on:
+  push:
+    branches: [fix/business-b2c-admin-plan-respected-20261017]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DJANGO_SECRET_KEY: ci-only-business-plan-20261017-not-prod-secret
+      DJANGO_DEBUG: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py test payments.tests.test_business_b2c_admin_price_2026_10_17 payments.tests.test_forfait_gratuit_2026_10_15 payments.tests.test_abonnement_plan_2026_10_16 payments.tests.test_outils_forfaits_2026_10_16 --noinput -v 1
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
