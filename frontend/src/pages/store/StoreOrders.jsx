@@ -75,13 +75,25 @@ const StoreOrders = () => {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
+  const [page, setPage] = useState(1);
+  const [nextPage, setNextPage] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (pageNumber = 1) => {
     try {
-      setLoading(true);
-      const res = await getOrders();
+      if (pageNumber === 1) setLoading(true);
+      else setLoadingMore(true);
+      const res = await getOrders({
+        page: pageNumber, search: search.trim(),
+        date_from: fromDate, date_to: untilDate,
+        status: FILTERS[activeFilter]?.statuses?.join(',') || '',
+      });
       if (res.success) {
-        setOrders(res.data || []);
+        setOrders((previous) => pageNumber === 1 ? (res.data || []) : [...previous, ...(res.data || [])]);
+        setNextPage(Boolean(res.meta?.next));
+        setTotalCount(res.meta?.count ?? (res.data || []).length);
+        setPage(pageNumber);
         setError(null);
       } else {
         const detail = res.error?.details;
@@ -94,12 +106,18 @@ const StoreOrders = () => {
       setError(`Erreur: ${msg}`);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
-    // Venu d'une notification (« Voir la commande ») : on ouvre directement cette commande.
+    // Rechercher aussi dans les pages anciennes de la base, pas seulement les 20 visibles.
+    const task = setTimeout(() => fetchOrders(1), 300);
+    return () => clearTimeout(task);
+  }, [search, fromDate, untilDate, activeFilter]);
+
+  useEffect(() => {
+    // Accès depuis une notification ou depuis une ligne du relevé Gaboshop.
     const wanted = new URLSearchParams(window.location.search).get('order');
     if (wanted) openDetail(wanted);
   }, []);
@@ -209,7 +227,7 @@ const StoreOrders = () => {
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading && orders.length === 0) return <LoadingSpinner />;
 
   return (
     <StoreLayout title="Mes Commandes">
@@ -217,7 +235,7 @@ const StoreOrders = () => {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Vue globale</h3>
           <button
-            onClick={fetchOrders}
+            onClick={() => fetchOrders(1)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
           >
             Rafraîchir
@@ -240,7 +258,7 @@ const StoreOrders = () => {
               }`}
             >
               {cfg.label}
-              <span className="ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">{counts[key] || 0}</span>
+              
             </button>
           ))}
         </div>
@@ -265,7 +283,10 @@ const StoreOrders = () => {
             Tout afficher
           </button>
         </div>
-        <p className="mb-3 text-sm text-gray-600">{filteredOrders.length} commande(s) affichée(s). Cliquez sur une vente pour son relevé détaillé.</p>
+        <p className="mb-3 text-sm text-gray-600">
+          {filteredOrders.length} sur {totalCount} commande(s) correspondant aux critères.
+          {loading ? ' Actualisation en cours…' : ''} Cliquez sur une vente pour son relevé détaillé.
+        </p>
 
         {filteredOrders.length === 0 ? (
           <div className="text-center py-12">
@@ -389,6 +410,14 @@ const StoreOrders = () => {
               </tbody>
             </table>
           </div>
+          {nextPage && (
+            <div className="mt-4 text-center">
+              <button type="button" disabled={loadingMore} onClick={() => fetchOrders(page + 1)}
+                className="rounded-md border border-indigo-300 px-5 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+                {loadingMore ? 'Chargement…' : 'Charger des commandes plus anciennes'}
+              </button>
+            </div>
+          )}
           </>
         )}
       </div>
