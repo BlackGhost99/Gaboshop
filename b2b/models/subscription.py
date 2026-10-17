@@ -218,18 +218,11 @@ class B2BSubscriptionPlan(models.Model):
             })
         
         # Seules les lignes que le code applique (payments/plan_features.py). Ne sont plus promis : remises en gros
-        # (seul l'admin crée les prix par quantité), promotions, API, support prioritaire.
+        # (seul l'admin crée les prix par quantité), promotions, API, support prioritaire, approvisionnement
+        # (un grossiste ne peut pas commander : b2b/services/permissions.py must_be_b2c_store).
         from payments.plan_features import keep_free_text, tool_lines
         for title in tool_lines(self):
             features.append({'title': title, 'category': 'features', 'enabled': True})
-
-        # Le serveur ouvre l'approvisionnement à tout grossiste qui n'est pas au forfait Gratuit (b2b/api/views.py).
-        if self.plan_type != 'free':
-            features.append({
-                'title': "Commandes chez les autres grossistes et industries (approvisionnement)",
-                'category': 'features',
-                'enabled': True
-            })
 
         if self.featured_in_catalog:
             features.append({

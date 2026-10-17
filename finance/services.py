@@ -9,7 +9,11 @@ from django.utils import timezone
 
 def get_plan_features(store):
     """Retourne les features du plan actuel du store"""
-    plan = store.get_current_plan()
+    return plan_feature_map(store.get_current_plan())
+
+
+def plan_feature_map(plan):
+    """Ce qu'un forfait permet côté finance (forfait commerce ou grossiste)."""
     if not plan:
         # Plan Free par défaut
         return {
@@ -72,15 +76,27 @@ def enforce_feature(store, feature_key, messages=None):
     features = get_plan_features(store)
     
     if not features.get(feature_key, False):
-        default_messages = {
-            'can_export_excel': "L'export Excel/CSV fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
-            'can_export_pdf': "L'export PDF fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
-            'can_view_detailed_reports': "Les rapports détaillés font partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
-            'can_export_finance_csv': "L'export CSV fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
-            'can_export_finance_pdf': "L'export PDF fait partie du forfait Pro. Passez à Pro dans « Mon forfait ».",
-            'can_view_finance_detailed': "Les rapports détaillés font partie du forfait Pro. Passez à Pro dans « Mon forfait »."
+        labels = {
+            'can_export_excel': "L'export Excel/CSV",
+            'can_export_pdf': "L'export PDF",
+            'can_view_detailed_reports': "Les rapports détaillés",
+            'can_export_finance_csv': "L'export CSV",
+            'can_export_finance_pdf': "L'export PDF",
+            'can_view_finance_detailed': "Les rapports détaillés",
         }
-        message = (messages or {}).get(feature_key) or default_messages.get(feature_key, "Fonctionnalité non disponible dans votre plan.")
+        message = (messages or {}).get(feature_key)
+        if not message:
+            # Conseiller seulement un forfait en vente qui donne vraiment cet outil.
+            from payments.plan_features import plan_for_sale
+            target = plan_for_sale(store.get_current_plan(), lambda plan: plan_feature_map(plan).get(feature_key, False))
+            label = labels.get(feature_key, "Cet outil")
+            plural = label.startswith('Les ')
+            if target is None:
+                verb = 'ne sont inclus' if plural else "n'est inclus"
+                message = f"{label} {verb} dans aucun forfait en vente pour le moment."
+            else:
+                verb = 'font' if plural else 'fait'
+                message = f"{label} {verb} partie du forfait {target.name}. Passez à {target.name} dans « Mon forfait »."
         raise PermissionDenied(message)
 
 

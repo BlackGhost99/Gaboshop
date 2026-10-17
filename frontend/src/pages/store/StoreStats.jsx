@@ -483,7 +483,8 @@ const StoreStats = () => {
                 {slowProducts.length ? (
                   <>
                     <p className="mb-3 text-sm text-gray-600">
-                      En stock, mais aucune vente sur les {period} derniers jours. Pensez à une promotion ou à revoir le prix.
+                      En stock, mais aucune vente sur les {period} derniers jours.
+                      {data.can_promote ? ' Pensez à une promotion ou à revoir le prix.' : ' Pensez à revoir le prix ou la description.'}
                     </p>
                     <ul className="divide-y divide-gray-100">
                       {slowProducts.map((p) => (

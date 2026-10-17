@@ -128,23 +128,29 @@ class SubscriptionChecker:
     @staticmethod
     def product_limit_message(plan, limit):
         name = 'Gratuit' if getattr(plan, 'plan_type', '') == 'free' else plan.name
+        field = 'max_b2b_products' if hasattr(plan, 'max_b2b_products') else 'max_products'
+
+        def more_products(candidate):
+            room = getattr(candidate, field, None)
+            return room is None or room > limit
+
         return (f"Vous avez atteint la limite de {limit} produit{'s' if limit > 1 else ''} du forfait {name}. "
-                + SubscriptionChecker.upgrade_hint(plan, 'ajouter davantage de produits'))
+                + SubscriptionChecker.upgrade_hint(plan, 'ajouter davantage de produits', accepts=more_products))
 
     @staticmethod
-    def upgrade_hint(plan, what, **needs):
+    def upgrade_hint(plan, what, accepts=None, **needs):
         """Que faire, honnêtement : un forfait en vente qui débloque vraiment la chose, sinon « pas encore ».
 
-        ``needs`` : cases que ce forfait doit avoir (ex. can_access_b2b=True). Business fermé n'est jamais proposé.
+        ``needs`` : cases que ce forfait doit avoir (ex. can_access_b2b=True) ; ``accepts`` : test plus fin
+        (ex. plus de produits que la limite atteinte). Business fermé n'est jamais proposé.
         """
-        model = type(plan) if plan is not None else SubscriptionPlan
-        ranks = ('free', 'pro', 'business')
-        current = getattr(plan, 'plan_type', 'free')
-        higher = ranks[ranks.index(current) + 1:] if current in ranks else ranks[1:]
-        target = None
-        if higher:
-            target = (model.objects.filter(plan_type__in=higher, is_active=True, is_available=True, **needs)
-                      .order_by('price').first())
+        from payments.plan_features import plan_for_sale
+
+        def unlocks(candidate):
+            return (all(getattr(candidate, key, None) == value for key, value in needs.items())
+                    and (accepts is None or accepts(candidate)))
+
+        target = plan_for_sale(plan, unlocks)
         if target is not None:
             return f"Passez au forfait {target.name} dans « Mon forfait » pour {what}."
         article = "d'" if what[:1].lower() in 'aeiouyéèêh' else 'de '
@@ -211,12 +217,19 @@ class SubscriptionChecker:
         )
 
         if food_count >= max_food:
-            raise PermissionDenied(
-                f"Votre forfait {plan.name} permet {max_food} produits alimentaires. "
-                f"Vous en avez déjà {food_count}. "
-                f"Les produits non alimentaires restent possibles. "
-                + SubscriptionChecker.upgrade_hint(plan, "ajouter plus de produits alimentaires")
-            )
+            raise PermissionDenied(SubscriptionChecker.food_limit_message(plan, max_food, food_count))
+
+    @staticmethod
+    def food_limit_message(plan, max_food, food_count):
+        return (
+            f"Votre forfait {plan.name} permet {max_food} produits alimentaires. "
+            f"Vous en avez déjà {food_count}. "
+            f"Les produits non alimentaires restent possibles. "
+            + SubscriptionChecker.upgrade_hint(
+                plan, "ajouter plus de produits alimentaires",
+                accepts=lambda candidate: getattr(candidate, 'max_products_food', None) is None
+                or candidate.max_products_food > max_food)
+        )
 
     # Ancien nom, gardé pour les appels existants.
     check_can_add_non_food_product = check_can_add_food_product
@@ -289,10 +302,10 @@ class SubscriptionChecker:
                 created_at__gte=month_start
             ).exclude(status__in=('cancelled', 'refunded')).count()
             if order_count >= monthly_limit:
+                # Ce refus est lu par le client au moment de commander, pas par le commerçant.
                 raise PermissionDenied(
-                    f"Vous avez atteint la limite de {monthly_limit} commandes/mois "
-                    f"de votre forfait {plan.name}. "
-                    + SubscriptionChecker.upgrade_hint(plan, 'recevoir plus de commandes')
+                    f"« {store.name} » a reçu ce mois-ci toutes les commandes prévues par son forfait et ne peut "
+                    "plus en recevoir. Choisissez un autre commerce ou réessayez le mois prochain."
                 )
     
     @staticmethod

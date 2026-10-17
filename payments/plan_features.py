@@ -76,14 +76,33 @@ def store_has(store, feature):
     return has(store.get_current_plan(), feature) if store is not None else False
 
 
+RANKS = ('free', 'pro', 'business')
+
+
+def plan_for_sale(plan, accepts):
+    """Le moins cher des forfaits en vente au-dessus de l'actuel (même famille : commerce ou grossiste)
+    pour lequel ``accepts(forfait)`` est vrai ; None s'il n'y en a pas (Business fermé n'est jamais proposé)."""
+    from payments.models import SubscriptionPlan
+    model = type(plan) if plan is not None else SubscriptionPlan
+    current = getattr(plan, 'plan_type', 'free')
+    higher = RANKS[RANKS.index(current) + 1:] if current in RANKS else RANKS[1:]
+    for candidate in model.objects.filter(plan_type__in=higher, is_active=True, is_available=True).order_by('price'):
+        if accepts(candidate):
+            return candidate
+    return None
+
+
 def required_message(feature, plan=None):
     label = LABELS.get(feature, feature)
     if feature == 'promotions' and plan is not None and is_b2b_plan(plan):
         return (f"« {label} » n'est pas encore proposé aux grossistes. "
                 "Une promotion déjà en place reste affichée.")
     current = f' Votre forfait actuel : {plan.name}.' if plan is not None else ''
-    return (f"« {label} » fait partie du forfait Pro.{current} "
-            "Passez à Pro dans « Mon forfait » pour l'utiliser.")
+    target = plan_for_sale(plan, lambda candidate: has(candidate, feature))
+    if target is None:
+        return f"« {label} » n'est inclus dans aucun forfait en vente pour le moment.{current}"
+    return (f"« {label} » fait partie du forfait {target.name}.{current} "
+            f"Passez à {target.name} dans « Mon forfait » pour l'utiliser.")
 
 
 class PlanFeatureRequired(PermissionDenied):
@@ -112,7 +131,7 @@ def tool_lines(plan):
     if has(plan, 'product_import'):
         lines.append(LABELS['product_import'])
     if has(plan, 'stock_alerts'):
-        lines.append('Alertes de stock faible sur votre téléphone')
+        lines.append('Alertes de stock faible dans vos notifications')
     if has(plan, 'promotions') and not is_b2b_plan(plan):
         lines.append('Promotions : prix barré sur vos produits')
     return lines

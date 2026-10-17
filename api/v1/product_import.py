@@ -10,7 +10,6 @@ import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
 
-from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
@@ -48,9 +47,12 @@ COLUMNS = {
 REQUIRED = ('name', 'price', 'weight_kg', 'length_m')
 TEMPLATE_HEADER = ['Nom', 'Prix', 'Stock', 'Poids (kg)', 'Longueur (m)', 'Catégorie', 'Description',
                    'Prix avant promo', 'Marque', 'Couleur', 'Tailles', 'Référence', 'Code-barres']
+# Les lignes d'exemple commencent par « Exemple » : l'import les ignore si le commerçant les laisse dans le fichier.
+EXAMPLE_PREFIX = 'exemple'
 TEMPLATE_ROWS = [
-    ['Riz parfumé 5 kg', '4500', '20', '5', '0,4', '', 'Sac de 5 kg', '', 'Uncle Bens', '', '', 'RIZ5', ''],
-    ['Baskets en toile', '12000', '6', '0,8', '0,35', '', 'Confortables', '15000', 'Converse', 'Noir', '39, 40, 41', '', ''],
+    ['Exemple : Riz parfumé 5 kg', '4500', '20', '5', '0,4', '', 'Sac de 5 kg', '', 'Uncle Bens', '', '', 'RIZ5', ''],
+    ['Exemple : Baskets en toile', '12000', '6', '0,8', '0,35', '', 'Confortables', '15000', 'Converse', 'Noir',
+     '39, 40, 41', '', ''],
 ]
 
 
@@ -247,15 +249,28 @@ def import_products(request):
     confirm = str(request.data.get('confirm', '0')).lower() in ('1', 'true', 'oui')
     categories = _categories(store)
     promotions = has(plan, 'promotions')
-    existing = {_plain(n) for n in store.products.values_list('name', flat=True)}
+    # Un produit supprimé mais gardé pour ses commandes (is_available=False) n'est plus dans « Mes produits » :
+    # il ne bloque pas un produit importé du même nom.
+    existing = {_plain(n) for n in store.products.filter(is_available=True).values_list('name', flat=True)}
     max_products = getattr(plan, 'max_b2b_products', None) if store.is_b2b else plan.max_products
     room = None if max_products is None else max(0, max_products - store.products.count())
+    # En aperçu rien n'est enregistré : on compte nous-mêmes les produits alimentaires à venir.
+    max_food = getattr(plan, 'max_products_food', None)
+    food_keywords = SubscriptionChecker._food_keywords() if max_food is not None else None
+    food_now = 0
+    if max_food is not None:
+        food_now = sum(1 for product in store.products.select_related('category__store_category')
+                       if SubscriptionChecker._is_food_category(product.category, food_keywords))
+    food_planned = 0
 
     results, created, seen = [], 0, set()
     for number, row in enumerate(rows, start=2):
         name = str(row.get('name') or '').strip()
         entry = {'row': number, 'name': name, 'status': 'ok', 'message': '', 'notes': []}
         results.append(entry)
+        if _plain(name).startswith(EXAMPLE_PREFIX):
+            entry.update(status='skipped', message="Ligne d'exemple du modèle : ignorée.")
+            continue
         try:
             data, entry['notes'] = _prepare(row, store, categories, promotions)
         except ValueError as exc:
@@ -275,11 +290,14 @@ def import_products(request):
         if room is not None and len(seen) >= room:
             entry.update(status='error', message=SubscriptionChecker.product_limit_message(plan, max_products))
             continue
-        try:
-            SubscriptionChecker.check_can_add_food_product(store, serializer.validated_data.get('category'))
-        except PermissionDenied as exc:
-            entry.update(status='error', message=str(exc))
+        category = serializer.validated_data.get('category')
+        is_food = max_food is not None and SubscriptionChecker._is_food_category(category, food_keywords)
+        if is_food and food_now + food_planned >= max_food:
+            entry.update(status='error',
+                         message=SubscriptionChecker.food_limit_message(plan, max_food, food_now + food_planned))
             continue
+        if is_food:
+            food_planned += 1
         seen.add(key)
         if confirm:
             with transaction.atomic():

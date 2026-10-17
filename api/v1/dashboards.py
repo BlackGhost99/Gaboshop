@@ -175,54 +175,36 @@ class StoreDashboardView(APIView):
         from payments.subscription_check import SubscriptionChecker
         from b2b.models.subscription import B2BStoreSubscription
 
-        subscription_payload = None
+        # Le forfait affiché est celui que le serveur applique (get_current_plan) : forfait grossiste pour un
+        # grossiste (jamais un abonnement commerce resté actif), Gratuit si l'abonnement n'a pas de forfait.
+        current_plan = store.get_current_plan()
         active_subscription = None
-
-        # Si le store est B2B, vérifier l'abonnement B2B en priorité
         if store.is_b2b:
-            try:
-                b2b_subscription = B2BStoreSubscription.objects.get(
-                    store=store,
-                    status='active'
-                )
-                # Vérifier si l'abonnement n'est pas expiré
-                if b2b_subscription.is_active():
-                    active_subscription = b2b_subscription
-                    days_until_expiry = b2b_subscription.get_remaining_days()
-                    # Récupérer le plan_type depuis le plan B2B si disponible
-                    plan_type = b2b_subscription.plan.plan_type if b2b_subscription.plan else 'b2b_business'
-                    subscription_payload = {
-                        'plan_name': b2b_subscription.plan_name,
-                        'plan_type': plan_type,
-                        'status': b2b_subscription.status,
-                        'end_date': b2b_subscription.end_date.isoformat() if b2b_subscription.end_date else None,
-                        'auto_renew': b2b_subscription.auto_renew,
-                        'monthly_fee': float(b2b_subscription.monthly_fee),
-                        'days_until_expiry': days_until_expiry,
-                    }
-            except B2BStoreSubscription.DoesNotExist:
-                pass
+            b2b_subscription = B2BStoreSubscription.objects.filter(store=store, status='active').select_related('plan').first()
+            if b2b_subscription and b2b_subscription.is_active() and b2b_subscription.plan:
+                active_subscription = b2b_subscription
+        else:
+            candidate = store.get_active_subscription()
+            if candidate and candidate.plan:
+                active_subscription = candidate
 
-        # Si pas d'abonnement B2B trouvé, vérifier les abonnements B2C
-        if not active_subscription:
-            active_subscription = store.get_active_subscription()
-            if active_subscription:
-                days_until_expiry = SubscriptionChecker.get_days_until_expiry(store)
-                plan_type = active_subscription.plan.plan_type if active_subscription.plan else 'free'
-                subscription_payload = {
-                    'plan_name': active_subscription.plan_name,
-                    'plan_type': plan_type,
-                    'status': active_subscription.status,
-                    'end_date': active_subscription.end_date.isoformat() if active_subscription.end_date else None,
-                    'auto_renew': active_subscription.auto_renew,
-                    'monthly_fee': float(active_subscription.monthly_fee),
-                    'days_until_expiry': days_until_expiry,
-                }
-
-        # Si aucun abonnement trouvé, utiliser le plan Free par défaut
-        if not subscription_payload:
+        is_free = getattr(current_plan, 'plan_type', 'free') == 'free'
+        if active_subscription and not is_free:
+            days_until_expiry = (active_subscription.get_remaining_days() if store.is_b2b
+                                 else SubscriptionChecker.get_days_until_expiry(store))
             subscription_payload = {
-                'plan_name': 'Free',
+                'plan_name': active_subscription.plan_name or current_plan.name,
+                'plan_type': current_plan.plan_type,
+                'status': active_subscription.status,
+                'end_date': active_subscription.end_date.isoformat() if active_subscription.end_date else None,
+                'auto_renew': active_subscription.auto_renew,
+                'monthly_fee': float(active_subscription.monthly_fee),
+                'days_until_expiry': days_until_expiry,
+            }
+        else:
+            # Le Gratuit n'expire pas : pas de date de fin ni de « renouvelez », même si la ligne en porte une.
+            subscription_payload = {
+                'plan_name': getattr(current_plan, 'name', None) or 'Gratuit',
                 'plan_type': 'free',
                 'status': 'active',
                 'end_date': None,
@@ -301,6 +283,9 @@ class StoreDashboardView(APIView):
                     'max': max_products,
                     'can_add_more': max_products is None or current_products < max_products,
                     'message': f"Vous avez {current_products}/{max_products if max_products else '8'} produits" if max_products else "Produits illimités",
+                    # Le même conseil que le serveur donne au moment de créer (seulement vers un forfait en vente).
+                    'limit_message': (SubscriptionChecker.product_limit_message(plan, max_products)
+                                      if max_products is not None and current_products >= max_products else None),
                 }
             }
             subscription_payload['features'] = {
@@ -329,7 +314,7 @@ class StoreDashboardView(APIView):
                     'payout_phone': store.payout_phone,
                     'payout_operator': store.payout_operator,
                     'stock_alert_threshold': store.stock_alert_threshold,
-                    # Grossiste : pas de promotions ; l'approvisionnement lui demande le forfait Pro.
+                    # Grossiste : pas de promotions ni d'approvisionnement chez un autre grossiste.
                     'is_b2b': bool(store.is_b2b),
                     # Le commerce voit seulement si ses versements sont prêts, pas l'identifiant SingPay.
                     'payouts_ready': bool(store.singpay_disbursement_id),
