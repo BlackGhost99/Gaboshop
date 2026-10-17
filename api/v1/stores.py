@@ -234,7 +234,7 @@ class StoreUpdateView(APIView):
 			return Response({
 				'success': True,
 				'message': 'Magasin et profil commerçant mis à jour avec succès.',
-				'data': StoreDetailSerializer(store).data
+				'data': StoreDetailSerializer(store, context={'request': request}).data
 			})
         
 		print("Store Update Errors:", serializer.errors)

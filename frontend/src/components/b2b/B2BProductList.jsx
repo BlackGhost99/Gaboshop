@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '../../utils/helpers';
+import { minimumQuantity, unitPriceForQuantity, tierForQuantity, nextTier } from '../../utils/b2bPricing';
 
 /**
  * Liste des produits B2B
@@ -15,7 +16,7 @@ const B2BProductList = ({ products, onAddToCart, loading }) => {
 	};
 
 	const handleAddToCart = (product) => {
-		const quantity = quantities[product.id] || product.min_order_quantity || product.b2b_pricings?.[0]?.min_quantity || 1;
+		const quantity = Math.max(quantities[product.id] || 0, minimumQuantity(product));
 		onAddToCart?.(product, quantity);
 	};
 
@@ -44,10 +45,13 @@ const B2BProductList = ({ products, onAddToCart, loading }) => {
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 			{products.map((product) => {
-				const b2bPrice = product.wholesale_price || product.b2b_price || product.b2b_pricings?.[0]?.b2b_price;
-				const minQuantity = product.min_order_quantity || product.b2b_pricings?.[0]?.min_quantity || 1;
+				const baseB2bPrice = product.wholesale_price || product.b2b_price || product.b2b_pricings?.[0]?.b2b_price;
+				const minQuantity = minimumQuantity(product);
 				const maxQuantity = product.b2b_pricings?.[0]?.max_quantity;
 				const currentQuantity = quantities[product.id] || minQuantity;
+				const b2bPrice = baseB2bPrice ? unitPriceForQuantity(product, currentQuantity) : null;
+				const reachedTier = tierForQuantity(product, currentQuantity);
+				const upcomingTier = nextTier(product, currentQuantity);
 
 				return (
 					<div
@@ -64,6 +68,11 @@ const B2BProductList = ({ products, onAddToCart, loading }) => {
 									e.target.src = '/placeholder.svg';
 								}}
 							/>
+							{product.promo && (
+								<span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-bold">
+									Promo -{product.promo.saving_percent} %
+								</span>
+							)}
 						</div>
 
 						{/* Content */}
@@ -88,19 +97,35 @@ const B2BProductList = ({ products, onAddToCart, loading }) => {
 										<p className="text-3xl font-bold text-indigo-700 mb-1">
 											{formatCurrency(b2bPrice)}
 										</p>
-										{product.price && b2bPrice < product.price && (
-											<p className="text-sm text-gray-500 line-through font-medium">
-												Prix retail: {formatCurrency(product.price)}
+										{product.promo ? (
+											<p className="text-sm text-gray-600 font-medium">
+												Prix public : <span className="line-through text-gray-500">{formatCurrency(product.promo.compare_price)}</span>{' '}
+												<span className="text-red-700 font-bold">{formatCurrency(product.promo.price)}</span>
 											</p>
+										) : (
+											product.price && b2bPrice < product.price && (
+												<p className="text-sm text-gray-500 line-through font-medium">
+													Prix retail: {formatCurrency(product.price)}
+												</p>
+											)
 										)}
 										{product.pricing_tiers && product.pricing_tiers.length > 1 && (
 											<div className="mt-3 space-y-1">
-												<p className="text-xs font-bold text-indigo-800 bg-indigo-100 px-2 py-1 rounded">Paliers de prix :</p>
-												{product.pricing_tiers.map((tier, idx) => (
-													<p key={idx} className="text-xs text-indigo-700 font-semibold bg-indigo-50 px-2 py-1 rounded">
-														Dès {tier.min_qty} unités : {formatCurrency(tier.price)}
+												<p className="text-xs font-bold text-indigo-800 bg-indigo-100 px-2 py-1 rounded">Prix dégressifs :</p>
+												{product.pricing_tiers.map((tier) => (
+													<p
+														key={tier.min_qty}
+														className={`text-xs font-semibold px-2 py-1 rounded ${reachedTier?.min_qty === tier.min_qty ? 'bg-green-100 text-green-800' : 'bg-indigo-50 text-indigo-700'}`}
+													>
+														Dès {tier.min_qty} unités : {formatCurrency(tier.price)} l'unité
+														{tier.saving_percent > 0 && ` (-${tier.saving_percent} %)`}
 													</p>
 												))}
+												{upcomingTier && (
+													<p className="text-xs text-indigo-800">
+														Encore {upcomingTier.min_qty - currentQuantity} unité(s) pour passer à {formatCurrency(upcomingTier.price)} l'unité.
+													</p>
+												)}
 											</div>
 										)}
 									</div>

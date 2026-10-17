@@ -749,7 +749,8 @@ class DeliveryQuoteView(APIView):
 	"""POST /orders/delivery-quote/ : devis complet avant de commander (même calcul que la commande).
 
 	Corps : {store, items: [{product_id, quantity}], delivery_requested, city, delivery_zone, neighborhood,
-	landmark, delivery_address (repère), payment_flow, payment_method, delivery_by}. Rien n'est enregistré.
+	landmark, delivery_address (repère), payment_flow, payment_method, delivery_by, delivery_type standard|express}.
+	Rien n'est enregistré.
 	Réponse : prix de livraison (champs historiques) + devis détaillé (orders/quote.py).
 	"""
 	permission_classes = [permissions.IsAuthenticated]
@@ -784,6 +785,7 @@ class DeliveryQuoteView(APIView):
 			details=str(data.get('delivery_address') or '')[:300],
 			payment_flow=str(data.get('payment_flow') or ''), payment_method=str(data.get('payment_method') or ''),
 			delivery_by=str(data.get('delivery_by') or ''), missing_products=missing,
+			delivery_type=str(data.get('delivery_type') or 'standard'),
 		)
 		return Response({'success': True, 'data': quote})
 

@@ -27,6 +27,8 @@ from b2b.api.views import (
     B2BProductPricingBulkCreateView,
 )
 
+from b2b.api.wholesale_pricing import MyWholesalePricingView, MyWholesalePricingDetailView
+
 app_name = 'b2b'
 
 urlpatterns = [
@@ -41,6 +43,10 @@ urlpatterns = [
     # Commandes B2B
     path('orders/', B2BOrderCreateView.as_view(), name='b2b-order-create'),
     path('my-orders/', MyB2BOrdersView.as_view(), name='my-b2b-orders'),
+    
+    # Prix de gros et paliers dégressifs du grossiste connecté
+    path('my-pricing/', MyWholesalePricingView.as_view(), name='my-wholesale-pricing'),
+    path('my-pricing/<int:pricing_id>/', MyWholesalePricingDetailView.as_view(), name='my-wholesale-pricing-detail'),
     
     # ==================== ADMIN ENDPOINTS ====================
     # Gestion des profils B2B

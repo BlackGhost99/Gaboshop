@@ -103,6 +103,7 @@ from b2b.api.views import (
 )
 from .b2c_admin import B2CProductPricingListView
 from .internal import HealthView, SchedulerTickView
+from support import views as support_views
 from .orders_admin import (
     OrderStatsView, OrdersListView, OrderDetailView as AdminOrderDetailView,
     DeliveryAssignmentView, OrderStatusUpdateView as AdminOrderStatusUpdateView,
@@ -376,6 +377,7 @@ urlpatterns = [
     path('b2b/profiles/<int:store_id>/update/', B2BProfileUpdateView.as_view(), name='b2b-profile-update'),
     path('b2b/profiles/<int:store_id>/activate/', B2BProfileActivateView.as_view(), name='b2b-profile-activate'),
     path('b2b/profiles/<int:store_id>/deactivate/', B2BProfileDeactivateView.as_view(), name='b2b-profile-deactivate'),
+    path('b2b/', include('b2b.api_keys.urls')),  # Accès API des grossistes : clés et endpoints d'intégration
     path('b2b/pricing/<int:store_id>/', B2BProductPricingListView.as_view(), name='b2b-pricings'),
     path('b2b/pricing/', B2BProductPricingCreateView.as_view(), name='b2b-pricing-create'),
     path('b2b/pricing/bulk/', B2BProductPricingBulkCreateView.as_view(), name='b2b-pricing-bulk-create'),
@@ -405,4 +407,10 @@ urlpatterns = [
     # Tâches automatiques (minuteur) et santé de l'API
     path('internal/tick/', SchedulerTickView.as_view(), name='scheduler-tick'),
     path('health/', HealthView.as_view(), name='health'),
+
+    # Support : demandes d'assistance et contact direct selon le forfait
+    path('support/tickets/', support_views.TicketListCreateView.as_view(), name='support-tickets'),
+    path('support/tickets/<int:ticket_id>/', support_views.TicketDetailView.as_view(), name='support-ticket'),
+    path('support/tickets/<int:ticket_id>/replies/', support_views.TicketReplyView.as_view(), name='support-ticket-replies'),
+    path('support/contact/', support_views.ContactView.as_view(), name='support-contact'),
 ]

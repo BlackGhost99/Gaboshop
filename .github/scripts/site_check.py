@@ -56,6 +56,11 @@ MARKERS = {
     'Forfaits honnêtes : cartes exactes (17 oct.)': 'Chaque carte liste exactement',
     'Forfait Pro : page Statistiques (17 oct.)': 'Voir mes statistiques',
     'Forfait Pro : export dans l application Android (17 oct.)': 'pas encore possible dans l',
+    'Options des forfaits réelles : support (17 oct.)': 'Aide / Support',
+    'Options des forfaits réelles : page de boutique (17 oct.)': 'Personnaliser ma boutique',
+    'Options des forfaits réelles : express (17 oct.)': 'Frais de livraison express',
+    'Options des forfaits réelles : API grossiste (17 oct.)': 'Créer une clé',
+    'Options des forfaits réelles : prix de gros (17 oct.)': 'Prix de gros',
 }
 
 

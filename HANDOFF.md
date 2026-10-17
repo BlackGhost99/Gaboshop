@@ -4,7 +4,7 @@ Ce fichier dit ce qu'il faut savoir pour continuer le projet sans tout redécouv
 ils sont dans Render (variables d'environnement) et dans les secrets GitHub Actions. Ne jamais les écrire dans le code ou
 dans une conversation.
 
-Dernière mise à jour : 16 octobre 2026.
+Dernière mise à jour : 17 octobre 2026.
 
 ## 1. Le propriétaire et sa façon de travailler
 
@@ -75,6 +75,17 @@ pourquoi les images envoyées sont stockées en base (`core.StoredFile`, `core/s
     forfait en vente qui donne vraiment la chose. Le Gratuit n'affiche jamais de date de fin.
   - Piège : à l'expiration, un signal crée une ligne Gratuit valable 100 ans. Cherchez toujours l'abonnement actif
     avec `Store.get_active_subscription()` (ordre `payments.models.paid_first()`).
+  - **Options marketing réelles (17 oct. 2026, sur le site de test d'abord).** Chaque case de forfait a un code derrière :
+    support prioritaire / ligne dédiée (app `support/` : tickets, priorité selon le forfait, contact direct réservé),
+    page de boutique personnalisée (champs `Store.accent_color/tagline/about/…`, éteints à l'expiration), livraison express
+    (choix au panier, supplément = frais express − frais standard du commerce), suivi sur carte réservé aux forfaits avec la
+    case (le Gratuit n'a que la frise de statuts ; le livreur et l'admin gardent la carte), rapport financier détaillé par
+    catégorie (Finance), grossistes : prix dégressifs (`b2b/services/tiers.py`, page « Prix de gros »), prix barré, plafond
+    de commerces clients (`check_b2c_buyer_quota`), badge « Populaire », accès API par clés (`b2b/api_keys/`, clé montrée une
+    seule fois, hash en base, 60 requêtes/min). Règle unique : `payments/plan_features.py` (`has`). Migrations : payments 0029
+    (active les cases sur Pro/Business, coupe suivi+express du Gratuit), stores 0024, b2b 0009, support 0001.
+    Retirés des fenêtres admin : les 3 réglages de visibilité B2B de détail (`has_b2b_visibility`, `b2b_catalog_priority`,
+    `b2b_featured_access`), qui doublonnaient ceux du forfait grossiste (ils restent dans l'admin Django, sans effet).
   - Le paiement d'un forfait par carte (CinetPay) est refusé : seulement Airtel Money et Moov Money.
 - **Adresses :** Province › Ville › Arrondissement › Quartier, puis une zone phare facultative et un repère libre.
   - Le code est dans `delivery/geo_data.py`, `delivery/zones.py` et `api/v1/geo.py`. L'écran admin est dans Admin › Livraison › Adresses.

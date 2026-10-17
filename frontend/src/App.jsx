@@ -26,9 +26,11 @@ const StoreOrders = lazy(() => import('./pages/store/StoreOrders'));
 const StoreSettings = lazy(() => import('./pages/store/StoreSettings'));
 const StoreProfile = lazy(() => import('./pages/store/StoreProfile'));
 const B2BProcurement = lazy(() => import('./pages/store/B2BProcurement'));
+const WholesalePricing = lazy(() => import('./pages/store/WholesalePricing'));
 const Finance = lazy(() => import('./pages/store/Finance'));
 const StoreStats = lazy(() => import('./pages/store/StoreStats'));
 const StoreSubscriptionPlans = lazy(() => import('./pages/store/SubscriptionPlans'));
+const ApiAccess = lazy(() => import('./pages/store/ApiAccess'));
 const DeliveryDashboard = lazy(() => import('./pages/delivery/DeliveryDashboard'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 import ErrorBoundary from './components/ErrorBoundary';
@@ -41,6 +43,8 @@ const MentionsLegales = lazy(() => import('./pages/legal/MentionsLegales'));
 const SuppressionCompte = lazy(() => import('./pages/legal/SuppressionCompte'));
 const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
 const Notifications = lazy(() => import('./pages/Notifications'));
+const Support = lazy(() => import('./pages/support/Support'));
+const SupportTickets = lazy(() => import('./pages/admin/SupportTickets'));
 
 // Les espaces client, commerce, livreur et admin se chargent à la demande :
 // le premier écran du site reste léger.
@@ -141,6 +145,10 @@ function App() {
           </PrivateRoute>
         } />
 
+        {/* Aide et support : tous les comptes connectés */}
+        <Route path="/support" element={<PrivateRoute><Support /></PrivateRoute>} />
+        <Route path="/admin/support" element={<PrivateRoute allowedRoles={['admin']}><SupportTickets /></PrivateRoute>} />
+
         {/* Panier : il vit dans l'espace client (lien de la barre du bas, de l'en-tête et de l'assistant) */}
         <Route path="/cart" element={
           <PrivateRoute allowedRoles={CLIENT_ONLY}>
@@ -179,6 +187,16 @@ function App() {
         <Route path="/store/b2b" element={
           <PrivateRoute allowedRoles={['store_manager']}>
             <B2BProcurement />
+          </PrivateRoute>
+        } />
+        <Route path="/store/api" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <ApiAccess />
+          </PrivateRoute>
+        } />
+        <Route path="/store/wholesale-pricing" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <WholesalePricing />
           </PrivateRoute>
         } />
         <Route path="/store/finance" element={

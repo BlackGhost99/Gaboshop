@@ -220,7 +220,8 @@ const SubscriptionPlans = () => {
           {plans.map((plan) => {
             const isCurrent = currentPlan?.plan_type === plan.plan_type;
             const unavailable = plan.is_available === false;
-            const isHighlighted = plan.plan_type === 'pro' && !unavailable;
+            const isPopular = plan.is_popular === true && !unavailable;
+            const isHighlighted = (plan.plan_type === 'pro' || isPopular) && !unavailable;
 
             return (
               <div
@@ -237,7 +238,7 @@ const SubscriptionPlans = () => {
                 )}
                 {isHighlighted && !isCurrent && (
                   <div className="absolute top-4 right-4 bg-indigo-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg z-10">
-                    ⭐ RECOMMANDÉ
+                    {isPopular ? '⭐ POPULAIRE' : '⭐ RECOMMANDÉ'}
                   </div>
                 )}
                 {isCurrent && (

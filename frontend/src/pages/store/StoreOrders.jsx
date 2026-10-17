@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { openInvoice } from '../../utils/invoice';
 import OrderLiveMap from '../../components/map/OrderLiveMap';
+import ExpressBadge from '../../components/ExpressBadge';
 import { describeOptions } from '../../utils/productOptions';
 import { notifyError, notifySuccess } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
@@ -302,7 +303,7 @@ const StoreOrders = () => {
               <div key={order.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-base font-semibold text-gray-900">{order.order_number || `#${order.id}`}</p>
+                    <p className="text-base font-semibold text-gray-900">{order.order_number || `#${order.id}`} <ExpressBadge show={order.is_express} /></p>
                     <p className="text-sm text-gray-700">{order.client_phone || order.client}</p>
                     <p className="text-xs text-gray-500">{formatDateTime(order.created_at)}</p>
                   </div>
@@ -357,7 +358,7 @@ const StoreOrders = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{order.order_number || `#${order.id}`}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{order.order_number || `#${order.id}`} <ExpressBadge show={order.is_express} /></td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.client_phone || order.client}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(order.created_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount || order.total)}</td>
@@ -427,7 +428,7 @@ const StoreOrders = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b">
               <div>
-                <p className="text-xs text-gray-500">Commande {detail.order_number || `#${detail.id}`}</p>
+                <p className="text-xs text-gray-500">Commande {detail.order_number || `#${detail.id}`} <ExpressBadge show={detail.is_express} /></p>
                 <h3 className="text-lg font-semibold text-gray-900">{detail.store_name || 'Commande'}</h3>
               </div>
               <button className="text-gray-500 hover:text-gray-800" onClick={() => setDetail(null)}>✕</button>

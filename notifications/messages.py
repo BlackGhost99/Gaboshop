@@ -406,3 +406,22 @@ def delivery_payout_message(payout, delivery):
             next_step="Vérifiez votre numéro Mobile Money dans « Mon profil ». Gaboshop relancera le versement.",
         )
     return None
+
+
+# --- Forfait grossiste : plafond de commerces clients -------------------------------------
+
+def b2c_buyer_cap_for_wholesaler(buyer_store, plan, cap, upgrade_plan=None):
+    buyer = getattr(buyer_store, 'name', '') or 'Un commerce'
+    plan_name = getattr(plan, 'name', '') or 'actuel'
+    if upgrade_plan is not None:
+        next_step = (f"Passez au forfait {upgrade_plan.name} dans « Mon forfait » pour accepter davantage de commerces clients.")
+    else:
+        next_step = "Aucun forfait en vente ne relève encore ce plafond ; vos clients actuels restent servis."
+    return _message(
+        f"Nouveau commerce client refusé : {buyer}",
+        f"{buyer} a voulu commander chez vous, mais votre forfait {plan_name} est limité à {cap} commerces clients "
+        "sur 30 jours et ce plafond est atteint. Les commerces qui commandent déjà chez vous restent servis.",
+        level='warning', reason=f"Plafond de {cap} commerces clients atteint (forfait {plan_name}).",
+        next_step=next_step,
+        sms=f"GABOSHOP - {buyer} n'a pas pu commander : plafond de {cap} commerces clients atteint.",
+    )

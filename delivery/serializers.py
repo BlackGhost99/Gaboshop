@@ -33,6 +33,12 @@ class DeliverySerializer(serializers.ModelSerializer):
     delivery_agent_phone = serializers.CharField(source='delivery_agent.phone', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     tracking_history = DeliveryTrackingSerializer(many=True, read_only=True)
+    delivery_type = serializers.CharField(source='order.delivery_type', read_only=True)
+    is_express = serializers.SerializerMethodField()
+
+    def get_is_express(self, obj):
+        order = obj.order
+        return bool(order.delivery_requested and order.delivery_type == 'express')
 
     def get_client_phone(self, obj):
         # Un livreur ne voit le téléphone du client qu'une fois la course à lui.
@@ -56,7 +62,7 @@ class DeliverySerializer(serializers.ModelSerializer):
             'minimum_required_vehicle_type', 'minimum_required_vehicle_type_detail',
             'is_intra_city', 'distance_km',
             'assigned_at', 'picked_up_at', 'delivered_at',
-            'delivery_notes', 'customer_feedback', 'rating',
+            'delivery_notes', 'customer_feedback', 'rating', 'delivery_type', 'is_express',
             'tracking_history', 'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -71,10 +77,12 @@ class DeliverySerializer(serializers.ModelSerializer):
         if not request or not hasattr(request, 'user'):
             return data
         user = request.user
-        if getattr(user, 'is_store_manager', lambda: False)():
+        # Historique de positions du suivi en temps réel : outil du forfait du commerce (payments/plan_features.py),
+        # pour le commerçant comme pour le client. Le livreur de la course et l'admin le gardent.
+        if getattr(user, 'is_store_manager', lambda: False)() or getattr(user, 'user_type', '') == 'client':
             store = getattr(getattr(instance, 'order', None), 'store', None)
-            plan = store.get_current_plan() if store else None
-            if not getattr(plan, 'has_advanced_delivery_tracking', False):
+            from payments.plan_features import store_has
+            if not store_has(store, 'live_tracking'):
                 data['tracking_history'] = []
         return data
 

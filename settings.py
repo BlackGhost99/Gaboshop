@@ -126,6 +126,7 @@ INSTALLED_APPS = [
     'core',
     'b2b',
     'finance',
+    'support',
 ]
 
 MIDDLEWARE = [

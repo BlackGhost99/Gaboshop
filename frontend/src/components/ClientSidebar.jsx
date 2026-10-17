@@ -50,6 +50,11 @@ const ClientSidebar = ({ open = false, onClose }) => {
       icon: 'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
     },
     {
+      name: 'Aide / Support',
+      path: '/support',
+      icon: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    },
+    {
       name: 'Toutes les boutiques',
       path: '/boutiques',
       icon: 'M3 9l9-6 9 6v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',

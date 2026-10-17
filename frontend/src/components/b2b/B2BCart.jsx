@@ -1,14 +1,13 @@
 import React from 'react';
 import { formatCurrency } from '../../utils/helpers';
+import { minimumQuantity, unitPriceForQuantity, tierForQuantity, nextTier, lineTotal } from '../../utils/b2bPricing';
 
 /**
  * Panier B2B
  */
 const B2BCart = ({ cartItems, onRemoveItem, onUpdateQuantity, onCheckout, loading, wholesaler }) => {
 	const calculateSubtotal = () => {
-		return cartItems.reduce((total, item) => {
-			return total + (item.b2b_price || item.price) * item.quantity;
-		}, 0);
+		return cartItems.reduce((total, item) => total + lineTotal(item), 0);
 	};
 
 	const calculateTotal = () => {
@@ -72,15 +71,25 @@ const B2BCart = ({ cartItems, onRemoveItem, onUpdateQuantity, onCheckout, loadin
 						<div className="flex-1">
 							<h3 className="font-semibold text-black">{item.name}</h3>
 							<p className="text-sm text-black font-semibold">
-								{formatCurrency(item.b2b_price || item.price)} × {item.quantity}
+								{formatCurrency(unitPriceForQuantity(item, item.quantity))} × {item.quantity}
 							</p>
+							{tierForQuantity(item, item.quantity)?.saving_percent > 0 && (
+								<p className="text-xs text-green-700 font-semibold">
+									Prix dégressif : -{tierForQuantity(item, item.quantity).saving_percent} % appliqué
+								</p>
+							)}
+							{nextTier(item, item.quantity) && (
+								<p className="text-xs text-indigo-700">
+									Dès {nextTier(item, item.quantity).min_qty} unités : {formatCurrency(nextTier(item, item.quantity).price)} l'unité
+								</p>
+							)}
 						</div>
 
 						{/* Quantity */}
 						<div className="flex items-center gap-2">
 							<button
 								onClick={() => onUpdateQuantity?.(item.id, item.quantity - 1)}
-								disabled={item.quantity <= 1}
+								disabled={item.quantity <= minimumQuantity(item)}
 								className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								-
@@ -98,7 +107,7 @@ const B2BCart = ({ cartItems, onRemoveItem, onUpdateQuantity, onCheckout, loadin
 						{/* Subtotal */}
 						<div className="text-right">
 							<p className="font-bold text-black text-lg">
-								{formatCurrency((item.b2b_price || item.price) * item.quantity)}
+								{formatCurrency(lineTotal(item))}
 							</p>
 						</div>
 

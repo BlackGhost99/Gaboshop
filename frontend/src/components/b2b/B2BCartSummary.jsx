@@ -1,14 +1,13 @@
 import React from 'react';
 import { formatCurrency } from '../../utils/helpers';
+import { lineTotal } from '../../utils/b2bPricing';
 
 /**
  * Composant de résumé du panier B2B affiché dans l'en-tête du catalogue
  */
 const B2BCartSummary = ({ cartItems, onViewCart, totalAmount }) => {
 	const itemCount = cartItems?.length || 0;
-	const total = totalAmount || cartItems?.reduce((sum, item) => {
-		return sum + (item.b2b_price || item.price) * item.quantity;
-	}, 0) || 0;
+	const total = totalAmount || cartItems?.reduce((sum, item) => sum + lineTotal(item), 0) || 0;
 
 	if (itemCount === 0) {
 		return (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ExpressBadge from './ExpressBadge';
 import { notifyError } from '../utils/feedback';
 import { getAssignedOrders, acceptDelivery, rejectDelivery } from '../services/deliveryService';
 import { formatCurrency } from '../utils/helpers';
@@ -199,6 +200,7 @@ const AssignedOrdersList = () => {
                       <h4 className="text-sm font-semibold text-gray-900">
                         Commande #{order.order_number}
                       </h4>
+                      <ExpressBadge show={order.is_express} />
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
                         {order.status_display}
                       </span>

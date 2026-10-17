@@ -14,18 +14,27 @@ LABELS = {
     'product_import': 'Import de produits par fichier Excel/CSV',
     'stock_alerts': 'Alertes de stock faible',
     'promotions': 'Promotions (prix barré)',
+    'priority_support': 'Support prioritaire',
+    'dedicated_support': 'Ligne de support dédiée',
+    'custom_page': 'Page de boutique personnalisée',
+    'express_delivery': 'Livraison express',
+    'live_tracking': 'Suivi des livraisons en temps réel',
+    'detailed_finance': 'Rapport financier détaillé par catégorie',
+    'bulk_discounts': 'Prix dégressifs pour achats en gros',
+    'api_access': 'Accès API pour vos logiciels',
 }
 
 # Promesses sans code derrière : jamais affichées sur la carte d'un forfait en vente, même saisies par l'admin.
 UNBACKED_PATTERNS = (
-    'express', 'api', 'multi boutique', 'multiboutique', 'synchronisation', 'tarifs negocies', 'tarif negocie',
-    'page personnalisee', 'personnalisation', 'support prioritaire', 'support vip', 'support dedie', 'account manager',
-    'gestionnaire de compte', 'formation', 'suivi detaille', 'suivi avance', 'gps', 'visibilite b2b', 'mis en avant',
-    'mise en avant', 'sponsor', 'remise', 'achats en gros', 'badge',
+    'multi boutique', 'multiboutique', 'synchronisation', 'tarifs negocies', 'tarif negocie',
+    'account manager', 'gestionnaire de compte', 'formation', 'visibilite b2b', 'mis en avant',
+    'mise en avant', 'sponsor', 'badge',
 )
 # Lignes libres remplacées par les cases du forfait (la case décide, le texte ne peut plus mentir).
 SUPERSEDED_PATTERNS = (
     'statist', 'rapport', 'export', 'import', 'alerte', 'promo', 'commission', 'historique', 'approvisionnement',
+    'express', 'api', 'page personnalisee', 'personnalisation', 'support prioritaire', 'support vip',
+    'support dedie', 'suivi detaille', 'suivi avance', 'gps', 'remise', 'achats en gros', 'finance', 'financier',
 )
 
 
@@ -63,8 +72,23 @@ def has(plan, feature):
     if feature == 'stock_alerts':
         return bool(getattr(plan, 'has_stock_alerts', False))
     if feature == 'promotions':
-        # Les promotions (prix barré) sont un outil des commerces ; rien n'est construit pour les grossistes.
-        return not is_b2b_plan(plan) and bool(getattr(plan, 'can_create_promotions', False))
+        return bool(getattr(plan, 'can_create_promotions', False))
+    if feature == 'priority_support':
+        return bool(plan.has_priority_support or getattr(plan, 'support_level', 'standard') in ('prioritaire', 'dedie'))
+    if feature == 'dedicated_support':
+        return getattr(plan, 'support_level', 'standard') == 'dedie'
+    if feature == 'custom_page':
+        return not is_b2b_plan(plan) and bool(plan.has_custom_page)
+    if feature == 'express_delivery':
+        return not is_b2b_plan(plan) and bool(plan.can_offer_express_delivery)
+    if feature == 'live_tracking':
+        return not is_b2b_plan(plan) and bool(plan.has_advanced_delivery_tracking)
+    if feature == 'detailed_finance':
+        return bool(plan.can_view_finance_detailed)
+    if feature == 'bulk_discounts':
+        return is_b2b_plan(plan) and bool(plan.can_offer_bulk_discounts)
+    if feature == 'api_access':
+        return is_b2b_plan(plan) and bool(plan.has_api_access)
     if feature == 'exports':
         if is_b2b_plan(plan):
             return bool(plan.can_export_finance_csv)
@@ -94,9 +118,6 @@ def plan_for_sale(plan, accepts):
 
 def required_message(feature, plan=None):
     label = LABELS.get(feature, feature)
-    if feature == 'promotions' and plan is not None and is_b2b_plan(plan):
-        return (f"« {label} » n'est pas encore proposé aux grossistes. "
-                "Une promotion déjà en place reste affichée.")
     current = f' Votre forfait actuel : {plan.name}.' if plan is not None else ''
     target = plan_for_sale(plan, lambda candidate: has(candidate, feature))
     if target is None:
@@ -132,6 +153,22 @@ def tool_lines(plan):
         lines.append(LABELS['product_import'])
     if has(plan, 'stock_alerts'):
         lines.append('Alertes de stock faible dans vos notifications')
-    if has(plan, 'promotions') and not is_b2b_plan(plan):
+    if has(plan, 'promotions'):
         lines.append('Promotions : prix barré sur vos produits')
+    if has(plan, 'detailed_finance'):
+        lines.append('Rapport financier détaillé : ventes par catégorie et par commande')
+    if has(plan, 'custom_page'):
+        lines.append('Page de boutique personnalisée : couleur, présentation, réseaux sociaux')
+    if has(plan, 'express_delivery'):
+        lines.append('Livraison express proposée à vos clients')
+    if has(plan, 'live_tracking'):
+        lines.append('Suivi de la livraison en temps réel sur carte, pour vous et vos clients')
+    if has(plan, 'dedicated_support'):
+        lines.append('Ligne de support dédiée (WhatsApp et téléphone) et réponse en priorité')
+    elif has(plan, 'priority_support'):
+        lines.append('Support prioritaire : vos demandes sont traitées en premier, avec le contact direct de Gaboshop')
+    if has(plan, 'bulk_discounts'):
+        lines.append('Prix dégressifs : tarifs par palier de quantité pour vos acheteurs')
+    if has(plan, 'api_access'):
+        lines.append("Accès API : clés d'intégration pour relier votre stock et vos commandes à vos logiciels")
     return lines

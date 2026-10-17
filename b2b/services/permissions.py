@@ -231,6 +231,71 @@ def check_b2b_buyer_quotas(buyer_store):
 	return True, quotas
 
 
+BUYER_CAP_MESSAGE = "Ce grossiste ne peut plus accepter de nouveaux commerces clients pour le moment."
+
+
+def recent_buyer_ids(wholesaler_store, days=30):
+	"""Identifiants des commerces acheteurs distincts d'un grossiste sur les derniers jours (commandes annulées exclues)."""
+	from orders.models import Order
+	from django.utils import timezone
+	from datetime import timedelta
+	since = timezone.now() - timedelta(days=days)
+	return set(
+		Order.objects.filter(
+			store=wholesaler_store, is_b2b=True, source_store__isnull=False, created_at__gte=since,
+		).exclude(status='cancelled').values_list('source_store_id', flat=True).distinct()
+	)
+
+
+def check_b2c_buyer_quota(wholesaler_store, buyer_store=None):
+	"""
+	Plafond de commerces clients du forfait grossiste (max_b2c_buyers, commerces distincts sur 30 jours).
+
+	Un commerce déjà client sur la période reste toujours servi ; seul un nouveau commerce est refusé
+	quand le plafond est atteint. Sans plafond (forfait illimité ou forfait de commerce), tout passe.
+
+	Returns:
+		tuple: (bool, dict) - (autorisé, détails : max_buyers, current_buyers, message)
+	"""
+	from b2b.models import B2BSubscriptionPlan
+	plan = wholesaler_store.get_current_plan() if wholesaler_store is not None else None
+	max_buyers = getattr(plan, 'max_b2c_buyers', None) if isinstance(plan, B2BSubscriptionPlan) else None
+	details = {'max_buyers': max_buyers, 'current_buyers': None, 'message': ''}
+	if not max_buyers:
+		return True, details
+	buyers = recent_buyer_ids(wholesaler_store)
+	details['current_buyers'] = len(buyers)
+	if buyer_store is not None and buyer_store.id in buyers:
+		return True, details
+	if len(buyers) < max_buyers:
+		return True, details
+	details['message'] = BUYER_CAP_MESSAGE
+	return False, details
+
+
+def notify_buyer_cap_reached(wholesaler_store, buyer_store, details):
+	"""Prévient le grossiste (une fois par jour) qu'un nouveau commerce a été refusé, avec le forfait qui lève le plafond."""
+	from django.utils import timezone
+	from datetime import timedelta
+	from notifications.models import Notification
+	from notifications.service import NotificationService
+	from notifications import messages
+	from payments.plan_features import plan_for_sale
+	manager = getattr(wholesaler_store, 'manager', None)
+	if manager is None:
+		return None
+	recent = Notification.objects.filter(
+		user=manager, metadata__reason_code='b2c_buyer_cap', created_at__gte=timezone.now() - timedelta(days=1))
+	if recent.exists():
+		return None
+	plan = wholesaler_store.get_current_plan()
+	cap = details.get('max_buyers') or 0
+	target = plan_for_sale(plan, lambda candidate: not candidate.max_b2c_buyers or candidate.max_b2c_buyers > cap)
+	message = messages.b2c_buyer_cap_for_wholesaler(buyer_store, plan, cap, target)
+	return NotificationService.notify_user(
+		manager, message, notif_type='warning', metadata={'reason_code': 'b2c_buyer_cap', 'buyer_store_id': buyer_store.id})
+
+
 def check_b2b_wholesaler_quotas(wholesaler_store):
 	"""
 	Vérifie les quotas B2B pour un grossiste
@@ -269,14 +334,7 @@ def check_b2b_wholesaler_quotas(wholesaler_store):
 	quotas['current_products'] = current_products
 	
 	# Compter les buyers uniques (30 derniers jours)
-	from orders.models import Order
-	thirty_days_ago = timezone.now() - timedelta(days=30)
-	unique_buyers = Order.objects.filter(
-		store=wholesaler_store,
-		is_b2b=True,
-		source_store__isnull=False,
-		created_at__gte=thirty_days_ago
-	).values_list('source_store_id', flat=True).distinct().count()
+	unique_buyers = len(recent_buyer_ids(wholesaler_store))
 	
 	quotas['current_buyers'] = unique_buyers
 	

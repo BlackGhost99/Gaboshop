@@ -156,7 +156,8 @@ def get_b2b_categories(wholesaler_id=None):
 
 def get_b2b_price_for_product(product, wholesaler, quantity=1):
 	"""
-	Retourne le prix B2B d'un produit pour une quantité donnée
+	Retourne le prix B2B unitaire d'un produit pour une quantité donnée
+	(palier dégressif si le forfait du grossiste l'inclut, sinon prix de base).
 	
 	Args:
 		product: Product - Produit concerné
@@ -166,23 +167,9 @@ def get_b2b_price_for_product(product, wholesaler, quantity=1):
 	Returns:
 		Decimal ou None - Prix B2B ou None si non disponible
 	"""
-	try:
-		# Chercher le prix B2B correspondant à la quantité
-		pricing = B2BProductPricing.objects.filter(
-			product=product,
-			b2b_store=wholesaler,
-			is_active=True,
-			min_quantity__lte=quantity
-		).exclude(
-			max_quantity__lt=quantity
-		).order_by('-min_quantity').first()
-		
-		if pricing:
-			return pricing.b2b_price
-	except Exception:
-		pass
-	
-	return None
+	from b2b.services.tiers import price_for_quantity
+	price, _ = price_for_quantity(product, wholesaler, quantity)
+	return price
 
 
 def calculate_b2b_order_totals(order_items, wholesaler, buyer_store):
@@ -204,34 +191,40 @@ def calculate_b2b_order_totals(order_items, wholesaler, buyer_store):
 	"""
 	items_total = Decimal('0.00')
 	items = []
+	errors = []
 	
 	# Récupérer le profil B2B du grossiste
 	b2b_profile = wholesaler.b2b_profile if hasattr(wholesaler, 'b2b_profile') else None
 	
+	# Une même référence commandée sur plusieurs lignes compte pour sa quantité totale (palier dégressif).
+	quantities = {}
 	for item_data in order_items:
 		product_id = item_data.get('product_id')
-		quantity = item_data.get('quantity', 1)
-		
+		quantities[product_id] = quantities.get(product_id, 0) + int(item_data.get('quantity', 1) or 1)
+	
+	from b2b.services.tiers import price_for_quantity, bulk_discounts_active
+	bulk = bulk_discounts_active(wholesaler)
+	for product_id, quantity in quantities.items():
 		try:
 			product = Product.objects.get(id=product_id, store=wholesaler)
-			b2b_price = get_b2b_price_for_product(product, wholesaler, quantity)
-			
-			if b2b_price is None:
-				# Pas de prix B2B disponible pour cette quantité
-				continue
-			
-			item_subtotal = Decimal(str(b2b_price)) * Decimal(str(quantity))
-			items_total += item_subtotal
-			
-			items.append({
-				'product': product,
-				'product_id': product_id,
-				'quantity': quantity,
-				'unit_price': b2b_price,
-				'subtotal': item_subtotal
-			})
 		except Product.DoesNotExist:
+			errors.append(f"Le produit {product_id} n'est pas proposé par ce grossiste.")
 			continue
+		b2b_price, error = price_for_quantity(product, wholesaler, quantity, bulk)
+		if b2b_price is None:
+			errors.append(error)
+			continue
+		
+		item_subtotal = Decimal(str(b2b_price)) * Decimal(str(quantity))
+		items_total += item_subtotal
+		
+		items.append({
+			'product': product,
+			'product_id': product_id,
+			'quantity': quantity,
+			'unit_price': b2b_price,
+			'subtotal': item_subtotal
+		})
 	
 	# Calculer les frais
 	delivery_fee = wholesaler.delivery_fee or Decimal('0.00')
@@ -243,7 +236,8 @@ def calculate_b2b_order_totals(order_items, wholesaler, buyer_store):
 		'items_total': items_total,
 		'delivery_fee': delivery_fee,
 		'total_amount': total_amount,
-		'items': items
+		'items': items,
+		'errors': errors,
 	}
 
 
@@ -272,39 +266,20 @@ def validate_b2b_order(order_items, wholesaler, buyer_store):
 	# Calculer les totaux
 	totals = calculate_b2b_order_totals(order_items, wholesaler, buyer_store)
 	
+	# Un produit sans prix valable pour la quantité demandée refuse la commande (jamais ignoré en silence)
+	if totals['errors']:
+		return False, totals['errors'][0], None
+	
 	# Vérifier le montant minimum
 	b2b_profile = wholesaler.b2b_profile if hasattr(wholesaler, 'b2b_profile') else None
 	if b2b_profile and b2b_profile.minimum_order_amount > 0:
 		if totals['items_total'] < b2b_profile.minimum_order_amount:
 			return False, f"Le montant minimum de commande est de {b2b_profile.minimum_order_amount} FCFA", None
 	
-	# Vérifier les quantités min/max pour chaque produit
+	# Vérifier le stock
 	for item in totals['items']:
 		product = item['product']
-		quantity = item['quantity']
-		
-		# Vérifier le stock
-		if product.stock < quantity:
+		if product.stock < item['quantity']:
 			return False, f"Stock insuffisant pour {product.name} (disponible: {product.stock})", None
-		
-		# Vérifier les quantités min/max B2B
-		pricing = B2BProductPricing.objects.filter(
-			product=product,
-			b2b_store=wholesaler,
-			is_active=True,
-			min_quantity__lte=quantity
-		).exclude(
-			max_quantity__lt=quantity
-		).order_by('-min_quantity').first()
-		
-		if not pricing:
-			return False, f"Quantité invalide pour {product.name}", None
-		
-		if pricing.min_quantity > quantity:
-			return False, f"Quantité minimum de {pricing.min_quantity} requise pour {product.name}", None
-		
-		if pricing.max_quantity and pricing.max_quantity < quantity:
-			return False, f"Quantité maximum de {pricing.max_quantity} pour {product.name}", None
 	
 	return True, "", totals
-

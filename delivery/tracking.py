@@ -89,8 +89,74 @@ def can_read(user, order):
     return bool(delivery and delivery.delivery_agent_id == user.id)
 
 
+# Étapes affichées sans carte : mêmes mots pour le client et pour le commerce.
+STEP_LABELS = (
+    ('received', 'Commande reçue'),
+    ('confirmed', 'Commande confirmée'),
+    ('preparing', 'En préparation'),
+    ('ready', 'Prête pour la livraison'),
+    ('courier', 'Livreur en route vers le commerce'),
+    ('on_the_way', 'Colis en route vers le client'),
+    ('delivered', 'Livrée'),
+)
+ORDER_RANK = {'created': 0, 'pending_payment': 0, 'paid': 1, 'confirmed': 1, 'preparing': 2, 'ready': 3,
+              'assigned': 3, 'in_transit': 5, 'delivered': 6}
+DELIVERY_RANK = {'accepted_by_driver': 4, 'accepted': 4, 'picked_up': 5, 'in_delivery': 5, 'in_transit': 5, 'delivered': 6}
+
+
+def status_steps(order, delivery=None):
+    """Frise des étapes de la commande (sans position ni carte) : fait, en cours ou à venir."""
+    rank = ORDER_RANK.get(order.status, 0)
+    if delivery is not None:
+        rank = max(rank, DELIVERY_RANK.get(delivery.status, 0)) if order.status not in ('cancelled', 'refunded') else rank
+    if order.status in ('cancelled', 'refunded'):
+        rank = -1
+    return [{'key': key, 'label': label, 'done': index < rank or (rank == 6 and index == 6),
+             'current': index == rank and rank != 6}
+            for index, (key, label) in enumerate(STEP_LABELS)]
+
+
+def live_tracking_enabled(order):
+    """Le commerce de la commande a-t-il l'outil « suivi en temps réel » dans son forfait ? (payments/plan_features.py)"""
+    from payments.plan_features import store_has
+    return store_has(order.store, 'live_tracking')
+
+
+def sees_map_anyway(user, order):
+    """Le livreur de la course et l'admin gardent toujours la carte : c'est leur outil de travail, pas l'option du commerce."""
+    if user.is_staff or user.is_superuser or getattr(user, 'user_type', '') == 'admin':
+        return True
+    delivery = getattr(order, 'delivery', None)
+    return bool(delivery and delivery.delivery_agent_id == user.id)
+
+
+def steps_payload(order, user):
+    """Réponse sans carte ni position du livreur : seulement les étapes de statut, avec une explication honnête."""
+    from payments.plan_features import has, plan_for_sale
+    delivery = getattr(order, 'delivery', None)
+    plan = order.store.get_current_plan()
+    target = plan_for_sale(plan, lambda candidate: has(candidate, 'live_tracking'))
+    is_client = order.client_id == user.id
+    return {
+        'order_id': order.id, 'order_number': order.order_number,
+        'status': delivery.status if delivery else '',
+        'status_label': delivery.get_status_display() if delivery else order.get_status_display(),
+        'order_status_label': order.get_status_display(),
+        'live_tracking': False, 'active': False, 'carrying': False,
+        'is_express': bool(order.delivery_requested and order.delivery_type == 'express'),
+        'steps': status_steps(order, delivery),
+        'message': ("Le suivi du livreur sur carte n'est pas disponible pour cette commande. "
+                    + ("Suivez ici les étapes de votre livraison." if is_client
+                       else "Les étapes de la livraison restent visibles ici.")),
+        # Mention commerciale : seulement si un forfait en vente offre vraiment le suivi sur carte.
+        'upgrade_note': (f"Le suivi sur carte est réservé aux commerces au forfait {target.name}" if target is not None else ''),
+    }
+
+
 def tracking_payload(order, user):
     """Ce que la carte affiche pour cette commande et cet utilisateur."""
+    if not sees_map_anyway(user, order) and not live_tracking_enabled(order):
+        return steps_payload(order, user)
     delivery = getattr(order, 'delivery', None)
     store = order.store
     store_point = (store.latitude, store.longitude) if store.latitude is not None and store.longitude is not None else None
@@ -128,6 +194,9 @@ def tracking_payload(order, user):
         'order_id': order.id, 'order_number': order.order_number,
         'status': status,
         'status_label': delivery.get_status_display() if delivery else '',
+        'live_tracking': True,
+        'is_express': bool(order.delivery_requested and order.delivery_type == 'express'),
+        'steps': status_steps(order, delivery),
         'active': active, 'carrying': carrying,
         'store': {'name': store.name, 'address': store.address, 'position': _point(store_point)},
         'destination': {'address': order.delivery_address, 'position': _point(destination), 'source': source},

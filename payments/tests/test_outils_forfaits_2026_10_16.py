@@ -137,8 +137,12 @@ class CarteTests(Base):
         text = ' | '.join(self.pro.get_features_list()).lower()
         for real in ('statistiques avancées', 'import de produits', 'alertes de stock', 'promotions', 'export excel'):
             self.assertIn(real, text)
-        for fake in ('sponsor', 'express', 'api', 'page personnalisée', 'support prioritaire'):
+        for fake in ('sponsor', 'disponible', 'accès api'):
             self.assertNotIn(fake, text)
+        # Ces options sont maintenant réelles : une seule ligne chacune, celle des cases (pas le texte libre).
+        for real in ('livraison express proposée', 'page de boutique personnalisée', 'support prioritaire',
+                     'suivi de la livraison en temps réel'):
+            self.assertEqual(text.count(real), 1, real)
         self.assertIn('support standard', text)
 
     def test_free_card_keeps_basic_stats(self):
@@ -150,7 +154,7 @@ class CarteTests(Base):
         business = SubscriptionPlan.objects.get(plan_type='business')
         self.assertFalse(business.is_available)
         text = ' | '.join(business.get_features_list()).lower()
-        for fake in ('multi-boutiques', 'api', 'synchronisation', 'support prioritaire', 'tarifs négociés'):
+        for fake in ('multi-boutiques', 'accès api', 'synchronisation', 'tarifs négociés'):
             self.assertNotIn(fake, text)
 
     def test_pro_card_mentions_the_badge_and_the_pdf_export(self):
@@ -170,15 +174,17 @@ class CarteTests(Base):
         self.assertIn('historique financier illimité',
                       ' | '.join(f['title'] for f in pro.get_all_features()).lower())
 
-    def test_wholesalers_get_stats_and_exports_but_not_promotions(self):
+    def test_wholesalers_get_stats_exports_and_promotions_from_their_case(self):
         from payments.plan_features import has, required_message
         pro = B2BSubscriptionPlan.objects.get(plan_type='pro')
         pro.can_create_promotions = True
         pro.save()
-        for tool in ('advanced_stats', 'exports', 'product_import', 'stock_alerts'):
+        for tool in ('advanced_stats', 'exports', 'product_import', 'stock_alerts', 'promotions'):
             self.assertTrue(has(pro, tool), tool)
+        pro.can_create_promotions = False
+        pro.save()
         self.assertFalse(has(pro, 'promotions'))
-        self.assertIn('grossistes', required_message('promotions', pro))
+        self.assertIn('Promotions', required_message('promotions', pro))
 
     def test_wholesaler_card_drops_lines_without_code(self):
         plan = B2BSubscriptionPlan.objects.get(plan_type='pro')
@@ -190,8 +196,11 @@ class CarteTests(Base):
         plan.save()
         titles = ' | '.join(f['title'] for f in plan.get_all_features()).lower()
         # Un grossiste ne peut pas commander chez un autre grossiste : aucune carte ne promet l'approvisionnement.
-        for fake in ('remises', 'api', 'approvisionnement', 'promotions', 'support prioritaire', 'account manager'):
+        for fake in ('remises', 'approvisionnement', 'account manager'):
             self.assertNotIn(fake, titles)
+        # Les cases branchées (promotions, prix dégressifs, API, support) s'affichent par leur ligne d'outil.
+        for real in ('promotions : prix barré', 'prix dégressifs', 'accès api', 'support prioritaire'):
+            self.assertIn(real, titles)
         self.assertIn('livraison le samedi', titles)
         self.assertIn('import de produits', titles)
 

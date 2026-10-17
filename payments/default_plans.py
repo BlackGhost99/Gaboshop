@@ -13,28 +13,34 @@ PRO_FEATURES = []
 BUSINESS_FEATURES = ['Multi-boutiques', 'API', 'Synchronisation stock', 'Support prioritaire', 'Tarifs négociés']
 # Ce que le forfait Pro (et Business, quand il ouvrira) donne vraiment ; la migration 0028 l'applique aux forfaits existants.
 PRO_TOOLS = {'has_statistics': True, 'can_view_detailed_reports': True, 'can_export_excel': True, 'can_export_pdf': True,
-             'can_import_products': True, 'has_stock_alerts': True, 'can_create_promotions': True}
+             'can_import_products': True, 'has_stock_alerts': True, 'can_create_promotions': True,
+             # 17 oct. 2026 : les options marketing deviennent réelles (support, page, express, suivi, finance détaillée).
+             'has_priority_support': True, 'support_level': 'prioritaire', 'has_custom_page': True,
+             'can_offer_express_delivery': True, 'has_advanced_delivery_tracking': True, 'can_view_finance_detailed': True}
 B2B_PRO_TOOLS = {'can_view_detailed_reports': True, 'can_export_finance_csv': True, 'can_export_finance_pdf': True,
-                 'can_import_products': True, 'has_stock_alerts': True}
+                 'can_import_products': True, 'has_stock_alerts': True,
+                 'can_offer_bulk_discounts': True, 'can_create_promotions': True, 'has_priority_support': True,
+                 'has_api_access': True, 'can_view_finance_detailed': True}
 BUSINESS_DESCRIPTION = ('Business — réservé aux commerces à fort volume et partenaires professionnels. '
                         'Disponible prochainement.')
 
 B2C_DEFAULTS = {
     'free': {'names': ('Gratuit', 'Free'), 'price': Decimal('0'), 'max_products': 20,
+             'can_offer_express_delivery': False, 'has_advanced_delivery_tracking': False,
              'features_json': FREE_FEATURES, 'description': 'Pour démarrer et vendre sans payer.'},
     'pro': {'names': ('Pro',), 'price': Decimal('10000'), 'max_products': 200, **PRO_TOOLS,
             'features_json': PRO_FEATURES, 'description': 'Pour les commerces qui veulent vendre plus.'},
-    'business': {'names': ('Business',), 'price': Decimal('50000'), 'max_products': None, **PRO_TOOLS, 'is_available': False,
+    'business': {'names': ('Business',), 'price': Decimal('50000'), 'max_products': None, **PRO_TOOLS,
+                 'support_level': 'dedie', 'is_available': False,
                  'features_json': BUSINESS_FEATURES, 'description': BUSINESS_DESCRIPTION},
 }
 B2B_DEFAULTS = {
     'free': {'names': ('B2B Gratuit', 'B2B Free'), 'price': Decimal('0'), 'max_b2b_products': 20,
              'can_offer_bulk_discounts': False, 'description': 'Pour démarrer et vendre sans payer.', 'display_order': 1},
     'pro': {'names': ('B2B Pro',), 'price': Decimal('10000'), 'max_b2b_products': 200, **B2B_PRO_TOOLS,
-            'can_offer_bulk_discounts': False,
+            'is_popular': True,
             'description': 'Pour les grossistes qui veulent vendre plus.', 'display_order': 2},
     'business': {'names': ('B2B Business',), 'price': Decimal('80000'), 'max_b2b_products': None, **B2B_PRO_TOOLS,
-                 'can_offer_bulk_discounts': False,
                  'is_available': False, 'description': BUSINESS_DESCRIPTION, 'display_order': 3},
 }
 

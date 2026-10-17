@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Tab } from '@headlessui/react';
 import { ChartBarIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import FinanceSummary from '../../components/finance/FinanceSummary';
+import CategoryDetailedReport from '../../components/finance/CategoryDetailedReport';
 import RevenusTab from '../../components/finance/RevenusTab';
 import DepensesTab from '../../components/finance/DepensesTab';
 import { getFinanceSummary } from '../../services/financeService';
@@ -94,6 +95,14 @@ const Finance = () => {
           planFeatures={planFeatures}
           onRefresh={fetchSummary}
           loading={loading}
+        />
+      )}
+
+      {/* Rapport détaillé par catégorie (outil du forfait, commerces et grossistes) */}
+      {summary && (
+        <CategoryDetailedReport
+          report={summary.category_detailed_report || []}
+          detailedReport={summary.detailed_report}
         />
       )}
 

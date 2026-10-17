@@ -1,8 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const AdminSidebar = ({ activeTab, onTabChange, mobileOpen = false, onClose = () => {} }) => {
+  const navigate = useNavigate();
   const links = [
     { id: 'overview', label: 'Vue globale', icon: 'M3 12l2-2 7-7 7 7-2 2v7a1 1 0 01-1 1h-3m-6 0h6m-6 0a1 1 0 01-1-1v-7' },
+    { id: 'support', to: '/admin/support', label: 'Support', icon: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
     { id: 'announcements', label: 'Annonces', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z' },
     { id: 'users', label: 'Utilisateurs', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2a3 3 0 00-.879-2.121M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2a3 3 0 01.879-2.121m0 0a3 3 0 014.242 0M12 6a3 3 0 110 6 3 3 0 010-6zm-5 3a3 3 0 105.879 1.121' },
     { id: 'orders', label: 'Commandes', icon: 'M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 0a2 2 0 104 0m-4 0a2 2 0 114 0' },
@@ -44,7 +47,7 @@ const AdminSidebar = ({ activeTab, onTabChange, mobileOpen = false, onClose = ()
           return (
             <button
               key={link.id}
-              onClick={() => { onTabChange(link.id); onClose(); }}
+              onClick={() => { if (link.to) navigate(link.to); else onTabChange(link.id); onClose(); }}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition ${
                 active ? 'bg-gray-100 text-gray-900' : 'text-gray-200 hover:bg-gray-800'
               }`}

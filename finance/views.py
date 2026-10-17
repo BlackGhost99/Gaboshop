@@ -14,8 +14,9 @@ from django.http import HttpResponse
 from orders.models import Order
 from .models import Expense, Supplier
 from .services import get_plan_features, apply_history_limit, enforce_feature
-from .selectors import get_sales_summary, get_expenses_summary, get_top_categories, get_category_detailed_report
+from .selectors import get_sales_summary, get_expenses_summary, get_top_categories, get_category_detailed_report, inclusive_end
 from .permissions import IsStoreManager
+from payments.plan_features import has, required_message
 from .serializers import (
     ExpenseSerializer, SupplierSerializer, SalesSerializer
 )
@@ -55,9 +56,11 @@ class FinanceSummaryView(APIView):
         can_view_detailed = features.get('can_view_finance_detailed', False) or features.get('can_view_detailed_reports', False)
         if can_view_detailed:
             top_categories = get_top_categories(store, date_from, date_to)
-            # Rapport détaillé par catégorie (uniquement pour Business B2B)
-            if features.get('can_view_finance_detailed', False):
-                category_detailed_report = get_category_detailed_report(store, date_from, date_to)
+        # Rapport détaillé par catégorie et par commande : outil « detailed_finance » du forfait (commerce ou grossiste)
+        plan = store.get_current_plan()
+        detailed_available = has(plan, 'detailed_finance')
+        if detailed_available:
+            category_detailed_report = get_category_detailed_report(store, date_from, date_to)
         
         return Response({
             'success': True,
@@ -66,7 +69,12 @@ class FinanceSummaryView(APIView):
                 'expenses': expenses,
                 'profit_estimate': profit_estimate,
                 'top_categories': top_categories,
-                'category_detailed_report': category_detailed_report  # Rapport détaillé par catégorie
+                'category_detailed_report': category_detailed_report,  # Rapport détaillé par catégorie
+                # Dit honnêtement pourquoi le rapport détaillé est absent, et quel forfait en vente le donne
+                'detailed_report': {
+                    'available': detailed_available,
+                    'message': '' if detailed_available else required_message('detailed_finance', plan),
+                },
             },
             'plan_features': features
         })
@@ -108,7 +116,7 @@ class SalesListView(APIView):
         if date_from:
             orders = orders.filter(created_at__gte=date_from)
         if date_to:
-            orders = orders.filter(created_at__lte=date_to)
+            orders = orders.filter(created_at__lte=inclusive_end(date_to))
         if status_filter:
             orders = orders.filter(status=status_filter)
         if is_b2b is not None:
@@ -161,7 +169,7 @@ class SalesExportBaseView(APIView):
         if date_from:
             orders = orders.filter(created_at__gte=date_from)
         if date_to:
-            orders = orders.filter(created_at__lte=date_to)
+            orders = orders.filter(created_at__lte=inclusive_end(date_to))
         if status_filter:
             orders = orders.filter(status=status_filter)
         if is_b2b is not None:

@@ -336,3 +336,26 @@ export const bulkCreateB2BPricing = async (storeId, discountPercent = 10) => {
 		throw error;
 	}
 };
+
+/**
+ * Prix de gros et paliers dégressifs du grossiste connecté
+ */
+export const getMyWholesalePricing = async (search = '') => {
+	const response = await api.get('/b2b/my-pricing/', { params: search ? { search } : {} });
+	return response.data;
+};
+
+export const addMyWholesalePrice = async (data) => {
+	const response = await api.post('/b2b/my-pricing/', data);
+	return response.data;
+};
+
+export const updateMyWholesalePrice = async (pricingId, data) => {
+	const response = await api.put(`/b2b/my-pricing/${pricingId}/`, data);
+	return response.data;
+};
+
+export const deleteMyWholesalePrice = async (pricingId) => {
+	const response = await api.delete(`/b2b/my-pricing/${pricingId}/`);
+	return response.data;
+};
