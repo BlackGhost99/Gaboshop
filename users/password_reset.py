@@ -1,4 +1,4 @@
-"""« Mot de passe oublié » : un code à 6 chiffres envoyé par WhatsApp ou SMS (et par e-mail si le compte en a un).
+"""« Mot de passe oublié » : un code à 6 chiffres, envoyable par e-mail ou autres canaux activés.
 
 Le code expire au bout de 15 minutes, 5 essais au plus. On ne dit jamais si un numéro a un compte.
 Sans WhatsApp ni SMS configuré, aucun code n'est simulé : l'utilisateur est orienté vers le support,
@@ -71,6 +71,9 @@ def send_code_whatsapp(phone, code):
 
 
 def email_available():
+	# Sur Render gratuit, l'e-mail est disponible uniquement via API HTTPS (Brevo).
+	if getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only':
+		return bool(getattr(settings, 'BREVO_API_KEY', ''))
 	return bool(getattr(settings, 'BREVO_API_KEY', '') or getattr(settings, 'EMAIL_HOST_USER', ''))
 
 
@@ -86,8 +89,12 @@ def _issue_code(user, purpose):
 	recent = PasswordResetCode.objects.filter(user=user, purpose=purpose, created_at__gte=now - timedelta(hours=1))
 	if recent.count() >= MAX_CODES_PER_HOUR:
 		return False
-	can_whatsapp, can_sms = whatsapp_available(), sms_available()
-	can_email = email_available() and bool(user.email)
+	email_only = getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only'
+	# Un code reçu par e-mail ne prouve pas la possession du numéro de téléphone.
+	# La vérification téléphonique doit rester WhatsApp/SMS, jamais e-mail.
+	can_whatsapp = not email_only and whatsapp_available()
+	can_sms = not email_only and sms_available()
+	can_email = purpose == 'reset' and email_available() and bool(user.email)
 	if not (can_whatsapp or can_sms or can_email):
 		return False
 	code = f"{secrets.randbelow(1_000_000):06d}"
@@ -110,8 +117,8 @@ def _issue_code(user, purpose):
 			logger.exception("Envoi SMS du code impossible")
 	if can_email:
 		try:
-			send_mail('Gaboshop : votre code', message, settings.DEFAULT_FROM_EMAIL, [user.email])
-			sent = True
+			count = send_mail('Gaboshop : votre code', message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
+			sent = sent or count == 1
 		except Exception:
 			logger.exception("Envoi e-mail du code impossible")
 	return sent
@@ -137,7 +144,8 @@ def _check_code(user, code, purpose):
 
 
 def channels_available():
-	return whatsapp_available() or sms_available()
+	return (getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') != 'email_only'
+	        and (whatsapp_available() or sms_available()))
 
 
 def request_code(phone):

@@ -22,6 +22,9 @@ class SMSService:
         """
         Envoyer un SMS avec fallback automatique
         """
+        # Aucun appel payant quand le site est volontairement en mode e-mail.
+        if getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only':
+            return False
         providers = provider or settings.SMS_PROVIDER
         
         if isinstance(providers, str):

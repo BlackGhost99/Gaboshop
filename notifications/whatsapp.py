@@ -23,6 +23,8 @@ class WhatsAppService:
         """
         Envoyer un message template WhatsApp
         """
+        if getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only':
+            return False
         try:
             formatted_phone = WhatsAppService._format_phone(phone)
             
@@ -71,6 +73,8 @@ class WhatsAppService:
         """
         Envoyer un message texte simple
         """
+        if getattr(settings, 'NOTIFICATION_CHANNEL_MODE', 'auto') == 'email_only':
+            return False
         try:
             formatted_phone = WhatsAppService._format_phone(phone)
             
