@@ -164,6 +164,102 @@ class OrderDetailView(RetrieveAPIView):
 			'data': serializer.data
 		})
 
+class StoreOrderActivityView(APIView):
+	"""Chronologie métier pour le gérant de la boutique concernée et les administrateurs."""
+	permission_classes = [permissions.IsAuthenticated]
+
+	def get(self, request, order_id):
+		from django.shortcuts import get_object_or_404
+		from core.models import AuditLog
+		from payments.direct_models import PaymentReceipt, PaymentAdjustment
+
+		user = request.user
+		if user.is_store_manager():
+			orders = Order.objects.filter(store__manager=user)
+		elif user.is_admin():
+			orders = Order.objects.all()
+		else:
+			return Response({'detail': 'Accès réservé au gérant et à l’administration.'}, status=403)
+		order = get_object_or_404(orders.select_related('client'), pk=order_id)
+		def actor_label(actor):
+			if not actor:
+				return 'Compte non identifié / système'
+			return actor.get_full_name().strip() or actor.phone or f'Compte #{actor.pk}'
+
+		events = [{
+			'id': f'created-{order.pk}',
+			'type': 'order_created',
+			'actor': actor_label(order.client),
+			'actor_role': 'client',
+			'old_status': '',
+			'new_status': 'created',
+			'note': 'Commande créée par le client',
+			'at': order.created_at,
+		}]
+		logs = AuditLog.objects.filter(
+			object_type='order', object_id=order.pk,
+			action_type__in=('order_status_change', 'order_cancelled', 'order_created'),
+		).select_related('user').order_by('action_timestamp', 'pk')[:150]
+		for log in logs:
+			events.append({
+				'id': f'audit-{log.pk}', 'type': log.action_type,
+				'actor': actor_label(log.user), 'actor_role': log.user_role,
+				'old_status': log.old_value or '',
+				'new_status': log.new_value or '',
+				'note': log.reason or '',
+				'at': log.action_timestamp,
+			})
+		# Les reçus portent déjà les utilisateurs déclarants et confirmateurs ;
+		# ne jamais attribuer une action financière à un employé sans preuve.
+		receipts = PaymentReceipt.objects.filter(
+			obligation__arrangement__order=order,
+		).select_related('actor', 'confirmed_by').order_by('created_at', 'pk')[:100]
+		for receipt in receipts:
+			events.append({
+				'id': f'receipt-{receipt.pk}', 'type': 'payment_receipt',
+				'actor': actor_label(receipt.actor),
+				'actor_role': getattr(receipt.actor, 'user_type', ''),
+				'old_status': '', 'new_status': receipt.status,
+				'note': f'Reçu {receipt.receipt_number} déclaré ({receipt.amount:.0f} FCFA)',
+				'at': receipt.created_at,
+			})
+			if receipt.confirmed_at and receipt.confirmed_by_id:
+				events.append({
+					'id': f'receipt-confirmed-{receipt.pk}', 'type': 'payment_confirmed',
+					'actor': actor_label(receipt.confirmed_by),
+					'actor_role': getattr(receipt.confirmed_by, 'user_type', ''),
+					'old_status': 'pending', 'new_status': receipt.status,
+					'note': f'Reçu {receipt.receipt_number} : confirmation financière',
+					'at': receipt.confirmed_at,
+				})
+		adjustments = PaymentAdjustment.objects.filter(
+			obligation__arrangement__order=order,
+		).select_related('actor').order_by('created_at', 'pk')[:100]
+		for adjustment in adjustments:
+			events.append({
+				'id': f'adjust-{adjustment.pk}', 'type': 'payment_adjustment',
+				'actor': actor_label(adjustment.actor),
+				'actor_role': getattr(adjustment.actor, 'user_type', ''),
+				'old_status': '', 'new_status': adjustment.status,
+				'note': f'{adjustment.get_adjustment_type_display()} : {adjustment.amount:.0f} FCFA'
+					+ (f' — {adjustment.reason[:160]}' if adjustment.reason else ''),
+				'at': adjustment.created_at,
+			})
+		events.sort(key=lambda event: (event['at'], event['id']))
+		return Response({
+			'success': True,
+			'data': {
+				'order_id': order.pk,
+				'order_number': order.order_number,
+				'events': events[-200:],
+				'shared_account_notice': (
+				'Les actions sont associées au compte connecté. Si plusieurs employés '
+				'utilisent le même compte commerçant, ils ne peuvent pas être distingués.'
+			),
+			},
+		})
+
+
 class OrderListView(ListAPIView):
 	permission_classes = [permissions.IsAuthenticated]
 	serializer_class = OrderSerializer
