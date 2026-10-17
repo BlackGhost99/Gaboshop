@@ -336,24 +336,9 @@ class SubscriptionChecker:
     
     @staticmethod
     def get_subscription_price(store):
-        """
-        💵 Retourne le prix de la souscription selon le type de store
-        Business: 50 000 F (B2C) ou 80 000 F (B2B)
-        Pro: 20 000 F
-        Free: 0 F
-        """
+        """Prix réel du forfait actif en base, pour les boutiques B2C et B2B."""
         plan = SubscriptionChecker.get_current_plan(store)
-        if not plan:
-            return Decimal('0.00')
-        
-        # Plan Business a un prix différent selon le type de store
-        if plan.plan_type == 'business':
-            if store.is_b2b:
-                return Decimal('80000.00')  # B2B
-            else:
-                return Decimal('50000.00')  # B2C
-        
-        return plan.price
+        return Decimal(plan.price) if plan else Decimal('0.00')
 
 
 def check_subscription_permission(permission_type):
