@@ -54,6 +54,7 @@ from delivery.admin_dashboard import (
     DeliveryTariffAnalyticsView, DeliveryZoneHealthCheckView
 )
 from .store_stats import store_stats
+from .store_team import StoreTeamPolicyView
 from .product_import import import_products, import_template
 from .subscription import (
     get_subscription_status, get_available_plans, check_permission, purchase_plan
@@ -396,6 +397,7 @@ urlpatterns = [
     # Store Finance Module (Store-level financial management)
     path('store/sponsoring/', StoreSponsoringView.as_view(), name='store-sponsoring'),
     path('store/stats/', store_stats, name='store-stats'),
+    path('store/team/policy/', StoreTeamPolicyView.as_view(), name='store-team-policy'),
     path('store/products/import/', import_products, name='store-products-import'),
     path('store/products/import/template/', import_template, name='store-products-import-template'),
     path('store/finance/', include('finance.urls')),
