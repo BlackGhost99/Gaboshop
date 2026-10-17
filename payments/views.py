@@ -45,10 +45,7 @@ def _b2b_subscription_tables_ready():
 
 
 def _get_subscription_price(store, plan):
-    if isinstance(plan, SubscriptionPlan) and plan.plan_type == 'business':
-        if store.is_b2b:
-            return int(Decimal('80000.00'))
-        return int(Decimal('50000.00'))
+    """Prix de l'abonnement défini par l'administrateur (également pour Business)."""
     return int(Decimal(plan.price))
 
 
@@ -1014,21 +1011,13 @@ class SubscriptionPlansAPIView(APIView):
         plans_qs = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
         plans_data = SubscriptionPlanSerializer(plans_qs, many=True).data
         
-        # Ajouter le prix dynamique pour Business selon le type de store
-        if store:
-            for plan in plans_data:
-                price_value = float(plan.get('price') or 0)
-                if plan['plan_type'] == 'business':
-                    # Prix dynamique: 50k B2C, 80k B2B
-                    if store.is_b2b:
-                        plan['actual_price'] = 80000.00
-                        plan['price_label'] = '80 000 F/mois (B2B)'
-                    else:
-                        plan['actual_price'] = 50000.00
-                        plan['price_label'] = '50 000 F/mois (B2C)'
-                else:
-                    plan['actual_price'] = price_value
-                    plan['price_label'] = f"{int(price_value)} F/mois" if price_value > 0 else "Gratuit"
+        # Prix affiché = prix réellement administré pour tous les plans B2C,
+        # y compris Business. Les grossistes sont traités plus haut par leur
+        # propre modèle B2BSubscriptionPlan.
+        for plan in plans_data:
+            price_value = float(plan.get('price') or 0)
+            plan['actual_price'] = price_value
+            plan['price_label'] = f"{int(price_value)} F/mois" if price_value > 0 else "Gratuit"
 
         current_plan = None
         paid_sub = store.get_active_subscription() if store else None
