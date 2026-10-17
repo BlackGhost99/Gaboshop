@@ -233,6 +233,11 @@ def payment_summary(value, user=None):
             item['i_am_payer'] = user.id == role_user_id(obligation, obligation.payer)
             item['i_am_payee'] = user.id == role_user_id(obligation, obligation.payee)
             item['receipts'] = [receipt_payload(r) for r in obligation.receipts.all()]
+            item['adjustments'] = [{
+                'id': adj.id, 'type': adj.adjustment_type, 'status': adj.status,
+                'amount': str(adj.amount), 'reference': adj.reference,
+                'reason': adj.reason, 'created_at': adj.created_at,
+            } for adj in obligation.adjustments.all()]
         obligations.append(item)
     order = arrangement.order
     live = ((arrangement.store.payment_preferences or {}).get('instructions') or {}).get(arrangement.method, '')
