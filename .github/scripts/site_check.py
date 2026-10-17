@@ -180,7 +180,10 @@ def check(site):
             js = fetch(web + scripts[0].decode(), attempts=1, max_bytes=20_000_000)
             lines.append(f"- Fichier du site : `{scripts[0].decode()}`")
             # Depuis le 15 oct. chaque espace (client, commerce, livreur, admin) est un fichier à part.
-            chunks = sorted(set(re.findall(rb'assets/[A-Za-z0-9_.-]+\.js', js['body'] or b'')))
+            # Les morceaux sont cités « assets/X.js » ou, pour certains écrans (Finance), « ./X.js ».
+            names = re.findall(rb'assets/[A-Za-z0-9_.-]+\.js', js['body'] or b'')
+            names += [b'assets/' + n for n in re.findall(rb'["\']\./([A-Za-z0-9_.-]+\.js)["\']', js['body'] or b'')]
+            chunks = sorted(set(names))
             body = js['body'] or b''
             for chunk in chunks:
                 part = fetch(f"{web}/{chunk.decode()}", attempts=1, max_bytes=20_000_000)
