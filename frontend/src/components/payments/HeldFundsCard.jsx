@@ -1,5 +1,6 @@
 import React from 'react';
-import { formatCurrency } from '../../utils/helpers';
+import { Link } from 'react-router-dom';
+import { formatCurrency, formatDateTime } from '../../utils/helpers';
 
 /** Argent payé en ligne par les clients, gardé par Gaboshop jusqu'au versement au commerce. */
 export default function HeldFundsCard({ funds }) {
@@ -9,11 +10,12 @@ export default function HeldFundsCard({ funds }) {
     <div className="mb-8 rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-bold text-emerald-900">🔒 Votre argent en sécurité chez Gaboshop</p>
+          <p className="font-bold text-emerald-900">Paiements en ligne reçus — part commerçant à reverser</p>
           <p className="text-sm text-emerald-800">
-            {trusted
-              ? 'Quand un client paie en ligne, Gaboshop garde l’argent puis vous le verse sur votre Mobile Money dès que vous préparez la commande.'
-              : 'Quand un client paie en ligne, Gaboshop garde l’argent puis vous le verse sur votre Mobile Money dès que le client confirme la réception, ou automatiquement 48 h après la livraison s’il ne la confirme pas.'}
+            Il s'agit des sommes attribuées à votre boutique après des commandes payées en ligne.
+            Un versement ne sera indiqué comme effectué qu'après confirmation du transfert.
+            {trusted ? ' Certaines commandes peuvent être éligibles plus tôt, sous réserve des vérifications.' : ''}
+            {' '}Les délais et les étapes dépendent des validations et du prestataire de paiement.
           </p>
         </div>
         <div className="text-right">
@@ -30,7 +32,14 @@ export default function HeldFundsCard({ funds }) {
         <ul className="mt-3 divide-y divide-emerald-100 rounded bg-white text-sm">
           {items.map((item) => (
             <li key={item.order_number} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-              <span className="font-medium">{item.order_number}</span>
+              <div className="min-w-0 flex-1">
+                {item.order_id ? (
+                  <Link to={`/store/orders?order=${item.order_id}`} className="font-semibold text-indigo-700 hover:underline">
+                    {item.order_number}
+                  </Link>
+                ) : <span className="font-medium">{item.order_number}</span>}
+                {item.created_at && <p className="text-xs text-gray-500">{formatDateTime(item.created_at)}</p>}
+              </div>
               <span className="text-gray-600">{item.stage}</span>
               <span className="font-semibold">{formatCurrency(item.amount)}</span>
             </li>
