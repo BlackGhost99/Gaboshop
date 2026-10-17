@@ -48,7 +48,7 @@ class TeamSubscriptionPlanConfigurationTests(TestCase):
         self.free.history_limit_days = 5
         self.free.save()
         response = self.api(self.admin).patch(
-            f'/api/v1/admin/subscription-plans/{self.free.id}/',
+            f'/api/v1/admin/subscription-plans/{self.free.id}/update/',
             {'can_manage_staff': True, 'max_staff_accounts': 2},
             format='json',
         )
@@ -101,7 +101,7 @@ class TeamSubscriptionPlanConfigurationTests(TestCase):
 
     def test_negative_quota_cannot_be_saved_via_admin(self):
         response = self.api(self.admin).patch(
-            f'/api/v1/admin/subscription-plans/{self.free.id}/',
+            f'/api/v1/admin/subscription-plans/{self.free.id}/update/',
             {'can_manage_staff': True, 'max_staff_accounts': -1},
             format='json',
         )
