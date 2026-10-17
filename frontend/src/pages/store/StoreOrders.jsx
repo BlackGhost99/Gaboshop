@@ -395,7 +395,7 @@ const StoreOrders = () => {
 
       {detail && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full overflow-hidden">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b">
               <div>
                 <p className="text-xs text-gray-500">Commande {detail.order_number || `#${detail.id}`}</p>
@@ -424,6 +424,108 @@ const StoreOrders = () => {
                   <p>{formatCurrency(detail.total_amount || detail.total)}</p>
                 </div>
               </div>
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-bold text-gray-900">Fiche de vente — {detail.order_number}</h4>
+                  {renderStatus(detail.status)}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                  <div><p className="text-xs text-gray-600">Création de la commande</p><p className="font-semibold">{formatDateTime(detail.created_at)}</p></div>
+                  <div><p className="text-xs text-gray-600">Confirmée</p><p className="font-semibold">{detail.confirmed_at ? formatDateTime(detail.confirmed_at) : 'Non confirmée'}</p></div>
+                  <div><p className="text-xs text-gray-600">Livrée</p><p className="font-semibold">{detail.delivered_at ? formatDateTime(detail.delivered_at) : 'Non livrée / non renseignée'}</p></div>
+                  <div><p className="text-xs text-gray-600">Dernière mise à jour</p><p className="font-semibold">{detail.updated_at ? formatDateTime(detail.updated_at) : 'Indisponible'}</p></div>
+                </div>
+                <p className="mt-3 text-xs text-gray-600">
+                  Ces dates proviennent des enregistrements réels de la commande.
+                  L'identité de l'employé ayant préparé ou encaissé la vente n'est pas encore historisée :
+                  elle ne peut pas être reconstituée automatiquement.
+                </p>
+              </div>
+
+              <section className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-bold text-gray-900">Récapitulatif du montant facturé</h4>
+                <dl className="mt-2 space-y-1 text-sm">
+                  {[
+                    ['Articles', detail.items_total],
+                    ['Frais de livraison', detail.delivery_fee],
+                    ['Frais opérateur', detail.operator_fee],
+                    ['Autres frais de paiement', detail.payment_fees],
+                    ['Taxes', detail.tax_amount],
+                  ].filter(([, amount]) => Number(amount || 0) !== 0).map(([label, amount]) => (
+                    <div key={label} className="flex justify-between gap-3"><dt>{label}</dt><dd>{formatCurrency(amount)}</dd></div>
+                  ))}
+                  {Number(detail.forfait_discount || 0) > 0 && (
+                    <div className="flex justify-between gap-3 text-green-700"><dt>Réduction forfait livraison</dt><dd>-{formatCurrency(detail.forfait_discount)}</dd></div>
+                  )}
+                  <div className="flex justify-between gap-3 border-t pt-2 font-bold"><dt>Total de la commande</dt><dd>{formatCurrency(detail.total_amount)}</dd></div>
+                </dl>
+              </section>
+
+              <section className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-bold text-gray-900">Paiement et traçabilité financière</h4>
+                {detail.payment_arrangement ? (
+                  <>
+                    <p className="mt-2 text-sm text-gray-800">
+                      <strong>Circuit :</strong> {PAYMENT_FLOW_NAMES[detail.payment_arrangement.flow] || detail.payment_arrangement.flow}
+                      {' · '}<strong>Moyen :</strong> {PAYMENT_METHOD_NAMES[detail.payment_arrangement.method] || detail.payment_arrangement.method}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-700">
+                      Commission calculée lors de la commande : <strong>{formatCurrency(detail.payment_arrangement.commission_amount)}</strong>
+                      {' '}— ce n'est pas nécessairement une somme exigible si la commande n'est pas livrée.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {(detail.payment_arrangement.obligations || []).map((debt) => (
+                        <div key={debt.id} className="rounded-md bg-gray-50 p-3 text-sm">
+                          <div className="flex flex-wrap justify-between gap-2 font-semibold text-gray-900">
+                            <span>{DEBT_KIND_NAMES[debt.kind] || debt.kind}</span>
+                            <span>{formatCurrency(debt.amount)}</span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {ROLE_NAMES[debt.payer] || debt.payer} → {ROLE_NAMES[debt.payee] || debt.payee}
+                            {' · '}État : {debt.status}
+                            {' · '}Reçu : {formatCurrency(debt.received_amount)}
+                            {' · '}Restant : {formatCurrency(debt.remaining_amount)}
+                          </p>
+                          {(debt.receipts || []).length > 0 && (
+                            <ul className="mt-2 space-y-1 border-t pt-2 text-xs text-gray-700">
+                              {debt.receipts.map((receipt) => (
+                                <li key={receipt.id}>
+                                  Reçu {receipt.receipt_number || `#${receipt.id}`} — {formatCurrency(receipt.amount)}
+                                  {' · '}{receipt.status === 'confirmed' ? 'Confirmé' : receipt.status === 'rejected' ? 'Refusé' : 'En attente'}
+                                  {receipt.reference ? ` · Réf. ${receipt.reference}` : ''}
+                                  {receipt.created_at ? ` · ${formatDateTime(receipt.created_at)}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {['cancelled', 'pending_payment', 'refunded'].includes(detail.status) && (
+                      <p className="mt-3 rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                        Attention : cette commande n'est pas une vente livrée. Un montant comptable affiché ici
+                        doit être rapproché avec Gaboshop avant tout règlement ou remboursement.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-600">Aucun détail de règlement historique disponible pour cette commande.</p>
+                )}
+              </section>
+
+              {detail.notes && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                  <p className="font-bold">Instructions / notes de commande</p>
+                  <p className="mt-1 whitespace-pre-wrap">{detail.notes}</p>
+                </div>
+              )}
+              {detail.client_problem_reported_at && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                  <p className="font-bold">Réclamation client signalée le {formatDateTime(detail.client_problem_reported_at)}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{detail.client_problem || 'Motif non renseigné'}</p>
+                </div>
+              )}
 
               {['ready', 'assigned', 'in_transit'].includes(detail.status) && <OrderLiveMap orderId={detail.id} viewer="store" />}
 
