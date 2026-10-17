@@ -16,6 +16,9 @@ from b2b.models import B2BSubscriptionPlan, B2BStoreSubscription
 from stores.models import Store
 from users.models import User
 
+# Durée d'une ligne Gratuit (comme payments/signals.py) : le Gratuit n'expire jamais.
+FREE_PLAN_DAYS = 36500
+
 
 class IsPlatformAdmin(permissions.BasePermission):
     """Allow access to staff or explicit admin user_type."""
@@ -374,8 +377,19 @@ class StoreSubscriptionCreateView(APIView):
                     'error': 'Plan introuvable'
                 }, status=status.HTTP_404_NOT_FOUND)
         
-        # Calculer end_date si non fourni (30 jours par défaut)
-        if not end_date:
+        # Le statut choisi dans la fenêtre admin est respecté (avant, il était remplacé par « Actif »).
+        wanted_status = request.data.get('status') or 'active'
+        if wanted_status not in dict(StoreSubscription.SUBSCRIPTION_STATUS_CHOICES):
+            return Response({
+                'success': False,
+                'error': 'Statut inconnu'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if plan is None or plan.plan_type == 'free':
+            # Le Gratuit n'expire pas : sans ça, le commerce lisait « votre forfait Gratuit expire, renouvelez-le ».
+            end_date = (timezone.now().date() + timedelta(days=FREE_PLAN_DAYS)).isoformat()
+        elif not end_date:
+            # Calculer end_date si non fourni (30 jours par défaut)
             end_date = (timezone.now().date() + timedelta(days=subscription_days())).isoformat()
         
         subscription_data = {
@@ -385,15 +399,16 @@ class StoreSubscriptionCreateView(APIView):
             'monthly_fee': plan.price if plan else 0,
             'end_date': end_date,
             'auto_renew': auto_renew,
-            'status': 'active'
+            'status': wanted_status
         }
         
         serializer = StoreSubscriptionSerializer(data=subscription_data)
         if serializer.is_valid():
             with transaction.atomic():
-                # Le forfait choisi par l'admin remplace l'actuel : sans ça, « Gratuit » restait caché derrière un Pro.
-                # update() n'appelle pas le signal qui recrée une ligne Gratuit à l'expiration.
-                StoreSubscription.objects.filter(store=store, status='active').update(status='expired')
+                if wanted_status == 'active':
+                    # Le forfait actif choisi par l'admin remplace l'actuel : sans ça, « Gratuit » restait caché
+                    # derrière un Pro. update() n'appelle pas le signal qui recrée une ligne Gratuit à l'expiration.
+                    StoreSubscription.objects.filter(store=store, status='active').update(status='expired')
                 serializer.save().store.refresh_plan_badge()
             return Response({
                 'success': True,
@@ -537,8 +552,11 @@ class B2BStoreSubscriptionCreateView(APIView):
                     'error': 'Plan introuvable'
                 }, status=status.HTTP_404_NOT_FOUND)
         
-        # Calculer end_date si non fourni (30 jours par défaut)
-        if not end_date:
+        if plan is None or plan.plan_type == 'free':
+            # Le Gratuit n'expire pas (pas de « renouvelez votre forfait Gratuit »).
+            end_date = (timezone.now().date() + timedelta(days=FREE_PLAN_DAYS)).isoformat()
+        elif not end_date:
+            # Calculer end_date si non fourni (30 jours par défaut)
             end_date = (timezone.now().date() + timedelta(days=subscription_days())).isoformat()
         
         subscription_data = {
@@ -553,10 +571,13 @@ class B2BStoreSubscriptionCreateView(APIView):
         
         serializer = B2BStoreSubscriptionSerializer(data=subscription_data)
         if serializer.is_valid():
-            serializer.save().store.refresh_plan_badge()
+            subscription = serializer.save()
+            # start_date vaut timezone.now (une date et heure) tant qu'on ne relit pas : la réponse plantait en 500.
+            subscription.refresh_from_db()
+            subscription.store.refresh_plan_badge()
             return Response({
                 'success': True,
-                'data': serializer.data
+                'data': B2BStoreSubscriptionSerializer(subscription).data
             }, status=status.HTTP_201_CREATED)
         return Response({
             'success': False,

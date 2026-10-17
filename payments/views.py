@@ -990,6 +990,17 @@ class SubscriptionPlansAPIView(APIView):
                     }
             except B2BStoreSubscription.DoesNotExist:
                 pass
+            if current_plan is not None and current_plan['plan_type'] == 'free':
+                # Le Gratuit n'expire pas : pas de date de fin ni de « renouvelez ».
+                current_plan.update({'end_date': None, 'days_until_expiry': None})
+            if current_plan is None:
+                free = store.get_current_b2b_plan()
+                current_plan = {
+                    'id': free.id, 'name': free.name, 'plan_type': free.plan_type, 'price': 0.0,
+                    'end_date': None, 'status': 'active', 'auto_renew': False,
+                    'features': [f['title'] for f in free.get_all_features() if f.get('enabled', True)],
+                    'days_until_expiry': None,
+                }
             
             return Response({
                 'success': True,
@@ -1020,8 +1031,12 @@ class SubscriptionPlansAPIView(APIView):
                     plan['price_label'] = f"{int(price_value)} F/mois" if price_value > 0 else "Gratuit"
 
         current_plan = None
-        if store and not SubscriptionChecker.get_active_subscription(store):
-            # Pas d'abonnement payé : le commerce est au forfait Gratuit (sans date de fin).
+        paid_sub = store.get_active_subscription() if store else None
+        if paid_sub is not None and (paid_sub.plan is None or paid_sub.plan.plan_type == 'free'):
+            paid_sub = None
+        if store and paid_sub is None:
+            # Pas d'abonnement payé : le commerce est au forfait Gratuit (sans date de fin), même quand
+            # la ligne Gratuit en porte une (créée par l'admin, ou valable 100 ans après une expiration).
             free = store.get_current_plan()
             if free:
                 current_plan = {

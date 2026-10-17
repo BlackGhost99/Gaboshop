@@ -133,6 +133,8 @@ def store_stats(request):
     return Response({'success': True, 'data': {
         'locked': False,
         'days': days,
+        # Les grossistes n'ont pas de promotions : le conseil sur les produits qui dorment s'adapte.
+        'can_promote': has(plan, 'promotions'),
         'summary': summary,
         'daily': daily,
         'top_products': top_products,

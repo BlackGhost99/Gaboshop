@@ -410,16 +410,12 @@ const StoreProducts = () => {
                             
                             if (!canAdd) {
                                 
-                                const currentProducts = subscriptionInfo?.limits?.products?.current ?? subscriptionInfo?.features?.current_products ?? 0;
+                                // Le serveur rédige le conseil : il ne propose qu'un forfait réellement en vente.
                                 const maxProducts = subscriptionInfo?.limits?.products?.max ?? subscriptionInfo?.features?.max_products ?? null;
-                                const planName = subscriptionInfo?.subscription?.plan_name ?? subscriptionInfo?.plan?.name ?? 'votre forfait';
-                                
-                                const isFree = /free|gratuit/i.test(String(planName));
-                                let message = maxProducts !== null
-                                    ? `Vous avez atteint la limite de ${maxProducts} produits du forfait ${isFree ? 'Gratuit' : planName} (${currentProducts}/${maxProducts}). `
-                                    : `Vous avez atteint la limite de produits du forfait ${planName}. `;
-                                // Business n'est pas encore en vente : on n'envoie pas un Pro vers un forfait qu'il ne peut pas prendre.
-                                message += isFree ? 'Passez à Pro pour ajouter davantage de produits.' : "Aucun forfait en vente ne permet encore d'ajouter davantage de produits.";
+                                const message = subscriptionInfo?.limits?.products?.limit_message
+                                    || (maxProducts !== null
+                                        ? `Vous avez atteint la limite de ${maxProducts} produits de votre forfait.`
+                                        : 'Vous avez atteint la limite de produits de votre forfait.');
                                 
                                 showToast(message, 'error');
                                 return;
@@ -880,6 +876,7 @@ const StoreProducts = () => {
                                             <li>500 lignes et 2 Mo maximum par fichier, .xlsx ou .csv, dans la limite de produits de votre forfait.</li>
                                             <li>Prix en francs CFA, sans centimes : « 4500 », « 4 500 » ou « 4.500 ».</li>
                                             <li>Une ligne par produit. Les photos s'ajoutent ensuite, produit par produit.</li>
+                                            <li>Les lignes qui commencent par « Exemple » sont ignorées : remplacez-les par vos produits.</li>
                                         </ul>
                                         <button
                                             type="button"

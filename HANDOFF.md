@@ -69,8 +69,10 @@ pourquoi les images envoyées sont stockées en base (`core.StoredFile`, `core/s
   - Une seule règle « ce forfait donne-t-il l'outil X ? » : `payments/plan_features.py` (`has`). Le serveur, les cartes
     et le tableau de bord la lisent. Une carte ne montre que ce que le code applique (`keep_free_text`).
   - Pro donne : plus de produits, page Statistiques, exports Excel/CSV et PDF, import de produits par fichier,
-    alertes de stock, promotions (prix barré), badge « Pro ». Grossistes : pareil sans promotions, plus
-    l'approvisionnement chez les autres grossistes (refusé au B2B Gratuit).
+    alertes de stock, promotions (prix barré), badge « Pro ». Grossistes : pareil sans promotions ; un grossiste
+    ne commande jamais chez un autre grossiste (`must_be_b2c_store`), donc aucune carte ne promet l'approvisionnement.
+  - Les conseils « Passez au forfait X » viennent de `plan_for_sale` (`payments/plan_features.py`) : seulement un
+    forfait en vente qui donne vraiment la chose. Le Gratuit n'affiche jamais de date de fin.
   - Piège : à l'expiration, un signal crée une ligne Gratuit valable 100 ans. Cherchez toujours l'abonnement actif
     avec `Store.get_active_subscription()` (ordre `payments.models.paid_first()`).
   - Le paiement d'un forfait par carte (CinetPay) est refusé : seulement Airtel Money et Moov Money.

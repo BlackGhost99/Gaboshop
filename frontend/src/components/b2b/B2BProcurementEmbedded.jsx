@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import WholesalerList from './WholesalerList';
 import WholesalerDetail from './WholesalerDetail';
 import B2BProductList from './B2BProductList';
@@ -18,7 +17,7 @@ import {
  * Composant d'approvisionnement B2B intégré dans le dashboard
  * (sans StoreLayout car déjà géré par le parent)
  */
-const B2BProcurementEmbedded = ({ subscription, store }) => {
+const B2BProcurementEmbedded = ({ store }) => {
 	const [view, setView] = useState('list'); // 'list', 'detail', 'products', 'cart', 'checkout'
 	const [wholesalers, setWholesalers] = useState([]);
 	const [selectedWholesaler, setSelectedWholesaler] = useState(null);
@@ -193,22 +192,16 @@ const B2BProcurementEmbedded = ({ subscription, store }) => {
 		}
 	};
 
-	// Grossiste au forfait Gratuit : commander chez les grossistes fait partie du forfait Pro (refusé par le serveur).
-	if (store?.is_b2b && subscription?.plan_type === 'free') {
+	// Un grossiste vend aux commerces ; il ne commande pas chez un autre grossiste (refusé par le serveur).
+	if (store?.is_b2b) {
 		return (
 			<div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 border border-gray-200">
 				<div className="flex flex-col items-center justify-center text-center py-8">
-					<h3 className="text-xl font-bold text-gray-900 mb-3">Approvisionnement : forfait Pro</h3>
-					<p className="text-gray-600 max-w-md mb-6">
-						Avec le forfait Gratuit, vous vendez aux commerces. Pour commander vous-même chez les autres grossistes
-						et industries, passez au forfait Pro.
+					<h3 className="text-xl font-bold text-gray-900 mb-3">Réservé aux commerces de détail</h3>
+					<p className="text-gray-600 max-w-md">
+						L'approvisionnement sert aux boutiques qui achètent leur stock chez les grossistes.
+						En tant que grossiste, vous vendez ici aux commerces : vous ne commandez pas chez un autre grossiste.
 					</p>
-					<Link
-						to="/store/subscription"
-						className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-					>
-						Voir le forfait Pro
-					</Link>
 				</div>
 			</div>
 		);

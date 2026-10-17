@@ -453,7 +453,7 @@ const StoreProfile = () => {
                             <span>unité(s) ou moins</span>
                         </div>
                         <p id="stock_alert_help" className="text-xs text-gray-500">
-                            0 = seulement à la rupture de stock. Vous recevez une notification sur votre téléphone et dans l'application.
+                            0 = seulement à la rupture de stock. L'alerte arrive dans vos notifications Gaboshop, et sur votre appareil si vous y avez activé les alertes.
                         </p>
                         {!stockAlertsIncluded && (
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">

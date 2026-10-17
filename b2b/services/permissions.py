@@ -162,7 +162,8 @@ def must_be_b2c_store(store):
 		tuple: (bool, str) - (autorisé, message d'erreur)
 	"""
 	if not store or not store.is_b2c:
-		return False, "Seuls les magasins B2C peuvent passer des commandes B2B"
+		return False, ("Un grossiste vend aux commerces mais ne commande pas chez un autre grossiste : "
+		               "l'approvisionnement est réservé aux commerces de détail.")
 	return True, None
 
 

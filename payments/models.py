@@ -475,6 +475,13 @@ class SubscriptionPlan(models.Model):
 			features.append("Meilleure visibilité : votre boutique et vos produits passent devant")
 		if self.commission_reduction_percent > 0 and self.plan_type != 'business':
 			features.append(f"Commission Gaboshop réduite de {self.commission_reduction_percent} %")
+		# Historique des ventes (finance/selectors.py) : un avantage seulement s'il dépasse celui du Gratuit.
+		free = type(self).objects.filter(plan_type='free').exclude(pk=self.pk).first()
+		free_limit = free.history_limit_days if free is not None else None
+		if self.plan_type != 'free' and free_limit is not None and (
+				self.history_limit_days is None or self.history_limit_days > free_limit):
+			features.append("Historique des ventes illimité" if self.history_limit_days is None
+			                else f"Historique des ventes : {self.history_limit_days} jours")
 		if self.plan_type in ('pro', 'business'):
 			# Le badge suit l'abonnement payé (Store.refresh_plan_badge) ; l'accueil met ces boutiques en vitrine.
 			label = 'Pro' if self.plan_type == 'pro' else 'Business'

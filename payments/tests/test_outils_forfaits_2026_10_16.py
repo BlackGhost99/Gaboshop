@@ -189,14 +189,11 @@ class CarteTests(Base):
         plan.custom_features = [{'title': 'Account Manager dédié'}, {'title': 'Livraison le samedi'}]
         plan.save()
         titles = ' | '.join(f['title'] for f in plan.get_all_features()).lower()
-        for fake in ('remises', 'api', 'promotions', 'support prioritaire', 'account manager'):
+        # Un grossiste ne peut pas commander chez un autre grossiste : aucune carte ne promet l'approvisionnement.
+        for fake in ('remises', 'api', 'approvisionnement', 'promotions', 'support prioritaire', 'account manager'):
             self.assertNotIn(fake, titles)
         self.assertIn('livraison le samedi', titles)
         self.assertIn('import de produits', titles)
-        # L'approvisionnement est bien ouvert par le serveur aux grossistes Pro : la carte le dit, pas celle du Gratuit.
-        self.assertIn('approvisionnement', titles)
-        free = B2BSubscriptionPlan.objects.get(plan_type='free')
-        self.assertNotIn('approvisionnement', ' | '.join(f['title'] for f in free.get_all_features()).lower())
 
 
 class StatistiquesTests(Base):
@@ -443,17 +440,19 @@ class ConseilsHonnetesTests(Base):
         b2b_pro = B2BSubscriptionPlan.objects.get(plan_type='pro')
         self.assertNotIn('Passez', required_message('promotions', b2b_pro))
 
-    def test_wholesaler_procurement_needs_pro_and_says_so(self):
+    def test_wholesaler_is_told_procurement_is_for_retailers_whatever_its_plan(self):
         self.store.set_market_mode('b2b')
         self.store.save()
         res = self.api.get('/api/v1/b2b/wholesalers/')
         self.assertEqual(res.status_code, 403)
-        self.assertIn('Passez au forfait B2B Pro', res.json()['error']['message'])
+        self.assertIn('réservé aux commerces de détail', res.json()['error']['message'])
         b2b_pro = B2BSubscriptionPlan.objects.get(plan_type='pro')
         B2BStoreSubscription.objects.create(store=self.store, plan=b2b_pro, plan_name=b2b_pro.name,
                                             monthly_fee=b2b_pro.price, status='active',
                                             end_date=timezone.now().date() + timedelta(days=10))
-        self.assertEqual(self.api.get('/api/v1/b2b/wholesalers/').status_code, 200)
+        res = self.api.get('/api/v1/b2b/wholesalers/')
+        self.assertEqual(res.status_code, 403)
+        self.assertIn('réservé aux commerces de détail', res.json()['error']['message'])
 
     def test_assistant_promo_refusal_uses_the_plan_rule(self):
         from api.v1.ai import assistant
@@ -489,3 +488,135 @@ class AttributionAdminTests(Base):
         StoreSubscription.objects.create(store=self.store, plan=None, plan_name='Free', monthly_fee=0,
                                          status='active', end_date=timezone.now().date() + timedelta(days=36500))
         self.assertEqual(self.store.get_active_subscription().plan_id, self.pro.id)
+
+
+class TroisiemeRelectureTests(Base):
+    """Défauts trouvés à la troisième relecture (17 oct. 2026)."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_user(phone='+24107610198', password='Mapeto88x', user_type='admin', is_staff=True)
+        self.admin_api = APIClient()
+        self.admin_api.force_authenticate(self.admin)
+
+    def dashboard_sub(self):
+        return self.api.get('/api/v1/dashboard/store/').json()['data']['subscription']
+
+    def test_admin_status_other_than_active_keeps_the_paid_plan(self):
+        paid = self.subscribe(days_left=20)
+        res = self.admin_api.post('/api/v1/admin/store-subscriptions/create/',
+                                  {'store_id': self.store.id, 'plan_id': self.pro.id, 'status': 'pending_payment'},
+                                  format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(res.json()['data']['status'], 'pending_payment')
+        paid.refresh_from_db()
+        self.assertEqual(paid.status, 'active')
+        self.assertEqual(self.store.get_active_subscription().pk, paid.pk)
+
+    def test_free_given_by_admin_never_says_it_expires(self):
+        self.subscribe(days_left=20)
+        res = self.admin_api.post('/api/v1/admin/store-subscriptions/create/',
+                                  {'store_id': self.store.id, 'plan_id': self.free.id,
+                                   'end_date': (timezone.now().date() + timedelta(days=3)).isoformat()}, format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        sub = self.dashboard_sub()
+        self.assertEqual(sub['plan_type'], 'free')
+        self.assertIsNone(sub['days_until_expiry'])
+        self.assertIsNone(sub['end_date'])
+        current = self.api.get('/api/v1/payments/subscription-plans/').json()['current_plan']
+        self.assertEqual(current['plan_type'], 'free')
+        self.assertIsNone(current['end_date'])
+
+    def test_automatic_free_row_shows_no_end_date(self):
+        StoreSubscription.objects.create(store=self.store, plan=self.free, plan_name=self.free.name, monthly_fee=0,
+                                         status='active', end_date=timezone.now().date() + timedelta(days=36500))
+        self.assertIsNone(self.api.get('/api/v1/payments/subscription-plans/').json()['current_plan']['end_date'])
+        self.assertIsNone(self.dashboard_sub()['end_date'])
+
+    def test_wholesaler_dashboard_shows_the_enforced_wholesale_plan(self):
+        self.subscribe(days_left=20)  # reste d'un abonnement commerce
+        self.store.set_market_mode('b2b')
+        self.store.save()
+        sub = self.dashboard_sub()
+        self.assertEqual(sub['plan_type'], 'free')
+        self.assertEqual(sub['plan_name'], self.store.get_current_plan().name)
+        self.assertFalse(sub['tools']['exports'])
+
+    def test_admin_gives_a_wholesaler_its_first_plan_without_error(self):
+        self.store.set_market_mode('b2b')
+        self.store.save()
+        b2b_pro = B2BSubscriptionPlan.objects.get(plan_type='pro')
+        res = self.admin_api.post('/api/v1/admin/b2b-store-subscriptions/create/',
+                                  {'store_id': self.store.id, 'plan_id': b2b_pro.id}, format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(self.dashboard_sub()['plan_type'], 'pro')
+
+    def test_no_message_sends_a_shop_to_a_plan_that_is_not_for_sale(self):
+        from payments.plan_features import required_message
+        b2b_free = B2BSubscriptionPlan.objects.get(plan_type='free')
+        B2BSubscriptionPlan.objects.filter(plan_type='pro').update(is_available=False)
+        text = required_message('exports', b2b_free)
+        self.assertIn('aucun forfait en vente', text)
+        self.assertNotIn('Passez', text)
+        # Un Pro sans export : on ne lui dit pas de passer à Pro.
+        SubscriptionPlan.objects.filter(pk=self.pro.pk).update(can_export_excel=False, can_export_pdf=False)
+        self.subscribe()
+        res = self.api.get('/api/v1/store/finance/sales/export/csv/')
+        self.assertEqual(res.status_code, 403)
+        self.assertIn('aucun forfait en vente', res.content.decode('utf-8'))
+
+    def test_pro_at_its_limit_is_offered_business_once_it_opens_with_more_room(self):
+        from payments.subscription_check import SubscriptionChecker
+        SubscriptionPlan.objects.filter(plan_type='business').update(is_available=True, max_products=None)
+        self.assertIn('Passez au forfait', SubscriptionChecker.product_limit_message(self.pro, self.pro.max_products))
+        SubscriptionPlan.objects.filter(plan_type='business').update(max_products=self.pro.max_products)
+        self.assertIn('Aucun forfait en vente',
+                      SubscriptionChecker.product_limit_message(self.pro, self.pro.max_products))
+
+    def test_order_limit_refusal_is_written_for_the_customer(self):
+        from django.core.exceptions import PermissionDenied
+        from payments.subscription_check import SubscriptionChecker
+        SubscriptionPlan.objects.filter(pk=self.free.pk).update(max_orders_per_month=1)
+        client = User.objects.create_user(phone='+24107610197', password='Mapeto88x', user_type='client')
+        Order.objects.create(client=client, store=self.store, status='pending', items_total=Decimal('1000'),
+                             total_amount=Decimal('1000'), delivery_address='Centre', delivery_phone='+24107000000',
+                             delivery_zone='Centre')
+        with self.assertRaises(PermissionDenied) as ctx:
+            SubscriptionChecker.check_can_create_order(self.store)
+        text = str(ctx.exception)
+        self.assertIn(self.store.name, text)
+        self.assertNotIn('Passez', text)
+        self.assertNotIn('votre forfait', text)
+
+    def test_pro_card_shows_a_longer_sales_history(self):
+        SubscriptionPlan.objects.filter(pk=self.free.pk).update(history_limit_days=30)
+        SubscriptionPlan.objects.filter(pk=self.pro.pk).update(history_limit_days=None)
+        self.pro.refresh_from_db()
+        self.assertIn('Historique des ventes illimité', self.pro.get_features_list())
+
+
+class ImportRelectureTests(Base):
+    post = ImportTests.post
+
+    def test_example_rows_and_deleted_products_and_food_limit(self):
+        self.subscribe()
+        Product.objects.create(store=self.store, name='Sandales', price=5000, stock=1, is_available=False)
+        body = ('Exemple : Riz parfumé 5 kg;4500;20;5;0,4;;\n'
+                'Sandales;6000;2;0,5;0,3;chaussures;\n')
+        data = self.post(body).json()['data']
+        by_name = {r['name']: r for r in data['rows']}
+        self.assertEqual(by_name['Exemple : Riz parfumé 5 kg']['status'], 'skipped')
+        self.assertEqual(by_name['Sandales']['status'], 'ok')
+
+    def test_preview_counts_food_rows_against_the_food_limit(self):
+        self.category.name = 'Alimentation test'
+        self.category.save()
+        SubscriptionPlan.objects.filter(pk=self.pro.pk).update(max_products_food=1)
+        self.subscribe()
+        body = ('Riz;4500;20;5;0,4;chaussures;\n'
+                'Huile;2500;20;1;0,3;chaussures;\n')
+        data = self.post(body).json()['data']
+        self.assertEqual(data['counts']['ok'], 1)
+        self.assertEqual(data['counts']['error'], 1)
+        done = self.post(body, confirm=True).json()['data']
+        self.assertEqual(done['counts']['created'], 1)

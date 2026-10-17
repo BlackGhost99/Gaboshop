@@ -42,6 +42,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+WHOLESALER_CANNOT_BUY = ("Un grossiste vend aux commerces mais ne commande pas chez un autre grossiste : "
+						 "l'approvisionnement est réservé aux commerces de détail.")
+
+
 def get_detailed_b2b_access_error(user):
 	"""
 	Retourne un message d'erreur détaillé pour l'accès B2B
@@ -73,7 +77,6 @@ def get_detailed_b2b_access_error(user):
 		}
 	
 	from payments.subscription_check import SubscriptionChecker
-	from b2b.models import B2BSubscriptionPlan
 	plan = SubscriptionChecker.get_current_plan(store)
 	
 	if not plan:
@@ -83,18 +86,14 @@ def get_detailed_b2b_access_error(user):
 			'message': 'Aucun plan d\'abonnement trouvé. Un forfait Pro ou Business est requis pour accéder au B2B.'
 		}
 	
-	# Si c'est un plan B2B, vérifier que ce n'est pas Free
-	if isinstance(plan, B2BSubscriptionPlan):
-		if plan.plan_type == 'free':
-			logger.warning(f"get_detailed_b2b_access_error: Plan B2B Free - accès refusé pour store {store.id}")
-			return False, {
-				'code': status.HTTP_403_FORBIDDEN,
-				'message': f"Avec le forfait {plan.name}, vous vendez aux commerces mais ne commandez pas chez les autres grossistes. "
-						   + SubscriptionChecker.upgrade_hint(plan, "commander chez les grossistes et industries")
-			}
-		logger.debug(f"get_detailed_b2b_access_error: Plan B2B {plan.name} (plan_type: {plan.plan_type}) - accès autorisé")
-		return True, None
-	
+	# Un grossiste vend aux commerces : il ne commande jamais chez un autre grossiste (must_be_b2c_store),
+	# quel que soit son forfait. On le dit dès le catalogue plutôt qu'au moment de commander.
+	if store.is_b2b and not store.is_b2c:
+		return False, {
+			'code': status.HTTP_403_FORBIDDEN,
+			'message': WHOLESALER_CANNOT_BUY,
+		}
+
 	# Pour les plans B2C, vérifier can_access_b2b
 	if not getattr(plan, 'can_access_b2b', False):
 		logger.warning(f"get_detailed_b2b_access_error: Plan {plan.name} (plan_type: {plan.plan_type}) n'a pas can_access_b2b=True pour store {store.id}")

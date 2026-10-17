@@ -318,10 +318,11 @@ def send_subscription_expiry_reminder(self):
         expiry_date_in_7_days = now + timedelta(days=reminder_days)
         
         # Chercher les abonnements qui expirent dans 7 jours
+        # Le Gratuit n'expire pas : pas de rappel « renouvelez » pour lui.
         expiring_soon = StoreSubscription.objects.filter(
             status='active',
             end_date=expiry_date_in_7_days
-        )
+        ).exclude(plan__isnull=True).exclude(plan__plan_type='free')
         
         count = 0
         for subscription in expiring_soon:

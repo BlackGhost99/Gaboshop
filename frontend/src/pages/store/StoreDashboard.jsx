@@ -127,7 +127,8 @@ const StoreDashboard = () => {
     );
   }
 
-  const isB2BFree = Boolean(dashboardData?.store?.is_b2b) && dashboardData?.subscription?.plan_type === 'free';
+  // Un grossiste ne commande pas chez un autre grossiste (refusé par le serveur).
+  const isWholesaler = Boolean(dashboardData?.store?.is_b2b);
 
   // Ventes réelles de la semaine (jamais de chiffres inventés)
   const chartData = Array.isArray(dashboardData?.weekly_revenue)
@@ -251,7 +252,6 @@ const StoreDashboard = () => {
                         !dashboardData?.store?.is_b2b && 'Promotions (prix barré)',
                         'Exports Excel/CSV et PDF de vos ventes',
                         !dashboardData?.store?.is_b2b && 'Badge « Pro » visible des clients',
-                        dashboardData?.store?.is_b2b && 'Commandes chez les autres grossistes et industries',
                       ].filter(Boolean).map((item) => (
                         <li key={item} className="flex items-start gap-2 min-w-0">
                           <span className="text-indigo-600" aria-hidden="true">✓</span>
@@ -293,21 +293,20 @@ const StoreDashboard = () => {
             )}
             <button
               onClick={() => {
-                // Grossiste au forfait Gratuit : l'approvisionnement fait partie du forfait Pro (refusé par le serveur).
-                if (isB2BFree) {
+                if (isWholesaler) {
                   return;
                 }
                 setActiveTab('supply');
               }}
-              disabled={isB2BFree}
+              disabled={isWholesaler}
               className={`px-4 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
-                isB2BFree
+                isWholesaler
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : activeTab === 'supply'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
-              title={isB2BFree ? "Commander chez les grossistes fait partie du forfait Pro. Passez à Pro dans « Mon forfait »." : ''}
+              title={isWholesaler ? 'Réservé aux commerces de détail : un grossiste ne commande pas chez un autre grossiste.' : ''}
             >
               Approvisionnement (B2B)
             </button>
