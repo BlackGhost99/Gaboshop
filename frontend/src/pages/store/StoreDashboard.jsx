@@ -127,6 +127,8 @@ const StoreDashboard = () => {
     );
   }
 
+  const isB2BFree = Boolean(dashboardData?.store?.is_b2b) && dashboardData?.subscription?.plan_type === 'free';
+
   // Ventes réelles de la semaine (jamais de chiffres inventés)
   const chartData = Array.isArray(dashboardData?.weekly_revenue)
     ? dashboardData.weekly_revenue.map(d => ({ name: d.name, vente: d.revenue }))
@@ -237,10 +239,26 @@ const StoreDashboard = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   <div className="flex-1">
-                    <p className="font-bold text-lg mb-2">✨ Passez au plan Business !</p>
-                    <p className="text-sm mb-3">
-                      Débloquez l'accès B2B : 0% de commission sur l'alimentaire (gratuit) et le vrai bénéfice sur le non-alimentaire, analytics avancés et bien plus encore.
-                    </p>
+                    <p className="font-bold text-lg mb-2">✨ Passez au forfait Pro</p>
+                    <p className="text-sm mb-2">Le forfait Pro vous donne des outils pour vendre plus :</p>
+                    <ul className="text-sm mb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {[
+                        'Plus de produits en ligne',
+                        'Statistiques avancées (meilleurs produits, clients fidèles, meilleures heures)',
+                        'Import de produits par fichier Excel/CSV',
+                        'Alertes de stock faible',
+                        // Les promotions (prix barré) ne sont pas proposées aux grossistes.
+                        !dashboardData?.store?.is_b2b && 'Promotions (prix barré)',
+                        'Exports Excel/CSV et PDF de vos ventes',
+                        !dashboardData?.store?.is_b2b && 'Badge « Pro » visible des clients',
+                        dashboardData?.store?.is_b2b && 'Commandes chez les autres grossistes et industries',
+                      ].filter(Boolean).map((item) => (
+                        <li key={item} className="flex items-start gap-2 min-w-0">
+                          <span className="text-indigo-600" aria-hidden="true">✓</span>
+                          <span className="break-words">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
                     <Link
                       to="/store/subscription"
                       className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors shadow-md"
@@ -248,7 +266,7 @@ const StoreDashboard = () => {
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                       </svg>
-                      Découvrir les plans
+                      Voir le forfait Pro
                     </Link>
                   </div>
                 </div>
@@ -275,26 +293,21 @@ const StoreDashboard = () => {
             )}
             <button
               onClick={() => {
-                // Vérifier si le plan est Free B2B
-                const isB2BFree = dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b;
+                // Grossiste au forfait Gratuit : l'approvisionnement fait partie du forfait Pro (refusé par le serveur).
                 if (isB2BFree) {
-                  return; // Ne rien faire si Free B2B
+                  return;
                 }
                 setActiveTab('supply');
               }}
-              disabled={dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b}
+              disabled={isB2BFree}
               className={`px-4 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
-                dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b
+                isB2BFree
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : activeTab === 'supply'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
-              title={
-                dashboardData?.subscription?.plan_type === 'free' && dashboardData?.store?.is_b2b
-                  ? 'L\'approvisionnement B2B n\'est pas disponible avec le plan Free. Passez au plan Pro ou Business.'
-                  : ''
-              }
+              title={isB2BFree ? "Commander chez les grossistes fait partie du forfait Pro. Passez à Pro dans « Mon forfait »." : ''}
             >
               Approvisionnement (B2B)
             </button>
@@ -315,6 +328,11 @@ const StoreDashboard = () => {
             <SponsoringCard />
 
             {/* Statistiques principales */}
+            <div className="flex justify-end mb-2">
+              <Link to="/store/stats" className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 hover:underline">
+                Voir mes statistiques →
+              </Link>
+            </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
               <StatCard
                 title="Commandes du jour"
@@ -404,9 +422,30 @@ const StoreDashboard = () => {
                 )}
               </div>
               <div className="mt-4 md:mt-0 flex flex-wrap gap-3">
-                <span className="bg-white/10 text-white px-4 py-2 rounded-full text-sm border border-white/20">Commission réduite</span>
-                <span className="bg-white/10 text-white px-4 py-2 rounded-full text-sm border border-white/20">Support prioritaire</span>
-                <span className="bg-white/10 text-white px-4 py-2 rounded-full text-sm border border-white/20">Promos mises en avant</span>
+                {/* Seulement ce que le forfait donne vraiment (mêmes règles que le serveur). */}
+                {(() => {
+                  const sub = dashboardData?.subscription || {};
+                  const tools = sub.tools || {};
+                  const cut = Number(sub.commission_reduction_percent) || 0;
+                  const chips = [
+                    cut > 0 && `Commission réduite de ${cut.toLocaleString('fr-FR')} %`,
+                    tools.advanced_stats && 'Statistiques avancées',
+                    tools.product_import && 'Import Excel/CSV',
+                    tools.stock_alerts && 'Alertes de stock',
+                    tools.promotions && 'Promotions',
+                    tools.exports && 'Exports',
+                  ].filter(Boolean);
+                  if (!chips.length) {
+                    return (
+                      <Link to="/store/subscription" className="bg-white/10 text-white px-4 py-2 rounded-full text-sm border border-white/20 hover:bg-white/20">
+                        Outils de base · voir le forfait Pro
+                      </Link>
+                    );
+                  }
+                  return chips.map((chip) => (
+                    <span key={chip} className="bg-white/10 text-white px-4 py-2 rounded-full text-sm border border-white/20">{chip}</span>
+                  ));
+                })()}
               </div>
             </div>
 

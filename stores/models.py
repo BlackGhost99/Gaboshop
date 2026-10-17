@@ -209,7 +209,11 @@ class Store(models.Model):
 		max_length=20,
 		choices=[('starter', 'Starter'), ('pro', 'Pro'), ('business', 'Business')],
 		default='starter',
-		help_text="Plan d'abonnement du magasin"
+		help_text="Badge du forfait affiché aux clients ; suit l'abonnement réel (refresh_plan_badge)"
+	)
+	stock_alert_threshold = models.PositiveSmallIntegerField(
+		default=3,
+		help_text="Alerte de stock (forfaits qui l'incluent) quand il reste ce nombre d'unités ou moins ; 0 = seulement à la rupture"
 	)
 	# Horaires par défaut d'un nouveau commerce : réglés dans l'espace admin.
 	opening_time = models.TimeField(default=default_opening_time)
@@ -302,14 +306,12 @@ class Store(models.Model):
 		from django.utils import timezone
 		from payments.models import StoreSubscription
 		
-		try:
-			return StoreSubscription.objects.filter(
-				store=self,
-				status='active',
-				end_date__gte=timezone.now().date()
-			).latest('end_date')
-		except StoreSubscription.DoesNotExist:
-			return None
+		from payments.models import paid_first
+		return StoreSubscription.objects.filter(
+			store=self,
+			status='active',
+			end_date__gte=timezone.now().date()
+		).order_by(*paid_first()).first()
 	
 	def get_current_plan(self):
 		"""
@@ -351,7 +353,16 @@ class Store(models.Model):
 		# Plan par défaut : B2B Gratuit, créé s'il manque.
 		from payments.default_plans import ensure_free_b2b_plan
 		return ensure_free_b2b_plan(B2BSubscriptionPlan)
-	
+
+	def refresh_plan_badge(self):
+		"""Aligne le badge « Pro » / « Business » vu par les clients sur l'abonnement réellement actif."""
+		plan = self.get_current_plan()
+		badge = plan.plan_type if plan is not None and plan.plan_type in ('pro', 'business') else 'starter'
+		if badge != self.subscription_plan:
+			self.subscription_plan = badge
+			self.save(update_fields=['subscription_plan'])
+		return badge
+
 	def is_subscription_active(self):
 		"""Vérifie si le magasin a un forfait ACTIF"""
 		return self.get_active_subscription() is not None

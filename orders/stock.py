@@ -21,11 +21,17 @@ def reserve_stock(lines):
 	for product, quantity in lines:
 		wanted[product.pk] += int(quantity)
 		names[product.pk] = product.name
+	changes = {}
 	for product_id, quantity in wanted.items():
 		updated = Product.objects.filter(pk=product_id, stock__gte=quantity).update(stock=F('stock') - quantity)
 		if not updated:
 			left = Product.objects.filter(pk=product_id).values_list('stock', flat=True).first() or 0
 			raise ValidationError({'items': [f'Stock insuffisant pour « {names[product_id]} » : il reste {left} unité(s).']})
+		after = Product.objects.filter(pk=product_id).values_list('stock', flat=True).first() or 0
+		changes[product_id] = (after + quantity, after)
+	# Alertes de stock faible (forfaits qui l'incluent), une fois la commande enregistrée.
+	from products.stock_alerts import after_sale
+	after_sale(changes)
 
 
 def restock_order(order):

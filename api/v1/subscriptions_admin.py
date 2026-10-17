@@ -6,6 +6,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import serializers
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
@@ -389,7 +390,11 @@ class StoreSubscriptionCreateView(APIView):
         
         serializer = StoreSubscriptionSerializer(data=subscription_data)
         if serializer.is_valid():
-            serializer.save()
+            with transaction.atomic():
+                # Le forfait choisi par l'admin remplace l'actuel : sans ça, « Gratuit » restait caché derrière un Pro.
+                # update() n'appelle pas le signal qui recrée une ligne Gratuit à l'expiration.
+                StoreSubscription.objects.filter(store=store, status='active').update(status='expired')
+                serializer.save().store.refresh_plan_badge()
             return Response({
                 'success': True,
                 'data': serializer.data
@@ -440,7 +445,7 @@ class StoreSubscriptionUpdateView(APIView):
             
             serializer = StoreSubscriptionSerializer(subscription, data=data, partial=True)
             if serializer.is_valid():
-                serializer.save()
+                serializer.save().store.refresh_plan_badge()
                 # Recharger l'objet depuis la DB pour avoir toutes les données à jour
                 subscription.refresh_from_db()
                 # Réutiliser le serializer avec l'objet rafraîchi pour avoir tous les champs calculés
@@ -548,7 +553,7 @@ class B2BStoreSubscriptionCreateView(APIView):
         
         serializer = B2BStoreSubscriptionSerializer(data=subscription_data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save().store.refresh_plan_badge()
             return Response({
                 'success': True,
                 'data': serializer.data
@@ -598,7 +603,7 @@ class B2BStoreSubscriptionUpdateView(APIView):
             
             serializer = B2BStoreSubscriptionSerializer(subscription, data=data, partial=True)
             if serializer.is_valid():
-                serializer.save()
+                serializer.save().store.refresh_plan_badge()
                 # Recharger l'objet depuis la DB pour avoir toutes les données à jour
                 subscription.refresh_from_db()
                 # Réutiliser le serializer avec l'objet rafraîchi pour avoir tous les champs calculés

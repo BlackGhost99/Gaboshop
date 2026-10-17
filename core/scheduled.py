@@ -155,8 +155,11 @@ def cancel_abandoned_orders():
 
 
 def expire_subscriptions():
-	"""Passe en « expiré » les abonnements de commerce dont la date de fin est passée."""
+	"""Passe en « expiré » les abonnements dont la date de fin est passée, et retire le badge « Pro » / « Business »
+	(et la vitrine de l'accueil) aux commerces qui n'ont plus d'abonnement actif."""
+	from b2b.models import B2BStoreSubscription
 	from payments.models import StoreSubscription
+	from stores.models import Store
 	today = timezone.now().date()
 	expired = StoreSubscription.objects.filter(status='active', end_date__lt=today)
 	count = 0
@@ -164,7 +167,15 @@ def expire_subscriptions():
 		subscription.status = 'expired'
 		subscription.save()
 		count += 1
-	return f'{count} abonnement(s) expiré(s)'
+	count += B2BStoreSubscription.objects.filter(status='active', end_date__lt=today).update(status='expired')
+	changed = 0
+	stores = Store.objects.filter(Q(subscription_plan__in=('pro', 'business'))
+								  | Q(subscriptions__status='active') | Q(b2b_subscription__status='active')).distinct()
+	for store in stores:
+		before = store.subscription_plan
+		if store.refresh_plan_badge() != before:
+			changed += 1
+	return f'{count} abonnement(s) expiré(s), {changed} badge(s) de forfait corrigé(s)'
 
 
 # Le client n'a ni confirmé ni signalé de problème 48 h après la livraison : le commerce (et le livreur) sont payés.
@@ -263,7 +274,7 @@ JOBS = (
 	('paiements_en_ligne', timedelta(minutes=2), check_online_payments),
 	('commandes_abandonnees', timedelta(hours=1), cancel_abandoned_orders),
 	('retards_preparation', timedelta(minutes=15), alert_stale_preparation),
-	('abonnements_expires', timedelta(hours=12), expire_subscriptions),
+	('abonnements_expires', timedelta(hours=1), expire_subscriptions),
 	('versements_sans_confirmation', timedelta(hours=1), release_unconfirmed_payouts),
 	('gardien_antifraude', timedelta(minutes=30), guard_against_fraud),
 	('annonces_differees', timedelta(minutes=10), send_deferred_announcement_pushes),

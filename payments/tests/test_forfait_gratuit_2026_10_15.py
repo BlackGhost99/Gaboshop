@@ -49,7 +49,7 @@ class ForfaitGratuitTests(TestCase):
         self.assertNotEqual(res.status_code, 201)
         text = res.content.decode()
         self.assertIn('limite de 2 produits du forfait Gratuit', text)
-        self.assertIn('Passez à Pro', text)
+        self.assertIn('Passez au forfait Pro', text)
 
     def test_range_business_greyed_and_not_buyable(self):
         ensure_range(SubscriptionPlan, B2BSubscriptionPlan)

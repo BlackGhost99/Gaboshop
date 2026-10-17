@@ -175,7 +175,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
             'max_orders_per_month', 'can_access_b2b', 'has_b2b_visibility',
             'can_sponsor_products', 'has_statistics', 'has_custom_page',
             'has_priority_support', 'priority_listing', 'commission_rate',
-            'commission_multiplier',
+            'commission_multiplier', 'can_import_products', 'has_stock_alerts', 'can_create_promotions',
             'description', 'features_json', 'is_active', 'is_available', 'features'
         ]
         read_only_fields = fields

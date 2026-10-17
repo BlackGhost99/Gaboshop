@@ -6,7 +6,11 @@ from rest_framework.response import Response
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
+import logging
+
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
+from django.http import HttpResponse
 from orders.models import Order
 from .models import Expense, Supplier
 from .services import get_plan_features, apply_history_limit, enforce_feature
@@ -15,6 +19,10 @@ from .permissions import IsStoreManager
 from .serializers import (
     ExpenseSerializer, SupplierSerializer, SalesSerializer
 )
+
+logger = logging.getLogger(__name__)
+EXPORT_FAILED = ("L'export n'a pas abouti. Réessayez dans un instant ; si cela continue, "
+                 "écrivez au support Gaboshop.")
 
 
 class FinanceSummaryView(APIView):
@@ -180,7 +188,6 @@ class SalesExportCSVView(SalesExportBaseView):
         try:
             store = request.user.managed_stores.first()
             if not store:
-                from django.http import HttpResponse
                 return HttpResponse('Aucun magasin associé', status=404)
             
             # Enforce permissions
@@ -192,11 +199,12 @@ class SalesExportCSVView(SalesExportBaseView):
             # Import export function
             from .exports import export_sales_csv
             return export_sales_csv(orders, store)
-        except Exception as e:
-            import traceback
-            from django.http import HttpResponse
-            error_msg = f"Erreur lors de l'export CSV: {str(e)}\n{traceback.format_exc()}"
-            return HttpResponse(error_msg, status=500, content_type='text/plain')
+        except PermissionDenied as exc:
+            # Outil hors forfait : la raison et la marche à suivre, jamais une erreur 500.
+            return HttpResponse(str(exc), status=403, content_type='text/plain; charset=utf-8')
+        except Exception:
+            logger.exception("Export CSV impossible")
+            return HttpResponse(EXPORT_FAILED, status=500, content_type='text/plain; charset=utf-8')
 
 
 class SalesExportPDFView(SalesExportBaseView):
@@ -206,7 +214,6 @@ class SalesExportPDFView(SalesExportBaseView):
         try:
             store = request.user.managed_stores.first()
             if not store:
-                from django.http import HttpResponse
                 return HttpResponse('Aucun magasin associé', status=404)
             
             # Enforce permissions
@@ -223,11 +230,12 @@ class SalesExportPDFView(SalesExportBaseView):
             from .exports import export_sales_pdf
             summary = get_sales_summary(store, date_from, date_to)
             return export_sales_pdf(orders, store, summary)
-        except Exception as e:
-            import traceback
-            from django.http import HttpResponse
-            error_msg = f"Erreur lors de l'export PDF: {str(e)}\n{traceback.format_exc()}"
-            return HttpResponse(error_msg, status=500, content_type='text/plain')
+        except PermissionDenied as exc:
+            # Outil hors forfait : la raison et la marche à suivre, jamais une erreur 500.
+            return HttpResponse(str(exc), status=403, content_type='text/plain; charset=utf-8')
+        except Exception:
+            logger.exception("Export PDF impossible")
+            return HttpResponse(EXPORT_FAILED, status=500, content_type='text/plain; charset=utf-8')
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
@@ -317,11 +325,12 @@ class ExpensesExportCSVView(ExpensesExportBaseView):
     def get(self, request):
         store = request.user.managed_stores.first()
         if not store:
-            from django.http import HttpResponse
             return HttpResponse('Aucun magasin associé', status=404)
         
-        # Enforce permissions
-        enforce_feature(store, 'can_export_excel')
+        try:
+            enforce_feature(store, 'can_export_excel')
+        except PermissionDenied as exc:
+            return HttpResponse(str(exc), status=403, content_type='text/plain; charset=utf-8')
         
         # Get expenses
         expenses = self.get_expenses(request, store)
@@ -338,7 +347,6 @@ class ExpensesExportPDFView(ExpensesExportBaseView):
         try:
             store = request.user.managed_stores.first()
             if not store:
-                from django.http import HttpResponse
                 return HttpResponse('Aucun magasin associé', status=404)
             
             # Enforce permissions
@@ -355,11 +363,12 @@ class ExpensesExportPDFView(ExpensesExportBaseView):
             from .exports import export_expenses_pdf
             summary = get_expenses_summary(store, date_from, date_to)
             return export_expenses_pdf(expenses, store, summary)
-        except Exception as e:
-            import traceback
-            from django.http import HttpResponse
-            error_msg = f"Erreur lors de l'export PDF: {str(e)}\n{traceback.format_exc()}"
-            return HttpResponse(error_msg, status=500, content_type='text/plain')
+        except PermissionDenied as exc:
+            # Outil hors forfait : la raison et la marche à suivre, jamais une erreur 500.
+            return HttpResponse(str(exc), status=403, content_type='text/plain; charset=utf-8')
+        except Exception:
+            logger.exception("Export PDF impossible")
+            return HttpResponse(EXPORT_FAILED, status=500, content_type='text/plain; charset=utf-8')
 
 
 class SupplierViewSet(viewsets.ModelViewSet):

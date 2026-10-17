@@ -9,8 +9,8 @@ const SubscriptionPlans = () => {
   const [currentPlan, setCurrentPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(null);
-  const [toast, setToast] = useState(null);
   const [storeType, setStoreType] = useState(null);
+  // Seul le Mobile Money fonctionne : Airtel Money ou Moov Money (pas de carte bancaire).
   const [paymentProvider, setPaymentProvider] = useState('airtel');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [lastIntent, setLastIntent] = useState(null);
@@ -19,7 +19,8 @@ const SubscriptionPlans = () => {
     fetchPlans();
   }, []);
 
-  const fetchPlans = async () => {
+  // quiet : pendant le suivi d'un paiement (toutes les 10 s), ne pas répéter le message d'erreur.
+  const fetchPlans = async ({ quiet = false } = {}) => {
     try {
       const response = await api.get('/payments/subscription-plans/');
       setPlans(response.data.plans || []);
@@ -27,11 +28,12 @@ const SubscriptionPlans = () => {
       setStoreType(response.data.store_type);
     } catch (err) {
       console.error('Erreur chargement plans:', err);
-      const message =
-        err.response?.data?.error ||
-        err.response?.data?.detail ||
-        'Erreur lors du chargement des plans';
-      showToast(message, 'error');
+      if (!quiet) {
+        notifyError(err, {
+          action: 'Charger les forfaits',
+          fallback: "Les forfaits n'ont pas pu être chargés.",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -44,8 +46,9 @@ const SubscriptionPlans = () => {
 
     setSubscribing(planId);
     try {
-      const isMobileMoney = paymentProvider === 'airtel' || paymentProvider === 'moov';
-      if (isMobileMoney && !phoneNumber.trim()) {
+      // Toujours Airtel ou Moov : le paiement par carte (CinetPay) ne fonctionne pas.
+      const provider = paymentProvider === 'moov' ? 'moov' : 'airtel';
+      if (!phoneNumber.trim()) {
         notifyError({ error: { message: 'Le numéro Mobile Money est requis.', reason: 'Le paiement du plan part sur votre téléphone.', next_step: 'Saisissez votre numéro Airtel ou Moov dans « Mode de paiement », puis recommencez.' } }, { action: 'Activer le plan' });
         setSubscribing(null);
         return;
@@ -53,8 +56,8 @@ const SubscriptionPlans = () => {
 
       const response = await api.post('/payments/subscriptions/intent/', {
         plan_id: planId,
-        provider: paymentProvider,
-        phone_number: isMobileMoney ? phoneNumber.trim() : undefined
+        provider,
+        phone_number: phoneNumber.trim()
       });
 
       if (response.data.success) {
@@ -82,12 +85,7 @@ const SubscriptionPlans = () => {
   };
 
   // Paiement en attente : suivre l'activation du plan (et au retour dans l'app)
-  useVisibleInterval(fetchPlans, 10000, Boolean(lastIntent));
-
-  const showToast = (message, type) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
+  useVisibleInterval(() => fetchPlans({ quiet: true }), 10000, Boolean(lastIntent));
 
   const getPlanIcon = (planType) => {
     const icons = {
@@ -127,6 +125,19 @@ const SubscriptionPlans = () => {
     );
   }
 
+  // Ce que le Pro débloque vraiment, lu sur sa carte (le serveur n'y met que les outils branchés).
+  const proPlan = plans.find((plan) => plan.plan_type === 'pro' && plan.is_available !== false);
+  const featureTitles = (plan) => (plan?.features || [])
+    .map((feature) => (typeof feature === 'string' ? feature : feature?.title))
+    .filter(Boolean);
+  // Seulement ce que le Gratuit n'a pas déjà.
+  const freeTitles = new Set(featureTitles(plans.find((plan) => plan.plan_type === 'free')));
+  const proHighlights = featureTitles(proPlan)
+    .filter((feature) => !freeTitles.has(feature))
+    .filter((feature) => !/^commandes illimit/i.test(feature))
+    .map((feature) => feature.split(' : ')[0].split(', et ')[0])
+    .slice(0, 6);
+
   return (
     <StoreLayout title="Plans de Souscription">
       <div className="max-w-7xl mx-auto">
@@ -135,8 +146,8 @@ const SubscriptionPlans = () => {
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
             Choisissez le plan adapté à votre business
           </h2>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Développez votre activité avec des fonctionnalités premium, 0% de commission sur l'alimentaire (gratuit) et le vrai bénéfice sur le non-alimentaire, avec une visibilité maximale sur GABOSHOP
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto break-words">
+            Commencez gratuitement, puis passez au forfait Pro quand vous voulez vendre plus. Chaque carte liste exactement ce que le forfait vous donne.
           </p>
         </div>
 
@@ -146,33 +157,30 @@ const SubscriptionPlans = () => {
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Mode de paiement</h3>
               <p className="text-sm text-slate-600">
-                Airtel Money, Moov Money ou carte bancaire (CinetPay).
+                Airtel Money ou Moov Money. Vous validez le paiement sur votre téléphone.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 min-w-0">
               <select
                 value={paymentProvider}
                 onChange={(event) => setPaymentProvider(event.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+                className="w-full sm:w-auto rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
               >
                 <option value="airtel">Airtel Money</option>
                 <option value="moov">Moov Money</option>
-                <option value="cinetpay">Carte bancaire</option>
               </select>
-              {(paymentProvider === 'airtel' || paymentProvider === 'moov') && (
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(event) => setPhoneNumber(event.target.value)}
-                  placeholder="Téléphone Mobile Money"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
-                />
-              )}
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(event) => setPhoneNumber(event.target.value)}
+                placeholder="Téléphone Mobile Money"
+                className="w-full sm:w-auto min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+              />
             </div>
           </div>
           {lastIntent && (
-            <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Paiement en attente. Référence: <span className="font-semibold text-slate-900">{lastIntent.reference}</span>
+            <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600 break-words">
+              Paiement en attente. Référence : <span className="font-semibold text-slate-900">{lastIntent.reference}</span>
             </div>
           )}
         </div>
@@ -180,9 +188,9 @@ const SubscriptionPlans = () => {
         {/* Current Plan Banner */}
         {currentPlan && (
           <div className="mb-10 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-lg font-semibold text-green-900">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-green-900 break-words">
                   {getPlanIcon(currentPlan.plan_type)} Votre plan actuel : <span className="text-green-700">{currentPlan.name}</span>
                 </p>
                 {currentPlan.end_date && currentPlan.days_until_expiry !== undefined && (
@@ -197,10 +205,10 @@ const SubscriptionPlans = () => {
                   </p>
                 )}
               </div>
-              {currentPlan.plan_type === 'free' && (
-                <div className="text-right">
+              {currentPlan.plan_type === 'free' && proHighlights.length > 0 && (
+                <div className="min-w-0 text-left sm:text-right">
                   <p className="text-sm text-gray-600">Passez à Pro pour débloquer :</p>
-                  <p className="text-xs text-indigo-600 font-semibold mt-1">✓ Plus de produits ✓ Import CSV ✓ Statistiques avancées</p>
+                  <p className="text-xs text-indigo-600 font-semibold mt-1 break-words">{proHighlights.map((item) => `✓ ${item}`).join('  ')}</p>
                 </div>
               )}
             </div>
@@ -295,12 +303,18 @@ const SubscriptionPlans = () => {
                       {isCurrent ? '✓ Plan actif (gratuit)' : 'Plan par défaut'}
                     </button>
                   ) : isCurrent ? (
-                    <button
-                      disabled
-                      className="w-full py-4 px-6 bg-green-100 text-green-700 rounded-lg font-bold cursor-default border-2 border-green-300"
-                    >
-                      ✓ Plan actif
-                    </button>
+                    // Renouveler en avance : les jours qui restent s'ajoutent au nouveau mois (serveur : carried_days).
+                    <div className="space-y-2">
+                      <p className="text-center text-sm font-semibold text-green-700">✓ Plan actif</p>
+                      <button
+                        onClick={() => handleSubscribe(plan.id)}
+                        disabled={!!subscribing}
+                        className={`w-full py-4 px-6 rounded-lg font-bold text-green-800 bg-green-100 border-2 border-green-300 hover:bg-green-200 transition-colors ${subscribing ? 'opacity-50 cursor-wait' : ''}`}
+                      >
+                        {subscribing === plan.id ? 'Traitement...' : 'Renouveler maintenant'}
+                      </button>
+                      <p className="text-center text-xs text-gray-500">Les jours qui vous restent sont gardés et s'ajoutent au nouveau mois.</p>
+                    </div>
                   ) : (
                     <button
                       onClick={() => handleSubscribe(plan.id)}
@@ -339,37 +353,13 @@ const SubscriptionPlans = () => {
             <div>
               <h4 className="font-bold text-blue-900 mb-2">À propos des paiements</h4>
               <p className="text-sm text-blue-800">
-                Après paiement via Airtel, Moov ou carte bancaire, votre plan est activé automatiquement.
+                Après paiement par Airtel Money ou Moov Money, votre plan est activé automatiquement.
                 Si vous ne voyez pas le changement immédiatement, rafraîchissez la page.
               </p>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-5 right-5 z-50 animate-slide-in-right">
-          <div
-            className={`px-6 py-4 rounded-lg shadow-2xl border-2 text-white font-semibold ${
-              toast.type === 'success' ? 'bg-green-600 border-green-500' : 'bg-red-600 border-red-500'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {toast.type === 'success' ? (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-              <span>{toast.message}</span>
-            </div>
-          </div>
-        </div>
-      )}
     </StoreLayout>
   );
 };

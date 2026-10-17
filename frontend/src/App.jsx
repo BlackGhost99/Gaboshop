@@ -27,6 +27,7 @@ const StoreSettings = lazy(() => import('./pages/store/StoreSettings'));
 const StoreProfile = lazy(() => import('./pages/store/StoreProfile'));
 const B2BProcurement = lazy(() => import('./pages/store/B2BProcurement'));
 const Finance = lazy(() => import('./pages/store/Finance'));
+const StoreStats = lazy(() => import('./pages/store/StoreStats'));
 const StoreSubscriptionPlans = lazy(() => import('./pages/store/SubscriptionPlans'));
 const DeliveryDashboard = lazy(() => import('./pages/delivery/DeliveryDashboard'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -183,6 +184,11 @@ function App() {
         <Route path="/store/finance" element={
           <PrivateRoute allowedRoles={['store_manager']}>
             <Finance />
+          </PrivateRoute>
+        } />
+        <Route path="/store/stats" element={
+          <PrivateRoute allowedRoles={['store_manager']}>
+            <StoreStats />
           </PrivateRoute>
         } />
         <Route path="/store/settings" element={

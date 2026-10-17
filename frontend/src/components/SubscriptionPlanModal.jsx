@@ -75,6 +75,11 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     has_custom_page: false,
     has_priority_support: false,
     priority_listing: 0,
+
+    // Outils boutique (vérifiés par le serveur)
+    can_import_products: false,
+    has_stock_alerts: false,
+    can_create_promotions: false,
     features_json: []
   });
 
@@ -122,6 +127,9 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         has_custom_page: false,
         has_priority_support: false,
         priority_listing: 0,
+        can_import_products: false,
+        has_stock_alerts: false,
+        can_create_promotions: false,
         features_json: []
       });
     }
@@ -177,6 +185,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
     { id: 'b2b_visibility', label: 'Visibilité B2B' },
     { id: 'delivery', label: 'Livraison' },
     { id: 'reports', label: 'Rapports et Exports' },
+    { id: 'tools', label: 'Outils boutique' },
     { id: 'finance', label: 'Finance B2B' },
     { id: 'support', label: 'Support' },
   ];
@@ -218,7 +227,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         {/* General Section */}
         {activeSection === 'general' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Nom *</label>
                 <input
@@ -240,7 +249,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Type de plan *</label>
                 <select
@@ -315,7 +324,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         {/* Limits Section */}
         {activeSection === 'limits' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Max produits (null = illimité)</label>
                 <input
@@ -359,7 +368,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         {/* B2B Quotas Section */}
         {activeSection === 'b2b_quotas' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Max grossistes (null = illimité)</label>
                 <input
@@ -451,7 +460,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_b2b_visibility', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_b2b_visibility" className="text-sm text-gray-700">Visibilité maximale catalogue B2B</label>
+              <label htmlFor="has_b2b_visibility" className="text-sm text-gray-700">Visibilité maximale catalogue B2B <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
           </div>
         )}
@@ -460,7 +469,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         {activeSection === 'b2b_visibility' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Priorité catalogue B2B</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Priorité catalogue B2B <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
               <input
                 type="number"
                 min="0"
@@ -477,7 +486,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('b2b_featured_access', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="b2b_featured_access" className="text-sm text-gray-700">Accès prioritaire aux grossistes mis en avant</label>
+              <label htmlFor="b2b_featured_access" className="text-sm text-gray-700">Accès prioritaire aux grossistes mis en avant <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
           </div>
         )}
@@ -493,7 +502,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('can_offer_express_delivery', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_offer_express" className="text-sm text-gray-700">Peut proposer la livraison express</label>
+              <label htmlFor="can_offer_express" className="text-sm text-gray-700">Peut proposer la livraison express <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -503,7 +512,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_advanced_delivery_tracking', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_advanced_tracking" className="text-sm text-gray-700">Suivi détaillé des livraisons (GPS, temps réel)</label>
+              <label htmlFor="has_advanced_tracking" className="text-sm text-gray-700">Suivi détaillé des livraisons (GPS, temps réel) <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
           </div>
         )}
@@ -565,6 +574,42 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
           </div>
         )}
 
+        {/* Tools Section */}
+        {activeSection === 'tools' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="can_import_products"
+                checked={Boolean(formData.can_import_products)}
+                onChange={(e) => updateField('can_import_products', e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="can_import_products" className="text-sm text-gray-700">Import de produits (Excel/CSV)</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="has_stock_alerts"
+                checked={Boolean(formData.has_stock_alerts)}
+                onChange={(e) => updateField('has_stock_alerts', e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="has_stock_alerts" className="text-sm text-gray-700">Alertes de stock faible</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="can_create_promotions"
+                checked={Boolean(formData.can_create_promotions)}
+                onChange={(e) => updateField('can_create_promotions', e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="can_create_promotions" className="text-sm text-gray-700">Promotions (prix barré)</label>
+            </div>
+          </div>
+        )}
+
         {/* Finance Section */}
         {activeSection === 'finance' && (
           <div className="space-y-4">
@@ -586,7 +631,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('can_view_finance_detailed', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="can_view_finance_detailed" className="text-sm text-gray-700">Peut voir les détails financiers</label>
+              <label htmlFor="can_view_finance_detailed" className="text-sm text-gray-700">Peut voir les détails financiers <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -626,7 +671,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
         {activeSection === 'support' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Niveau de support</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Niveau de support <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
               <select
                 value={formData.support_level}
                 onChange={(e) => updateField('support_level', e.target.value)}
@@ -645,7 +690,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_priority_support', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_priority_support" className="text-sm text-gray-700">Support prioritaire</label>
+              <label htmlFor="has_priority_support" className="text-sm text-gray-700">Support prioritaire <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -675,7 +720,7 @@ const SubscriptionPlanModal = ({ isOpen, onClose, planId = null, onSuccess }) =>
                 onChange={(e) => updateField('has_custom_page', e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="has_custom_page" className="text-sm text-gray-700">Page personnalisée</label>
+              <label htmlFor="has_custom_page" className="text-sm text-gray-700">Page personnalisée <span className="text-xs text-gray-500">(sans effet pour l'instant)</span></label>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Priorité dans les listings</label>

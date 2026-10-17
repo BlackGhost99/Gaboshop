@@ -205,7 +205,7 @@ class StoreDashboardView(APIView):
 
         # Si pas d'abonnement B2B trouvé, vérifier les abonnements B2C
         if not active_subscription:
-            active_subscription = StoreSubscription.objects.filter(store=store, status='active').order_by('-end_date').first()
+            active_subscription = store.get_active_subscription()
             if active_subscription:
                 days_until_expiry = SubscriptionChecker.get_days_until_expiry(store)
                 plan_type = active_subscription.plan.plan_type if active_subscription.plan else 'free'
@@ -308,6 +308,13 @@ class StoreDashboardView(APIView):
                 'current_products': current_products,
                 'can_add_more_products': max_products is None or current_products < max_products,
             }
+            # Outils réellement débloqués par le forfait (même règle que les vérifications du serveur).
+            from payments.plan_features import has
+            subscription_payload['tools'] = {
+                key: has(plan, key) for key in ('advanced_stats', 'product_import', 'stock_alerts', 'promotions', 'exports')
+            }
+            subscription_payload['commission_reduction_percent'] = float(
+                getattr(plan, 'commission_reduction_percent', 0) or 0)
 
         return Response({
             'success': True,
@@ -321,6 +328,9 @@ class StoreDashboardView(APIView):
                     'agent_code': store.agent_code,
                     'payout_phone': store.payout_phone,
                     'payout_operator': store.payout_operator,
+                    'stock_alert_threshold': store.stock_alert_threshold,
+                    # Grossiste : pas de promotions ; l'approvisionnement lui demande le forfait Pro.
+                    'is_b2b': bool(store.is_b2b),
                     # Le commerce voit seulement si ses versements sont prêts, pas l'identifiant SingPay.
                     'payouts_ready': bool(store.singpay_disbursement_id),
                     # Tant que Gaboshop n'a pas validé le commerce, il n'est visible de personne.

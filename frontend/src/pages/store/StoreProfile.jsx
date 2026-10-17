@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { notifyError, notifySuccess } from '../../utils/feedback';
+import { Link } from 'react-router-dom';
+import { notifyError, notifySuccess, notifyWarning } from '../../utils/feedback';
 import StoreLayout from '../../components/StoreLayout';
 import { getStoreDashboard } from '../../services/dashboardService';
 import { getStoreDetails, updateStore } from '../../services/storeService';
@@ -13,6 +14,36 @@ const payoutOperatorText = (phone) => {
     if (local.startsWith('06')) return 'Moov Money';
     return 'Numéro Airtel (07…) ou Moov (06…) uniquement.';
 };
+
+// Seuil des alertes de stock : nombre entier de 0 à 1000 (même limite que le serveur).
+const STOCK_ALERT_MAX = 1000;
+const normalizeThreshold = (raw) => {
+    if (raw === '' || raw === null || raw === undefined) return '';
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return '';
+    return String(Math.min(STOCK_ALERT_MAX, Math.max(0, Math.trunc(n))));
+};
+// Pas de virgule, de signe ni d'exposant : seulement des unités entières.
+const blockNonInteger = (e) => {
+    if (['.', ',', 'e', 'E', '-', '+'].includes(e.key)) e.preventDefault();
+};
+
+// Noms des champs en clair dans les erreurs renvoyées par le serveur.
+const FIELD_NAMES = {
+    stock_alert_threshold: "Seuil d'alerte de stock",
+    agent_code: 'Code agent',
+    payout_phone: 'Numéro Mobile Money',
+    delivery_fee: 'Frais de livraison',
+    min_order_amount: 'Montant min. commande',
+    opening_time: "Heure d'ouverture",
+    closing_time: 'Heure de fermeture',
+    offers_delivery: 'Livraison',
+    banner_image: 'Bannière',
+    logo: 'Logo',
+};
+const withFieldNames = (details) => Object.fromEntries(
+    Object.entries(details).map(([key, value]) => [FIELD_NAMES[key] || key, value])
+);
 
 const StoreProfile = () => {
     const [store, setStore] = useState(null);
@@ -43,6 +74,10 @@ const StoreProfile = () => {
     // toute requête qui la contient. On ne l'envoie donc que si elle a vraiment changé.
     const [initialDescription, setInitialDescription] = useState('');
     const [payoutsReady, setPayoutsReady] = useState(false);
+    // Alertes de stock : modifiables seulement si le forfait inclut l'outil (forfait Pro).
+    const [stockThreshold, setStockThreshold] = useState('');
+    const [savedStockThreshold, setSavedStockThreshold] = useState('');
+    const [stockAlertsIncluded, setStockAlertsIncluded] = useState(false);
 
     useEffect(() => {
         fetchStoreData();
@@ -78,12 +113,20 @@ const StoreProfile = () => {
                     });
                     setInitialDescription(data.description || '');
                     setPayoutsReady(!!dashboardStore.payouts_ready);
+                    const threshold = normalizeThreshold(dashboardStore.stock_alert_threshold ?? 3);
+                    setStockThreshold(threshold);
+                    setSavedStockThreshold(threshold);
+                    setStockAlertsIncluded(!!dashboardRes.data.subscription?.tools?.stock_alerts);
                     setPreviewLogo(data.logo);
                     setPreviewBanner(data.banner_image);
                 }
             }
         } catch (error) {
             console.error("Error fetching store settings", error);
+            notifyError(error, {
+                action: 'Charger le profil du commerce',
+                fallback: "Le profil du commerce n'a pas pu être chargé.",
+            });
         } finally {
             setLoading(false);
         }
@@ -108,8 +151,32 @@ const StoreProfile = () => {
         }
     };
 
+    const handleThresholdChange = (e) => {
+        setStockThreshold(normalizeThreshold(e.target.value));
+    };
+
+    // Champ vidé : on remet la dernière valeur enregistrée.
+    const handleThresholdBlur = () => {
+        if (normalizeThreshold(stockThreshold) === '') setStockThreshold(savedStockThreshold);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!store) {
+            notifyWarning("Le profil du commerce n'est pas chargé", 'Rechargez la page, puis réessayez.');
+            return;
+        }
+        let threshold = null;
+        if (stockAlertsIncluded) {
+            threshold = normalizeThreshold(stockThreshold);
+            if (threshold === '') {
+                notifyWarning(
+                    'Indiquez le seuil des alertes de stock',
+                    'Entrez un nombre de 0 à 1000 (0 = seulement à la rupture de stock), puis enregistrez.'
+                );
+                return;
+            }
+        }
         const data = new FormData();
         Object.keys(formData).forEach(key => {
             const value = formData[key];
@@ -128,13 +195,25 @@ const StoreProfile = () => {
         });
         if (logoFile) data.append('logo', logoFile);
         if (bannerFile) data.append('banner_image', bannerFile);
+        if (threshold !== null) data.append('stock_alert_threshold', threshold);
 
         try {
             const res = await updateStore(store.id, data);
             if (res.success) {
-                notifySuccess('Profil du commerce enregistré', 'Vos clients voient déjà les nouvelles informations.');
+                const thresholdChanged = threshold !== null && threshold !== savedStockThreshold;
+                const thresholdText = threshold === '0'
+                    ? 'seulement à la rupture de stock'
+                    : `quand il reste ${threshold} unité(s) ou moins`;
+                notifySuccess(
+                    'Profil du commerce enregistré',
+                    `Vos clients voient déjà les nouvelles informations.${thresholdChanged ? ` Alertes de stock : ${thresholdText}.` : ''}`
+                );
                 setStore(res.data);
                 setInitialDescription(res.data?.description ?? formData.description);
+                if (threshold !== null) {
+                    setStockThreshold(threshold);
+                    setSavedStockThreshold(threshold);
+                }
             }
         } catch (error) {
             console.error("Error updating store", error);
@@ -143,7 +222,13 @@ const StoreProfile = () => {
             const message = apiError?.details
                 ? Object.values(apiError.details).flat().join('\n')
                 : apiError?.message || "Erreur lors de la mise à jour.";
-            notifyError(error, { action: 'Enregistrer le profil', fallback: message });
+            const details = apiError?.details && typeof apiError.details === 'object' && !Array.isArray(apiError.details)
+                ? apiError.details
+                : null;
+            notifyError(
+                details ? { error: { ...apiError, details: withFieldNames(details) } } : error,
+                { action: 'Enregistrer le profil', fallback: message }
+            );
         }
     };
 
@@ -345,6 +430,45 @@ const StoreProfile = () => {
                                 className="mt-1 block w-full border rounded-md shadow-sm p-2" 
                             />
                         </div>
+                    </div>
+
+                    {/* Alertes de stock (outil du forfait Pro) */}
+                    <div className={`rounded-md border border-gray-200 p-4 space-y-3 ${stockAlertsIncluded ? '' : 'bg-gray-50'}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold text-gray-900">Alertes de stock</h3>
+                            {!stockAlertsIncluded && (
+                                <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Forfait Pro</span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                            <label htmlFor="stock_alert_threshold">Prévenez-moi quand il reste</label>
+                            <input
+                                id="stock_alert_threshold" name="stock_alert_threshold"
+                                type="number" min={0} max={STOCK_ALERT_MAX} step={1} inputMode="numeric"
+                                value={stockThreshold} onChange={handleThresholdChange} onBlur={handleThresholdBlur}
+                                onKeyDown={blockNonInteger} disabled={!stockAlertsIncluded}
+                                aria-describedby="stock_alert_help"
+                                className="w-24 border rounded-md shadow-sm p-2 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                            />
+                            <span>unité(s) ou moins</span>
+                        </div>
+                        <p id="stock_alert_help" className="text-xs text-gray-500">
+                            0 = seulement à la rupture de stock. Vous recevez une notification sur votre téléphone et dans l'application.
+                        </p>
+                        {!stockAlertsIncluded && (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="break-words text-sm font-medium text-amber-900">Alertes de stock faible : forfait Pro</p>
+                                    <p className="mt-0.5 break-words text-xs text-amber-800">Soyez prévenu avant qu'un produit soit épuisé.</p>
+                                </div>
+                                <Link
+                                    to="/store/subscription"
+                                    className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                >
+                                    Passer au forfait Pro
+                                </Link>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-end">

@@ -89,7 +89,8 @@ def get_detailed_b2b_access_error(user):
 			logger.warning(f"get_detailed_b2b_access_error: Plan B2B Free - accès refusé pour store {store.id}")
 			return False, {
 				'code': status.HTTP_403_FORBIDDEN,
-				'message': 'L\'approvisionnement B2B n\'est pas disponible avec le plan Free. Passez au plan Pro ou Business pour accéder aux catalogues des grossistes.'
+				'message': f"Avec le forfait {plan.name}, vous vendez aux commerces mais ne commandez pas chez les autres grossistes. "
+						   + SubscriptionChecker.upgrade_hint(plan, "commander chez les grossistes et industries")
 			}
 		logger.debug(f"get_detailed_b2b_access_error: Plan B2B {plan.name} (plan_type: {plan.plan_type}) - accès autorisé")
 		return True, None
@@ -99,7 +100,8 @@ def get_detailed_b2b_access_error(user):
 		logger.warning(f"get_detailed_b2b_access_error: Plan {plan.name} (plan_type: {plan.plan_type}) n'a pas can_access_b2b=True pour store {store.id}")
 		return False, {
 			'code': status.HTTP_403_FORBIDDEN,
-			'message': f'Votre forfait actuel ({plan.name}) n\'inclut pas l\'accès au B2B. L\'administrateur doit l\'activer pour ce forfait.'
+			'message': f"Votre forfait actuel ({plan.name}) n'inclut pas les commandes chez les grossistes. "
+					   + SubscriptionChecker.upgrade_hint(plan, "commander chez les grossistes", can_access_b2b=True)
 		}
 	
 	# Vérification finale avec can_access_b2b
